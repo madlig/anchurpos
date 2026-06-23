@@ -75,7 +75,7 @@ export default function CrewPrePackingPage() {
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} /></div>;
 
   return (
-    <div className="px-5 pt-6 pb-4 max-w-md mx-auto page-enter">
+    <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
       <div className="flex items-center gap-2 mb-1">
         <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
           <PackageOpen size={16} style={{ color: "#E85D8C" }} />

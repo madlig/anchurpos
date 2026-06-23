@@ -85,7 +85,7 @@ export default function CrewStockOpnamePage() {
 
   if (!shiftType) {
     return (
-      <div className="px-5 pt-6 pb-4 max-w-md mx-auto page-enter">
+      <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
         <div className="flex items-center gap-2 mb-1">
           <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
             <ClipboardList size={16} style={{ color: "#E85D8C" }} />
@@ -111,7 +111,7 @@ export default function CrewStockOpnamePage() {
   }
 
   return (
-    <div className="px-5 pt-6 pb-4 max-w-md mx-auto page-enter">
+    <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>Stock Opname</h1>

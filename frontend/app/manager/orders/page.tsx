@@ -46,7 +46,7 @@ export default function OrdersListPage() {
   }
 
   return (
-    <div className="px-5 pt-6 pb-4 max-w-md mx-auto page-enter">
+    <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
       <h1 className="text-2xl font-extrabold tracking-tight mb-1" style={{ color: "#1C1C1E" }}>Riwayat Order</h1>
       <p className="text-sm mb-5" style={{ color: "#64748B" }}>Daftar semua pesanan</p>
 
@@ -77,7 +77,7 @@ export default function OrdersListPage() {
           <p className="text-sm font-medium" style={{ color: "#94A3B8" }}>Belum ada order</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-5xl">
           {orders.map((order) => (
             <Link key={order.id} href={`/manager/orders/${order.id}`} data-testid={`order-item-${order.id}`}>
               <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>

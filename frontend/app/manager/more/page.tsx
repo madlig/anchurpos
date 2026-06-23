@@ -21,9 +21,9 @@ export default function ManagerMorePage() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="px-5 pt-6 pb-4 max-w-md mx-auto page-enter">
+    <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
       {/* Profile mini */}
-      <div className="flex items-center gap-3 mb-6 rounded-3xl p-4" style={{ background: "#fff", border: "1px solid #F1F5F9" }}>
+      <div className="flex items-center gap-3 mb-6 rounded-3xl p-4 max-w-2xl md:max-w-none" style={{ background: "#fff", border: "1px solid #F1F5F9" }}>
         <div className="h-12 w-12 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)" }}>
           <span className="text-xl font-black text-white">{(user?.displayName ?? "M")[0].toUpperCase()}</span>
         </div>
@@ -34,7 +34,7 @@ export default function ManagerMorePage() {
       </div>
 
       {/* Menu items */}
-      <div className="space-y-2 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-6">
         {MENU_ITEMS.map((item) => {
           const Icon = item.icon;
           return (

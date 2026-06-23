@@ -54,7 +54,7 @@ export default function OwnerApprovalPage() {
   const counts: Record<TabKey, number> = { opname: opnames.length, attendance: attendanceFlags.length, payroll: payrolls.length };
 
   return (
-    <div className="px-5 pt-6 pb-4 max-w-md mx-auto page-enter">
+    <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
       <h1 className="text-2xl font-extrabold tracking-tight mb-5" style={{ color: "#1C1C1E" }}>Approval</h1>
 
       {/* Tabs */}

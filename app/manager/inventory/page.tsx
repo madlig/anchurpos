@@ -65,11 +65,11 @@ export default function InventoryPage() {
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} /></div>;
 
   return (
-    <div className="px-5 pt-6 pb-4 max-w-md mx-auto page-enter">
-      <h1 className="text-2xl font-extrabold tracking-tight mb-5" style={{ color: "#1C1C1E" }}>Inventori</h1>
+    <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
+      <h1 className="text-2xl font-extrabold tracking-tight mb-5 max-w-5xl" style={{ color: "#1C1C1E" }}>Inventori</h1>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-5 max-w-5xl">
         {([["bahan", "Bahan Baku", Beaker], ["pengeluaran", "Pengeluaran", Receipt]] as const).map(([key, label, Icon]) => (
           <button key={key} onClick={() => setTab(key)} className={CHIP(tab === key)} style={tab === key ? { background: "linear-gradient(135deg,#E85D8C,#C94A73)" } : { background: "#fff", border: "1px solid #E2E8F0" }} data-testid={`tab-${key}`}>
             <span className="flex items-center gap-1.5"><Icon size={14} />{label}</span>
@@ -78,7 +78,7 @@ export default function InventoryPage() {
       </div>
 
       {tab === "bahan" && (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-5xl">
           {ingredients.length === 0 ? <EmptyState label="Belum ada bahan baku" /> : ingredients.map((ing) => {
             const isLow = ing.currentStock < ing.minStock;
             const isEditing = editingStock === ing.id;

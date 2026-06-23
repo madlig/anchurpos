@@ -77,9 +77,9 @@ export default function CrewAttendancePage() {
   const todayLabel = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
 
   return (
-    <div className="page-enter px-5 pt-6 pb-4 max-w-md mx-auto">
+    <div className="page-enter px-5 pt-6 pb-4 md:px-8 md:pt-8">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between mb-6 max-w-2xl">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94A3B8" }}>{todayLabel}</p>
           <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>
@@ -91,6 +91,9 @@ export default function CrewAttendancePage() {
         </button>
       </div>
 
+      <div className="md:grid md:grid-cols-[1fr_360px] md:gap-6 max-w-5xl">
+        {/* Left: Status + Action */}
+        <div>
       {/* Status card */}
       <div className="rounded-3xl p-5 mb-6" style={{ background: sc.bg }} data-testid="attendance-status-card">
         <div className="flex items-center gap-4">
@@ -149,43 +152,45 @@ export default function CrewAttendancePage() {
           <p className="text-sm font-medium" style={{ color: "#DC2626" }}>{error}</p>
         </div>
       )}
-
-      {/* History */}
-      {history.length > 0 && (
-        <div className="mt-2">
-          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "#94A3B8" }}>Riwayat 7 Hari</p>
-          <div className="space-y-2">
-            {history.map((h, i) => (
-              <div
-                key={h.id}
-                className={`rounded-2xl px-4 py-3 flex items-center justify-between page-enter stagger-${Math.min(i + 1, 5)}`}
-                style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}
-                data-testid={`history-item-${i}`}
-              >
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>{formatDate(h.date)}</p>
-                  <p className="text-xs mt-0.5" style={{ color: "#94A3B8" }}>
-                    {formatTime(h.checkIn.time)}{h.checkOut?.time ? ` — ${formatTime(h.checkOut.time)}` : " — belum pulang"}
-                  </p>
-                </div>
-                <div className="text-right">
-                  {h.totalHours !== null && <p className="text-sm font-bold tabular-nums" style={{ color: "#334155" }}>{h.totalHours.toFixed(1)}j</p>}
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                    style={{
-                      color: h.status === "lengkap" ? "#16A34A" : h.status === "direview" ? "#D97706" : "#64748B",
-                      background: h.status === "lengkap" ? "#DCFCE7" : h.status === "direview" ? "#FEF3C7" : "#F1F5F9",
-                    }}
-                    data-testid={`history-status-${i}`}
-                  >
-                    {h.status === "lengkap" ? "Lengkap" : h.status === "direview" ? "Review" : "Belum"}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
-      )}
+
+        {/* Right: History */}
+        {history.length > 0 && (
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "#94A3B8" }}>Riwayat 7 Hari</p>
+            <div className="space-y-2">
+              {history.map((h, i) => (
+                <div
+                  key={h.id}
+                  className={`rounded-2xl px-4 py-3 flex items-center justify-between page-enter stagger-${Math.min(i + 1, 5)}`}
+                  style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}
+                  data-testid={`history-item-${i}`}
+                >
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>{formatDate(h.date)}</p>
+                    <p className="text-xs mt-0.5" style={{ color: "#94A3B8" }}>
+                      {formatTime(h.checkIn.time)}{h.checkOut?.time ? ` — ${formatTime(h.checkOut.time)}` : " — belum pulang"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    {h.totalHours !== null && <p className="text-sm font-bold tabular-nums" style={{ color: "#334155" }}>{h.totalHours.toFixed(1)}j</p>}
+                    <span
+                      className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                      style={{
+                        color: h.status === "lengkap" ? "#16A34A" : h.status === "direview" ? "#D97706" : "#64748B",
+                        background: h.status === "lengkap" ? "#DCFCE7" : h.status === "direview" ? "#FEF3C7" : "#F1F5F9",
+                      }}
+                      data-testid={`history-status-${i}`}
+                    >
+                      {h.status === "lengkap" ? "Lengkap" : h.status === "direview" ? "Review" : "Belum"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

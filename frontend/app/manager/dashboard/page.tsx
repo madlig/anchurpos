@@ -58,9 +58,9 @@ export default function ManagerDashboardPage() {
   }
 
   return (
-    <div className="page-enter px-5 pt-6 pb-4 max-w-md mx-auto">
+    <div className="page-enter px-5 pt-6 pb-4 md:px-8 md:pt-8">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between mb-6 max-w-5xl">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94A3B8" }}>{today}</p>
           <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>
@@ -79,29 +79,41 @@ export default function ManagerDashboardPage() {
       {data && (
         <div
           data-testid="hero-revenue-card"
-          className="relative rounded-3xl p-6 mb-4 overflow-hidden"
+          className="relative rounded-3xl p-6 mb-5 overflow-hidden max-w-5xl"
           style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)", boxShadow: "0 8px 32px rgba(232,93,140,0.3)" }}
         >
           <div className="absolute -top-6 -right-6 h-32 w-32 rounded-full" style={{ background: "rgba(255,255,255,0.12)" }} />
           <div className="absolute -bottom-8 right-8 h-20 w-20 rounded-full" style={{ background: "rgba(255,255,255,0.07)" }} />
-          <div className="relative">
-            <div className="flex items-center gap-1.5 mb-1">
-              <TrendingUp size={14} style={{ color: "rgba(255,255,255,0.7)" }} />
-              <span className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.85)" }}>Omzet Hari Ini</span>
+          <div className="relative md:flex md:items-center md:justify-between">
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <TrendingUp size={14} style={{ color: "rgba(255,255,255,0.7)" }} />
+                <span className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.85)" }}>Omzet Hari Ini</span>
+              </div>
+              <p className="text-3xl font-extrabold tracking-tight text-white tabular-nums mb-2" data-testid="omzet-value">{fmt(data.omzet)}</p>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.75)" }}>{data.orderCount} order</span>
+                <span style={{ color: "rgba(255,255,255,0.4)" }}>·</span>
+                <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.75)" }}>Profit: {fmt(data.profit)}</span>
+              </div>
             </div>
-            <p className="text-3xl font-extrabold tracking-tight text-white tabular-nums mb-2" data-testid="omzet-value">{fmt(data.omzet)}</p>
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.75)" }}>{data.orderCount} order</span>
-              <span style={{ color: "rgba(255,255,255,0.4)" }}>·</span>
-              <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.75)" }}>Profit: {fmt(data.profit)}</span>
+            <div className="hidden md:flex items-center gap-3">
+              <div className="rounded-2xl px-5 py-3" style={{ background: "rgba(255,255,255,0.15)" }}>
+                <p className="text-xs font-bold" style={{ color: "rgba(255,255,255,0.7)" }}>HPP</p>
+                <p className="text-lg font-extrabold text-white tabular-nums">{fmt(data.hpp)}</p>
+              </div>
+              <div className="rounded-2xl px-5 py-3" style={{ background: "rgba(255,255,255,0.15)" }}>
+                <p className="text-xs font-bold" style={{ color: "rgba(255,255,255,0.7)" }}>Profit</p>
+                <p className="text-lg font-extrabold text-white tabular-nums">{fmt(data.profit)}</p>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Stat cards */}
+      {/* Stat cards - mobile only */}
       {data && (
-        <div className="grid grid-cols-2 gap-3 mb-4 page-enter stagger-1">
+        <div className="grid grid-cols-2 gap-3 mb-5 md:hidden page-enter stagger-1">
           <div className="rounded-2xl p-4" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", border: "1px solid #F1F5F9" }} data-testid="hpp-card">
             <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "#94A3B8" }}>HPP</p>
             <p className="text-lg font-extrabold tabular-nums" style={{ color: "#1C1C1E" }}>{fmt(data.hpp)}</p>
@@ -114,9 +126,9 @@ export default function ManagerDashboardPage() {
       )}
 
       {/* Quick actions */}
-      <div className="mb-5 page-enter stagger-2">
+      <div className="mb-5 page-enter stagger-2 max-w-5xl">
         <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "#94A3B8" }}>Aksi Cepat</p>
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-2.5">
           {QUICK_ACTIONS.map((action) => {
             const Icon = action.icon;
             return (
@@ -133,78 +145,84 @@ export default function ManagerDashboardPage() {
         </div>
       </div>
 
-      {/* Production today */}
-      {data && data.productionToday.length > 0 && (
-        <div className="rounded-2xl p-4 mb-4 page-enter stagger-3" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", border: "1px solid #F1F5F9" }} data-testid="production-today-card">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="h-7 w-7 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
-              <Package size={14} style={{ color: "#E85D8C" }} />
-            </div>
-            <h2 className="text-sm font-bold" style={{ color: "#1C1C1E" }}>Produksi Hari Ini</h2>
-          </div>
-          <div className="space-y-2">
-            {data.productionToday.map((p) => (
-              <div key={p.variantId} className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: "#F8FAFC" }}>
-                <span className="text-sm font-medium" style={{ color: "#334155" }}>{p.variantName}</span>
-                <span className="text-xs font-bold tabular-nums" style={{ color: "#64748B" }}>
-                  {p.batches}batch · {p.loyangCount}lyang
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Low stock */}
-      {data && data.lowStockItems.length > 0 && (
-        <div className="rounded-2xl p-4 mb-4 page-enter stagger-4" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }} data-testid="low-stock-card">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="h-7 w-7 rounded-xl flex items-center justify-center" style={{ background: "#FEE2E2" }}>
-              <AlertTriangle size={14} style={{ color: "#DC2626" }} />
-            </div>
-            <h2 className="text-sm font-bold" style={{ color: "#991B1B" }}>Bahan Menipis</h2>
-          </div>
-          <div className="space-y-1.5">
-            {data.lowStockItems.map((item) => (
-              <div key={item.id} className="flex items-center justify-between">
-                <span className="text-sm font-medium" style={{ color: "#991B1B" }}>{item.name}</span>
-                <span className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-full" style={{ color: "#DC2626", background: "#FEE2E2" }}>
-                  {item.currentStock}/{item.minStock} {item.baseUnit}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Alerts */}
-      {alerts.length > 0 && (
-        <div className="rounded-2xl p-4 page-enter stagger-5" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", border: "1px solid #F1F5F9" }} data-testid="alerts-card">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
-                <Bell size={14} style={{ color: "#E85D8C" }} />
-              </div>
-              <h2 className="text-sm font-bold" style={{ color: "#1C1C1E" }}>Notifikasi</h2>
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ color: "#E85D8C", background: "#FEF1F5" }}>{alerts.length}</span>
-            </div>
-            <button onClick={markAllRead} className="flex items-center gap-1 text-xs font-semibold tap-target" style={{ color: "#64748B" }} data-testid="mark-all-read-button">
-              <CheckCheck size={12} /> Baca semua
-            </button>
-          </div>
-          <div className="space-y-2">
-            {alerts.slice(0, 5).map((alert) => (
-              <div key={alert.id} className="rounded-xl px-3 py-2.5 flex items-start justify-between gap-2" style={{ background: alert.severity === "warning" ? "#FFFBEB" : "#F8FAFC", border: `1px solid ${alert.severity === "warning" ? "#FDE68A" : "#F1F5F9"}` }}>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>{alert.title}</p>
-                  <p className="text-xs mt-0.5" style={{ color: "#64748B" }}>{alert.message}</p>
+      {/* Desktop: 2-col content / Mobile: stacked */}
+      <div className="md:grid md:grid-cols-2 md:gap-5 max-w-5xl">
+        {/* Left */}
+        <div className="space-y-4">
+          {data && data.productionToday.length > 0 && (
+            <div className="rounded-2xl p-4 page-enter stagger-3" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", border: "1px solid #F1F5F9" }} data-testid="production-today-card">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-7 w-7 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
+                  <Package size={14} style={{ color: "#E85D8C" }} />
                 </div>
-                <ChevronRight size={14} style={{ color: "#CBD5E1" }} className="mt-0.5 shrink-0" />
+                <h2 className="text-sm font-bold" style={{ color: "#1C1C1E" }}>Produksi Hari Ini</h2>
               </div>
-            ))}
-          </div>
+              <div className="space-y-2">
+                {data.productionToday.map((p) => (
+                  <div key={p.variantId} className="flex items-center justify-between rounded-xl px-3 py-2.5" style={{ background: "#F8FAFC" }}>
+                    <span className="text-sm font-medium" style={{ color: "#334155" }}>{p.variantName}</span>
+                    <span className="text-xs font-bold tabular-nums" style={{ color: "#64748B" }}>
+                      {p.batches} batch · {p.loyangCount} loyang
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {data && data.lowStockItems.length > 0 && (
+            <div className="rounded-2xl p-4 page-enter stagger-4" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }} data-testid="low-stock-card">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-7 w-7 rounded-xl flex items-center justify-center" style={{ background: "#FEE2E2" }}>
+                  <AlertTriangle size={14} style={{ color: "#DC2626" }} />
+                </div>
+                <h2 className="text-sm font-bold" style={{ color: "#991B1B" }}>Bahan Menipis</h2>
+              </div>
+              <div className="space-y-1.5">
+                {data.lowStockItems.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between">
+                    <span className="text-sm font-medium" style={{ color: "#991B1B" }}>{item.name}</span>
+                    <span className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-full" style={{ color: "#DC2626", background: "#FEE2E2" }}>
+                      {item.currentStock}/{item.minStock} {item.baseUnit}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Right */}
+        <div className="mt-4 md:mt-0">
+          {alerts.length > 0 && (
+            <div className="rounded-2xl p-4 page-enter stagger-5" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", border: "1px solid #F1F5F9" }} data-testid="alerts-card">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
+                    <Bell size={14} style={{ color: "#E85D8C" }} />
+                  </div>
+                  <h2 className="text-sm font-bold" style={{ color: "#1C1C1E" }}>Notifikasi</h2>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ color: "#E85D8C", background: "#FEF1F5" }}>{alerts.length}</span>
+                </div>
+                <button onClick={markAllRead} className="flex items-center gap-1 text-xs font-semibold tap-target" style={{ color: "#64748B" }} data-testid="mark-all-read-button">
+                  <CheckCheck size={12} /> Baca semua
+                </button>
+              </div>
+              <div className="space-y-2">
+                {alerts.slice(0, 6).map((alert) => (
+                  <div key={alert.id} className="rounded-xl px-3 py-2.5 flex items-start justify-between gap-2" style={{ background: alert.severity === "warning" ? "#FFFBEB" : "#F8FAFC", border: `1px solid ${alert.severity === "warning" ? "#FDE68A" : "#F1F5F9"}` }}>
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>{alert.title}</p>
+                      <p className="text-xs mt-0.5" style={{ color: "#64748B" }}>{alert.message}</p>
+                    </div>
+                    <ChevronRight size={14} style={{ color: "#CBD5E1" }} className="mt-0.5 shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
