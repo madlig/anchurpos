@@ -10,17 +10,29 @@ interface OrderSummary {
   status: string; paymentStatus: string; source: string; createdAt: string;
 }
 
-const FILTERS = [
+const TABS = [
   { key: "semua", label: "Semua" },
-  { key: "belum_selesai", label: "Belum Selesai" },
-  { key: "belum_bayar", label: "Belum Bayar" },
+  { key: "pending", label: "Pending" },
+  { key: "proses", label: "Proses" },
+  { key: "selesai", label: "Selesai" },
 ];
+
+function getStatusStyle(status: string) {
+  if (status === "selesai") return { color: "#16A34A", background: "#DCFCE7" };
+  if (status === "proses") return { color: "#D97706", background: "#FEF3C7" };
+  return { color: "#64748B", background: "#F1F5F9" };
+}
+function getStatusLabel(status: string) {
+  if (status === "selesai") return "Selesai";
+  if (status === "proses") return "Proses";
+  return "Pending";
+}
 
 export default function OrdersListPage() {
   const { getToken } = useAuth();
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("semua");
+  const [tab, setTab] = useState("semua");
 
   const fetchWithAuth = useCallback(async (url: string) => {
     const token = await getToken();
@@ -32,80 +44,109 @@ export default function OrdersListPage() {
       setLoading(true);
       try {
         const params = new URLSearchParams();
-        if (filter === "belum_selesai") params.set("status", "belum_selesai");
-        if (filter === "belum_bayar") params.set("paymentStatus", "belum_bayar");
+        if (tab !== "semua") params.set("status", tab);
         const res = await fetchWithAuth(`/api/orders${params.toString() ? `?${params}` : ""}`);
         const data = await res.json();
         if (res.ok) setOrders(data);
       } finally { setLoading(false); }
     })();
-  }, [fetchWithAuth, filter]);
+  }, [fetchWithAuth, tab]);
 
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const todayCount = orders.length;
+
+  function formatTime(iso: string) {
+    return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
   }
 
   return (
-    <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
-      <h1 className="text-2xl font-extrabold tracking-tight mb-1" style={{ color: "#1C1C1E" }}>Riwayat Order</h1>
-      <p className="text-sm mb-5" style={{ color: "#64748B" }}>Daftar semua pesanan</p>
+    <div className="page-enter min-h-screen" style={{ background: "#FCABB4" }}>
 
-      {/* Filter chips */}
-      <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className="px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all tap-target"
-            style={filter === f.key
-              ? { background: "linear-gradient(135deg,#E85D8C,#C94A73)", color: "#fff" }
-              : { background: "#fff", color: "#64748B", border: "1px solid #E2E8F0" }}
-            data-testid={`filter-${f.key}`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      {/* Header (white) */}
+      <div className="px-5 pt-4 pb-0" style={{ background: "#fff" }}>
+        <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Pesanan</h1>
+        <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "2px" }}>
+          Hari ini — {todayCount} pesanan
+        </p>
 
-      {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} />
-        </div>
-      ) : orders.length === 0 ? (
-        <div className="rounded-3xl p-10 text-center" style={{ background: "#fff", border: "2px dashed #E2E8F0" }}>
-          <ClipboardList className="h-10 w-10 mx-auto mb-3" style={{ color: "#CBD5E1" }} />
-          <p className="text-sm font-medium" style={{ color: "#94A3B8" }}>Belum ada order</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-5xl">
-          {orders.map((order) => (
-            <Link key={order.id} href={`/manager/orders/${order.id}`} data-testid={`order-item-${order.id}`}>
-              <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-bold" style={{ color: "#1C1C1E" }}>{order.orderNumber}</p>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                      style={order.status === "selesai"
-                        ? { color: "#16A34A", background: "#DCFCE7" }
-                        : { color: "#D97706", background: "#FEF3C7" }}>
-                      {order.status === "selesai" ? "Selesai" : "Proses"}
-                    </span>
-                  </div>
-                  <p className="text-xs truncate" style={{ color: "#64748B" }}>{order.customerName}</p>
-                  <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-xs font-semibold"
-                      style={{ color: order.paymentStatus === "sudah_bayar" ? "#E85D8C" : "#DC2626" }}>
-                      {order.paymentStatus === "sudah_bayar" ? "Lunas" : "Belum Bayar"}
-                    </span>
-                    <span className="text-xs" style={{ color: "#94A3B8" }}>{formatDate(order.createdAt)}</span>
-                  </div>
-                </div>
-                <ChevronRight size={16} style={{ color: "#CBD5E1" }} className="shrink-0" />
-              </div>
-            </Link>
+        {/* Status Tabs — underline style */}
+        <div className="flex" style={{ marginTop: "12px" }}>
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              data-testid={`tab-${t.key}`}
+              className="flex-1 tap-target"
+              style={{
+                paddingBottom: "8px",
+                paddingTop: "8px",
+                borderBottom: tab === t.key ? "2px solid #E85D8C" : "2px solid transparent",
+                fontSize: "12px",
+                fontWeight: tab === t.key ? "600" : "500",
+                color: tab === t.key ? "#E85D8C" : "#94A3B8",
+                background: "transparent",
+                border: "none",
+                borderBottom: tab === t.key ? "2px solid #E85D8C" : "2px solid transparent",
+                cursor: "pointer",
+              }}
+            >
+              {t.label}
+            </button>
           ))}
         </div>
-      )}
+      </div>
+
+      {/* Order Cards */}
+      <div className="px-4 pt-3 pb-4 flex flex-col gap-2.5 md:px-8 md:max-w-5xl">
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} />
+          </div>
+        ) : orders.length === 0 ? (
+          <div style={{ background: "#fff", borderRadius: "14px", padding: "40px", textAlign: "center", border: "1px solid #F1F5F9" }}>
+            <ClipboardList className="mx-auto mb-3" size={32} style={{ color: "#CBD5E1" }} />
+            <p style={{ fontSize: "14px", color: "#94A3B8" }}>Belum ada pesanan</p>
+          </div>
+        ) : (
+          orders.map((order) => (
+            <Link key={order.id} href={`/manager/orders/${order.id}`} data-testid={`order-item-${order.id}`}>
+              <div
+                className="tap-target"
+                style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }}
+              >
+                {/* Row 1: avatar + name + orderId + status */}
+                <div className="flex items-center justify-between" style={{ marginBottom: "8px" }}>
+                  <div className="flex items-center gap-2">
+                    <div style={{
+                      width: "32px", height: "32px", borderRadius: "10px",
+                      background: "#FEF1F5", display: "flex", alignItems: "center",
+                      justifyContent: "center", fontSize: "12px", fontWeight: "600", color: "#E85D8C", flexShrink: 0
+                    }}>
+                      {(order.customerName || "?")[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{order.customerName}</p>
+                      <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>{order.orderNumber}</p>
+                    </div>
+                  </div>
+                  <span style={{
+                    padding: "3px 10px", borderRadius: "100px",
+                    fontSize: "10px", fontWeight: "500",
+                    ...getStatusStyle(order.status)
+                  }}>
+                    {getStatusLabel(order.status)}
+                  </span>
+                </div>
+
+                {/* Row 2: source + time */}
+                <div className="flex items-center justify-between">
+                  <span style={{ fontSize: "12px", color: "#64748B" }}>{order.source?.replace(/_/g, " ") ?? "-"}</span>
+                  <span style={{ fontSize: "11px", color: "#94A3B8" }}>{formatTime(order.createdAt)}</span>
+                </div>
+              </div>
+            </Link>
+          ))
+        )}
+      </div>
     </div>
   );
 }

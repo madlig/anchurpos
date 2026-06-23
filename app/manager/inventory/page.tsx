@@ -26,6 +26,7 @@ export default function InventoryPage() {
   const [newStockValue, setNewStockValue] = useState("");
   const [stockNote, setStockNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
@@ -62,68 +63,127 @@ export default function InventoryPage() {
     } finally { setSubmitting(false); }
   }
 
-  if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} /></div>;
+  if (loading) return <div className="flex h-screen items-center justify-center" style={{ background: "#FCABB4" }}><Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} /></div>;
 
   return (
-    <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
-      <h1 className="text-2xl font-extrabold tracking-tight mb-5 max-w-5xl" style={{ color: "#1C1C1E" }}>Inventori</h1>
+    <div className="page-enter min-h-screen" style={{ background: "#FCABB4" }}>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-5 max-w-5xl">
-        {([["bahan", "Bahan Baku", Beaker], ["pengeluaran", "Pengeluaran", Receipt]] as const).map(([key, label, Icon]) => (
-          <button key={key} onClick={() => setTab(key)} className={CHIP(tab === key)} style={tab === key ? { background: "linear-gradient(135deg,#E85D8C,#C94A73)" } : { background: "#fff", border: "1px solid #E2E8F0" }} data-testid={`tab-${key}`}>
-            <span className="flex items-center gap-1.5"><Icon size={14} />{label}</span>
-          </button>
-        ))}
+      {/* Header (white) */}
+      <div className="px-5 pt-4 pb-0" style={{ background: "#fff" }}>
+        <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Inventori</h1>
+
+        {/* Search bar */}
+        <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", background: "#F8FAFC", borderRadius: "12px" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            type="text"
+            placeholder={tab === "bahan" ? "Cari bahan baku..." : "Cari pengeluaran..."}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 bg-transparent text-sm outline-none"
+            style={{ color: "#1C1C1E", fontSize: "13px" }}
+            data-testid="inventory-search"
+          />
+        </div>
+
+        {/* Tabs — underline style */}
+        <div className="flex" style={{ marginTop: "12px" }}>
+          {([["bahan", "Bahan Baku"], ["pengeluaran", "Pengeluaran"]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => { setTab(key); setSearchQuery(""); }}
+              data-testid={`tab-${key}`}
+              className="flex-1 tap-target"
+              style={{
+                paddingBottom: "8px",
+                paddingTop: "8px",
+                border: "none",
+                borderBottom: tab === key ? "2px solid #E85D8C" : "2px solid transparent",
+                fontSize: "12px",
+                fontWeight: tab === key ? "600" : "500",
+                color: tab === key ? "#E85D8C" : "#94A3B8",
+                background: "transparent",
+                cursor: "pointer",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
+      <div className="px-4 pt-3 pb-4 md:px-8 md:max-w-5xl">
+
       {tab === "bahan" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-5xl">
-          {ingredients.length === 0 ? <EmptyState label="Belum ada bahan baku" /> : ingredients.map((ing) => {
-            const isLow = ing.currentStock < ing.minStock;
-            const isEditing = editingStock === ing.id;
-            return (
-              <div key={ing.id} className="rounded-2xl p-4" style={{ background: "#fff", border: `1px solid ${isLow ? "#FECACA" : "#F1F5F9"}`, background: isLow ? "#FEF2F2" : "#fff" } as React.CSSProperties} data-testid={`ingredient-${ing.id}`}>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    {isLow && <AlertTriangle size={14} style={{ color: "#DC2626" }} />}
-                    <span className="font-semibold text-sm" style={{ color: "#1C1C1E" }}>{ing.name}</span>
-                  </div>
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ color: "#64748B", background: "#F1F5F9" }}>{ing.category}</span>
-                </div>
-                {isEditing ? (
-                  <div className="mt-2 space-y-2">
-                    <div className="flex gap-2">
-                      <Input type="number" value={newStockValue} onChange={(e) => setNewStockValue(e.target.value)} placeholder={`Stok baru (${ing.baseUnit})`} className="flex-1 h-11 rounded-xl border-stone-200" />
-                      <span className="self-center text-sm" style={{ color: "#64748B" }}>{ing.baseUnit}</span>
+        <>
+          {/* Low stock alert */}
+          {ingredients.filter(i => i.currentStock < i.minStock).length > 0 && (
+            <div style={{ padding: "10px 14px", borderRadius: "12px", background: "#FEF2F2", border: "1px solid #FECACA", display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+              <AlertTriangle size={16} style={{ color: "#DC2626", flexShrink: 0 }} />
+              <span style={{ fontSize: "12px", fontWeight: "500", color: "#DC2626" }}>
+                {ingredients.filter(i => i.currentStock < i.minStock).length} bahan baku stok rendah
+              </span>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+          {ingredients
+            .filter(ing => !searchQuery || ing.name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .length === 0 ? (
+              <EmptyState label={searchQuery ? "Tidak ditemukan" : "Belum ada bahan baku"} />
+            ) : (
+              ingredients
+                .filter(ing => !searchQuery || ing.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                .map((ing) => {
+                  const isLow = ing.currentStock < ing.minStock;
+                  const barPct = Math.min(100, (ing.currentStock / (ing.minStock * 2)) * 100);
+                  const barColor = isLow ? "#DC2626" : ing.currentStock < ing.minStock * 1.5 ? "#D97706" : "#16A34A";
+                  const isEditing = editingStock === ing.id;
+                  return (
+                    <div key={ing.id} style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: `1px solid ${isLow ? "#FECACA" : "#F1F5F9"}` }} data-testid={`ingredient-${ing.id}`}>
+                      <div className="flex items-center justify-between" style={{ marginBottom: "8px" }}>
+                        <span style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{ing.name}</span>
+                        <span style={{ fontSize: "12px", fontWeight: "600", color: isLow ? "#DC2626" : "#334155" }}>
+                          {ing.currentStock.toLocaleString("id-ID")} {ing.baseUnit}
+                        </span>
+                      </div>
+                      {!isEditing && (
+                        <>
+                          <div style={{ height: "6px", borderRadius: "3px", background: "#F1F5F9", marginBottom: "6px" }}>
+                            <div style={{ height: "6px", borderRadius: "3px", background: barColor, width: `${barPct}%`, transition: "width 0.4s" }} />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span style={{ fontSize: "11px", color: "#94A3B8" }}>Min: {ing.minStock.toLocaleString("id-ID")} {ing.baseUnit}</span>
+                            <button onClick={() => { setEditingStock(ing.id); setNewStockValue(String(ing.currentStock)); }} className="tap-target" style={{ fontSize: "11px", color: "#E85D8C", fontWeight: "600" }}>
+                              Edit stok
+                            </button>
+                          </div>
+                        </>
+                      )}
+                      {isEditing && (
+                        <div className="space-y-2 mt-2">
+                          <div className="flex gap-2">
+                            <Input type="number" value={newStockValue} onChange={(e) => setNewStockValue(e.target.value)} placeholder={`Stok baru (${ing.baseUnit})`} className="flex-1 h-11 rounded-xl border-stone-200" />
+                            <span className="self-center text-sm" style={{ color: "#64748B" }}>{ing.baseUnit}</span>
+                          </div>
+                          <Input value={stockNote} onChange={(e) => setStockNote(e.target.value)} placeholder="Catatan (opsional)" className="h-11 rounded-xl border-stone-200" />
+                          <div className="flex gap-2">
+                            <button onClick={() => handleStockEdit(ing.id)} disabled={submitting} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white tap-target" style={{ background: "#E85D8C" }}>
+                              {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Simpan
+                            </button>
+                            <button onClick={() => { setEditingStock(null); setNewStockValue(""); setStockNote(""); }} className="px-4 py-2 rounded-xl text-sm font-semibold" style={{ background: "#F1F5F9", color: "#64748B" }}>
+                              Batal
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <Input value={stockNote} onChange={(e) => setStockNote(e.target.value)} placeholder="Catatan (opsional)" className="h-11 rounded-xl border-stone-200" />
-                    <div className="flex gap-2">
-                      <button onClick={() => handleStockEdit(ing.id)} disabled={submitting} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white tap-target" style={{ background: "#E85D8C" }}>
-                        {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Simpan
-                      </button>
-                      <button onClick={() => { setEditingStock(null); setNewStockValue(""); setStockNote(""); }} className="px-4 py-2 rounded-xl text-sm font-semibold" style={{ background: "#F1F5F9", color: "#64748B" }}>
-                        Batal
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between mt-1">
-                    <div className="flex items-center gap-3 text-sm">
-                      <span className="font-bold font-mono tabular-nums" style={{ color: isLow ? "#DC2626" : "#334155" }}>
-                        {ing.currentStock.toLocaleString("id-ID")} {ing.baseUnit}
-                      </span>
-                      <span style={{ color: "#94A3B8" }}>min: {ing.minStock.toLocaleString("id-ID")}</span>
-                    </div>
-                    <button onClick={() => { setEditingStock(ing.id); setNewStockValue(String(ing.currentStock)); }} className="p-2 rounded-xl tap-target" style={{ background: "#F8FAFC" }}>
-                      <Pencil size={14} style={{ color: "#94A3B8" }} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  );
+                })
+            )
+          }
+          </div>
+        </>
       )}
 
       {tab === "pengeluaran" && (
@@ -159,6 +219,7 @@ export default function InventoryPage() {
         </div>
       )}
     </div>
+  </div>
   );
 }
 

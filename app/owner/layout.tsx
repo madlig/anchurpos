@@ -119,7 +119,7 @@ function MobileBottomNav() {
 export default function OwnerLayout({ children }: { children: React.ReactNode }) {
   return (
     <RoleGuard allowedRoles={["owner"]}>
-      <div className="min-h-screen" style={{ background: "#F0EDE8" }}>
+      <div className="min-h-screen" style={{ background: "#FCABB4" }}>
         <DesktopSidebar />
         <div className="md:ml-60 pb-24 md:pb-6">
           {children}
