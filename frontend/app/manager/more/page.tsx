@@ -1,105 +1,70 @@
 "use client";
 
 import { useAuth } from "@/lib/auth-context";
-import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import {
-  Users,
-  Settings,
-  Database,
-  ChevronRight,
-  LogOut,
-  ClipboardList,
-  Palette,
-  Scale,
-  PackageMinus,
+  Users, Settings, Database, ChevronRight, LogOut,
+  ClipboardList, Palette, Scale, PackageMinus,
 } from "lucide-react";
 
 const MENU_ITEMS = [
-  {
-    label: "Master Data",
-    description: "Produk, varian, bahan, resep",
-    href: "/manager/master-data",
-    icon: Database,
-  },
-  {
-    label: "Karyawan",
-    description: "Absensi & payroll",
-    href: "/manager/employees",
-    icon: Users,
-  },
-  {
-    label: "Riwayat Order",
-    description: "Daftar semua pesanan",
-    href: "/manager/orders",
-    icon: ClipboardList,
-  },
-  {
-    label: "Rainbow Assembly",
-    description: "Konfirmasi assembly Rainbow",
-    href: "/manager/rainbow-assembly",
-    icon: Palette,
-  },
-  {
-    label: "Review Stock Opname",
-    description: "Review & koreksi stok dari opname crew",
-    href: "/manager/stock-opname-review",
-    icon: Scale,
-  },
-  {
-    label: "Pengeluaran Stok",
-    description: "Sample, hadiah, rusak, konsumsi internal",
-    href: "/manager/stock-adjustments",
-    icon: PackageMinus,
-  },
-  {
-    label: "Pengaturan",
-    description: "Whitelist IP absen",
-    href: "/manager/settings",
-    icon: Settings,
-  },
+  { label: "Master Data", description: "Produk, varian, bahan, resep", href: "/manager/master-data", icon: Database },
+  { label: "Karyawan", description: "Absensi & payroll", href: "/manager/employees", icon: Users },
+  { label: "Riwayat Order", description: "Daftar semua pesanan", href: "/manager/orders", icon: ClipboardList },
+  { label: "Rainbow Assembly", description: "Konfirmasi assembly Rainbow", href: "/manager/rainbow-assembly", icon: Palette },
+  { label: "Review Stock Opname", description: "Review & koreksi stok dari opname crew", href: "/manager/stock-opname-review", icon: Scale },
+  { label: "Pengeluaran Stok", description: "Sample, hadiah, rusak, konsumsi internal", href: "/manager/stock-adjustments", icon: PackageMinus },
+  { label: "Pengaturan", description: "Whitelist IP absen", href: "/manager/settings", icon: Settings },
 ];
 
 export default function ManagerMorePage() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="p-5">
-      <div className="flex items-center justify-between mb-6">
+    <div className="px-5 pt-6 pb-4 max-w-md mx-auto page-enter">
+      {/* Profile mini */}
+      <div className="flex items-center gap-3 mb-6 rounded-3xl p-4" style={{ background: "#fff", border: "1px solid #F1F5F9" }}>
+        <div className="h-12 w-12 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)" }}>
+          <span className="text-xl font-black text-white">{(user?.displayName ?? "M")[0].toUpperCase()}</span>
+        </div>
         <div>
-          <h1 className="text-xl font-bold text-stone-900">Lainnya</h1>
-          <p className="text-sm text-stone-500">
-            {user?.displayName ?? "Manager"}
-          </p>
+          <p className="font-bold text-base" style={{ color: "#1C1C1E" }}>{user?.displayName ?? "Manager"}</p>
+          <p className="text-xs font-semibold" style={{ color: "#E85D8C" }}>Manager</p>
         </div>
       </div>
 
+      {/* Menu items */}
       <div className="space-y-2 mb-6">
         {MENU_ITEMS.map((item) => {
           const Icon = item.icon;
           return (
-            <Link key={item.href} href={item.href}>
-              <Card className="p-4 flex items-center gap-3 hover:bg-stone-50 transition-colors">
-                <Icon size={20} className="text-emerald-600 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-stone-900">
-                    {item.label}
-                  </p>
-                  <p className="text-xs text-stone-500">{item.description}</p>
+            <Link key={item.href} href={item.href} data-testid={`menu-${item.label.toLowerCase().replace(/\s/g, "-")}`}>
+              <div className="rounded-2xl p-4 flex items-center gap-3 tap-target" style={{ background: "#fff", border: "1px solid #F1F5F9" }}>
+                <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#FEF1F5" }}>
+                  <Icon size={18} style={{ color: "#E85D8C" }} />
                 </div>
-                <ChevronRight size={16} className="text-stone-400" />
-              </Card>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>{item.label}</p>
+                  <p className="text-xs" style={{ color: "#94A3B8" }}>{item.description}</p>
+                </div>
+                <ChevronRight size={16} style={{ color: "#CBD5E1" }} />
+              </div>
             </Link>
           );
         })}
       </div>
 
+      {/* Logout */}
       <button
         onClick={logout}
-        className="flex items-center gap-2 text-sm text-stone-500 hover:text-red-600 transition-colors px-1"
+        className="flex items-center gap-2.5 w-full rounded-2xl p-4 tap-target"
+        style={{ background: "#FEF2F2", border: "1px solid #FECACA" }}
+        data-testid="logout-button"
       >
-        <LogOut size={16} />
-        Keluar
+        <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: "#FEE2E2" }}>
+          <LogOut size={18} style={{ color: "#DC2626" }} />
+        </div>
+        <span className="text-sm font-semibold" style={{ color: "#DC2626" }}>Keluar</span>
       </button>
     </div>
   );

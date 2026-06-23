@@ -50,7 +50,7 @@ function CrewNav() {
 
 export default function CrewLayout({ children }: { children: React.ReactNode }) {
   return (
-    <RoleGuard allowedRoles={["crew"]}>
+    <RoleGuard allowedRoles={["owner", "manager", "crew"]}>
       <div className="min-h-screen pb-24" style={{ background: "#F0EDE8" }}>
         {children}
       </div>

@@ -2,19 +2,15 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Loader2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus, FileText } from "lucide-react";
 
 interface PnlData {
-  month: string;
-  pemasukan: number;
-  hppProduk: number;
-  labaKotor: number;
-  biayaOperasional: number;
-  biayaPromosi: number;
-  gajiBonus: number;
-  labaBersih: number;
+  month: string; pemasukan: number; hppProduk: number; labaKotor: number;
+  biayaOperasional: number; biayaPromosi: number; gajiBonus: number; labaBersih: number;
+}
+
+function fmt(n: number) {
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 }
 
 export default function OwnerReportsPage() {
@@ -26,22 +22,14 @@ export default function OwnerReportsPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
 
-  const fetchWithAuth = useCallback(
-    async (url: string) => {
-      const token = await getToken();
-      return fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    },
-    [getToken]
-  );
+  const fetchWithAuth = useCallback(async (url: string) => {
+    const token = await getToken();
+    return fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  }, [getToken]);
 
   useEffect(() => {
     setLoading(true);
-    fetchWithAuth(`/api/reports/pnl?month=${month}`)
-      .then((r) => r.json())
-      .then((d) => setData(d))
-      .finally(() => setLoading(false));
+    fetchWithAuth(`/api/reports/pnl?month=${month}`).then((r) => r.json()).then((d) => setData(d)).finally(() => setLoading(false));
   }, [month, fetchWithAuth]);
 
   function shiftMonth(delta: number) {
@@ -50,109 +38,93 @@ export default function OwnerReportsPage() {
     setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
   }
 
-  function formatCurrency(n: number) {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(n);
-  }
-
+  const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
   function formatMonth(m: string) {
     const [y, mo] = m.split("-").map(Number);
-    const names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
-    return `${names[mo - 1]} ${y}`;
+    return `${MONTH_NAMES[mo - 1]} ${y}`;
   }
 
   return (
-    <div className="p-5">
-      <h1 className="text-xl font-bold text-stone-900 mb-1">Laporan Laba Rugi</h1>
-      <p className="text-sm text-stone-500 mb-5">Profit & Loss per bulan</p>
+    <div className="px-5 pt-6 pb-4 max-w-md mx-auto page-enter">
+      <div className="flex items-center gap-2 mb-5">
+        <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
+          <FileText size={16} style={{ color: "#E85D8C" }} />
+        </div>
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>Laporan Laba Rugi</h1>
+        </div>
+      </div>
 
-      <div className="flex items-center justify-between mb-5">
-        <Button variant="ghost" size="icon" onClick={() => shiftMonth(-1)}>
-          <ChevronLeft size={18} />
-        </Button>
-        <span className="text-sm font-semibold text-stone-900">{formatMonth(month)}</span>
-        <Button variant="ghost" size="icon" onClick={() => shiftMonth(1)}>
-          <ChevronRight size={18} />
-        </Button>
+      {/* Month picker */}
+      <div className="flex items-center justify-between mb-6 rounded-2xl p-3" style={{ background: "#fff", border: "1px solid #F1F5F9" }}>
+        <button onClick={() => shiftMonth(-1)} className="h-9 w-9 rounded-xl flex items-center justify-center tap-target" style={{ background: "#F1F5F9" }} data-testid="prev-month">
+          <ChevronLeft size={18} style={{ color: "#334155" }} />
+        </button>
+        <span className="text-sm font-bold" style={{ color: "#1C1C1E" }}>{formatMonth(month)}</span>
+        <button onClick={() => shiftMonth(1)} className="h-9 w-9 rounded-xl flex items-center justify-center tap-target" style={{ background: "#F1F5F9" }} data-testid="next-month">
+          <ChevronRight size={18} style={{ color: "#334155" }} />
+        </button>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
-        </div>
+        <div className="flex justify-center py-20"><Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} /></div>
       ) : data ? (
         <div className="space-y-3">
-          <Card className="p-4 bg-emerald-600 text-white">
-            <p className="text-sm text-emerald-100">Pemasukan</p>
-            <p className="text-2xl font-bold">{formatCurrency(data.pemasukan)}</p>
-          </Card>
-
-          <PnlRow label="HPP Produk" value={data.hppProduk} formatCurrency={formatCurrency} negative />
-          <Card className="p-3 border-emerald-200 bg-emerald-50/50">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-emerald-800">Laba Kotor</span>
-              <div className="flex items-center gap-1">
-                {data.labaKotor > 0 ? (
-                  <TrendingUp size={14} className="text-emerald-600" />
-                ) : data.labaKotor < 0 ? (
-                  <TrendingDown size={14} className="text-red-600" />
-                ) : (
-                  <Minus size={14} className="text-stone-400" />
-                )}
-                <span className={`text-sm font-bold ${data.labaKotor >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                  {formatCurrency(data.labaKotor)}
-                </span>
-              </div>
-            </div>
-          </Card>
-
-          <div className="border-t border-stone-100 pt-3">
-            <p className="text-xs text-stone-400 mb-2 uppercase tracking-wide">Pengeluaran</p>
-            <PnlRow label="Biaya Operasional" value={data.biayaOperasional} formatCurrency={formatCurrency} negative />
-            <PnlRow label="Biaya Promosi / Adj. Stok" value={data.biayaPromosi} formatCurrency={formatCurrency} negative />
-            <PnlRow label="Gaji & Bonus" value={data.gajiBonus} formatCurrency={formatCurrency} negative />
+          {/* Hero pemasukan */}
+          <div className="relative rounded-3xl p-6 overflow-hidden" style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)", boxShadow: "0 8px 24px rgba(232,93,140,0.25)" }} data-testid="pemasukan-card">
+            <div className="absolute -top-6 -right-6 h-28 w-28 rounded-full" style={{ background: "rgba(255,255,255,0.1)" }} />
+            <p className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.8)" }}>Pemasukan</p>
+            <p className="text-3xl font-extrabold tabular-nums text-white mt-1" data-testid="pemasukan-value">{fmt(data.pemasukan)}</p>
           </div>
 
-          <Card className={`p-4 ${data.labaBersih >= 0 ? "bg-emerald-600" : "bg-red-600"} text-white`}>
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Laba Bersih</span>
-              <span className="text-xl font-bold">{formatCurrency(data.labaBersih)}</span>
+          <PnlRow label="HPP Produk" value={data.hppProduk} negative />
+
+          {/* Laba kotor */}
+          <div className="rounded-2xl p-4 flex items-center justify-between" style={{ background: data.labaKotor >= 0 ? "#F0FDF4" : "#FEF2F2", border: `1px solid ${data.labaKotor >= 0 ? "#BBF7D0" : "#FECACA"}` }}>
+            <span className="text-sm font-bold" style={{ color: data.labaKotor >= 0 ? "#166534" : "#991B1B" }}>Laba Kotor</span>
+            <div className="flex items-center gap-1.5">
+              {data.labaKotor > 0 ? <TrendingUp size={15} style={{ color: "#16A34A" }} /> : data.labaKotor < 0 ? <TrendingDown size={15} style={{ color: "#DC2626" }} /> : <Minus size={15} style={{ color: "#94A3B8" }} />}
+              <span className="text-sm font-extrabold tabular-nums" style={{ color: data.labaKotor >= 0 ? "#16A34A" : "#DC2626" }}>{fmt(data.labaKotor)}</span>
             </div>
-          </Card>
+          </div>
+
+          {/* Pengeluaran */}
+          <div className="rounded-2xl p-4" style={{ background: "#fff", border: "1px solid #F1F5F9" }}>
+            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "#94A3B8" }}>Pengeluaran</p>
+            <div className="space-y-0.5">
+              <PnlRow label="Biaya Operasional" value={data.biayaOperasional} negative />
+              <PnlRow label="Biaya Promosi / Adj. Stok" value={data.biayaPromosi} negative />
+              <PnlRow label="Gaji & Bonus" value={data.gajiBonus} negative />
+            </div>
+          </div>
+
+          {/* Laba bersih */}
+          <div className="rounded-3xl p-5 flex items-center justify-between" style={{ background: data.labaBersih >= 0 ? "linear-gradient(135deg,#E85D8C,#C94A73)" : "linear-gradient(135deg,#EF4444,#DC2626)", boxShadow: "0 4px 16px rgba(232,93,140,0.2)" }} data-testid="laba-bersih-card">
+            <span className="text-sm font-semibold text-white">Laba Bersih</span>
+            <span className="text-xl font-extrabold tabular-nums text-white" data-testid="laba-bersih-value">{fmt(data.labaBersih)}</span>
+          </div>
 
           {data.pemasukan > 0 && (
-            <p className="text-xs text-center text-stone-400">
-              Margin bersih: {((data.labaBersih / data.pemasukan) * 100).toFixed(1)}%
+            <p className="text-xs text-center" style={{ color: "#94A3B8" }}>
+              Margin bersih: <span className="font-bold" style={{ color: "#E85D8C" }}>{((data.labaBersih / data.pemasukan) * 100).toFixed(1)}%</span>
             </p>
           )}
         </div>
       ) : (
-        <p className="text-center text-stone-400 py-10">Data tidak tersedia</p>
+        <div className="rounded-2xl border-2 border-dashed p-10 text-center" style={{ borderColor: "#E2E8F0" }}>
+          <p className="text-sm font-medium" style={{ color: "#94A3B8" }}>Data tidak tersedia untuk bulan ini</p>
+        </div>
       )}
     </div>
   );
 }
 
-function PnlRow({
-  label,
-  value,
-  formatCurrency,
-  negative,
-}: {
-  label: string;
-  value: number;
-  formatCurrency: (n: number) => string;
-  negative?: boolean;
-}) {
+function PnlRow({ label, value, negative }: { label: string; value: number; negative?: boolean }) {
   return (
     <div className="flex justify-between items-center py-2 px-1">
-      <span className="text-sm text-stone-600">{label}</span>
-      <span className={`text-sm font-medium ${negative && value > 0 ? "text-red-600" : "text-stone-900"}`}>
-        {negative && value > 0 ? "- " : ""}
-        {formatCurrency(value)}
+      <span className="text-sm" style={{ color: "#64748B" }}>{label}</span>
+      <span className="text-sm font-semibold tabular-nums" style={{ color: negative && value > 0 ? "#DC2626" : "#1C1C1E" }}>
+        {negative && value > 0 ? "- " : ""}{fmt(value)}
       </span>
     </div>
   );

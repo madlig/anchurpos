@@ -50,7 +50,7 @@ function ManagerNav() {
 
 export default function ManagerLayout({ children }: { children: React.ReactNode }) {
   return (
-    <RoleGuard allowedRoles={["manager"]}>
+    <RoleGuard allowedRoles={["owner", "manager"]}>
       <div className="min-h-screen pb-24" style={{ background: "#F0EDE8" }}>
         {children}
       </div>

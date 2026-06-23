@@ -2,17 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Check, Minus, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Check, Minus, Plus, ChevronDown, ChevronUp, PackageOpen } from "lucide-react";
 import type { Variant } from "@/types";
 
-interface PoolItem {
-  productionId: string;
-  date: string;
-  loyangRemaining: number;
-}
+interface PoolItem { productionId: string; date: string; loyangRemaining: number; }
 
 export default function CrewPrePackingPage() {
   const { getToken } = useAuth();
@@ -21,67 +15,37 @@ export default function CrewPrePackingPage() {
   const [pool, setPool] = useState<PoolItem[]>([]);
   const [totalAvailable, setTotalAvailable] = useState(0);
   const [showDetail, setShowDetail] = useState(false);
-
   const [loyangUsed, setLoyangUsed] = useState("");
   const [regularPacks, setRegularPacks] = useState("");
   const [fullPacks, setFullPacks] = useState("");
-
   const [loading, setLoading] = useState(true);
   const [poolLoading, setPoolLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
-  const fetchWithAuth = useCallback(
-    async (url: string, options?: RequestInit) => {
-      const token = await getToken();
-      return fetch(url, {
-        ...options,
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options?.headers },
-      });
-    },
-    [getToken]
-  );
+  const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
+    const token = await getToken();
+    return fetch(url, { ...options, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options?.headers } });
+  }, [getToken]);
 
   useEffect(() => {
-    fetchWithAuth("/api/variants")
-      .then(async (res) => {
-        if (res.ok) {
-          const data: Variant[] = await res.json();
-          setVariants(data.filter((v) => v.isProductionVariant));
-        }
-      })
-      .finally(() => setLoading(false));
+    fetchWithAuth("/api/variants").then(async (res) => {
+      if (res.ok) { const d: Variant[] = await res.json(); setVariants(d.filter((v) => v.isProductionVariant)); }
+    }).finally(() => setLoading(false));
   }, [fetchWithAuth]);
 
-  const loadPool = useCallback(
-    async (variantId: string) => {
-      setPoolLoading(true);
-      try {
-        const res = await fetchWithAuth(`/api/productions/loyang-pool?variantId=${variantId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setPool(data.pool);
-          setTotalAvailable(data.totalAvailable);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setPoolLoading(false);
-      }
-    },
-    [fetchWithAuth]
-  );
+  const loadPool = useCallback(async (variantId: string) => {
+    setPoolLoading(true);
+    try {
+      const res = await fetchWithAuth(`/api/productions/loyang-pool?variantId=${variantId}`);
+      if (res.ok) { const d = await res.json(); setPool(d.pool); setTotalAvailable(d.totalAvailable); }
+    } finally { setPoolLoading(false); }
+  }, [fetchWithAuth]);
 
   function selectVariant(id: string) {
-    setSelectedVariant(id);
-    setLoyangUsed("");
-    setRegularPacks("");
-    setFullPacks("");
-    setSuccess("");
-    setError("");
-    setShowDetail(false);
-    loadPool(id);
+    setSelectedVariant(id); setLoyangUsed(""); setRegularPacks(""); setFullPacks("");
+    setSuccess(""); setError(""); setShowDetail(false); loadPool(id);
   }
 
   function stepVal(setter: (v: string) => void, current: string, delta: number, max?: number) {
@@ -91,73 +55,43 @@ export default function CrewPrePackingPage() {
   }
 
   async function handleSubmit() {
-    setError("");
-    setSuccess("");
-
+    setError(""); setSuccess("");
     const loyang = parseInt(loyangUsed) || 0;
-    if (loyang <= 0) {
-      setError("Jumlah loyang harus lebih dari 0");
-      return;
-    }
-    if (loyang > totalAvailable) {
-      setError(`Loyang tidak cukup, tersedia hanya ${totalAvailable}`);
-      return;
-    }
-
+    if (loyang <= 0) { setError("Jumlah loyang harus lebih dari 0"); return; }
+    if (loyang > totalAvailable) { setError(`Loyang tidak cukup, tersedia hanya ${totalAvailable}`); return; }
     setSubmitting(true);
     try {
       const res = await fetchWithAuth("/api/pre-packing", {
         method: "POST",
-        body: JSON.stringify({
-          variantId: selectedVariant,
-          totalLoyangUsed: loyang,
-          resultRegularPacks: parseInt(regularPacks) || 0,
-          resultFullPacks: parseInt(fullPacks) || 0,
-        }),
+        body: JSON.stringify({ variantId: selectedVariant, totalLoyangUsed: loyang, resultRegularPacks: parseInt(regularPacks) || 0, resultFullPacks: parseInt(fullPacks) || 0 }),
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Gagal menyimpan");
-        return;
-      }
-
-      setSuccess("Tersimpan ✓");
-      setLoyangUsed("");
-      setRegularPacks("");
-      setFullPacks("");
+      const d = await res.json();
+      if (!res.ok) { setError(d.error || "Gagal menyimpan"); return; }
+      setSuccess("Tersimpan!"); setLoyangUsed(""); setRegularPacks(""); setFullPacks("");
       if (selectedVariant) loadPool(selectedVariant);
-    } catch {
-      setError("Gagal menyimpan pre-packing");
-    } finally {
-      setSubmitting(false);
-    }
+    } catch { setError("Gagal menyimpan pre-packing"); } finally { setSubmitting(false); }
   }
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
-      </div>
-    );
-  }
+  if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} /></div>;
 
   return (
-    <div className="p-5">
-      <h1 className="text-xl font-bold text-stone-900 mb-1">Pre-Packing</h1>
-      <p className="text-sm text-stone-500 mb-5">Loyang → Pack Regular & Full</p>
+    <div className="px-5 pt-6 pb-4 max-w-md mx-auto page-enter">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
+          <PackageOpen size={16} style={{ color: "#E85D8C" }} />
+        </div>
+        <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>Pre-Packing</h1>
+      </div>
+      <p className="text-sm mb-5 ml-10" style={{ color: "#64748B" }}>Loyang → Pack Regular & Full</p>
 
+      {/* Variant chips */}
       <div className="flex flex-wrap gap-2 mb-5">
         {variants.map((v) => (
-          <button
-            key={v.id}
-            onClick={() => selectVariant(v.id)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-[44px] ${
-              selectedVariant === v.id
-                ? "bg-emerald-600 text-white"
-                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-            }`}
-          >
+          <button key={v.id} onClick={() => selectVariant(v.id)} className="min-h-[48px] px-5 py-2.5 rounded-full text-sm font-bold transition-all tap-target"
+            style={selectedVariant === v.id
+              ? { background: "#E85D8C", color: "#fff", boxShadow: "0 4px 12px rgba(232,93,140,0.3)" }
+              : { background: "#fff", color: "#334155", border: "1px solid #E2E8F0" }}
+            data-testid={`variant-chip-${v.id}`}>
             {v.name}
           </button>
         ))}
@@ -166,126 +100,75 @@ export default function CrewPrePackingPage() {
       {selectedVariant && (
         <>
           {poolLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
-            </div>
+            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" style={{ color: "#E85D8C" }} /></div>
           ) : (
             <>
-              <Card className="p-4 mb-4">
+              {/* Pool card */}
+              <div className="rounded-3xl p-5 mb-5" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-2xl font-bold text-stone-900">{totalAvailable}</p>
-                    <p className="text-sm text-stone-500">loyang siap di-pack</p>
+                    <p className="text-3xl font-extrabold tabular-nums" style={{ color: "#1C1C1E" }}>{totalAvailable}</p>
+                    <p className="text-sm" style={{ color: "#64748B" }}>loyang siap di-pack</p>
                   </div>
                   {pool.length > 0 && (
-                    <button
-                      onClick={() => setShowDetail(!showDetail)}
-                      className="text-xs text-emerald-600 flex items-center gap-1"
-                    >
-                      {showDetail ? "Sembunyikan" : "Lihat rincian"}
+                    <button onClick={() => setShowDetail(!showDetail)} className="flex items-center gap-1 text-xs font-semibold tap-target" style={{ color: "#E85D8C" }}>
+                      {showDetail ? "Sembunyikan" : "Rincian"}
                       {showDetail ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </button>
                   )}
                 </div>
                 {showDetail && pool.length > 0 && (
-                  <div className="mt-3 space-y-1 border-t border-stone-100 pt-3">
+                  <div className="mt-3 space-y-1 pt-3" style={{ borderTop: "1px solid #F1F5F9" }}>
                     {pool.map((p) => (
-                      <div key={p.productionId} className="flex justify-between text-xs text-stone-500">
+                      <div key={p.productionId} className="flex justify-between text-xs" style={{ color: "#64748B" }}>
                         <span>{new Date(p.date).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</span>
-                        <span className="font-mono">{p.loyangRemaining} loyang</span>
+                        <span className="font-mono font-bold">{p.loyangRemaining} loyang</span>
                       </div>
                     ))}
                   </div>
                 )}
-              </Card>
+              </div>
 
               {totalAvailable > 0 && (
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-xs text-stone-500 mb-1 block">Loyang dipakai sekarang</label>
-                    <StepperInput
-                      value={loyangUsed}
-                      onChange={setLoyangUsed}
-                      onStep={(d) => stepVal(setLoyangUsed, loyangUsed, d, totalAvailable)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-stone-500 mb-1 block">Jadi pack Regular berapa</label>
-                    <StepperInput
-                      value={regularPacks}
-                      onChange={setRegularPacks}
-                      onStep={(d) => stepVal(setRegularPacks, regularPacks, d)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-stone-500 mb-1 block">Jadi pack Full berapa</label>
-                    <StepperInput
-                      value={fullPacks}
-                      onChange={setFullPacks}
-                      onStep={(d) => stepVal(setFullPacks, fullPacks, d)}
-                    />
-                  </div>
+                  {[
+                    { label: "Loyang dipakai sekarang", val: loyangUsed, set: setLoyangUsed, max: totalAvailable },
+                    { label: "Jadi pack Regular berapa", val: regularPacks, set: setRegularPacks, max: undefined },
+                    { label: "Jadi pack Full berapa", val: fullPacks, set: setFullPacks, max: undefined },
+                  ].map(({ label, val, set, max }) => (
+                    <div key={label}>
+                      <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>{label}</label>
+                      <div className="flex items-center rounded-full p-1 gap-1" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                        <button type="button" onClick={() => stepVal(set, val, -1, max)} className="h-12 w-12 rounded-full flex items-center justify-center tap-target" style={{ background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", color: "#334155" }}>
+                          <Minus size={18} strokeWidth={2.5} />
+                        </button>
+                        <Input type="number" min="0" value={val} onChange={(e) => set(e.target.value)} className="flex-1 text-center font-extrabold text-xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0" style={{ color: "#1C1C1E" }} />
+                        <button type="button" onClick={() => stepVal(set, val, 1, max)} className="h-12 w-12 rounded-full text-white flex items-center justify-center tap-target" style={{ background: "#E85D8C" }}>
+                          <Plus size={18} strokeWidth={2.5} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
 
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={submitting || !(parseInt(loyangUsed) > 0)}
-                    className="w-full min-h-[48px] text-base gap-2"
-                    size="lg"
-                  >
-                    {submitting ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+                  <button onClick={handleSubmit} disabled={submitting || !(parseInt(loyangUsed) > 0)} className="w-full min-h-[56px] rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 tap-target disabled:opacity-60"
+                    style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)", boxShadow: "0 8px 20px rgba(232,93,140,0.3)" }} data-testid="submit-prepacking-button">
+                    {submitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
                     Simpan
-                  </Button>
+                  </button>
                 </div>
               )}
 
               {totalAvailable === 0 && (
-                <div className="rounded-xl border border-stone-200 bg-white p-6 text-center text-stone-400">
-                  Belum ada loyang tersedia untuk varian ini
+                <div className="rounded-2xl border-2 border-dashed p-8 text-center" style={{ borderColor: "#E2E8F0" }}>
+                  <p className="text-sm font-medium" style={{ color: "#94A3B8" }}>Belum ada loyang tersedia untuk varian ini</p>
                 </div>
               )}
             </>
           )}
-
-          {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
-          {success && <p className="text-sm text-emerald-600 mt-3 font-medium">{success}</p>}
+          {error && <div className="rounded-2xl px-4 py-3 mt-4" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }}><p className="text-sm font-medium" style={{ color: "#DC2626" }}>{error}</p></div>}
+          {success && <div className="rounded-2xl px-4 py-3 mt-4" style={{ background: "#F0FDF4", border: "1px solid #BBF7D0" }}><p className="text-sm font-medium" style={{ color: "#16A34A" }}>{success}</p></div>}
         </>
       )}
-    </div>
-  );
-}
-
-function StepperInput({
-  value,
-  onChange,
-  onStep,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onStep: (delta: number) => void;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={() => onStep(-1)}
-        className="h-10 w-10 rounded-lg bg-stone-100 flex items-center justify-center text-stone-600 hover:bg-stone-200 active:scale-95"
-      >
-        <Minus size={16} />
-      </button>
-      <Input
-        type="number"
-        min="0"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="text-center flex-1 font-mono text-lg"
-      />
-      <button
-        type="button"
-        onClick={() => onStep(1)}
-        className="h-10 w-10 rounded-lg bg-stone-100 flex items-center justify-center text-stone-600 hover:bg-stone-200 active:scale-95"
-      >
-        <Plus size={16} />
-      </button>
     </div>
   );
 }

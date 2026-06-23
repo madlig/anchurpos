@@ -26,8 +26,8 @@ export default function RootPage() {
   }, [user, role, loading, router]);
 
   return (
-    <div className="flex h-screen items-center justify-center bg-stone-50">
-      <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+    <div className="flex h-screen items-center justify-center" style={{ background: "#F0EDE8" }}>
+      <Loader2 className="h-8 w-8 animate-spin" style={{ color: "#E85D8C" }} />
     </div>
   );
 }
