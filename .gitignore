@@ -8,3 +8,12 @@ credentials.json
 *.pem
 *.key
 .credentials
+
+# Emergent environment - supervisor runs from this folder
+frontend/
+node_modules/
+.next/
+design_guidelines.json
+test_reports/
+memory/
+CuanPOS_PRD.md

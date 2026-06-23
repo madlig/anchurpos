@@ -5,24 +5,24 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 28 10% 10%;
+    --foreground: 222 14% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 28 10% 10%;
+    --card-foreground: 222 14% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 28 10% 10%;
-    --primary: 142.1 76.2% 36.3%;
-    --primary-foreground: 355.7 100% 97.3%;
-    --secondary: 60 4.8% 95.9%;
-    --secondary-foreground: 24 9.8% 10%;
-    --muted: 60 4.8% 95.9%;
-    --muted-foreground: 25 5.3% 44.7%;
-    --accent: 60 4.8% 95.9%;
-    --accent-foreground: 24 9.8% 10%;
-    --destructive: 0 84.2% 60.2%;
+    --popover-foreground: 222 14% 12%;
+    --primary: 340 76% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 15% 91%;
+    --secondary-foreground: 222 14% 12%;
+    --muted: 30 15% 91%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 340 76% 60%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 20 5.9% 90%;
-    --input: 20 5.9% 90%;
-    --ring: 142.1 76.2% 36.3%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 340 76% 60%;
     --radius: 0.75rem;
   }
 }
@@ -30,12 +30,50 @@
 @layer base {
   * { @apply border-border; }
   body {
-    @apply bg-stone-100 text-stone-900 antialiased;
-    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    background-color: #F0EDE8;
+    color: #1C1C1E;
+    font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
     -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
 .font-mono {
   font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, 'SFMono-Regular', monospace;
 }
+
+/* Page entrance animation */
+@keyframes fade-slide-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter { animation: fade-slide-up 0.28s ease-out both; }
+
+/* Stagger delays for list items */
+.stagger-1 { animation-delay: 0.04s; }
+.stagger-2 { animation-delay: 0.08s; }
+.stagger-3 { animation-delay: 0.12s; }
+.stagger-4 { animation-delay: 0.16s; }
+.stagger-5 { animation-delay: 0.20s; }
+
+/* Tap feedback */
+.tap-target { @apply active:scale-[0.97] transition-transform duration-100; }
+
+/* Brand gradient */
+.brand-gradient { background: linear-gradient(135deg, #E85D8C 0%, #C94A73 100%); }
+.brand-gradient-light { background: linear-gradient(135deg, #E85D8C 0%, #F2A0B7 100%); }
+
+/* Glassmorphism for login */
+.glass-input {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.6);
+}
+
+/* Safe area */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* Hide scrollbar */
+::-webkit-scrollbar { width: 0; height: 0; }
