@@ -1,29 +1,19 @@
-# AnchurPOS Test Credentials
+# Test Credentials
 
-## Login URL
-http://localhost:3000/login
+## Accounts
 
-## Test Accounts
+| Username | Password | Role | Default Route |
+|----------|----------|------|---------------|
+| manager | anchur123 | manager | /manager/dashboard |
+| crew1 | anchur123 | crew | /crew/attendance |
+| owner | anchur123 | owner | /owner/dashboard |
 
-### Owner
-- Username: `owner`
-- Password: `anchur123`
-- Role: owner
-- Dashboard: `/owner/dashboard`
+## Notes
+- Email format: `{username}@anchurpos.id`
+- All accounts were seeded via `scripts/seed.ts`
+- Firebase project: anchurpos
 
-### Manager
-- Username: `manager`
-- Password: `anchur123`
-- Role: manager
-- Dashboard: `/manager/dashboard`
-
-### Crew
-- Username: `crew1`
-- Password: `anchur123`
-- Role: crew
-- Dashboard: `/crew/attendance`
-
-## Firebase Project
-- Project ID: anchurpos
-- Auth Domain: anchurpos.firebaseapp.com
-- Storage Bucket: anchurpos.firebasestorage.app
+## Access Hierarchy
+- **Owner** can access: /owner/*, /manager/*, /crew/*
+- **Manager** can access: /manager/*, /crew/*
+- **Crew** can only access: /crew/*

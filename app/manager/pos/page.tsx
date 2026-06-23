@@ -55,7 +55,11 @@ export default function ManagerPosPage() {
       fetchWithAuth("/api/products").then((r) => r.json()),
       fetchWithAuth("/api/variants").then((r) => r.json()),
       fetchWithAuth("/api/customers").then((r) => r.json()),
-    ]).then(([p, v, c]) => { setProducts(p); setVariants(v); setCustomers(c); }).finally(() => setLoading(false));
+    ]).then(([p, v, c]) => {
+      setProducts(Array.isArray(p) ? p : []);
+      setVariants(Array.isArray(v) ? v : []);
+      setCustomers(Array.isArray(c) ? c : []);
+    }).finally(() => setLoading(false));
   }, [fetchWithAuth]);
 
   function getTierPrice(productId: string, qty: number): number {
