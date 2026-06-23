@@ -1,19 +1,24 @@
 # Test Credentials
 
-## Accounts
+## Manager
+- Username: `manager`
+- Password: `anchur123`
+- Login URL: http://localhost:3000/login
+- Redirects to: /manager/dashboard
 
-| Username | Password | Role | Default Route |
-|----------|----------|------|---------------|
-| manager | anchur123 | manager | /manager/dashboard |
-| crew1 | anchur123 | crew | /crew/attendance |
-| owner | anchur123 | owner | /owner/dashboard |
+## Crew
+- Username: `crew1`
+- Password: `anchur123`
+- Login URL: http://localhost:3000/login
+- Redirects to: /crew/attendance
+
+## Owner
+- Username: `owner`
+- Password: `anchur123`
+- Login URL: http://localhost:3000/login
+- Redirects to: /owner/dashboard
 
 ## Notes
-- Email format: `{username}@anchurpos.id`
-- All accounts were seeded via `scripts/seed.ts`
-- Firebase project: anchurpos
-
-## Access Hierarchy
-- **Owner** can access: /owner/*, /manager/*, /crew/*
-- **Manager** can access: /manager/*, /crew/*
-- **Crew** can only access: /crew/*
+- Login uses **username** field (NOT email)
+- All accounts use password: anchur123
+- Firebase Auth stores these as email: `manager@anchurpos.com`, etc. (internal)

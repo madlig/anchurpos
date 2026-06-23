@@ -1,120 +1,94 @@
 # AnchurPOS — PRD
 
-## Problem Statement
-Sistem manajemen produksi dan penjualan churros "Anchur Bandung". App ini mengatur seluruh proses dari kasir, produksi, absensi crew, hingga laporan keuangan owner.
+## Original Problem Statement
+Bangun sistem AnchurPOS (fases 0-9) dengan UI/UX pixel-perfect sesuai mockup yang diunggah (`AnchurPOS Mockup.dc.html` dan `CLAUDE.md`). Font, warna latar, posisi elemen, lokasi tombol harus persis sama dengan mockup. Aplikasi mobile-first dengan layout desktop yang tidak memiliki ruang kosong. Role-based access: Owner > Manager > Crew.
 
-## User Personas
-- **Owner**: Lihat laporan P&L, approval, akses semua fitur manager & crew
-- **Manager**: Kasir/POS, inventori, kelola karyawan, pesanan, produksi
-- **Crew**: Absensi, produksi, pre-packing, stock opname
-
-## Hierarchical Role Access
-- Owner > Manager > Crew (owner bisa akses semua halaman)
-- Manager bisa akses crew pages
-- Crew hanya bisa akses crew pages
-
-## Tech Stack
-- Next.js 14 (App Router), TypeScript, TailwindCSS
-- Firebase Authentication (username@anchurpos.id pattern)
-- Firebase Firestore (database)
-- Running: `yarn start` dari `/app/frontend/` (port 3000)
-
-## Color Theme
-- Primary: `#E85D8C` (pink deep)
-- Accent: `#FCABB4` (pink light)
-- Background: `#F0EDE8` (warm cream)
+## Design System (dari CLAUDE.md)
+- **Primary Pink**: `#E85D8C` (tombol, aksen, status aktif)
+- **Base Background**: `#FCABB4` (background seluruh halaman)
+- **Font**: `Plus Jakarta Sans` (sudah terkonfigurasi)
+- **Card Style**: white, `border-radius: 14px`, `border: 1px solid #F1F5F9`, `padding: 14px`
+- **Tab Active**: `border-bottom: 2px solid #E85D8C`, underline style
+- **Progress Bar**: `height: 6px`, gradient `#E85D8C → #F2A0B7`
 
 ## Architecture
 ```
 /app/frontend/
-├── app/               # Next.js App Router
-│   ├── api/           # Firebase/Firestore API routes
+├── app/               # Next.js 15 App Router
+│   ├── api/           # Firebase Admin API routes
 │   ├── login/         # Login page
-│   ├── manager/       # Manager pages (layout + dashboard, pos, orders, inventory, more, master-data, employees)
-│   ├── crew/          # Crew pages (layout + attendance, production, pre-packing, stock-opname)
-│   ├── owner/         # Owner pages (layout + dashboard, reports, approval, more)
-│   └── order/         # Public order form
-├── components/
-│   ├── shared/        # RoleGuard, etc.
-│   └── layout/        # BottomNav, Sidebar (legacy)
-├── lib/               # auth-context, firebase-admin, utils
-└── types/             # TypeScript types
+│   ├── manager/       # Manager pages (dashboard, pos, orders, inventory, more, employees, master-data)
+│   ├── crew/          # Crew pages (attendance, production, more)
+│   ├── owner/         # Owner pages (dashboard, reports, approval, more)
+│   └── order/         # Order tracking
+├── components/        # Shared components
+│   └── layout/        # Sidebar, BottomNav
+├── lib/               # Firebase, auth context
+└── types/             # TypeScript definitions
 ```
 
-## Key Routes
-- `/login` — Login page
-- `/manager/dashboard` — Manager dashboard (omzet, produksi, low stock, alerts)
-- `/manager/pos` — POS/Kasir
-- `/manager/orders` — Riwayat order
-- `/manager/inventory` — Inventori bahan baku + pengeluaran
-- `/manager/more` — Menu lainnya (master data, karyawan, dll)
-- `/crew/attendance` — Absensi crew
-- `/crew/production` — Input produksi
-- `/crew/pre-packing` — Pre-packing
-- `/crew/stock-opname` — Stock opname
-- `/owner/dashboard` — Dashboard owner
-- `/owner/reports` — Laporan P&L
-- `/owner/approval` — Approval opname & absensi
-- `/owner/more` — Menu owner
-- `/order` — Public order form (tanpa auth)
+## Tech Stack
+- **Frontend**: Next.js 15 (App Router), React 19, TailwindCSS
+- **Backend**: Firebase Admin SDK via API routes
+- **Auth**: Firebase Authentication (username-based login)
+- **DB**: Firestore
+
+## Role-Based Access
+- Owner: Akses semua fitur + laporan + approval
+- Manager: Dashboard, POS, Pesanan, Inventori, Pegawai, Master Data
+- Crew: Absensi, Produksi
+
+## Credentials Test
+- Manager: `manager` / `anchur123`
+- Crew: `crew1` / `anchur123`
+- Owner: `owner` / `anchur123`
 
 ---
 
-## What's Been Implemented
+## CHANGELOG
 
-### Phase 1 (Session 1)
-- ✅ Firebase Auth + Admin SDK setup
-- ✅ Seeding data (seed.ts script)
-- ✅ RoleGuard hierarchical access (Owner > Manager > Crew)
-- ✅ Login page dengan pink theme
-- ✅ Manager Dashboard (hero card, stat cards, produksi, low stock, alerts)
-- ✅ Manager Inventory (bahan baku + pengeluaran tabs)
-- ✅ Manager Orders (riwayat + filter)
-- ✅ Crew Attendance (check-in/out + history)
-- ✅ Crew Production (input batch)
-- ✅ Crew Pre-packing
-- ✅ Crew Stock Opname
-- ✅ Owner Approval
-- ✅ Owner Reports (P&L)
+### 2025-01 (Sebelum fork ini)
+- Implementasi Next.js 14 App Router dengan Firebase
+- Role-based route guards (Owner > Manager > Crew)
+- Manager: Dashboard, POS, Pesanan, Inventori, Lainnya
+- Crew: Absensi, Produksi
+- Owner: Dashboard, Reports
+- Desktop sidebar layout
+- Fix Firestore composite index errors di /api/customers dan /api/products
 
-### Phase 2 (Session 2 — Feb 2026)
-- ✅ Desktop Sidebar untuk Manager, Crew, Owner (240px, hidden md:flex)
-- ✅ Tab "Pesanan" ditambah ke Manager nav (mobile bottom + desktop sidebar)
-- ✅ Semua warna emerald/hijau diubah ke pink (#E85D8C)
-- ✅ Layout desktop responsive (md:grid, max-w-5xl, md:px-8)
-- ✅ Manager Dashboard: HPP+Profit di hero card on desktop, 2-col content
-- ✅ Manager POS: 2-col layout desktop (cart kiri, checkout kanan)
-- ✅ Manager Inventory: 2-col grid on desktop
-- ✅ Manager Orders: 2-col grid on desktop
-- ✅ Crew Attendance: 2-col (status+button kiri, history kanan) on desktop
-- ✅ Owner Dashboard: full pink theme + 2-col desktop layout
-- ✅ Owner More: 2-col menu grid on desktop
-- ✅ Public Order form: full pink hero, 2-col on desktop
-- ✅ Fix Firestore composite index issue pada /api/products dan /api/customers
-- ✅ Manager POS: defensive Array.isArray check untuk prevent crash
+### Feb 2026 — UI/UX Overhaul (fork ini)
+**SELESAI: Pixel-Perfect UI/UX Overhaul berdasarkan Mockup**
+- Ubah background seluruh halaman dari `#F0EDE8` → `#FCABB4`
+- **Manager Dashboard**: Restrukturisasi total → white greeting header + omzet card dengan progress bar + 2-col stat cards + Recent Orders section
+- **Manager Pesanan**: Tabs diganti underline style (Semua/Pending/Proses/Selesai), card layout dengan avatar+name+status badge
+- **Manager Inventori**: Search bar di white header, tabs underline style, progress bars pada ingredient cards dengan low-stock alert
+- **Manager POS**: White header "Kasir", customer select + cart dalam card
+- **Manager Lainnya**: White header, profile card, menu list card, logout dengan border merah
+- **Crew Attendance**: White header, gradient pink status card, tombol bulat 120px (MASUK/PULANG) dengan clock icon
+- **Crew Production**: White header, summary stats card (Selesai/Target/Progress), production items dengan progress bars
+- **Owner Dashboard**: White header, gradient pink revenue card, outlet card dengan progress bar
 
 ---
 
-## Prioritized Backlog
+## ROADMAP
 
-### P0 (Critical)
-- None currently
+### P0 (Kritis)
+- [x] Pixel-perfect UI/UX sesuai mockup
+- [x] Background #FCABB4, white header sections, underline tabs
+- [x] Circular clock-in button crew attendance
 
-### P1 (High Priority)
-- Verify Firestore indexes untuk semua query bermasalah (lihat Firebase console)
-- Manager POS: test dengan data customer yang sebenarnya
-- Rainbow Assembly feature
-- Karyawan & Payroll feature
+### P1 (Prioritas Tinggi)
+- [ ] Verify Firestore Schema sesuai Firestore_Data_Model.md
+- [ ] Owner vs Manager dashboard feature differences
+- [ ] Multi-outlet support di Owner Dashboard
 
-### P2 (Medium)
-- Laporan per-karyawan
-- Export laporan ke CSV/Excel
-- Notifikasi real-time (Firebase Cloud Messaging)
-- Stock Opname Review untuk Manager
-- Rainbow Assembly feature completion
+### P2 (Prioritas Menengah)
+- [ ] Owner-only: laporan keuangan detail, approval pengeluaran
+- [ ] Manager: stock opname feature
+- [ ] Crew: riwayat produksi lengkap
 
-### P3 (Future/Backlog)
-- Owner: perbandingan bulan ke bulan di laporan
-- Multi-outlet support
-- Print struk/invoice
-- Dashboard analytics dengan grafik
+### P3 (Backlog)
+- [ ] Push notifications untuk low-stock alerts
+- [ ] Export data ke Google Sheets
+- [ ] Dark mode support
+- [ ] Animations/transitions between screens
