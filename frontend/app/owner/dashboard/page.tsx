@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Loader2,
@@ -11,6 +10,7 @@ import {
   AlertTriangle,
   Bell,
   CheckCheck,
+  ChevronRight,
 } from "lucide-react";
 
 interface DashboardData {
@@ -78,125 +78,169 @@ export default function OwnerDashboardPage() {
     }).format(n);
   }
 
+  const today = new Date().toLocaleDateString("id-ID", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
   if (loading) {
     return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
       </div>
     );
   }
 
   return (
-    <div className="p-5">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-stone-900">Dashboard</h1>
-        <p className="text-sm text-stone-500">
-          Hai, {user?.displayName ?? "Owner"}
-        </p>
+    <div className="page-enter px-5 pt-6 pb-4 max-w-md mx-auto">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-stone-400 mb-0.5">{today}</p>
+          <h1 className="text-2xl font-black tracking-tight text-stone-900">
+            Hai, {user?.displayName?.split(" ")[0] ?? "Owner"} 👋
+          </h1>
+          <p className="text-sm text-stone-400 mt-0.5">Ringkasan bisnis hari ini</p>
+        </div>
+        {alerts.length > 0 && (
+          <div className="relative mt-1">
+            <div className="p-2 rounded-2xl bg-white shadow-sm border border-stone-100">
+              <Bell size={20} className="text-stone-600" />
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-rose-500" />
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* Hero card */}
       {data && (
-        <>
-          <Card className="p-4 mb-3 bg-emerald-600 text-white">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-sm text-emerald-100">Omzet Hari Ini</span>
-              <TrendingUp size={16} className="text-emerald-200" />
+        <div
+          className="relative rounded-3xl bg-gradient-to-br from-emerald-500 to-emerald-700 p-6 mb-4 overflow-hidden shadow-[0_8px_30px_rgba(5,150,105,0.25)]"
+          data-testid="owner-hero-card"
+        >
+          <div className="absolute -top-6 -right-6 h-32 w-32 rounded-full bg-white/10" />
+          <div className="absolute -bottom-8 -right-2 h-24 w-24 rounded-full bg-white/5" />
+
+          <div className="relative">
+            <div className="flex items-center gap-1.5 mb-1">
+              <TrendingUp size={14} className="text-emerald-200" />
+              <span className="text-sm font-medium text-emerald-100">Omzet Hari Ini</span>
             </div>
-            <p className="text-2xl font-bold">{formatCurrency(data.omzet)}</p>
-            <p className="text-xs text-emerald-200 mt-1">
-              {data.orderCount} order
+            <p className="text-3xl font-black tracking-tight text-white tabular-nums mb-2" data-testid="owner-omzet">
+              {formatCurrency(data.omzet)}
             </p>
-          </Card>
-
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <Card className="p-3">
-              <p className="text-xs text-stone-500">HPP</p>
-              <p className="text-lg font-bold text-stone-900">
-                {formatCurrency(data.hpp)}
-              </p>
-            </Card>
-            <Card className="p-3">
-              <p className="text-xs text-stone-500">Profit</p>
-              <p className="text-lg font-bold text-emerald-600">
-                {formatCurrency(data.profit)}
-              </p>
-            </Card>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-emerald-200">{data.orderCount} order</span>
+              <span className="text-emerald-400">·</span>
+              <span className="text-xs font-medium text-emerald-200">
+                Profit: {formatCurrency(data.profit)}
+              </span>
+            </div>
           </div>
-
-          {data.productionToday.length > 0 && (
-            <Card className="p-4 mb-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Package size={16} className="text-stone-400" />
-                <h2 className="text-sm font-semibold text-stone-900">
-                  Produksi Hari Ini
-                </h2>
-              </div>
-              <div className="space-y-1">
-                {data.productionToday.map((p) => (
-                  <div key={p.variantId} className="flex justify-between text-sm">
-                    <span className="text-stone-600">{p.variantName}</span>
-                    <span className="text-stone-900 font-medium">
-                      {p.batches} batch, {p.loyangCount} loyang
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {data.lowStockItems.length > 0 && (
-            <Card className="p-4 mb-4 border-amber-200 bg-amber-50/50">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle size={16} className="text-amber-600" />
-                <h2 className="text-sm font-semibold text-amber-800">
-                  Bahan Menipis
-                </h2>
-              </div>
-              <div className="space-y-1">
-                {data.lowStockItems.map((item) => (
-                  <div key={item.id} className="flex justify-between text-sm">
-                    <span className="text-amber-800">{item.name}</span>
-                    <span className="text-amber-600 font-mono text-xs">
-                      {item.currentStock.toLocaleString("id-ID")}/
-                      {item.minStock.toLocaleString("id-ID")} {item.baseUnit}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-        </>
+        </div>
       )}
 
+      {/* Stat cards */}
+      {data && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="rounded-2xl bg-white border border-stone-100 shadow-sm p-4" data-testid="owner-hpp-card">
+            <p className="text-xs font-bold uppercase tracking-widest text-stone-400 mb-1">HPP</p>
+            <p className="text-xl font-black tabular-nums text-stone-900">{formatCurrency(data.hpp)}</p>
+          </div>
+          <div className="rounded-2xl bg-white border border-stone-100 shadow-sm p-4" data-testid="owner-profit-card">
+            <p className="text-xs font-bold uppercase tracking-widest text-stone-400 mb-1">Profit</p>
+            <p className="text-xl font-black tabular-nums text-emerald-600">{formatCurrency(data.profit)}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Production today */}
+      {data && data.productionToday.length > 0 && (
+        <div className="rounded-2xl bg-white border border-stone-100 shadow-sm p-4 mb-4" data-testid="owner-production-card">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="h-7 w-7 rounded-xl bg-emerald-50 flex items-center justify-center">
+              <Package size={14} className="text-emerald-600" />
+            </div>
+            <h2 className="text-sm font-bold text-stone-900">Produksi Hari Ini</h2>
+          </div>
+          <div className="space-y-2">
+            {data.productionToday.map((p) => (
+              <div key={p.variantId} className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
+                <span className="text-sm font-medium text-stone-700">{p.variantName}</span>
+                <span className="text-xs font-bold text-stone-500 tabular-nums">
+                  {p.batches}batch · {p.loyangCount}lyang
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Low stock */}
+      {data && data.lowStockItems.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 mb-4" data-testid="owner-low-stock-card">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="h-7 w-7 rounded-xl bg-amber-100 flex items-center justify-center">
+              <AlertTriangle size={14} className="text-amber-600" />
+            </div>
+            <h2 className="text-sm font-bold text-amber-800">Bahan Menipis</h2>
+          </div>
+          <div className="space-y-1.5">
+            {data.lowStockItems.map((item) => (
+              <div key={item.id} className="flex items-center justify-between">
+                <span className="text-sm font-medium text-amber-800">{item.name}</span>
+                <span className="text-xs font-bold tabular-nums text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
+                  {item.currentStock}/{item.minStock} {item.baseUnit}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Alerts */}
       {alerts.length > 0 && (
-        <Card className="p-4">
+        <div className="rounded-2xl bg-white border border-stone-100 shadow-sm p-4" data-testid="owner-alerts-card">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Bell size={16} className="text-stone-400" />
-              <h2 className="text-sm font-semibold text-stone-900">
-                Notifikasi ({alerts.length})
-              </h2>
+              <div className="h-7 w-7 rounded-xl bg-rose-50 flex items-center justify-center">
+                <Bell size={14} className="text-rose-500" />
+              </div>
+              <h2 className="text-sm font-bold text-stone-900">Notifikasi</h2>
+              <span className="text-xs font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full">{alerts.length}</span>
             </div>
-            <Button onClick={markAllRead} variant="ghost" size="sm" className="text-xs gap-1">
-              <CheckCheck size={12} /> Tandai dibaca
+            <Button
+              onClick={markAllRead}
+              variant="ghost"
+              size="sm"
+              className="text-xs gap-1 h-7 text-stone-500"
+              data-testid="owner-mark-all-read"
+            >
+              <CheckCheck size={12} /> Baca semua
             </Button>
           </div>
           <div className="space-y-2">
             {alerts.slice(0, 5).map((alert) => (
               <div
                 key={alert.id}
-                className={`p-3 rounded-lg text-sm ${
+                className={`rounded-xl px-3 py-2.5 ${
                   alert.severity === "warning"
                     ? "bg-amber-50 border border-amber-100"
                     : "bg-stone-50 border border-stone-100"
                 }`}
               >
-                <p className="font-medium text-stone-900">{alert.title}</p>
-                <p className="text-xs text-stone-500 mt-0.5">{alert.message}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-stone-900">{alert.title}</p>
+                    <p className="text-xs text-stone-500 mt-0.5">{alert.message}</p>
+                  </div>
+                  <ChevronRight size={14} className="text-stone-300 mt-0.5 shrink-0" />
+                </div>
               </div>
             ))}
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );

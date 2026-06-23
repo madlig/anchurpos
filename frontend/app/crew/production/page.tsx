@@ -2,10 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Check, Minus, Plus } from "lucide-react";
+import { Loader2, Check, Minus, Plus, ChefHat } from "lucide-react";
 import type { Variant, Production } from "@/types";
 
 interface EntryInput {
@@ -139,66 +137,90 @@ export default function CrewProductionPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
       </div>
     );
   }
 
   return (
-    <div className="p-5">
-      <h1 className="text-xl font-bold text-stone-900 mb-1">Produksi</h1>
-      <p className="text-sm text-stone-500 mb-5">Apa yang kamu buat hari ini?</p>
-
-      <div className="flex flex-wrap gap-2 mb-4">
-        {variants.map((v) => {
-          const isSelected = selected.has(v.id);
-          return (
-            <button
-              key={v.id}
-              onClick={() => toggleVariant(v.id)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-[44px] ${
-                isSelected
-                  ? "bg-emerald-600 text-white"
-                  : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-              }`}
-            >
-              {v.name}
-            </button>
-          );
-        })}
+    <div className="page-enter px-5 pt-6 pb-4 max-w-md mx-auto">
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="h-8 w-8 rounded-xl bg-emerald-50 flex items-center justify-center">
+            <ChefHat size={16} className="text-emerald-600" />
+          </div>
+          <h1 className="text-2xl font-black tracking-tight text-stone-900">Produksi</h1>
+        </div>
+        <p className="text-sm text-stone-500 ml-10">Apa yang kamu buat hari ini?</p>
       </div>
 
-      <div className="space-y-3 mb-4">
+      {/* Variant chips */}
+      <div className="mb-5">
+        <p className="text-xs font-bold uppercase tracking-[0.15em] text-stone-400 mb-3">Pilih Varian</p>
+        <div className="flex flex-wrap gap-2" data-testid="variant-chips">
+          {variants.map((v) => {
+            const isSelected = selected.has(v.id);
+            return (
+              <button
+                key={v.id}
+                onClick={() => toggleVariant(v.id)}
+                data-testid={`variant-chip-${v.id}`}
+                className={`min-h-[48px] px-5 py-2.5 rounded-full text-sm font-bold transition-all duration-200 border tap-target ${
+                  isSelected
+                    ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20"
+                    : "bg-white text-stone-700 border-stone-200 hover:border-stone-300"
+                }`}
+              >
+                {v.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Entry cards */}
+      <div className="space-y-4 mb-4">
         {Array.from(selected).map((vid) => {
           const variant = variants.find((v) => v.id === vid);
           const entry = entries.get(vid);
           if (!variant || !entry) return null;
           return (
-            <Card key={vid} className="p-4">
-              <p className="font-semibold text-stone-900 mb-3">{variant.name}</p>
-              <div className="space-y-3">
+            <div
+              key={vid}
+              className="rounded-3xl bg-white border border-stone-100 shadow-sm p-5 page-enter"
+              data-testid={`entry-card-${vid}`}
+            >
+              <p className="font-bold text-stone-900 mb-4 text-base">{variant.name}</p>
+              <div className="space-y-4">
                 <div>
-                  <label className="text-xs text-stone-500 mb-1 block">Jumlah Batch/Adonan</label>
+                  <label className="text-xs font-bold uppercase tracking-[0.15em] text-stone-400 mb-2 block">
+                    Jumlah Batch / Adonan
+                  </label>
                   <Stepper
                     value={entry.batches}
                     onChange={(v) => updateEntry(vid, "batches", v)}
                     onStep={(d) => stepValue(vid, "batches", d)}
                     step="0.5"
+                    testId={`stepper-batches-${vid}`}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-stone-500 mb-1 block">Jumlah Loyang</label>
+                  <label className="text-xs font-bold uppercase tracking-[0.15em] text-stone-400 mb-2 block">
+                    Jumlah Loyang
+                  </label>
                   <Stepper
                     value={entry.loyangCount}
                     onChange={(v) => updateEntry(vid, "loyangCount", v)}
                     onStep={(d) => stepValue(vid, "loyangCount", d)}
                     step="1"
+                    testId={`stepper-loyang-${vid}`}
                   />
-                  <p className="text-xs text-stone-400 mt-1">Sesuai loyang yang sudah dicetak</p>
+                  <p className="text-xs text-stone-400 mt-1.5">Sesuai loyang yang sudah dicetak</p>
                 </div>
               </div>
-            </Card>
+            </div>
           );
         })}
       </div>
@@ -206,44 +228,63 @@ export default function CrewProductionPage() {
       {selected.size > 0 && (
         <>
           <div className="mb-4">
-            <label className="text-xs text-stone-500 mb-1 block">Catatan (opsional)</label>
+            <label className="text-xs font-bold uppercase tracking-[0.15em] text-stone-400 mb-2 block">
+              Catatan (Opsional)
+            </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-md border border-stone-200 px-3 py-2 text-sm resize-none"
+              className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-colors"
               rows={2}
-              placeholder="Catatan umum..."
+              placeholder="Catatan umum produksi hari ini..."
+              data-testid="production-notes"
             />
           </div>
 
-          <Button
+          <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full min-h-[48px] text-base gap-2"
-            size="lg"
+            className="w-full min-h-[56px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base flex items-center justify-center gap-3 shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition-all disabled:opacity-70 tap-target"
+            data-testid="save-production-button"
           >
-            {submitting ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+            {submitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
             Simpan Semua Produksi
-          </Button>
+          </button>
         </>
       )}
 
-      {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
-      {success && <p className="text-sm text-emerald-600 mt-3">{success}</p>}
+      {error && (
+        <div className="rounded-2xl bg-rose-50 border border-rose-100 px-4 py-3 mt-4" data-testid="production-error">
+          <p className="text-sm text-rose-700 font-medium">{error}</p>
+        </div>
+      )}
+      {success && (
+        <div className="rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-3 mt-4" data-testid="production-success">
+          <p className="text-sm text-emerald-700 font-medium">{success}</p>
+        </div>
+      )}
 
+      {/* Today's productions */}
       {todayProductions.length > 0 && (
         <div className="mt-8">
-          <h2 className="text-sm font-semibold text-stone-900 mb-2">Riwayat hari ini</h2>
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-stone-400 mb-3">
+            Sudah Dicatat Hari Ini
+          </p>
           <div className="space-y-2">
-            {todayProductions.map((p) => (
-              <Card key={p.id} className="p-3 flex items-center justify-between">
-                <div className="text-sm">
-                  <span className="font-medium text-stone-900">{p.variantId}</span>
-                  <span className="text-stone-400 mx-1">·</span>
-                  <span className="text-stone-500">{p.batches} batch</span>
+            {todayProductions.map((p, i) => (
+              <div
+                key={p.id}
+                className="rounded-2xl bg-white border border-stone-100 shadow-sm px-4 py-3 flex items-center justify-between"
+                data-testid={`today-production-${i}`}
+              >
+                <div>
+                  <span className="text-sm font-semibold text-stone-900">{p.variantId}</span>
+                  <p className="text-xs text-stone-400">{p.batches} batch</p>
                 </div>
-                <span className="text-sm font-mono text-stone-700">{p.loyangCount} loyang</span>
-              </Card>
+                <span className="text-sm font-bold tabular-nums text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full">
+                  {p.loyangCount} loyang
+                </span>
+              </div>
             ))}
           </div>
         </div>
@@ -257,20 +298,23 @@ function Stepper({
   onChange,
   onStep,
   step,
+  testId,
 }: {
   value: string;
   onChange: (v: string) => void;
   onStep: (delta: number) => void;
   step: string;
+  testId?: string;
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center bg-stone-50 border border-stone-200 rounded-full p-1 gap-1" data-testid={testId}>
       <button
         type="button"
         onClick={() => onStep(-1)}
-        className="h-10 w-10 rounded-lg bg-stone-100 flex items-center justify-center text-stone-600 hover:bg-stone-200 active:scale-95"
+        className="h-12 w-12 rounded-full bg-white shadow-sm flex items-center justify-center text-stone-600 active:bg-stone-100 transition-colors tap-target"
+        data-testid={testId ? `${testId}-minus` : undefined}
       >
-        <Minus size={16} />
+        <Minus size={18} strokeWidth={2.5} />
       </button>
       <Input
         type="number"
@@ -278,14 +322,16 @@ function Stepper({
         min="0"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="text-center flex-1 font-mono text-lg"
+        className="flex-1 text-center font-black text-xl tabular-nums border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 h-12 p-0"
+        data-testid={testId ? `${testId}-input` : undefined}
       />
       <button
         type="button"
         onClick={() => onStep(1)}
-        className="h-10 w-10 rounded-lg bg-stone-100 flex items-center justify-center text-stone-600 hover:bg-stone-200 active:scale-95"
+        className="h-12 w-12 rounded-full bg-emerald-600 shadow-sm flex items-center justify-center text-white active:bg-emerald-700 transition-colors tap-target"
+        data-testid={testId ? `${testId}-plus` : undefined}
       >
-        <Plus size={16} />
+        <Plus size={18} strokeWidth={2.5} />
       </button>
     </div>
   );

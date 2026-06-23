@@ -30,12 +30,35 @@
 @layer base {
   * { @apply border-border; }
   body {
-    @apply bg-stone-100 text-stone-900 antialiased;
+    @apply bg-stone-50 text-stone-900 antialiased;
     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
     -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
   }
+  /* Rounded card overrides for shadcn */
+  .card-rounded { border-radius: 1.5rem !important; }
 }
 
 .font-mono {
   font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, 'SFMono-Regular', monospace;
 }
+
+/* Page entrance animation */
+@keyframes fade-slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter { animation: fade-slide-up 0.3s ease-out both; }
+
+/* Stagger delays for list items */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }
+.stagger-5 { animation-delay: 0.25s; }
+
+/* Tap feedback */
+.tap-target { @apply active:scale-[0.97] transition-transform duration-100; }
+
+/* Safe area padding */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
