@@ -2,46 +2,31 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Button } from "@/components/ui/button";
 import {
-  Loader2,
-  TrendingUp,
-  Package,
-  AlertTriangle,
-  Bell,
-  CheckCheck,
-  ShoppingCart,
-  Receipt,
-  Users,
-  ChevronRight,
-  Sparkles,
+  Loader2, TrendingUp, Package, AlertTriangle, Bell, CheckCheck,
+  ShoppingCart, Receipt, Users, ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
 
 interface DashboardData {
-  omzet: number;
-  hpp: number;
-  profit: number;
-  orderCount: number;
+  omzet: number; hpp: number; profit: number; orderCount: number;
   productionToday: { variantId: string; variantName: string; batches: number; loyangCount: number }[];
   lowStockItems: { id: string; name: string; currentStock: number; minStock: number; baseUnit: string }[];
 }
-
 interface AlertItem {
-  id: string;
-  type: string;
-  severity: string;
-  title: string;
-  message: string;
-  isRead: boolean;
-  createdAt: string;
+  id: string; type: string; severity: string;
+  title: string; message: string; isRead: boolean; createdAt: string;
 }
 
 const QUICK_ACTIONS = [
-  { label: "Kasir", href: "/manager/pos", icon: ShoppingCart, color: "bg-emerald-50 text-emerald-700" },
-  { label: "Pengeluaran", href: "/manager/inventory", icon: Receipt, color: "bg-sky-50 text-sky-700" },
-  { label: "Payroll", href: "/manager/employees", icon: Users, color: "bg-violet-50 text-violet-700" },
+  { label: "Kasir", href: "/manager/pos", icon: ShoppingCart, bg: "#FEF1F5", color: "#E85D8C" },
+  { label: "Pengeluaran", href: "/manager/inventory", icon: Receipt, bg: "#EFF6FF", color: "#3B82F6" },
+  { label: "Payroll", href: "/manager/employees", icon: Users, bg: "#F5F3FF", color: "#8B5CF6" },
 ];
+
+function fmt(n: number) {
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+}
 
 export default function ManagerDashboardPage() {
   const { user, getToken } = useAuth();
@@ -49,31 +34,16 @@ export default function ManagerDashboardPage() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchWithAuth = useCallback(
-    async (url: string, options?: RequestInit) => {
-      const token = await getToken();
-      return fetch(url, {
-        ...options,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          ...options?.headers,
-        },
-      });
-    },
-    [getToken]
-  );
+  const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
+    const token = await getToken();
+    return fetch(url, { ...options, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options?.headers } });
+  }, [getToken]);
 
   useEffect(() => {
     Promise.all([
       fetchWithAuth("/api/dashboard/today").then((r) => r.json()),
       fetchWithAuth("/api/alerts?unread=true").then((r) => r.json()),
-    ])
-      .then(([d, a]) => {
-        setData(d);
-        setAlerts(Array.isArray(a) ? a : []);
-      })
-      .finally(() => setLoading(false));
+    ]).then(([d, a]) => { setData(d); setAlerts(Array.isArray(a) ? a : []); }).finally(() => setLoading(false));
   }, [fetchWithAuth]);
 
   async function markAllRead() {
@@ -81,26 +51,10 @@ export default function ManagerDashboardPage() {
     setAlerts([]);
   }
 
-  function formatCurrency(n: number) {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(n);
-  }
-
-  const today = new Date().toLocaleDateString("id-ID", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  const today = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
 
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
-      </div>
-    );
+    return <div className="flex h-screen items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} /></div>;
   }
 
   return (
@@ -108,19 +62,15 @@ export default function ManagerDashboardPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.15em] text-stone-400 mb-0.5">{today}</p>
-          <h1 className="text-2xl font-black tracking-tight text-stone-900">
+          <p className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94A3B8" }}>{today}</p>
+          <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>
             Hai, {user?.displayName?.split(" ")[0] ?? "Manager"} 👋
           </h1>
         </div>
         {alerts.length > 0 && (
-          <button
-            onClick={markAllRead}
-            className="relative mt-1 p-2 rounded-2xl bg-white shadow-sm border border-stone-100 tap-target"
-            data-testid="alerts-bell-button"
-          >
-            <Bell size={20} className="text-stone-600" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-rose-500" />
+          <button onClick={markAllRead} className="relative mt-1 p-2.5 rounded-2xl tap-target" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", border: "1px solid #F1F5F9" }} data-testid="alerts-bell-button">
+            <Bell size={20} style={{ color: "#64748B" }} />
+            <span className="absolute top-1.5 right-1.5 h-2.5 w-2.5 rounded-full" style={{ background: "#DC2626", border: "2px solid white" }} />
           </button>
         )}
       </div>
@@ -129,32 +79,21 @@ export default function ManagerDashboardPage() {
       {data && (
         <div
           data-testid="hero-revenue-card"
-          className="relative rounded-3xl bg-gradient-to-br from-emerald-500 to-emerald-700 p-6 mb-4 overflow-hidden shadow-[0_8px_30px_rgba(5,150,105,0.25)]"
+          className="relative rounded-3xl p-6 mb-4 overflow-hidden"
+          style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)", boxShadow: "0 8px 32px rgba(232,93,140,0.3)" }}
         >
-          {/* Decorations */}
-          <div className="absolute -top-6 -right-6 h-32 w-32 rounded-full bg-white/10" />
-          <div className="absolute -bottom-8 -right-2 h-24 w-24 rounded-full bg-white/5" />
-          <div className="absolute top-4 right-16 h-3 w-3 rounded-full bg-white/20" />
-
+          <div className="absolute -top-6 -right-6 h-32 w-32 rounded-full" style={{ background: "rgba(255,255,255,0.12)" }} />
+          <div className="absolute -bottom-8 right-8 h-20 w-20 rounded-full" style={{ background: "rgba(255,255,255,0.07)" }} />
           <div className="relative">
             <div className="flex items-center gap-1.5 mb-1">
-              <TrendingUp size={14} className="text-emerald-200" />
-              <span className="text-sm font-medium text-emerald-100">Omzet Hari Ini</span>
+              <TrendingUp size={14} style={{ color: "rgba(255,255,255,0.7)" }} />
+              <span className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.85)" }}>Omzet Hari Ini</span>
             </div>
-            <p
-              className="text-3xl font-black tracking-tight text-white tabular-nums mb-2"
-              data-testid="omzet-value"
-            >
-              {formatCurrency(data.omzet)}
-            </p>
+            <p className="text-3xl font-extrabold tracking-tight text-white tabular-nums mb-2" data-testid="omzet-value">{fmt(data.omzet)}</p>
             <div className="flex items-center gap-3">
-              <span className="text-xs font-medium text-emerald-200">
-                {data.orderCount} order
-              </span>
-              <span className="text-emerald-400">·</span>
-              <span className="text-xs font-medium text-emerald-200">
-                Profit: {formatCurrency(data.profit)}
-              </span>
+              <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.75)" }}>{data.orderCount} order</span>
+              <span style={{ color: "rgba(255,255,255,0.4)" }}>·</span>
+              <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.75)" }}>Profit: {fmt(data.profit)}</span>
             </div>
           </div>
         </div>
@@ -162,36 +101,31 @@ export default function ManagerDashboardPage() {
 
       {/* Stat cards */}
       {data && (
-        <div className="grid grid-cols-2 gap-3 mb-4 stagger-1 page-enter">
-          <div className="rounded-2xl bg-white border border-stone-100 shadow-sm p-4" data-testid="hpp-card">
-            <p className="text-xs font-bold uppercase tracking-widest text-stone-400 mb-1">HPP</p>
-            <p className="text-xl font-black tabular-nums text-stone-900">{formatCurrency(data.hpp)}</p>
+        <div className="grid grid-cols-2 gap-3 mb-4 page-enter stagger-1">
+          <div className="rounded-2xl p-4" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", border: "1px solid #F1F5F9" }} data-testid="hpp-card">
+            <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "#94A3B8" }}>HPP</p>
+            <p className="text-lg font-extrabold tabular-nums" style={{ color: "#1C1C1E" }}>{fmt(data.hpp)}</p>
           </div>
-          <div className="rounded-2xl bg-white border border-stone-100 shadow-sm p-4" data-testid="profit-card">
-            <p className="text-xs font-bold uppercase tracking-widest text-stone-400 mb-1">Profit</p>
-            <p className="text-xl font-black tabular-nums text-emerald-600">{formatCurrency(data.profit)}</p>
+          <div className="rounded-2xl p-4" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", border: "1px solid #F1F5F9" }} data-testid="profit-card">
+            <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "#94A3B8" }}>Profit</p>
+            <p className="text-lg font-extrabold tabular-nums" style={{ color: "#E85D8C" }}>{fmt(data.profit)}</p>
           </div>
         </div>
       )}
 
       {/* Quick actions */}
-      <div className="mb-5 stagger-2 page-enter">
-        <p className="text-xs font-bold uppercase tracking-[0.15em] text-stone-400 mb-3">Aksi Cepat</p>
-        <div className="grid grid-cols-3 gap-2">
+      <div className="mb-5 page-enter stagger-2">
+        <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "#94A3B8" }}>Aksi Cepat</p>
+        <div className="grid grid-cols-3 gap-2.5">
           {QUICK_ACTIONS.map((action) => {
             const Icon = action.icon;
             return (
-              <Link
-                key={action.href}
-                href={action.href}
-                data-testid={`quick-action-${action.label.toLowerCase()}`}
-                className="tap-target"
-              >
-                <div className="rounded-2xl bg-white border border-stone-100 shadow-sm p-4 text-center hover:shadow-md transition-shadow">
-                  <div className={`h-10 w-10 mx-auto rounded-xl ${action.color} flex items-center justify-center mb-2`}>
-                    <Icon size={18} />
+              <Link key={action.href} href={action.href} data-testid={`quick-action-${action.label.toLowerCase()}`} className="tap-target">
+                <div className="rounded-2xl p-4 text-center" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", border: "1px solid #F1F5F9" }}>
+                  <div className="h-11 w-11 mx-auto rounded-xl flex items-center justify-center mb-2" style={{ background: action.bg }}>
+                    <Icon size={19} style={{ color: action.color }} />
                   </div>
-                  <p className="text-xs font-semibold text-stone-700">{action.label}</p>
+                  <p className="text-xs font-semibold" style={{ color: "#334155" }}>{action.label}</p>
                 </div>
               </Link>
             );
@@ -201,24 +135,18 @@ export default function ManagerDashboardPage() {
 
       {/* Production today */}
       {data && data.productionToday.length > 0 && (
-        <div className="rounded-2xl bg-white border border-stone-100 shadow-sm p-4 mb-4 stagger-3 page-enter" data-testid="production-today-card">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-xl bg-emerald-50 flex items-center justify-center">
-                <Package size={14} className="text-emerald-600" />
-              </div>
-              <h2 className="text-sm font-bold text-stone-900">Produksi Hari Ini</h2>
+        <div className="rounded-2xl p-4 mb-4 page-enter stagger-3" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", border: "1px solid #F1F5F9" }} data-testid="production-today-card">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="h-7 w-7 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
+              <Package size={14} style={{ color: "#E85D8C" }} />
             </div>
-            <Sparkles size={14} className="text-stone-300" />
+            <h2 className="text-sm font-bold" style={{ color: "#1C1C1E" }}>Produksi Hari Ini</h2>
           </div>
           <div className="space-y-2">
             {data.productionToday.map((p) => (
-              <div
-                key={p.variantId}
-                className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2"
-              >
-                <span className="text-sm font-medium text-stone-700">{p.variantName}</span>
-                <span className="text-xs font-bold text-stone-500 tabular-nums">
+              <div key={p.variantId} className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: "#F8FAFC" }}>
+                <span className="text-sm font-medium" style={{ color: "#334155" }}>{p.variantName}</span>
+                <span className="text-xs font-bold tabular-nums" style={{ color: "#64748B" }}>
                   {p.batches}batch · {p.loyangCount}lyang
                 </span>
               </div>
@@ -227,21 +155,21 @@ export default function ManagerDashboardPage() {
         </div>
       )}
 
-      {/* Low stock warning */}
+      {/* Low stock */}
       {data && data.lowStockItems.length > 0 && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 mb-4 stagger-4 page-enter" data-testid="low-stock-card">
+        <div className="rounded-2xl p-4 mb-4 page-enter stagger-4" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }} data-testid="low-stock-card">
           <div className="flex items-center gap-2 mb-3">
-            <div className="h-7 w-7 rounded-xl bg-amber-100 flex items-center justify-center">
-              <AlertTriangle size={14} className="text-amber-600" />
+            <div className="h-7 w-7 rounded-xl flex items-center justify-center" style={{ background: "#FEE2E2" }}>
+              <AlertTriangle size={14} style={{ color: "#DC2626" }} />
             </div>
-            <h2 className="text-sm font-bold text-amber-800">Bahan Menipis</h2>
+            <h2 className="text-sm font-bold" style={{ color: "#991B1B" }}>Bahan Menipis</h2>
           </div>
           <div className="space-y-1.5">
             {data.lowStockItems.map((item) => (
               <div key={item.id} className="flex items-center justify-between">
-                <span className="text-sm font-medium text-amber-800">{item.name}</span>
-                <span className="text-xs font-bold tabular-nums text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
-                  {item.currentStock.toLocaleString("id-ID")}/{item.minStock.toLocaleString("id-ID")} {item.baseUnit}
+                <span className="text-sm font-medium" style={{ color: "#991B1B" }}>{item.name}</span>
+                <span className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-full" style={{ color: "#DC2626", background: "#FEE2E2" }}>
+                  {item.currentStock}/{item.minStock} {item.baseUnit}
                 </span>
               </div>
             ))}
@@ -251,44 +179,27 @@ export default function ManagerDashboardPage() {
 
       {/* Alerts */}
       {alerts.length > 0 && (
-        <div className="rounded-2xl bg-white border border-stone-100 shadow-sm p-4 stagger-5 page-enter" data-testid="alerts-card">
+        <div className="rounded-2xl p-4 page-enter stagger-5" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", border: "1px solid #F1F5F9" }} data-testid="alerts-card">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-xl bg-rose-50 flex items-center justify-center">
-                <Bell size={14} className="text-rose-500" />
+              <div className="h-7 w-7 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
+                <Bell size={14} style={{ color: "#E85D8C" }} />
               </div>
-              <h2 className="text-sm font-bold text-stone-900">Notifikasi</h2>
-              <span className="text-xs font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full">
-                {alerts.length}
-              </span>
+              <h2 className="text-sm font-bold" style={{ color: "#1C1C1E" }}>Notifikasi</h2>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ color: "#E85D8C", background: "#FEF1F5" }}>{alerts.length}</span>
             </div>
-            <Button
-              onClick={markAllRead}
-              variant="ghost"
-              size="sm"
-              className="text-xs gap-1 h-7 text-stone-500 hover:text-stone-700"
-              data-testid="mark-all-read-button"
-            >
+            <button onClick={markAllRead} className="flex items-center gap-1 text-xs font-semibold tap-target" style={{ color: "#64748B" }} data-testid="mark-all-read-button">
               <CheckCheck size={12} /> Baca semua
-            </Button>
+            </button>
           </div>
           <div className="space-y-2">
             {alerts.slice(0, 5).map((alert) => (
-              <div
-                key={alert.id}
-                className={`rounded-xl px-3 py-2.5 ${
-                  alert.severity === "warning"
-                    ? "bg-amber-50 border border-amber-100"
-                    : "bg-stone-50 border border-stone-100"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-stone-900">{alert.title}</p>
-                    <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">{alert.message}</p>
-                  </div>
-                  <ChevronRight size={14} className="text-stone-300 mt-0.5 shrink-0" />
+              <div key={alert.id} className="rounded-xl px-3 py-2.5 flex items-start justify-between gap-2" style={{ background: alert.severity === "warning" ? "#FFFBEB" : "#F8FAFC", border: `1px solid ${alert.severity === "warning" ? "#FDE68A" : "#F1F5F9"}` }}>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>{alert.title}</p>
+                  <p className="text-xs mt-0.5" style={{ color: "#64748B" }}>{alert.message}</p>
                 </div>
+                <ChevronRight size={14} style={{ color: "#CBD5E1" }} className="mt-0.5 shrink-0" />
               </div>
             ))}
           </div>

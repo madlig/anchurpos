@@ -9,6 +9,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["'Plus Jakarta Sans'", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["'JetBrains Mono'", "ui-monospace", "monospace"],
+      },
       colors: {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
@@ -39,6 +43,19 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        // Brand pink palette
+        brand: {
+          50:  "#FEF1F5",
+          100: "#FCDCE8",
+          200: "#FCABB4",
+          300: "#F2A0B7",
+          400: "#EE7BA0",
+          500: "#E85D8C",
+          600: "#D44D7A",
+          700: "#C94A73",
+          800: "#A83860",
+          900: "#8B2A4D",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
