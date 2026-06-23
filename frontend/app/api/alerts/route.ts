@@ -16,11 +16,30 @@ export async function GET(req: NextRequest) {
       .limit(50);
 
     if (unread === "true") {
-      query = adminDb
+      // Use simple query (no composite index needed) then filter in memory
+      const snap = await adminDb
         .collection("alerts")
-        .where("isRead", "==", false)
         .orderBy("createdAt", "desc")
-        .limit(50);
+        .limit(100)
+        .get();
+      const results = snap.docs
+        .filter((doc) => doc.data().isRead === false)
+        .slice(0, 50)
+        .map((doc) => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            type: d.type,
+            severity: d.severity,
+            title: d.title,
+            message: d.message,
+            sourceCollection: d.sourceCollection,
+            sourceId: d.sourceId,
+            isRead: d.isRead,
+            createdAt: d.createdAt?.toDate?.().toISOString() ?? d.createdAt,
+          };
+        });
+      return NextResponse.json(results);
     }
 
     const snap = await query.get();
