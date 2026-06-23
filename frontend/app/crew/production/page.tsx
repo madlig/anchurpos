@@ -137,24 +137,87 @@ export default function CrewProductionPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center" style={{ background: "#FCABB4" }}>
         <Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} />
       </div>
     );
   }
 
+  const totalLoyang = todayProductions.reduce((s, p) => s + p.loyangCount, 0);
+  const LOYANG_TARGET = 8;
+  const progressPct = Math.round((totalLoyang / LOYANG_TARGET) * 100);
+
   return (
-    <div className="page-enter px-5 pt-6 pb-4 md:px-8 md:pt-8">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
-            <ChefHat size={16} style={{ color: "#E85D8C" }} />
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>Produksi</h1>
-        </div>
-        <p className="text-sm ml-10" style={{ color: "#64748B" }}>Apa yang kamu buat hari ini?</p>
+    <div className="page-enter min-h-screen" style={{ background: "#FCABB4" }}>
+
+      {/* Header (white) */}
+      <div className="px-5 pt-4 pb-4" style={{ background: "#fff" }}>
+        <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Produksi Hari Ini</h1>
+        <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "2px" }}>
+          {todayProductions.length} item produksi tercatat
+        </p>
       </div>
+
+      <div className="px-4 pt-4 pb-4 md:px-8 md:max-w-3xl">
+
+      {/* Summary stats card */}
+      {todayProductions.length > 0 && (
+        <div
+          data-testid="production-summary-card"
+          style={{ background: "#fff", borderRadius: "14px", border: "1px solid #F1F5F9", marginBottom: "16px", overflow: "hidden" }}
+        >
+          <div className="flex" style={{ borderBottom: "1px solid #F8FAFC" }}>
+            {[
+              { label: "Selesai", value: String(totalLoyang), color: "#E85D8C" },
+              { label: "Target", value: String(LOYANG_TARGET), color: "#64748B" },
+              { label: "Progress", value: `${progressPct}%`, color: progressPct >= 100 ? "#16A34A" : "#D97706" },
+            ].map((s, i) => (
+              <div
+                key={s.label}
+                className="flex-1 text-center py-3"
+                style={{ borderRight: i < 2 ? "1px solid #F8FAFC" : "none" }}
+              >
+                <p style={{ fontSize: "20px", fontWeight: "700", color: s.color }}>{s.value}</p>
+                <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Today's productions */}
+      {todayProductions.length > 0 && (
+        <div style={{ marginBottom: "16px" }}>
+          <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "10px" }}>Sudah Dicatat</p>
+          <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden", border: "1px solid #F1F5F9" }}>
+            {todayProductions.map((p, i) => {
+              const barPct = Math.min(100, (p.loyangCount / LOYANG_TARGET) * 100);
+              return (
+                <div
+                  key={p.id}
+                  style={{ padding: "12px 14px", borderBottom: i < todayProductions.length - 1 ? "1px solid #F8FAFC" : "none" }}
+                  data-testid={`today-production-${i}`}
+                >
+                  <div className="flex items-center justify-between" style={{ marginBottom: "6px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{p.variantId}</span>
+                    <span style={{ fontSize: "11px", fontWeight: "600", color: "#E85D8C", padding: "2px 8px", borderRadius: "100px", background: "#FEF1F5" }}>
+                      {p.loyangCount} loyang
+                    </span>
+                  </div>
+                  <div style={{ height: "4px", borderRadius: "2px", background: "#F1F5F9" }}>
+                    <div style={{ height: "4px", borderRadius: "2px", background: "#E85D8C", width: `${barPct}%`, transition: "width 0.4s" }} />
+                  </div>
+                  <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "4px" }}>{p.batches} batch</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Add Production Form */}
+      <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9", marginBottom: "12px" }}>
+        <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "12px" }}>Tambah Produksi</p>
 
       {/* Variant chips */}
       <div className="mb-5">
@@ -267,32 +330,9 @@ export default function CrewProductionPage() {
         </div>
       )}
 
-      {/* Today's productions */}
-      {todayProductions.length > 0 && (
-        <div className="mt-8">
-          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "#94A3B8" }}>
-            Sudah Dicatat Hari Ini
-          </p>
-          <div className="space-y-2">
-            {todayProductions.map((p, i) => (
-              <div
-                key={p.id}
-                className="rounded-2xl px-4 py-3 flex items-center justify-between"
-                style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}
-                data-testid={`today-production-${i}`}
-              >
-                <div>
-                  <span className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>{p.variantId}</span>
-                  <p className="text-xs" style={{ color: "#94A3B8" }}>{p.batches} batch</p>
-                </div>
-                <span className="text-sm font-bold tabular-nums px-2 py-1 rounded-full" style={{ color: "#E85D8C", background: "#FEF1F5" }}>
-                  {p.loyangCount} loyang
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      </div>{/* /Add Production Form */}
+
+      </div>{/* /px-4 */}
     </div>
   );
 }

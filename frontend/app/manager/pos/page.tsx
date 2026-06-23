@@ -138,25 +138,26 @@ export default function ManagerPosPage() {
   }
 
   return (
-    <div className="page-enter px-5 pt-6 pb-4 md:px-8 md:pt-8">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-6">
-        <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
-          <ShoppingCart size={16} style={{ color: "#E85D8C" }} />
-        </div>
-        <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>Kasir</h1>
+    <div className="page-enter min-h-screen" style={{ background: "#FCABB4" }}>
+
+      {/* Header (white) */}
+      <div className="px-5 pt-4 pb-4" style={{ background: "#fff" }}>
+        <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Kasir</h1>
+        <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "2px" }}>Buat pesanan baru</p>
       </div>
 
+      <div className="px-4 pt-4 pb-4 md:px-8 md:max-w-5xl">
+
       {/* Desktop: 2-column layout */}
-      <div className="md:grid md:grid-cols-[1fr_340px] md:gap-6 max-w-5xl">
+      <div className="md:grid md:grid-cols-[1fr_340px] md:gap-5">
         {/* Left: Customer + Cart */}
         <div>
           {/* Customer selector */}
-          <div className="mb-4">
-            <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>Pelanggan</label>
+          <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9", marginBottom: "12px" }}>
+            <label style={{ fontSize: "11px", fontWeight: "600", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: "8px" }}>Pelanggan</label>
             <div className="relative">
               <select value={selectedCustomer} onChange={(e) => setSelectedCustomer(e.target.value)} className={SELECT_CLS}
-                style={{ borderColor: "#E2E8F0", background: "#fff" }} data-testid="customer-select">
+                style={{ borderColor: "#E2E8F0", background: "#F8FAFC", fontSize: "13px" }} data-testid="customer-select">
                 <option value="">Pilih pelanggan...</option>
                 {customers.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.channel})</option>)}
               </select>
@@ -164,40 +165,40 @@ export default function ManagerPosPage() {
             </div>
           </div>
 
+          {/* Cart */}
+          <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9", marginBottom: "12px" }}>
           {/* Cart header */}
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Item Pesanan</p>
-            <button onClick={() => setShowAddItem(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold tap-target"
-              style={{ background: "#FEF1F5", color: "#E85D8C" }} data-testid="add-item-button">
+          <div className="flex items-center justify-between" style={{ marginBottom: "12px" }}>
+            <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>Item Pesanan</p>
+            <button onClick={() => setShowAddItem(true)} className="flex items-center gap-1.5 tap-target"
+              style={{ padding: "6px 12px", borderRadius: "100px", background: "#FEF1F5", color: "#E85D8C", fontSize: "12px", fontWeight: "600", border: "none" }} data-testid="add-item-button">
               <Plus size={13} strokeWidth={2.5} /> Tambah
             </button>
           </div>
 
           {cart.length === 0 && !showAddItem && (
-            <div className="rounded-3xl py-10 text-center mb-4" style={{ background: "#fff", border: "2px dashed #E2E8F0" }}>
-              <ShoppingCart size={28} className="mx-auto mb-2" style={{ color: "#CBD5E1" }} />
-              <p className="text-sm font-medium" style={{ color: "#94A3B8" }}>Belum ada item</p>
-              <p className="text-xs mt-1" style={{ color: "#CBD5E1" }}>Tap Tambah untuk mulai</p>
+            <div className="py-8 text-center" style={{ borderRadius: "10px", background: "#F8FAFC", border: "1px dashed #E2E8F0" }}>
+              <ShoppingCart size={24} className="mx-auto mb-2" style={{ color: "#CBD5E1" }} />
+              <p style={{ fontSize: "13px", color: "#94A3B8" }}>Belum ada item</p>
             </div>
           )}
 
-          <div className="space-y-2 mb-4">
+          <div className="flex flex-col gap-2">
             {cart.map((item, idx) => (
-              <div key={idx} className="rounded-2xl px-4 py-3 flex items-center justify-between" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }} data-testid={`cart-item-${idx}`}>
+              <div key={idx} className="flex items-center justify-between" style={{ padding: "10px 12px", borderRadius: "10px", background: "#F8FAFC", border: "1px solid #F1F5F9" }} data-testid={`cart-item-${idx}`}>
                 <div className="min-w-0 flex-1 mr-3">
-                  <p className="text-sm font-semibold truncate" style={{ color: "#1C1C1E" }}>{item.productName} — {item.variantName}</p>
-                  <p className="text-xs mt-0.5 tabular-nums" style={{ color: "#94A3B8" }}>
-                    {item.qty} × {fmt(item.basePrice)} = <span className="font-bold" style={{ color: "#E85D8C" }}>{fmt(item.subtotal)}</span>
+                  <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{item.productName} — {item.variantName}</p>
+                  <p style={{ fontSize: "11px", marginTop: "2px", color: "#94A3B8" }}>
+                    {item.qty} × {fmt(item.basePrice)} = <span style={{ fontWeight: "700", color: "#E85D8C" }}>{fmt(item.subtotal)}</span>
                   </p>
                 </div>
-                <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} className="h-8 w-8 rounded-xl flex items-center justify-center tap-target" style={{ background: "#FEF2F2", color: "#DC2626" }} data-testid={`remove-cart-item-${idx}`}>
-                  <Trash2 size={14} />
+                <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#FEF2F2", color: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", border: "none" }} data-testid={`remove-cart-item-${idx}`}>
+                  <Trash2 size={13} />
                 </button>
               </div>
             ))}
           </div>
-
-          {/* Add item panel */}
+          </div>{/* /Cart */}
           {showAddItem && (
             <div className="rounded-3xl p-5 mb-4" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }} data-testid="add-item-panel">
               <div className="flex items-center justify-between mb-4">
@@ -334,9 +335,11 @@ export default function ManagerPosPage() {
         </div>
       )}
 
-      {error && <div className="rounded-2xl px-4 py-3 mt-4 max-w-5xl" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }} data-testid="pos-error">
+      {error && <div className="rounded-2xl px-4 py-3 mt-4" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }} data-testid="pos-error">
         <p className="text-sm font-medium" style={{ color: "#DC2626" }}>{error}</p>
       </div>}
+
+      </div>{/* /px-4 */}
     </div>
   );
 }

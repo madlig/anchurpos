@@ -21,33 +21,53 @@ export default function ManagerMorePage() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
-      {/* Profile mini */}
-      <div className="flex items-center gap-3 mb-6 rounded-3xl p-4 max-w-2xl md:max-w-none" style={{ background: "#fff", border: "1px solid #F1F5F9" }}>
-        <div className="h-12 w-12 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)" }}>
-          <span className="text-xl font-black text-white">{(user?.displayName ?? "M")[0].toUpperCase()}</span>
+    <div className="page-enter min-h-screen" style={{ background: "#FCABB4" }}>
+
+      {/* Header (white) */}
+      <div className="px-5 pt-4 pb-4" style={{ background: "#fff" }}>
+        <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Lainnya</h1>
+      </div>
+
+      <div className="px-4 pt-4 pb-4 md:px-8 md:max-w-3xl">
+
+      {/* Profile Card */}
+      <div
+        className="flex items-center gap-3"
+        style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9", marginBottom: "12px" }}
+      >
+        <div style={{
+          width: "46px", height: "46px", borderRadius: "12px", flexShrink: 0,
+          background: "linear-gradient(135deg,#E85D8C,#C94A73)",
+          display: "flex", alignItems: "center", justifyContent: "center"
+        }}>
+          <span style={{ fontSize: "20px", fontWeight: "800", color: "#fff" }}>
+            {(user?.displayName ?? "M")[0].toUpperCase()}
+          </span>
         </div>
         <div>
-          <p className="font-bold text-base" style={{ color: "#1C1C1E" }}>{user?.displayName ?? "Manager"}</p>
-          <p className="text-xs font-semibold" style={{ color: "#E85D8C" }}>Manager</p>
+          <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>{user?.displayName ?? "Manager"}</p>
+          <p style={{ fontSize: "12px", fontWeight: "500", color: "#E85D8C" }}>Manager</p>
         </div>
       </div>
 
-      {/* Menu items */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-6">
-        {MENU_ITEMS.map((item) => {
+      {/* Menu Items */}
+      <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden", border: "1px solid #F1F5F9", marginBottom: "12px" }}>
+        {MENU_ITEMS.map((item, i) => {
           const Icon = item.icon;
           return (
             <Link key={item.href} href={item.href} data-testid={`menu-${item.label.toLowerCase().replace(/\s/g, "-")}`}>
-              <div className="rounded-2xl p-4 flex items-center gap-3 tap-target" style={{ background: "#fff", border: "1px solid #F1F5F9" }}>
-                <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#FEF1F5" }}>
-                  <Icon size={18} style={{ color: "#E85D8C" }} />
+              <div
+                className="flex items-center gap-3 tap-target"
+                style={{ padding: "13px 14px", borderBottom: i < MENU_ITEMS.length - 1 ? "1px solid #F8FAFC" : "none" }}
+              >
+                <div style={{ width: "34px", height: "34px", borderRadius: "10px", background: "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Icon size={16} style={{ color: "#E85D8C" }} />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>{item.label}</p>
-                  <p className="text-xs" style={{ color: "#94A3B8" }}>{item.description}</p>
+                  <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{item.label}</p>
+                  <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>{item.description}</p>
                 </div>
-                <ChevronRight size={16} style={{ color: "#CBD5E1" }} />
+                <ChevronRight size={15} style={{ color: "#CBD5E1" }} />
               </div>
             </Link>
           );
@@ -57,15 +77,17 @@ export default function ManagerMorePage() {
       {/* Logout */}
       <button
         onClick={logout}
-        className="flex items-center gap-2.5 w-full rounded-2xl p-4 tap-target"
-        style={{ background: "#FEF2F2", border: "1px solid #FECACA" }}
+        className="flex items-center gap-3 w-full tap-target"
+        style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #FECACA" }}
         data-testid="logout-button"
       >
-        <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: "#FEE2E2" }}>
-          <LogOut size={18} style={{ color: "#DC2626" }} />
+        <div style={{ width: "34px", height: "34px", borderRadius: "10px", background: "#FEE2E2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <LogOut size={16} style={{ color: "#DC2626" }} />
         </div>
-        <span className="text-sm font-semibold" style={{ color: "#DC2626" }}>Keluar</span>
+        <span style={{ fontSize: "13px", fontWeight: "600", color: "#DC2626" }}>Keluar</span>
       </button>
+
+      </div>
     </div>
   );
 }

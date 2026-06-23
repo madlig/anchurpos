@@ -31,25 +31,28 @@ export async function GET(req: NextRequest) {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const startDate = sevenDaysAgo.toISOString().split("T")[0];
 
+    // Use single equality filter to avoid composite index requirement, then sort in JS
     const historySnap = await adminDb
       .collection("attendance")
       .where("employeeId", "==", user.uid)
       .where("date", ">=", startDate)
-      .where("date", "<=", today)
-      .orderBy("date", "desc")
       .get();
 
-    const history = historySnap.docs.map((doc) => {
-      const d = doc.data();
-      return {
-        id: doc.id,
-        date: d.date,
-        checkIn: d.checkIn,
-        checkOut: d.checkOut,
-        totalHours: d.totalHours,
-        status: d.status,
-      };
-    });
+    const history = historySnap.docs
+      .map((doc) => {
+        const d = doc.data();
+        return {
+          id: doc.id as string,
+          date: d.date as string,
+          checkIn: d.checkIn,
+          checkOut: d.checkOut,
+          totalHours: d.totalHours,
+          status: d.status,
+        };
+      })
+      .filter((h) => h.date <= today)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 7);
 
     return NextResponse.json({ today: todayStatus, history });
   } catch (err) {

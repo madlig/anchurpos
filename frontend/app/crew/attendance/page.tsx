@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, LogIn, LogOut, Clock, CheckCircle2, AlertTriangle, Wifi } from "lucide-react";
+import { Loader2, Clock, CheckCircle2, AlertTriangle, Wifi } from "lucide-react";
 
 interface TodayStatus {
   id: string; date: string;
@@ -21,7 +21,7 @@ interface HistoryItem {
 }
 
 export default function CrewAttendancePage() {
-  const { user, getToken, logout } = useAuth();
+  const { user, getToken } = useAuth();
   const [today, setToday] = useState<TodayStatus | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,13 +51,7 @@ export default function CrewAttendancePage() {
 
   const hasCheckedIn = !!today;
   const hasCheckedOut = !!today?.checkOut?.time;
-
-  function getStatusConfig() {
-    if (!hasCheckedIn) return { label: "Belum Absen", sub: "Tap tombol di bawah untuk absen masuk", icon: Clock, bg: "#F8FAFC", iconBg: "#F1F5F9", iconColor: "#64748B", textColor: "#334155" };
-    if (!hasCheckedOut) return { label: "Sedang Bekerja", sub: `Absen masuk pukul ${formatTime(today!.checkIn.time)}`, icon: CheckCircle2, bg: "#FEF1F5", iconBg: "#FCDCE8", iconColor: "#E85D8C", textColor: "#C94A73" };
-    if (today!.status === "direview") return { label: "Sudah Pulang — Perlu Review", sub: today!.flaggedReason ?? "Mohon hubungi Manager", icon: AlertTriangle, bg: "#FFFBEB", iconBg: "#FEF3C7", iconColor: "#D97706", textColor: "#92400E" };
-    return { label: "Sudah Pulang", sub: today!.totalHours ? `Total ${today!.totalHours.toFixed(1)} jam kerja` : "Terima kasih hari ini!", icon: CheckCircle2, bg: "#F0FDF4", iconBg: "#DCFCE7", iconColor: "#16A34A", textColor: "#166534" };
-  }
+  const isDone = hasCheckedIn && hasCheckedOut;
 
   async function handleAction(type: "check-in" | "check-out") {
     setError(""); setSubmitting(true);
@@ -69,114 +63,172 @@ export default function CrewAttendancePage() {
     } catch { setError("Gagal menghubungi server"); } finally { setSubmitting(false); }
   }
 
-  const sc = getStatusConfig();
-  const StatusIcon = sc.icon;
-
-  if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} /></div>;
-
   const todayLabel = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
 
+  // Status config for the gradient card
+  const statusCard = (() => {
+    if (!hasCheckedIn) return { label: "Belum Absen", sub: "Tap tombol di bawah untuk absen masuk", gradient: "linear-gradient(135deg,#E85D8C,#F2A0B7)" };
+    if (!hasCheckedOut) return { label: "Sedang Bekerja", sub: `Masuk pukul ${formatTime(today!.checkIn.time)}`, gradient: "linear-gradient(135deg,#E85D8C,#F2A0B7)" };
+    if (today!.status === "direview") return { label: "Perlu Review", sub: today!.flaggedReason ?? "Hubungi Manager", gradient: "linear-gradient(135deg,#F59E0B,#D97706)" };
+    return { label: "Sudah Pulang", sub: today!.totalHours ? `Total ${today!.totalHours.toFixed(1)} jam` : "Terima kasih!", gradient: "linear-gradient(135deg,#22C55E,#16A34A)" };
+  })();
+
+  // Button config
+  const btnConfig = (() => {
+    if (!hasCheckedIn) return { label: "MASUK", action: () => handleAction("check-in"), bg: "linear-gradient(135deg,#E85D8C,#C94A73)", shadow: "0 10px 40px rgba(232,93,140,0.4)", testId: "attendance-check-in-btn" };
+    if (!hasCheckedOut) return { label: "PULANG", action: () => handleAction("check-out"), bg: "linear-gradient(135deg,#EF4444,#DC2626)", shadow: "0 10px 40px rgba(220,38,38,0.35)", testId: "attendance-check-out-btn" };
+    return null;
+  })();
+
+  if (loading) return (
+    <div className="flex h-screen items-center justify-center" style={{ background: "#FCABB4" }}>
+      <Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} />
+    </div>
+  );
+
   return (
-    <div className="page-enter px-5 pt-6 pb-4 md:px-8 md:pt-8">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6 max-w-2xl">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: "#94A3B8" }}>{todayLabel}</p>
-          <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>
-            Hai, {user?.displayName?.split(" ")[0] ?? "Crew"} 👋
-          </h1>
-        </div>
-        <button onClick={logout} className="mt-1 px-3 py-1.5 rounded-xl text-xs font-semibold tap-target" style={{ background: "#F1F5F9", color: "#64748B" }} data-testid="logout-button">
-          Keluar
-        </button>
+    <div className="page-enter min-h-screen" style={{ background: "#FCABB4" }}>
+
+      {/* Header (white) */}
+      <div className="px-5 pt-4 pb-4" style={{ background: "#fff" }}>
+        <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Absensi</h1>
+        <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "2px" }}>
+          {user?.displayName?.split(" ")[0] ?? "Crew"} — {todayLabel}
+        </p>
       </div>
 
-      <div className="md:grid md:grid-cols-[1fr_360px] md:gap-6 max-w-5xl">
-        {/* Left: Status + Action */}
-        <div>
-      {/* Status card */}
-      <div className="rounded-3xl p-5 mb-6" style={{ background: sc.bg }} data-testid="attendance-status-card">
-        <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0" style={{ background: sc.iconBg }}>
-            <StatusIcon className="h-7 w-7" style={{ color: sc.iconColor }} />
-          </div>
-          <div className="min-w-0">
-            <p className="font-bold text-base" style={{ color: sc.textColor }}>{sc.label}</p>
-            <p className="text-sm mt-0.5 leading-snug" style={{ color: "#64748B" }}>{sc.sub}</p>
-            {hasCheckedIn && hasCheckedOut && today!.totalHours !== null && today!.status === "lengkap" && today!.totalHours > 8 && (
-              <span className="mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full" style={{ color: "#E85D8C", background: "#FEF1F5" }}>
-                +{(today!.totalHours - 8).toFixed(1)}j lembur
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
+      <div className="px-4 pt-4 pb-4 md:px-8 md:max-w-2xl">
 
-      {/* Check-in button */}
-      {!hasCheckedIn && (
-        <button
-          onClick={() => handleAction("check-in")}
-          disabled={submitting}
-          className="w-full min-h-[64px] rounded-2xl font-bold text-lg text-white flex items-center justify-center gap-3 tap-target disabled:opacity-70 mb-3"
-          style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)", boxShadow: "0 8px 24px rgba(232,93,140,0.35)" }}
-          data-testid="attendance-check-in-btn"
+        {/* Status Card — gradient pink */}
+        <div
+          data-testid="attendance-status-card"
+          style={{
+            padding: "18px 20px",
+            borderRadius: "16px",
+            background: statusCard.gradient,
+            textAlign: "center",
+            marginBottom: "28px",
+          }}
         >
-          {submitting ? <Loader2 size={24} className="animate-spin" /> : <LogIn size={24} />}
-          Absen Masuk
-        </button>
-      )}
-
-      {/* Check-out button */}
-      {hasCheckedIn && !hasCheckedOut && (
-        <button
-          onClick={() => handleAction("check-out")}
-          disabled={submitting}
-          className="w-full min-h-[64px] rounded-2xl font-bold text-lg text-white flex items-center justify-center gap-3 tap-target disabled:opacity-70 mb-3"
-          style={{ background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)", boxShadow: "0 8px 24px rgba(220,38,38,0.25)" }}
-          data-testid="attendance-check-out-btn"
-        >
-          {submitting ? <Loader2 size={24} className="animate-spin" /> : <LogOut size={24} />}
-          Absen Pulang
-        </button>
-      )}
-
-      {/* WiFi hint */}
-      <div className="flex items-center gap-2 justify-center mb-5">
-        <Wifi size={12} style={{ color: "#94A3B8" }} />
-        <p className="text-xs" style={{ color: "#94A3B8" }}>Pastikan terhubung WiFi rumah produksi</p>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="rounded-2xl px-4 py-3 mb-4" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }} data-testid="attendance-error">
-          <p className="text-sm font-medium" style={{ color: "#DC2626" }}>{error}</p>
-        </div>
-      )}
+          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)", fontWeight: "500" }}>Status Hari Ini</p>
+          <p style={{ fontSize: "24px", fontWeight: "700", color: "#fff", marginTop: "6px", marginBottom: "4px" }}>
+            {statusCard.label}
+          </p>
+          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)" }}>{statusCard.sub}</p>
         </div>
 
-        {/* Right: History */}
+        {/* Circular Clock-in/out Button */}
+        {btnConfig && (
+          <div className="flex flex-col items-center gap-3" style={{ marginBottom: "20px" }}>
+            <button
+              onClick={btnConfig.action}
+              disabled={submitting}
+              data-testid={btnConfig.testId}
+              style={{
+                width: "120px",
+                height: "120px",
+                borderRadius: "50%",
+                background: btnConfig.bg,
+                boxShadow: btnConfig.shadow,
+                border: "none",
+                cursor: submitting ? "default" : "pointer",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: submitting ? 0.7 : 1,
+                transition: "transform 0.15s, opacity 0.15s",
+              }}
+              className="tap-target"
+            >
+              {submitting ? (
+                <Loader2 size={30} color="#fff" className="animate-spin" />
+              ) : (
+                <>
+                  <Clock size={30} color="#fff" />
+                  <span style={{ color: "#fff", fontWeight: "700", fontSize: "13px", marginTop: "6px", letterSpacing: "1px" }}>
+                    {btnConfig.label}
+                  </span>
+                </>
+              )}
+            </button>
+            <div className="flex items-center gap-1.5">
+              <Wifi size={12} style={{ color: "#94A3B8" }} />
+              <p style={{ fontSize: "11px", color: "#64748B" }}>Tekan untuk absen {btnConfig.label === "MASUK" ? "masuk" : "pulang"}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Done state */}
+        {isDone && (
+          <div className="flex justify-center mb-4">
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 20px", borderRadius: "100px", background: "#fff", border: "1px solid #F1F5F9" }}>
+              <CheckCircle2 size={18} style={{ color: "#16A34A" }} />
+              <span style={{ fontSize: "13px", fontWeight: "600", color: "#16A34A" }}>Absensi hari ini selesai</span>
+            </div>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div style={{ padding: "12px 14px", borderRadius: "12px", background: "#FEF2F2", border: "1px solid #FECACA", marginBottom: "12px" }} data-testid="attendance-error">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={14} style={{ color: "#DC2626" }} />
+              <p style={{ fontSize: "13px", color: "#DC2626" }}>{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Log Hari Ini */}
+        {today && (
+          <div style={{ marginBottom: "20px" }}>
+            <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "10px" }}>Log Hari Ini</p>
+            <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden", border: "1px solid #F1F5F9" }}>
+              <div className="flex items-center justify-between" style={{ padding: "12px 14px", borderBottom: "1px solid #F8FAFC" }}>
+                <span style={{ fontSize: "13px", color: "#64748B" }}>Absen Masuk</span>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{formatTime(today.checkIn.time)}</span>
+              </div>
+              {today.checkOut && (
+                <div className="flex items-center justify-between" style={{ padding: "12px 14px", borderBottom: "1px solid #F8FAFC" }}>
+                  <span style={{ fontSize: "13px", color: "#64748B" }}>Absen Pulang</span>
+                  <span style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{formatTime(today.checkOut.time)}</span>
+                </div>
+              )}
+              {today.totalHours !== null && (
+                <div className="flex items-center justify-between" style={{ padding: "12px 14px" }}>
+                  <span style={{ fontSize: "13px", color: "#64748B" }}>Total Jam</span>
+                  <span style={{ fontSize: "13px", fontWeight: "700", color: "#E85D8C" }}>{today.totalHours.toFixed(1)} jam</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Riwayat 7 Hari */}
         {history.length > 0 && (
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "#94A3B8" }}>Riwayat 7 Hari</p>
-            <div className="space-y-2">
+            <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "10px" }}>Riwayat 7 Hari</p>
+            <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden", border: "1px solid #F1F5F9" }}>
               {history.map((h, i) => (
                 <div
                   key={h.id}
-                  className={`rounded-2xl px-4 py-3 flex items-center justify-between page-enter stagger-${Math.min(i + 1, 5)}`}
-                  style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}
+                  className="flex items-center justify-between"
+                  style={{ padding: "12px 14px", borderBottom: i < history.length - 1 ? "1px solid #F8FAFC" : "none" }}
                   data-testid={`history-item-${i}`}
                 >
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>{formatDate(h.date)}</p>
-                    <p className="text-xs mt-0.5" style={{ color: "#94A3B8" }}>
+                    <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{formatDate(h.date)}</p>
+                    <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>
                       {formatTime(h.checkIn.time)}{h.checkOut?.time ? ` — ${formatTime(h.checkOut.time)}` : " — belum pulang"}
                     </p>
                   </div>
                   <div className="text-right">
-                    {h.totalHours !== null && <p className="text-sm font-bold tabular-nums" style={{ color: "#334155" }}>{h.totalHours.toFixed(1)}j</p>}
+                    {h.totalHours !== null && (
+                      <p style={{ fontSize: "13px", fontWeight: "700", color: "#334155" }}>{h.totalHours.toFixed(1)}j</p>
+                    )}
                     <span
-                      className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
                       style={{
+                        fontSize: "10px", fontWeight: "600", padding: "2px 8px", borderRadius: "100px",
                         color: h.status === "lengkap" ? "#16A34A" : h.status === "direview" ? "#D97706" : "#64748B",
                         background: h.status === "lengkap" ? "#DCFCE7" : h.status === "direview" ? "#FEF3C7" : "#F1F5F9",
                       }}

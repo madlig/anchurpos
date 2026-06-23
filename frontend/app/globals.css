@@ -30,7 +30,7 @@
 @layer base {
   * { @apply border-border; }
   body {
-    background-color: #F0EDE8;
+    background-color: #FCABB4;
     color: #1C1C1E;
     font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
     -webkit-tap-highlight-color: transparent;
