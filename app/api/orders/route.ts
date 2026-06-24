@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
     customerId,
+    customerName: directCustomerName,
     source,
     items,
     paymentMethod,
@@ -107,7 +108,8 @@ export async function POST(req: NextRequest) {
     requestedDeliveryDate,
     orderNotes,
   } = body as {
-    customerId: string;
+    customerId?: string;
+    customerName?: string;
     source: string;
     items: { productId: string; variantId: string; qty: number }[];
     paymentMethod?: string;
@@ -117,14 +119,28 @@ export async function POST(req: NextRequest) {
     orderNotes?: string;
   };
 
-  if (!customerId || !items?.length) {
-    return NextResponse.json({ error: "Data order tidak lengkap" }, { status: 400 });
+  if (!items?.length) {
+    return NextResponse.json({ error: "Pilih minimal 1 item" }, { status: 400 });
   }
 
   try {
-    const customerSnap = await adminDb.doc(`customers/${customerId}`).get();
-    const customer = customerSnap.data();
-    const discountPerUnit = customer?.discountPerUnit ?? 0;
+    // Resolve customer — either from Firestore or use direct name (walk-in)
+    let resolvedCustomerName = directCustomerName?.trim() || "Walk-in";
+    let resolvedCustomerPhone: string | null = null;
+    let resolvedChannel = "walk_in";
+    let resolvedCustomerId = customerId ?? null;
+    let discountPerUnit = 0;
+
+    if (customerId) {
+      const customerSnap = await adminDb.doc(`customers/${customerId}`).get();
+      const customer = customerSnap.data();
+      if (customer) {
+        resolvedCustomerName = customer.name ?? resolvedCustomerName;
+        resolvedCustomerPhone = customer.phoneNumber ?? null;
+        resolvedChannel = customer.channel ?? "walk_in";
+        discountPerUnit = customer.discountPerUnit ?? 0;
+      }
+    }
 
     const orderNumber = await generateOrderNumber();
     const orderRef = adminDb.collection("orders").doc();
@@ -173,11 +189,11 @@ export async function POST(req: NextRequest) {
     await adminDb.runTransaction(async (tx) => {
       tx.set(orderRef, {
         orderNumber,
-        source: source ?? "marketplace_manual",
-        customerId,
-        customerName: customer?.name ?? "",
-        customerPhone: customer?.phoneNumber ?? null,
-        channel: customer?.channel ?? "walk_in",
+        source: source ?? "walk_in",
+        customerId: resolvedCustomerId,
+        customerName: resolvedCustomerName,
+        customerPhone: resolvedCustomerPhone,
+        channel: resolvedChannel,
         status: "belum_selesai",
         paymentStatus: inputPaymentStatus ?? "belum_bayar",
         paymentMethod: paymentMethod ?? null,
@@ -199,6 +215,14 @@ export async function POST(req: NextRequest) {
       for (const itemData of processedItems) {
         const itemRef = orderRef.collection("items").doc();
         tx.set(itemRef, itemData);
+      }
+
+      // Kurangi stok produk jadi per varian
+      for (const item of items) {
+        const variantRef = adminDb.doc(`variants/${item.variantId}`);
+        tx.update(variantRef, {
+          currentStock: FieldValue.increment(-item.qty),
+        });
       }
 
       if (hasRainbow) {

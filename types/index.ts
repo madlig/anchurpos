@@ -39,6 +39,8 @@ export interface Variant {
   name: string;
   isProductionVariant: boolean;
   sortOrder: number;
+  currentStock: number;    // stok produk jadi (pcs/pack)
+  minStock: number;        // stok minimum peringatan
 }
 
 // --- 4. ingredients/{ingredientId} ---

@@ -11,7 +11,6 @@ export async function GET(req: NextRequest) {
     const snap = await adminDb
       .collection("customers")
       .where("isActive", "==", true)
-      .orderBy("name")
       .get();
 
     const customers: Customer[] = snap.docs.map((doc) => {
@@ -29,7 +28,7 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json(customers);
+    return NextResponse.json(customers.sort((a, b) => a.name.localeCompare(b.name)));
   } catch (err) {
     console.error("GET /api/customers error:", err);
     return NextResponse.json(

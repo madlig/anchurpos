@@ -1,345 +1,581 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Input } from "@/components/ui/input";
-import {
-  Loader2, Plus, Trash2, ShoppingCart, Check, AlertTriangle, X, ChevronDown,
-} from "lucide-react";
-import Link from "next/link";
-import type { Product, Variant, Customer } from "@/types";
+import { Loader2, Search, ShoppingCart, X, Minus, Plus, ChevronDown } from "lucide-react";
+import { useRouter } from "next/navigation";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface PriceTier { id: string; minQty: number; maxQty: number | null; price: number; }
+interface ProductItem {
+  id: string; code: string; name: string; description: string;
+  packPerBatch: number; isActive: boolean; priceTiers: PriceTier[];
+}
+interface Variant {
+  id: string; name: string; currentStock: number; minStock: number; sortOrder: number;
+}
 interface CartItem {
   productId: string; productName: string;
   variantId: string; variantName: string;
-  qty: number; basePrice: number; subtotal: number;
-}
-interface ProductWithTiers extends Product {
-  priceTiers: { minQty: number; maxQty: number | null; price: number }[];
+  qty: number; price: number;
 }
 
+type PayMethod = "cash" | "transfer" | "qris";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 }
 
-const SELECT_CLS = "w-full h-11 rounded-2xl border px-4 pr-10 text-sm font-medium appearance-none focus:outline-none transition-colors";
+function getPrice(product: ProductItem, qty: number): number {
+  if (!product.priceTiers.length) return 0;
+  const sorted = [...product.priceTiers].sort((a, b) => a.minQty - b.minQty);
+  let price = sorted[0].price;
+  for (const tier of sorted) {
+    if (qty >= tier.minQty && (tier.maxQty === null || qty <= tier.maxQty)) {
+      price = tier.price;
+    }
+  }
+  return price;
+}
 
-export default function ManagerPosPage() {
+function startingPrice(product: ProductItem): number {
+  return getPrice(product, 1);
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+export default function KasirPage() {
   const { getToken } = useAuth();
-  const [products, setProducts] = useState<ProductWithTiers[]>([]);
+  const router = useRouter();
+
+  const [products, setProducts] = useState<ProductItem[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState("Semua");
 
-  const [selectedCustomer, setSelectedCustomer] = useState("");
+  // Variant selector sheet
+  const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
+  const [variantQtys, setVariantQtys] = useState<Record<string, number>>({});
+
+  // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [paymentStatus, setPaymentStatus] = useState("sudah_bayar");
 
-  const [showAddItem, setShowAddItem] = useState(false);
-  const [addProductId, setAddProductId] = useState("");
-  const [addVariantId, setAddVariantId] = useState("");
-  const [addQty, setAddQty] = useState("");
-
+  // Checkout sheet
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+  const [payMethod, setPayMethod] = useState<PayMethod>("cash");
+  const [orderNotes, setOrderNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ orderNumber: string; needsProduction: boolean; hasRainbow: boolean; orderId: string } | null>(null);
   const [error, setError] = useState("");
 
-  const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
+  const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
-    return fetch(url, { ...options, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options?.headers } });
+    return fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...opts?.headers } });
   }, [getToken]);
 
   useEffect(() => {
     Promise.all([
-      fetchWithAuth("/api/products").then((r) => r.json()),
-      fetchWithAuth("/api/variants").then((r) => r.json()),
-      fetchWithAuth("/api/customers").then((r) => r.json()),
-    ]).then(([p, v, c]) => {
+      fetchWithAuth("/api/products").then(r => r.json()),
+      fetchWithAuth("/api/variants").then(r => r.json()),
+    ]).then(([p, v]) => {
       setProducts(Array.isArray(p) ? p : []);
       setVariants(Array.isArray(v) ? v : []);
-      setCustomers(Array.isArray(c) ? c : []);
     }).finally(() => setLoading(false));
   }, [fetchWithAuth]);
 
-  function getTierPrice(productId: string, qty: number): number {
-    const product = products.find((p) => p.id === productId);
-    if (!product?.priceTiers?.length) return 0;
-    for (const tier of product.priceTiers) {
-      if (qty >= tier.minQty && (tier.maxQty === null || qty <= tier.maxQty)) return tier.price;
-    }
-    return product.priceTiers[0]?.price ?? 0;
+  // ── Filtered products ──────────────────────────────────────────────────────
+  const filteredProducts = useMemo(() => {
+    return products.filter(p =>
+      (activeCategory === "Semua" || p.name === activeCategory) &&
+      (!search || p.name.toLowerCase().includes(search.toLowerCase()))
+    );
+  }, [products, activeCategory, search]);
+
+  // ── Cart calculations ──────────────────────────────────────────────────────
+  const cartTotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart]);
+  const cartCount = useMemo(() => cart.reduce((s, i) => s + i.qty, 0), [cart]);
+
+  // ── Variant sheet helpers ──────────────────────────────────────────────────
+  function openVariantSheet(product: ProductItem) {
+    setSelectedProduct(product);
+    setVariantQtys({});
   }
+
+  function adjustVariantQty(variantId: string, delta: number) {
+    setVariantQtys(prev => {
+      const next = Math.max(0, (prev[variantId] ?? 0) + delta);
+      return { ...prev, [variantId]: next };
+    });
+  }
+
+  const totalVariantSelected = Object.values(variantQtys).reduce((s, n) => s + n, 0);
 
   function addToCart() {
-    if (!addProductId || !addVariantId || !addQty) return;
-    const qty = parseInt(addQty);
-    if (qty <= 0) return;
-    const product = products.find((p) => p.id === addProductId);
-    const variant = variants.find((v) => v.id === addVariantId);
-    const price = getTierPrice(addProductId, qty);
-    setCart((prev) => [...prev, { productId: addProductId, productName: product?.name ?? addProductId, variantId: addVariantId, variantName: variant?.name ?? addVariantId, qty, basePrice: price, subtotal: price * qty }]);
-    setAddProductId(""); setAddVariantId(""); setAddQty(""); setShowAddItem(false);
+    if (!selectedProduct) return;
+    const newItems: CartItem[] = [];
+    for (const [variantId, qty] of Object.entries(variantQtys)) {
+      if (qty <= 0) continue;
+      const variant = variants.find(v => v.id === variantId);
+      const totalQty = qty;
+      const price = getPrice(selectedProduct, totalQty);
+      newItems.push({
+        productId: selectedProduct.id,
+        productName: selectedProduct.name,
+        variantId,
+        variantName: variant?.name ?? variantId,
+        qty,
+        price,
+      });
+    }
+
+    setCart(prev => {
+      const next = [...prev];
+      for (const ni of newItems) {
+        const idx = next.findIndex(c => c.productId === ni.productId && c.variantId === ni.variantId);
+        if (idx >= 0) {
+          next[idx] = { ...next[idx], qty: next[idx].qty + ni.qty };
+        } else {
+          next.push(ni);
+        }
+      }
+      return next;
+    });
+    setSelectedProduct(null);
+    setVariantQtys({});
   }
 
-  const total = cart.reduce((s, item) => s + item.subtotal, 0);
+  function removeFromCart(idx: number) {
+    setCart(prev => prev.filter((_, i) => i !== idx));
+  }
 
-  async function handleSubmit() {
+  function updateCartQty(idx: number, delta: number) {
+    setCart(prev => prev.map((item, i) => {
+      if (i !== idx) return item;
+      const newQty = item.qty + delta;
+      if (newQty <= 0) return item; // use removeFromCart instead
+      return { ...item, qty: newQty, price: getPrice(products.find(p => p.id === item.productId)!, newQty) };
+    }));
+  }
+
+  // ── Checkout ───────────────────────────────────────────────────────────────
+  async function handleCheckout() {
+    if (!cart.length) return;
     setError(""); setSubmitting(true);
     try {
       const res = await fetchWithAuth("/api/orders", {
         method: "POST",
-        body: JSON.stringify({ customerId: selectedCustomer, source: "marketplace_manual", items: cart.map((c) => ({ productId: c.productId, variantId: c.variantId, qty: c.qty })), paymentMethod, paymentStatus }),
+        body: JSON.stringify({
+          customerName: customerName.trim() || "Walk-in",
+          source: "walk_in",
+          items: cart.map(c => ({ productId: c.productId, variantId: c.variantId, qty: c.qty })),
+          paymentMethod: payMethod,
+          paymentStatus: "sudah_bayar",
+          orderNotes: orderNotes.trim() || null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Gagal membuat order"); return; }
-      setResult(data); setCart([]);
-    } catch { setError("Gagal membuat order"); } finally { setSubmitting(false); }
+      // Success
+      setCart([]);
+      setShowCheckout(false);
+      setCustomerName("");
+      setOrderNotes("");
+      router.push(`/manager/orders/${data.orderId}`);
+    } catch { setError("Gagal menghubungi server"); } finally { setSubmitting(false); }
   }
 
-  if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} /></div>;
-
-  if (result) {
-    return (
-      <div className="page-enter flex min-h-screen items-center justify-center px-5" style={{ background: "#F0EDE8" }}>
-        <div className="rounded-3xl p-8 text-center w-full max-w-sm" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 8px 32px rgba(0,0,0,0.06)" }}>
-          <div className="h-16 w-16 mx-auto rounded-full flex items-center justify-center mb-4" style={{ background: "#FEF1F5" }}>
-            <Check className="h-8 w-8" style={{ color: "#E85D8C" }} strokeWidth={2.5} />
-          </div>
-          <h2 className="text-xl font-extrabold tracking-tight mb-1" style={{ color: "#1C1C1E" }}>Order Berhasil!</h2>
-          <p className="text-3xl font-extrabold tabular-nums mb-4" style={{ color: "#E85D8C" }} data-testid="order-number">{result.orderNumber}</p>
-          {result.needsProduction && (
-            <div className="rounded-2xl p-3 mb-3 text-left" style={{ background: "#FFFBEB", border: "1px solid #FDE68A" }}>
-              <div className="flex items-center gap-2">
-                <AlertTriangle size={15} style={{ color: "#D97706" }} className="shrink-0" />
-                <p className="text-sm font-medium" style={{ color: "#92400E" }}>Stok kurang, perlu produksi tambahan</p>
-              </div>
-            </div>
-          )}
-          {result.hasRainbow && (
-            <div className="rounded-2xl p-3 mb-3 text-left" style={{ background: "#F5F3FF", border: "1px solid #DDD6FE" }}>
-              <p className="text-sm font-medium mb-1" style={{ color: "#4C1D95" }}>Order ini berisi Rainbow, perlu di-assembly</p>
-              <Link href="/manager/rainbow-assembly" className="text-sm font-semibold underline" style={{ color: "#7C3AED" }}>Ke Rainbow Assembly →</Link>
-            </div>
-          )}
-          <div className="flex gap-2 mt-5">
-            <button onClick={() => setResult(null)} className="flex-1 h-12 rounded-2xl font-bold tap-target" style={{ background: "#F1F5F9", color: "#334155", border: "1px solid #E2E8F0" }} data-testid="new-order-button">
-              Order Baru
-            </button>
-            <Link href={`/manager/orders/${result.orderId}`} className="flex-1">
-              <button className="w-full h-12 rounded-2xl font-bold text-white tap-target" style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)" }} data-testid="view-order-detail-button">
-                Lihat Detail
-              </button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // ── Render ─────────────────────────────────────────────────────────────────
+  if (loading) return (
+    <div className="flex h-screen items-center justify-center" style={{ background: "#FCABB4" }}>
+      <Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} />
+    </div>
+  );
 
   return (
-    <div className="page-enter min-h-screen" style={{ background: "#FCABB4" }}>
+    <div className="min-h-screen" style={{ background: "#FCABB4" }}>
 
-      {/* Header (white) */}
-      <div className="px-5 pt-4 pb-4" style={{ background: "#fff" }}>
-        <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Kasir</h1>
-        <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "2px" }}>Buat pesanan baru</p>
+      {/* ── Header (white, sticky) ── */}
+      <div className="sticky top-0 z-30" style={{ background: "#fff", borderBottom: "1px solid #F1F5F9" }}>
+        <div className="px-5 pt-4 pb-2">
+          <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Kasir</h1>
+
+          {/* Search bar */}
+          <div
+            className="flex items-center gap-2 mt-2"
+            style={{ padding: "9px 12px", background: "#F8FAFC", borderRadius: "12px", border: "1px solid #F1F5F9" }}
+          >
+            <Search size={15} style={{ color: "#94A3B8", flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Cari produk..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ flex: 1, background: "transparent", fontSize: "13px", color: "#1C1C1E", outline: "none" }}
+              data-testid="pos-search"
+            />
+            {search && (
+              <button onClick={() => setSearch("")}>
+                <X size={14} style={{ color: "#94A3B8" }} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Category chips */}
+        <div className="flex gap-2 overflow-x-auto px-5 pb-3" style={{ scrollbarWidth: "none" }}>
+          {["Semua", ...products.map(p => p.name)].map(cat => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              data-testid={`category-chip-${cat}`}
+              style={{
+                padding: "5px 14px",
+                borderRadius: "100px",
+                fontSize: "12px",
+                fontWeight: activeCategory === cat ? "600" : "500",
+                color: activeCategory === cat ? "#fff" : "#64748B",
+                background: activeCategory === cat ? "#E85D8C" : "#F1F5F9",
+                border: "none",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="px-4 pt-4 pb-4 md:px-8 md:max-w-5xl">
-
-      {/* Desktop: 2-column layout */}
-      <div className="md:grid md:grid-cols-[1fr_340px] md:gap-5">
-        {/* Left: Customer + Cart */}
-        <div>
-          {/* Customer selector */}
-          <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9", marginBottom: "12px" }}>
-            <label style={{ fontSize: "11px", fontWeight: "600", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: "8px" }}>Pelanggan</label>
-            <div className="relative">
-              <select value={selectedCustomer} onChange={(e) => setSelectedCustomer(e.target.value)} className={SELECT_CLS}
-                style={{ borderColor: "#E2E8F0", background: "#F8FAFC", fontSize: "13px" }} data-testid="customer-select">
-                <option value="">Pilih pelanggan...</option>
-                {customers.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.channel})</option>)}
-              </select>
-              <ChevronDown size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#94A3B8" }} />
-            </div>
+      {/* ── Product Grid ── */}
+      <div className="p-4" style={{ paddingBottom: cart.length > 0 ? "120px" : "24px" }}>
+        {products.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center py-20"
+            style={{ background: "#fff", borderRadius: "16px", textAlign: "center" }}
+          >
+            <ShoppingCart size={40} style={{ color: "#CBD5E1", marginBottom: "12px" }} />
+            <p style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>Belum ada produk</p>
+            <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "4px" }}>Tambah produk di Master Data</p>
           </div>
-
-          {/* Cart */}
-          <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9", marginBottom: "12px" }}>
-          {/* Cart header */}
-          <div className="flex items-center justify-between" style={{ marginBottom: "12px" }}>
-            <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>Item Pesanan</p>
-            <button onClick={() => setShowAddItem(true)} className="flex items-center gap-1.5 tap-target"
-              style={{ padding: "6px 12px", borderRadius: "100px", background: "#FEF1F5", color: "#E85D8C", fontSize: "12px", fontWeight: "600", border: "none" }} data-testid="add-item-button">
-              <Plus size={13} strokeWidth={2.5} /> Tambah
-            </button>
+        ) : filteredProducts.length === 0 ? (
+          <div className="py-16 text-center">
+            <p style={{ fontSize: "14px", color: "#94A3B8" }}>Produk tidak ditemukan</p>
           </div>
-
-          {cart.length === 0 && !showAddItem && (
-            <div className="py-8 text-center" style={{ borderRadius: "10px", background: "#F8FAFC", border: "1px dashed #E2E8F0" }}>
-              <ShoppingCart size={24} className="mx-auto mb-2" style={{ color: "#CBD5E1" }} />
-              <p style={{ fontSize: "13px", color: "#94A3B8" }}>Belum ada item</p>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-2">
-            {cart.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between" style={{ padding: "10px 12px", borderRadius: "10px", background: "#F8FAFC", border: "1px solid #F1F5F9" }} data-testid={`cart-item-${idx}`}>
-                <div className="min-w-0 flex-1 mr-3">
-                  <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{item.productName} — {item.variantName}</p>
-                  <p style={{ fontSize: "11px", marginTop: "2px", color: "#94A3B8" }}>
-                    {item.qty} × {fmt(item.basePrice)} = <span style={{ fontWeight: "700", color: "#E85D8C" }}>{fmt(item.subtotal)}</span>
-                  </p>
-                </div>
-                <button onClick={() => setCart((p) => p.filter((_, i) => i !== idx))} style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#FEF2F2", color: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", border: "none" }} data-testid={`remove-cart-item-${idx}`}>
-                  <Trash2 size={13} />
-                </button>
-              </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            {filteredProducts.map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                variantCount={variants.length}
+                onAdd={() => openVariantSheet(product)}
+              />
             ))}
           </div>
-          </div>{/* /Cart */}
-          {showAddItem && (
-            <div className="rounded-3xl p-5 mb-4" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }} data-testid="add-item-panel">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold" style={{ color: "#1C1C1E" }}>Tambah Item</h3>
-                <button onClick={() => setShowAddItem(false)} className="tap-target" style={{ color: "#94A3B8" }}><X size={18} /></button>
-              </div>
-              <div className="space-y-3">
-                <div className="relative">
-                  <select value={addProductId} onChange={(e) => setAddProductId(e.target.value)} className={SELECT_CLS}
-                    style={{ borderColor: "#E2E8F0", background: "#F8FAFC" }} data-testid="add-product-select">
-                    <option value="">Pilih produk...</option>
-                    {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#94A3B8" }} />
-                </div>
-                <div className="relative">
-                  <select value={addVariantId} onChange={(e) => setAddVariantId(e.target.value)} className={SELECT_CLS}
-                    style={{ borderColor: "#E2E8F0", background: "#F8FAFC" }} data-testid="add-variant-select">
-                    <option value="">Pilih varian...</option>
-                    {variants.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#94A3B8" }} />
-                </div>
-                <Input type="number" min="1" placeholder="Jumlah (pcs/box)" value={addQty} onChange={(e) => setAddQty(e.target.value)}
-                  className="h-11 rounded-2xl text-center font-medium" style={{ borderColor: "#E2E8F0" }} data-testid="add-qty-input" />
-                {addProductId && addVariantId && addQty && (
-                  <div className="text-center py-1">
-                    <p className="text-sm font-bold" style={{ color: "#E85D8C" }}>= {fmt(getTierPrice(addProductId, parseInt(addQty) || 0) * (parseInt(addQty) || 0))}</p>
-                    <p className="text-xs" style={{ color: "#94A3B8" }}>@ {fmt(getTierPrice(addProductId, parseInt(addQty) || 0))} / pcs</p>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <button onClick={() => setShowAddItem(false)} className="flex-1 h-11 rounded-2xl font-bold tap-target" style={{ background: "#F1F5F9", color: "#64748B" }}>Batal</button>
-                  <button onClick={addToCart} disabled={!addProductId || !addVariantId || !addQty} className="flex-1 h-11 rounded-2xl font-bold text-white tap-target disabled:opacity-60"
-                    style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)" }} data-testid="confirm-add-item-button">
-                    Tambah ke Keranjang
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right: Summary & Checkout */}
-        <div>
-          {cart.length > 0 ? (
-            <div className="rounded-3xl p-5 sticky top-6" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-              <div className="flex items-center justify-between mb-4 pb-4" style={{ borderBottom: "1px solid #F1F5F9" }}>
-                <span className="text-sm font-bold" style={{ color: "#64748B" }}>Total Pembayaran</span>
-                <span className="text-2xl font-extrabold tabular-nums" style={{ color: "#1C1C1E" }} data-testid="cart-total">{fmt(total)}</span>
-              </div>
-              <div className="space-y-3 mb-4">
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>Metode Bayar</label>
-                  <div className="relative">
-                    <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={SELECT_CLS}
-                      style={{ borderColor: "#E2E8F0", background: "#F8FAFC" }} data-testid="payment-method-select">
-                      <option value="cash">Cash</option>
-                      <option value="transfer">Transfer</option>
-                      <option value="qris">QRIS</option>
-                    </select>
-                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#94A3B8" }} />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>Status Bayar</label>
-                  <div className="relative">
-                    <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} className={SELECT_CLS}
-                      style={{ borderColor: "#E2E8F0", background: "#F8FAFC" }} data-testid="payment-status-select">
-                      <option value="sudah_bayar">Lunas</option>
-                      <option value="belum_bayar">Belum Bayar</option>
-                    </select>
-                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#94A3B8" }} />
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || !selectedCustomer || cart.length === 0}
-                className="w-full min-h-[56px] rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 tap-target disabled:opacity-60"
-                style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)", boxShadow: "0 8px 20px rgba(232,93,140,0.3)" }}
-                data-testid="create-order-button"
-              >
-                {submitting ? <Loader2 size={20} className="animate-spin" /> : <ShoppingCart size={20} />}
-                Buat Order
-              </button>
-              {!selectedCustomer && <p className="text-xs text-center mt-2 font-medium" style={{ color: "#D97706" }}>Pilih pelanggan terlebih dahulu</p>}
-            </div>
-          ) : (
-            <div className="rounded-2xl p-6 text-center hidden md:block" style={{ background: "#fff", border: "1px solid #F1F5F9" }}>
-              <ShoppingCart size={28} className="mx-auto mb-2" style={{ color: "#CBD5E1" }} />
-              <p className="text-sm font-medium" style={{ color: "#94A3B8" }}>Keranjang kosong</p>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* Mobile checkout (only visible on mobile when cart has items) */}
+      {/* ── Bottom Cart Bar ── */}
       {cart.length > 0 && (
-        <div className="md:hidden mt-4">
-          <div className="rounded-3xl p-5" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+        <div
+          className="fixed left-0 right-0 z-40"
+          style={{ bottom: "66px", padding: "10px 16px", background: "linear-gradient(to top, #FCABB4 60%, transparent)" }}
+        >
+          <button
+            onClick={() => setShowCheckout(true)}
+            className="w-full flex items-center justify-between"
+            style={{
+              background: "linear-gradient(135deg,#E85D8C,#C94A73)",
+              borderRadius: "100px",
+              padding: "14px 20px",
+              boxShadow: "0 8px 30px rgba(232,93,140,0.4)",
+              border: "none",
+              cursor: "pointer",
+            }}
+            data-testid="cart-bar-button"
+          >
+            <div className="flex items-center gap-2.5">
+              <span
+                style={{ background: "rgba(255,255,255,0.2)", borderRadius: "100px", padding: "3px 10px", fontSize: "12px", fontWeight: "700", color: "#fff" }}
+              >
+                {cartCount} item
+              </span>
+              <span style={{ fontSize: "15px", fontWeight: "700", color: "#fff" }}>{fmt(cartTotal)}</span>
+            </div>
+            <span style={{ fontSize: "13px", fontWeight: "700", color: "#fff" }}>Bayar →</span>
+          </button>
+        </div>
+      )}
+
+      {/* ── Variant Selector Sheet ── */}
+      {selectedProduct && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end"
+          style={{ background: "rgba(0,0,0,0.45)" }}
+          onClick={e => { if (e.target === e.currentTarget) { setSelectedProduct(null); setVariantQtys({}); } }}
+        >
+          <div
+            className="overflow-y-auto"
+            style={{ background: "#fff", borderRadius: "20px 20px 0 0", padding: "20px 16px 32px", maxHeight: "80vh" }}
+          >
+            {/* Sheet header */}
             <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-bold" style={{ color: "#64748B" }}>Total</span>
-              <span className="text-2xl font-extrabold tabular-nums" style={{ color: "#1C1C1E" }}>{fmt(total)}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>Metode</label>
-                <div className="relative">
-                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={SELECT_CLS} style={{ borderColor: "#E2E8F0", background: "#F8FAFC" }}>
-                    <option value="cash">Cash</option><option value="transfer">Transfer</option><option value="qris">QRIS</option>
-                  </select>
-                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#94A3B8" }} />
-                </div>
+                <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#1C1C1E" }}>{selectedProduct.name}</h2>
+                <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "2px" }}>
+                  {fmt(startingPrice(selectedProduct))} / pack
+                </p>
               </div>
-              <div>
-                <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>Status</label>
-                <div className="relative">
-                  <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} className={SELECT_CLS} style={{ borderColor: "#E2E8F0", background: "#F8FAFC" }}>
-                    <option value="sudah_bayar">Lunas</option><option value="belum_bayar">Belum Bayar</option>
-                  </select>
-                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#94A3B8" }} />
-                </div>
-              </div>
+              <button
+                onClick={() => { setSelectedProduct(null); setVariantQtys({}); }}
+                style={{ width: "30px", height: "30px", borderRadius: "10px", background: "#F8FAFC", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <X size={16} style={{ color: "#64748B" }} />
+              </button>
             </div>
-            <button onClick={handleSubmit} disabled={submitting || !selectedCustomer || cart.length === 0}
-              className="w-full min-h-[56px] rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 tap-target disabled:opacity-60"
-              style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)", boxShadow: "0 8px 20px rgba(232,93,140,0.3)" }} data-testid="create-order-button-mobile">
-              {submitting ? <Loader2 size={20} className="animate-spin" /> : <ShoppingCart size={20} />}
-              Buat Order
-            </button>
-            {!selectedCustomer && <p className="text-xs text-center mt-2 font-medium" style={{ color: "#D97706" }}>Pilih pelanggan terlebih dahulu</p>}
+
+            {/* Variant list */}
+            <div className="flex flex-col gap-2">
+              {variants.map(v => {
+                const qty = variantQtys[v.id] ?? 0;
+                const isLowStock = v.currentStock < v.minStock;
+                return (
+                  <div
+                    key={v.id}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "10px 14px", borderRadius: "12px",
+                      background: qty > 0 ? "#FEF1F5" : "#F8FAFC",
+                      border: qty > 0 ? "1px solid #F2A0B7" : "1px solid #F1F5F9",
+                    }}
+                    data-testid={`variant-row-${v.id}`}
+                  >
+                    <div>
+                      <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{v.name}</p>
+                      <p style={{ fontSize: "11px", color: isLowStock ? "#DC2626" : "#94A3B8", marginTop: "2px" }}>
+                        Stok: {v.currentStock} pcs {isLowStock ? "⚠ Rendah" : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {qty > 0 && (
+                        <>
+                          <button
+                            onClick={() => adjustVariantQty(v.id, -1)}
+                            style={{ width: "28px", height: "28px", borderRadius: "8px", background: "#F1F5F9", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          >
+                            <Minus size={13} style={{ color: "#64748B" }} />
+                          </button>
+                          <span style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E", minWidth: "20px", textAlign: "center" }}>{qty}</span>
+                        </>
+                      )}
+                      <button
+                        onClick={() => adjustVariantQty(v.id, 1)}
+                        style={{ width: "28px", height: "28px", borderRadius: "8px", background: "#E85D8C", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        data-testid={`add-variant-${v.id}`}
+                      >
+                        <Plus size={13} style={{ color: "#fff" }} strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Add to cart button */}
+            {totalVariantSelected > 0 ? (
+              <button
+                onClick={addToCart}
+                className="w-full mt-4"
+                style={{ padding: "14px", borderRadius: "14px", background: "#E85D8C", color: "#fff", fontSize: "14px", fontWeight: "700", border: "none", cursor: "pointer" }}
+                data-testid="add-to-cart-btn"
+              >
+                Tambah ke Cart ({totalVariantSelected} item · {fmt(cart.length === 0 ? getPrice(selectedProduct, totalVariantSelected) * totalVariantSelected : cartTotal + Object.entries(variantQtys).reduce((s, [vId, qty]) => s + getPrice(selectedProduct, qty) * qty, 0))})
+              </button>
+            ) : (
+              <p className="text-center mt-4" style={{ fontSize: "12px", color: "#94A3B8" }}>Pilih varian untuk ditambah ke cart</p>
+            )}
           </div>
         </div>
       )}
 
-      {error && <div className="rounded-2xl px-4 py-3 mt-4" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }} data-testid="pos-error">
-        <p className="text-sm font-medium" style={{ color: "#DC2626" }}>{error}</p>
-      </div>}
+      {/* ── Checkout Sheet ── */}
+      {showCheckout && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end"
+          style={{ background: "rgba(0,0,0,0.45)" }}
+          onClick={e => { if (e.target === e.currentTarget) setShowCheckout(false); }}
+        >
+          <div
+            className="overflow-y-auto"
+            style={{ background: "#fff", borderRadius: "20px 20px 0 0", padding: "20px 16px 32px", maxHeight: "90vh" }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
+              <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#1C1C1E" }}>Konfirmasi Pesanan</h2>
+              <button
+                onClick={() => setShowCheckout(false)}
+                style={{ width: "30px", height: "30px", borderRadius: "10px", background: "#F8FAFC", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <X size={16} style={{ color: "#64748B" }} />
+              </button>
+            </div>
 
-      </div>{/* /px-4 */}
+            {/* Cart summary */}
+            <div style={{ background: "#F8FAFC", borderRadius: "12px", padding: "12px 14px", marginBottom: "16px" }}>
+              {cart.map((item, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between"
+                  style={{ paddingBottom: i < cart.length - 1 ? "8px" : 0, marginBottom: i < cart.length - 1 ? "8px" : 0, borderBottom: i < cart.length - 1 ? "1px solid #F1F5F9" : "none" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div style={{ width: "28px", height: "28px", borderRadius: "8px", background: "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <span style={{ fontSize: "11px", fontWeight: "700", color: "#E85D8C" }}>{item.qty}x</span>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: "12px", fontWeight: "600", color: "#1C1C1E" }}>{item.productName}</p>
+                      <p style={{ fontSize: "11px", color: "#94A3B8" }}>{item.variantName}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontSize: "12px", fontWeight: "700", color: "#1C1C1E" }}>{fmt(item.price * item.qty)}</span>
+                    <button
+                      onClick={() => removeFromCart(i)}
+                      style={{ width: "22px", height: "22px", borderRadius: "6px", background: "#FEE2E2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                    >
+                      <X size={11} style={{ color: "#DC2626" }} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Customer name */}
+            <div style={{ marginBottom: "12px" }}>
+              <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "6px" }}>
+                Nama Pelanggan
+              </label>
+              <input
+                type="text"
+                placeholder="Nama pelanggan (opsional)"
+                value={customerName}
+                onChange={e => setCustomerName(e.target.value)}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", border: "1px solid #E2E8F0", fontSize: "13px", color: "#1C1C1E", outline: "none", background: "#F8FAFC" }}
+                data-testid="checkout-customer-name"
+              />
+            </div>
+
+            {/* Payment method */}
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
+                Metode Pembayaran
+              </label>
+              <div className="flex gap-2">
+                {(["cash", "transfer", "qris"] as PayMethod[]).map(m => (
+                  <button
+                    key={m}
+                    onClick={() => setPayMethod(m)}
+                    style={{
+                      flex: 1, padding: "9px 0", borderRadius: "12px", fontSize: "12px", fontWeight: "600",
+                      color: payMethod === m ? "#fff" : "#64748B",
+                      background: payMethod === m ? "#E85D8C" : "#F1F5F9",
+                      border: payMethod === m ? "none" : "1px solid #E2E8F0",
+                      cursor: "pointer",
+                    }}
+                    data-testid={`pay-method-${m}`}
+                  >
+                    {m === "cash" ? "Tunai" : m === "transfer" ? "Transfer" : "QRIS"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div style={{ marginBottom: "16px" }}>
+              <input
+                type="text"
+                placeholder="Catatan pesanan (opsional)"
+                value={orderNotes}
+                onChange={e => setOrderNotes(e.target.value)}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", border: "1px solid #E2E8F0", fontSize: "13px", color: "#1C1C1E", outline: "none", background: "#F8FAFC" }}
+                data-testid="checkout-notes"
+              />
+            </div>
+
+            {/* Total */}
+            <div
+              className="flex items-center justify-between"
+              style={{ padding: "12px 14px", borderRadius: "12px", background: "#FEF1F5", border: "1px solid #F2A0B7", marginBottom: "16px" }}
+            >
+              <span style={{ fontSize: "14px", fontWeight: "600", color: "#64748B" }}>Total</span>
+              <span style={{ fontSize: "18px", fontWeight: "700", color: "#E85D8C" }}>{fmt(cartTotal)}</span>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <p style={{ fontSize: "12px", color: "#DC2626", textAlign: "center", marginBottom: "8px" }}>{error}</p>
+            )}
+
+            {/* Confirm button */}
+            <button
+              onClick={handleCheckout}
+              disabled={submitting || !cart.length}
+              className="w-full"
+              style={{
+                padding: "15px", borderRadius: "14px", fontSize: "14px", fontWeight: "700",
+                color: "#fff", background: "#E85D8C", border: "none",
+                cursor: submitting ? "default" : "pointer",
+                opacity: submitting ? 0.7 : 1,
+              }}
+              data-testid="confirm-order-btn"
+            >
+              {submitting ? "Memproses..." : "Konfirmasi Pesanan"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Product Card ─────────────────────────────────────────────────────────────
+function ProductCard({ product, variantCount, onAdd }: {
+  product: ProductItem; variantCount: number; onAdd: () => void;
+}) {
+  const sp = startingPrice(product);
+  return (
+    <div
+      style={{ background: "#fff", borderRadius: "14px", overflow: "hidden", border: "1px solid #F1F5F9" }}
+      data-testid={`product-card-${product.id}`}
+    >
+      {/* Image placeholder */}
+      <div style={{ height: "80px", background: "linear-gradient(135deg, rgba(232,93,140,0.12), rgba(252,171,180,0.3))", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: "rgba(232,93,140,0.18)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontSize: "20px" }}>🍰</span>
+        </div>
+      </div>
+
+      {/* Info */}
+      <div style={{ padding: "8px 10px 10px" }}>
+        <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E", lineHeight: "1.3" }}>{product.name}</p>
+        <p style={{ fontSize: "11px", fontWeight: "500", color: "#94A3B8", marginTop: "2px" }}>
+          {variantCount} varian
+        </p>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px" }}>
+          <span style={{ fontSize: "13px", fontWeight: "700", color: "#E85D8C" }}>
+            {sp > 0 ? fmt(sp) : "—"}
+          </span>
+          <button
+            onClick={onAdd}
+            style={{ width: "28px", height: "28px", borderRadius: "8px", background: "#E85D8C", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            data-testid={`product-add-btn-${product.id}`}
+          >
+            <Plus size={14} style={{ color: "#fff" }} strokeWidth={2.5} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

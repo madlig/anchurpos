@@ -7,7 +7,6 @@ export async function GET() {
     const snap = await adminDb
       .collection("products")
       .where("isActive", "==", true)
-      .orderBy("name")
       .get();
 
     const products: (Product & { priceTiers: PriceTier[] })[] = [];
@@ -41,7 +40,7 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json(products);
+    return NextResponse.json(products.sort((a, b) => a.name.localeCompare(b.name)));
   } catch (err) {
     console.error("GET /api/products error:", err);
     return NextResponse.json(
