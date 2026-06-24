@@ -78,6 +78,10 @@ Bangun sistem POS (Point of Sale) bernama AnchurPOS untuk usaha kuliner/bakery s
 
 ### ✅ Manager — Master Data `/manager/master-data`
 - 3 tab: Produk, Varian, Bahan Baku
+- **Tambah** produk (name, code, price tiers bertingkat)
+- **Edit** produk, varian, bahan baku — form inline pre-filled
+- **Hapus** produk (soft delete), varian & bahan baku (hard delete) — konfirmasi inline
+- Search bar real-time filter
 - Form tambah produk (name, code, price tiers bertingkat)
 - Form tambah varian (name, sortOrder, minStock)
 - Form tambah bahan baku (name, satuan, category, minStock)
@@ -88,7 +92,6 @@ Bangun sistem POS (Point of Sale) bernama AnchurPOS untuk usaha kuliner/bakery s
 ## Prioritized Backlog
 
 ### P1 — Manager (In Progress)
-- [ ] Edit/delete produk, varian, bahan baku (hanya tambah yang sudah ada)
 - [ ] Laporan harian/mingguan ke Owner
 
 ### P2 — Crew & Owner Redesign

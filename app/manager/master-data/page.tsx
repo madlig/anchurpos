@@ -441,7 +441,7 @@ export default function MasterDataPage() {
                       <div className="flex items-start justify-between" style={{ marginBottom: "8px" }}>
                         <div className="flex-1 min-w-0">
                           <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>{ing.name}</p>
-                          <span style={{ padding: "2px 8px", borderRadius: "6px", background: "#F8FAFC", border: "1px solid #E2E8F0", fontSize: "10px", color: "#64748B", display: "inline-block", marginTop: "3px" }}>{ing.category}</span>
+                          <span style={{ padding: "2px 8px", borderRadius: "6px", background: "#F8FAFC", border: "1px solid #E2E8F0", fontSize: "10px", color: "#64748B", display: "inline-block", marginTop: "3px" }}>{CAT_LABEL[ing.category] ?? ing.category}</span>
                         </div>
                         <div className="flex items-start gap-1.5 ml-2">
                           <div className="text-right mr-1">
@@ -470,6 +470,8 @@ export default function MasterDataPage() {
     </div>
   );
 }
+
+const CAT_LABEL: Record<string, string> = { bahan_baku: "Bahan Baku", packaging: "Packaging", operasional: "Operasional" };
 
 function EmptyState({ label, sub }: { label: string; sub: string }) {
   return (
