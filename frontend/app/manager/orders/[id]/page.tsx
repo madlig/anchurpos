@@ -3,52 +3,31 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useParams, useRouter } from "next/navigation";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Loader2,
-  ArrowLeft,
-  CheckCircle2,
-  Clock,
-  Truck,
-  CreditCard,
-  Ban,
-} from "lucide-react";
-import Link from "next/link";
+import { Loader2, ArrowLeft, CheckCircle2, Clock, CreditCard, Ban, Package, User } from "lucide-react";
 
+interface OrderItem {
+  id: string; productName: string; variantName: string;
+  qty: number; basePrice: number; discountPerUnit: number; totalPrice: number;
+  assemblyStatus: string | null;
+}
 interface OrderDetail {
-  id: string;
-  orderNumber: string;
-  source: string;
-  customerId: string;
-  customerName: string;
-  customerPhone: string;
-  channel: string;
-  status: string;
-  paymentStatus: string;
-  paymentMethod: string | null;
-  shippingAddress: string | null;
-  shippingCost: number | null;
-  shippingCostConfirmed: boolean;
-  requestedDeliveryDate: string | null;
-  orderNotes: string | null;
-  createdAt: string;
-  completedAt: string | null;
-  items: {
-    id: string;
-    productName: string;
-    variantName: string;
-    qty: number;
-    basePrice: number;
-    discountPerUnit: number;
-    totalPrice: number;
-    assemblyStatus: string | null;
-  }[];
+  id: string; orderNumber: string; source: string;
+  customerId: string | null; customerName: string; customerPhone: string | null;
+  channel: string; status: string; paymentStatus: string; paymentMethod: string | null;
+  shippingAddress: string | null; shippingCost: number | null; shippingCostConfirmed: boolean;
+  requestedDeliveryDate: string | null; orderNotes: string | null;
+  createdAt: string; completedAt: string | null; items: OrderItem[];
+}
+
+function fmt(n: number) {
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+}
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export default function OrderDetailPage() {
-  const { role, getToken } = useAuth();
+  const { getToken } = useAuth();
   const params = useParams();
   const router = useRouter();
   const orderId = params.id as string;
@@ -56,418 +35,251 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState("");
-  const [shippingInput, setShippingInput] = useState("");
   const [error, setError] = useState("");
   const [showVoidConfirm, setShowVoidConfirm] = useState(false);
 
-  const fetchWithAuth = useCallback(
-    async (url: string, options?: RequestInit) => {
-      const token = await getToken();
-      return fetch(url, {
-        ...options,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          ...options?.headers,
-        },
-      });
-    },
-    [getToken]
-  );
+  const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
+    const token = await getToken();
+    return fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...opts?.headers } });
+  }, [getToken]);
 
   const loadOrder = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`/api/orders/${orderId}`);
-      const data = await res.json();
-      if (res.ok) setOrder(data);
-    } finally {
-      setLoading(false);
-    }
+      if (res.ok) setOrder(await res.json());
+    } finally { setLoading(false); }
   }, [fetchWithAuth, orderId]);
 
-  useEffect(() => {
-    loadOrder();
-  }, [loadOrder]);
+  useEffect(() => { loadOrder(); }, [loadOrder]);
 
-  async function updateStatus(status: string) {
-    setActionLoading("status");
-    setError("");
+  async function markComplete() {
+    setActionLoading("status"); setError("");
     try {
-      const res = await fetchWithAuth(`/api/orders/${orderId}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        setError(d.error ?? "Gagal update status");
-        return;
-      }
+      const res = await fetchWithAuth(`/api/orders/${orderId}/status`, { method: "PATCH", body: JSON.stringify({ status: "selesai" }) });
+      if (!res.ok) { setError((await res.json()).error ?? "Gagal update status"); return; }
       await loadOrder();
-    } finally {
-      setActionLoading("");
-    }
+    } finally { setActionLoading(""); }
   }
 
-  async function updatePayment(paymentStatus: string, paymentMethod?: string) {
-    setActionLoading("payment");
-    setError("");
+  async function voidOrder() {
+    setActionLoading("void"); setError("");
     try {
-      const body: Record<string, string> = { paymentStatus };
-      if (paymentMethod) body.paymentMethod = paymentMethod;
-      const res = await fetchWithAuth(`/api/orders/${orderId}/payment`, {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        setError(d.error ?? "Gagal update pembayaran");
-        return;
-      }
-      await loadOrder();
-    } finally {
-      setActionLoading("");
-    }
+      const res = await fetchWithAuth(`/api/orders/${orderId}/void`, { method: "POST" });
+      if (!res.ok) { setError((await res.json()).error ?? "Gagal void order"); return; }
+      await loadOrder(); setShowVoidConfirm(false);
+    } finally { setActionLoading(""); }
   }
 
-  async function confirmShipping() {
-    const cost = parseInt(shippingInput);
-    if (isNaN(cost) || cost < 0) return;
-    setActionLoading("shipping");
-    setError("");
-    try {
-      const res = await fetchWithAuth(`/api/orders/${orderId}/shipping`, {
-        method: "PATCH",
-        body: JSON.stringify({ shippingCost: cost }),
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        setError(d.error ?? "Gagal update ongkir");
-        return;
-      }
-      await loadOrder();
-      setShippingInput("");
-    } finally {
-      setActionLoading("");
-    }
-  }
+  if (loading) return (
+    <div className="flex h-screen items-center justify-center" style={{ background: "#FCABB4" }}>
+      <Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} />
+    </div>
+  );
 
-  function formatCurrency(n: number) {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(n);
-  }
-
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleString("id-ID", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
-      </div>
-    );
-  }
-
-  if (!order) {
-    return (
-      <div className="p-5 text-center">
-        <p className="text-stone-500">Order tidak ditemukan</p>
-        <Button onClick={() => router.back()} variant="outline" className="mt-3">
-          Kembali
-        </Button>
-      </div>
-    );
-  }
+  if (!order) return (
+    <div className="flex flex-col items-center justify-center min-h-screen" style={{ background: "#FCABB4" }}>
+      <p style={{ fontSize: "14px", color: "#64748B" }}>Order tidak ditemukan</p>
+      <button onClick={() => router.back()} style={{ marginTop: "12px", padding: "10px 20px", borderRadius: "12px", background: "#E85D8C", color: "#fff", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
+        Kembali
+      </button>
+    </div>
+  );
 
   const itemsTotal = order.items.reduce((s, i) => s + i.totalPrice, 0);
-  const grandTotal = itemsTotal + (order.shippingCost ?? 0);
+  const grandTotal = itemsTotal + (order.shippingCostConfirmed ? (order.shippingCost ?? 0) : 0);
+  const isPaid = order.paymentStatus === "sudah_bayar";
+  const isDone = order.status === "selesai";
+  const isVoid = order.status === "void";
 
   return (
-    <div className="p-5">
-      <div className="flex items-center gap-3 mb-5">
-        <button onClick={() => router.back()} className="text-stone-400">
-          <ArrowLeft size={20} />
-        </button>
-        <div>
-          <h1 className="text-lg font-bold text-stone-900">
-            {order.orderNumber}
-          </h1>
-          <p className="text-xs text-stone-500">{formatDate(order.createdAt)}</p>
+    <div className="min-h-screen" style={{ background: "#FCABB4" }}>
+
+      {/* ── Sticky Header ── */}
+      <div className="sticky top-0 z-20" style={{ background: "#fff", borderBottom: "1px solid #F1F5F9" }}>
+        <div className="flex items-center gap-3 px-5 py-4">
+          <button onClick={() => router.back()} data-testid="back-button"
+            style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#F8FAFC", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <ArrowLeft size={16} style={{ color: "#64748B" }} />
+          </button>
+          <div className="flex-1 min-w-0">
+            <h1 style={{ fontSize: "16px", fontWeight: "700", color: "#1C1C1E", lineHeight: 1.2 }}>{order.orderNumber}</h1>
+            <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "1px" }}>{fmtDate(order.createdAt)}</p>
+          </div>
+          {/* Status badge */}
+          <span style={{
+            padding: "4px 10px", borderRadius: "100px", fontSize: "11px", fontWeight: "600",
+            color: isVoid ? "#DC2626" : isDone ? "#16A34A" : "#D97706",
+            background: isVoid ? "#FEE2E2" : isDone ? "#DCFCE7" : "#FEF3C7",
+          }}>
+            {isVoid ? "Void" : isDone ? "Selesai" : "Pending"}
+          </span>
         </div>
       </div>
 
-      <Card className="p-4 mb-4">
-        <h2 className="text-xs text-stone-500 mb-2">Pelanggan</h2>
-        <p className="text-sm font-medium text-stone-900">
-          {order.customerName}
-        </p>
-        <p className="text-xs text-stone-500">{order.customerPhone}</p>
-        {order.shippingAddress && (
-          <p className="text-xs text-stone-500 mt-1">{order.shippingAddress}</p>
-        )}
-        {order.requestedDeliveryDate && (
-          <p className="text-xs text-stone-500 mt-1">
-            Kirim: {order.requestedDeliveryDate}
-          </p>
-        )}
-        {order.orderNotes && (
-          <p className="text-xs text-stone-400 mt-1 italic">
-            {order.orderNotes}
-          </p>
-        )}
-      </Card>
+      <div className="px-4 pt-3 pb-24 flex flex-col gap-3">
 
-      <Card className="p-4 mb-4">
-        <h2 className="text-xs text-stone-500 mb-3">Item Pesanan</h2>
-        <div className="space-y-2">
-          {order.items.map((item) => (
-            <div
-              key={item.id}
-              className="flex justify-between items-start text-sm"
-            >
-              <div>
-                <p className="font-medium text-stone-900">
-                  {item.productName} — {item.variantName}
-                </p>
-                <p className="text-xs text-stone-500">
-                  {item.qty} x {formatCurrency(item.basePrice)}
-                  {item.discountPerUnit > 0 && (
-                    <span className="text-emerald-600">
-                      {" "}
-                      (-{formatCurrency(item.discountPerUnit)}/pcs)
-                    </span>
-                  )}
-                </p>
-                {item.assemblyStatus && (
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full mt-1 inline-block ${
-                      item.assemblyStatus === "completed"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-purple-100 text-purple-700"
-                    }`}
-                  >
-                    Rainbow:{" "}
-                    {item.assemblyStatus === "completed"
-                      ? "Selesai"
-                      : "Menunggu"}
-                  </span>
-                )}
-              </div>
-              <p className="font-medium text-stone-900">
-                {formatCurrency(item.totalPrice)}
-              </p>
+        {/* ── Success Banner (setelah checkout baru) ── */}
+        {isDone && (
+          <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #DCFCE7", display: "flex", alignItems: "center", gap: "10px" }} data-testid="success-banner">
+            <div style={{ width: "36px", height: "36px", borderRadius: "12px", background: "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <CheckCircle2 size={18} style={{ color: "#16A34A" }} />
             </div>
-          ))}
-        </div>
-        <div className="border-t border-stone-100 mt-3 pt-3 space-y-1">
-          <div className="flex justify-between text-sm">
-            <span className="text-stone-500">Subtotal</span>
-            <span>{formatCurrency(itemsTotal)}</span>
+            <div>
+              <p style={{ fontSize: "13px", fontWeight: "700", color: "#16A34A" }}>Order Selesai</p>
+              <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "1px" }}>Pesanan sudah dikonfirmasi selesai</p>
+            </div>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-stone-500">Ongkir</span>
-            <span>
-              {order.shippingCostConfirmed
-                ? formatCurrency(order.shippingCost ?? 0)
-                : "Belum dikonfirmasi"}
+        )}
+
+        {/* ── Customer Card ── */}
+        <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }} data-testid="customer-card">
+          <div className="flex items-center gap-2" style={{ marginBottom: "10px" }}>
+            <User size={13} style={{ color: "#E85D8C" }} />
+            <span style={{ fontSize: "11px", fontWeight: "600", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em" }}>Pelanggan</span>
+          </div>
+          <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>{order.customerName}</p>
+          {order.customerPhone && <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "2px" }}>{order.customerPhone}</p>}
+          {order.orderNotes && (
+            <p style={{ fontSize: "12px", color: "#64748B", marginTop: "6px", fontStyle: "italic" }}>"{order.orderNotes}"</p>
+          )}
+        </div>
+
+        {/* ── Items Card ── */}
+        <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }} data-testid="items-card">
+          <div className="flex items-center gap-2" style={{ marginBottom: "10px" }}>
+            <Package size={13} style={{ color: "#E85D8C" }} />
+            <span style={{ fontSize: "11px", fontWeight: "600", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em" }}>Item Pesanan</span>
+          </div>
+
+          <div className="flex flex-col gap-2.5">
+            {order.items.map((item) => (
+              <div key={item.id} className="flex items-start justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div style={{ width: "30px", height: "30px", borderRadius: "9px", background: "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <span style={{ fontSize: "11px", fontWeight: "700", color: "#E85D8C" }}>{item.qty}x</span>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{item.productName}</p>
+                    <p style={{ fontSize: "11px", color: "#94A3B8" }}>{item.variantName} · {fmt(item.basePrice)}/pack</p>
+                  </div>
+                </div>
+                <span style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>{fmt(item.totalPrice)}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Divider + Total */}
+          <div style={{ borderTop: "1px solid #F1F5F9", marginTop: "12px", paddingTop: "10px" }}>
+            <div className="flex justify-between" style={{ marginBottom: "6px" }}>
+              <span style={{ fontSize: "12px", color: "#94A3B8" }}>Subtotal</span>
+              <span style={{ fontSize: "12px", color: "#64748B" }}>{fmt(itemsTotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>Total</span>
+              <span style={{ fontSize: "16px", fontWeight: "700", color: "#E85D8C" }}>{fmt(grandTotal)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Payment Status ── */}
+        <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }} data-testid="payment-card">
+          <div className="flex items-center gap-2" style={{ marginBottom: "10px" }}>
+            <CreditCard size={13} style={{ color: "#E85D8C" }} />
+            <span style={{ fontSize: "11px", fontWeight: "600", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em" }}>Pembayaran</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <span style={{
+                padding: "4px 10px", borderRadius: "100px", fontSize: "11px", fontWeight: "600",
+                color: isPaid ? "#16A34A" : "#DC2626",
+                background: isPaid ? "#DCFCE7" : "#FEE2E2",
+              }}>
+                {isPaid ? "Lunas" : "Belum Bayar"}
+              </span>
+              {order.paymentMethod && (
+                <span style={{ fontSize: "11px", color: "#94A3B8", marginLeft: "8px", textTransform: "capitalize" }}>
+                  via {order.paymentMethod === "cash" ? "Tunai" : order.paymentMethod === "transfer" ? "Transfer" : order.paymentMethod.toUpperCase()}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Action Buttons ── */}
+        {!isVoid && (
+          <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }} data-testid="action-card">
+            <span style={{ fontSize: "11px", fontWeight: "600", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "10px" }}>Aksi</span>
+
+            {!isDone && (
+              <button
+                onClick={markComplete}
+                disabled={actionLoading === "status"}
+                data-testid="mark-complete-btn"
+                className="w-full flex items-center justify-center gap-2"
+                style={{ padding: "12px", borderRadius: "12px", background: "#E85D8C", color: "#fff", border: "none", cursor: actionLoading ? "default" : "pointer", fontSize: "13px", fontWeight: "700", opacity: actionLoading === "status" ? 0.7 : 1 }}>
+                {actionLoading === "status" ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                Tandai Selesai
+              </button>
+            )}
+
+            {!showVoidConfirm && isDone && (
+              <button
+                onClick={() => setShowVoidConfirm(true)}
+                data-testid="void-btn"
+                className="w-full flex items-center justify-center gap-2 mt-2"
+                style={{ padding: "11px", borderRadius: "12px", background: "#FEE2E2", color: "#DC2626", border: "1px solid #FECACA", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
+                <Ban size={14} />
+                Void Order
+              </button>
+            )}
+
+            {showVoidConfirm && (
+              <div style={{ borderRadius: "10px", background: "#FEF2F2", padding: "12px", border: "1px solid #FECACA" }}>
+                <p style={{ fontSize: "12px", fontWeight: "600", color: "#DC2626", marginBottom: "10px" }}>Yakin void order ini? Stok akan dikembalikan.</p>
+                <div className="flex gap-2">
+                  <button onClick={voidOrder} disabled={actionLoading === "void"} data-testid="confirm-void-btn"
+                    style={{ flex: 1, padding: "10px", borderRadius: "10px", background: "#DC2626", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}>
+                    {actionLoading === "void" ? <Loader2 size={12} className="animate-spin mx-auto" /> : "Ya, Void"}
+                  </button>
+                  <button onClick={() => setShowVoidConfirm(false)}
+                    style={{ flex: 1, padding: "10px", borderRadius: "10px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
+                    Batal
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isVoid && (
+          <div style={{ background: "#FEE2E2", borderRadius: "14px", padding: "14px", border: "1px solid #FECACA", textAlign: "center" }} data-testid="void-banner">
+            <p style={{ fontSize: "13px", fontWeight: "700", color: "#DC2626" }}>Order ini sudah di-void</p>
+          </div>
+        )}
+
+        {error && <p style={{ fontSize: "12px", color: "#DC2626", textAlign: "center" }}>{error}</p>}
+
+        {/* ── Order Info ── */}
+        <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }}>
+          <div className="flex items-center justify-between">
+            <span style={{ fontSize: "11px", color: "#94A3B8" }}>Metode</span>
+            <span style={{ fontSize: "12px", fontWeight: "500", color: "#64748B", textTransform: "capitalize" }}>
+              {order.source === "walk_in" ? "Walk-in / Kasir" : order.source}
             </span>
           </div>
-          <div className="flex justify-between text-sm font-bold">
-            <span>Total</span>
-            <span>{formatCurrency(grandTotal)}</span>
+          <div className="flex items-center justify-between" style={{ marginTop: "6px" }}>
+            <span style={{ fontSize: "11px", color: "#94A3B8" }}>No. Order</span>
+            <span style={{ fontSize: "12px", fontWeight: "600", color: "#1C1C1E", fontFamily: "monospace" }}>{order.orderNumber}</span>
           </div>
-        </div>
-      </Card>
-
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <Card className="p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock size={14} className="text-stone-400" />
-            <span className="text-xs text-stone-500">Status</span>
-          </div>
-          <span
-            className={`text-xs font-medium px-2 py-1 rounded-full ${
-              order.status === "selesai"
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-amber-100 text-amber-700"
-            }`}
-          >
-            {order.status === "selesai" ? "Selesai" : "Belum Selesai"}
-          </span>
-        </Card>
-        <Card className="p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <CreditCard size={14} className="text-stone-400" />
-            <span className="text-xs text-stone-500">Pembayaran</span>
-          </div>
-          <span
-            className={`text-xs font-medium px-2 py-1 rounded-full ${
-              order.paymentStatus === "sudah_bayar"
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-red-100 text-red-700"
-            }`}
-          >
-            {order.paymentStatus === "sudah_bayar" ? "Lunas" : "Belum Bayar"}
-          </span>
-          {order.paymentMethod && (
-            <p className="text-xs text-stone-400 mt-1 capitalize">
-              {order.paymentMethod}
-            </p>
+          {order.completedAt && (
+            <div className="flex items-center justify-between" style={{ marginTop: "6px" }}>
+              <span style={{ fontSize: "11px", color: "#94A3B8" }}>Selesai</span>
+              <span style={{ fontSize: "12px", color: "#64748B" }}>{fmtDate(order.completedAt)}</span>
+            </div>
           )}
-        </Card>
+        </div>
+
       </div>
-
-      <Card className="p-4 mb-4">
-        <h2 className="text-xs text-stone-500 mb-3">Aksi</h2>
-        <div className="space-y-2">
-          {order.status === "belum_selesai" && (
-            <Button
-              onClick={() => updateStatus("selesai")}
-              disabled={actionLoading === "status"}
-              className="w-full gap-2"
-              variant="outline"
-            >
-              {actionLoading === "status" ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <CheckCircle2 size={14} />
-              )}
-              Tandai Selesai
-            </Button>
-          )}
-
-          {order.paymentStatus === "belum_bayar" && (
-            <Button
-              onClick={() => updatePayment("sudah_bayar", "cash")}
-              disabled={actionLoading === "payment"}
-              className="w-full gap-2"
-              variant="outline"
-            >
-              {actionLoading === "payment" ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <CreditCard size={14} />
-              )}
-              Tandai Lunas
-            </Button>
-          )}
-
-          {!order.shippingCostConfirmed && (
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                min="0"
-                placeholder="Ongkir (Rp)"
-                value={shippingInput}
-                onChange={(e) => setShippingInput(e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                onClick={confirmShipping}
-                disabled={actionLoading === "shipping" || !shippingInput}
-                variant="outline"
-                className="gap-1"
-              >
-                {actionLoading === "shipping" ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Truck size={14} />
-                )}
-                Konfirmasi
-              </Button>
-            </div>
-          )}
-        </div>
-      </Card>
-
-      {order.items.some((i) => i.assemblyStatus === "pending_approval") && (
-        <Link href="/manager/rainbow-assembly">
-          <Card className="p-4 bg-purple-50 border-purple-200 text-center">
-            <p className="text-sm text-purple-800 font-medium">
-              Ada item Rainbow yang perlu di-assembly
-            </p>
-            <p className="text-xs text-purple-600 mt-1">
-              Tap untuk ke halaman Rainbow Assembly
-            </p>
-          </Card>
-        </Link>
-      )}
-
-      {role === "owner" && order.status !== "void" && (
-        <Card className="p-4 mt-4 border-red-200 bg-red-50/50">
-          {!showVoidConfirm ? (
-            <Button
-              onClick={() => setShowVoidConfirm(true)}
-              variant="outline"
-              className="w-full gap-2 text-red-600 border-red-200 hover:bg-red-50"
-            >
-              <Ban size={14} />
-              Void Order
-            </Button>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-red-800 font-medium">
-                Yakin void order ini? Stok akan dikembalikan.
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  onClick={async () => {
-                    setActionLoading("void");
-                    setError("");
-                    try {
-                      const res = await fetchWithAuth(`/api/orders/${orderId}/void`, {
-                        method: "POST",
-                      });
-                      if (!res.ok) {
-                        const d = await res.json();
-                        setError(d.error ?? "Gagal void order");
-                        return;
-                      }
-                      await loadOrder();
-                      setShowVoidConfirm(false);
-                    } finally {
-                      setActionLoading("");
-                    }
-                  }}
-                  disabled={actionLoading === "void"}
-                  className="flex-1 bg-red-600 hover:bg-red-700 gap-2"
-                >
-                  {actionLoading === "void" ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Ban size={14} />
-                  )}
-                  Ya, Void
-                </Button>
-                <Button
-                  onClick={() => setShowVoidConfirm(false)}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Batal
-                </Button>
-              </div>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {order.status === "void" && (
-        <Card className="p-4 mt-4 bg-red-100 border-red-300 text-center">
-          <p className="text-sm font-medium text-red-800">Order telah di-void</p>
-        </Card>
-      )}
-
-      {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
     </div>
   );
 }
