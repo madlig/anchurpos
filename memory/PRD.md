@@ -1,96 +1,106 @@
 # AnchurPOS — PRD
 
 ## Original Problem Statement
-Bangun sistem AnchurPOS (fases 0-9) dengan UI/UX pixel-perfect sesuai mockup yang diunggah (`AnchurPOS Mockup.dc.html` dan `CLAUDE.md`). Font, warna latar, posisi elemen, lokasi tombol harus persis sama dengan mockup. Aplikasi mobile-first dengan layout desktop yang tidak memiliki ruang kosong. Role-based access: Owner > Manager > Crew.
-
-## Design System (dari CLAUDE.md)
-- **Primary Pink**: `#E85D8C` (tombol, aksen, status aktif)
-- **Base Background**: `#FCABB4` (background seluruh halaman)
-- **Font**: `Plus Jakarta Sans` (sudah terkonfigurasi)
-- **Card Style**: white, `border-radius: 14px`, `border: 1px solid #F1F5F9`, `padding: 14px`
-- **Tab Active**: `border-bottom: 2px solid #E85D8C`, underline style
-- **Progress Bar**: `height: 6px`, gradient `#E85D8C → #F2A0B7`
+Bangun sistem POS (Point of Sale) bernama AnchurPOS untuk usaha kuliner/bakery skala UMKM.
+- Mobile-first, tapi punya layout desktop yang tidak kosong
+- Pixel-perfect sesuai mockup (AnchurPOS Mockup.dc.html + CLAUDE.md)
+- Desain: background #FCABB4 (pink), header putih sticky, card putih borderRadius 14px, accent #E85D8C
+- RBAC: Owner > Manager > Crew
+- **Fokus saat ini: Manager role** (Kasir/POS dan Inventori)
+- Backend: Firebase Auth + Firestore (pure Next.js 14 App Router, tanpa Python backend)
 
 ## Architecture
 ```
-/app/frontend/
-├── app/               # Next.js 15 App Router
-│   ├── api/           # Firebase Admin API routes
-│   ├── login/         # Login page
-│   ├── manager/       # Manager pages (dashboard, pos, orders, inventory, more, employees, master-data)
-│   ├── crew/          # Crew pages (attendance, production, more)
-│   ├── owner/         # Owner pages (dashboard, reports, approval, more)
-│   └── order/         # Order tracking
-├── components/        # Shared components
-│   └── layout/        # Sidebar, BottomNav
-├── lib/               # Firebase, auth context
-└── types/             # TypeScript definitions
+/app/                          ← Root (sumber kebenaran, yang dijalankan user lokal)
+├── app/                       ← Next.js App Router pages & API routes
+│   ├── api/                   ← API Route Handlers (Firebase Admin SDK)
+│   │   ├── auth/              ← login, verify
+│   │   ├── products/          ← GET list, POST buat baru
+│   │   ├── variants/          ← GET list, POST buat baru, PATCH stok [id]
+│   │   ├── ingredients/       ← GET list, POST buat baru
+│   │   ├── orders/            ← GET list, POST checkout, PATCH status, void
+│   │   ├── customers/         ← GET list
+│   │   └── seed/              ← POST isi data awal
+│   ├── login/
+│   ├── manager/
+│   │   ├── pos/               ← Kasir / POS
+│   │   ├── inventory/         ← Inventori (Produk Jadi, Bahan Baku, Pengeluaran)
+│   │   ├── orders/            ← Daftar pesanan + [id] detail
+│   │   └── master-data/       ← CRUD Produk, Varian, Bahan Baku
+│   ├── crew/
+│   └── owner/
+├── lib/                       ← Auth context, Firebase admin/client, utils
+├── types/                     ← TypeScript definitions
+├── components/ui/             ← Shadcn components
+├── backend/server.py          ← Proxy FastAPI port 8001 → 3000 (Emergent routing fix)
+└── frontend/                  ← Cloud runner (package.json start = cd /app && next dev)
 ```
 
-## Tech Stack
-- **Frontend**: Next.js 15 (App Router), React 19, TailwindCSS
-- **Backend**: Firebase Admin SDK via API routes
-- **Auth**: Firebase Authentication (username-based login)
-- **DB**: Firestore
+## Firestore Collections
+- `users`: {uid, email, role, name}
+- `products`: {name, code, description, packPerBatch, isActive}
+  - subcollection `priceTiers`: {minQty, maxQty, price}
+- `variants`: {name, sortOrder, isProductionVariant, currentStock, minStock}
+- `ingredients`: {name, category, baseUnit, currentStock, minStock, unitAlternatives}
+- `orders`: {orderNumber, source, customerId, customerName, items[], total, status, paymentStatus, ...}
+- `customers`: {name, channel, phoneNumber, discountPerUnit, isActive}
 
-## Role-Based Access
-- Owner: Akses semua fitur + laporan + approval
-- Manager: Dashboard, POS, Pesanan, Inventori, Pegawai, Master Data
-- Crew: Absensi, Produksi
+## What's Implemented
 
-## Credentials Test
-- Manager: `manager` / `anchur123`
-- Crew: `crew1` / `anchur123`
-- Owner: `owner` / `anchur123`
+### ✅ Infrastructure
+- Firebase Auth + Firestore (pure Next.js, no Python backend)
+- Role-based middleware (`requireRole`)
+- Proxy server `/app/backend/server.py` agar API bisa diakses dari cloud preview URL
+- Root folder = sumber kebenaran; `frontend/` hanya launcher dengan `start: cd /app && next dev`
 
----
+### ✅ Authentication
+- Login page (username-based, bukan email)
+- Role redirect: manager → /manager/dashboard, crew → /crew, owner → /owner
+- JWT via Firebase custom tokens
 
-## CHANGELOG
+### ✅ Manager — POS / Kasir
+- Katalog produk dengan category chips
+- Bottom sheet pilih varian
+- Cart sidebar/bar (gradient pink)
+- Checkout sheet (pilih customer, metode bayar)
+- Stok berkurang otomatis setelah checkout
 
-### 2025-01 (Sebelum fork ini)
-- Implementasi Next.js 14 App Router dengan Firebase
-- Role-based route guards (Owner > Manager > Crew)
-- Manager: Dashboard, POS, Pesanan, Inventori, Lainnya
-- Crew: Absensi, Produksi
-- Owner: Dashboard, Reports
-- Desktop sidebar layout
-- Fix Firestore composite index errors di /api/customers dan /api/products
+### ✅ Manager — Inventori
+- Tab: Produk Jadi, Bahan Baku, Pengeluaran
+- Stock opname produk jadi (PATCH /api/variants/[id])
+- Progress bar stok bahan baku
+- Warning stok rendah
 
-### Feb 2026 — UI/UX Overhaul (fork ini)
-**SELESAI: Pixel-Perfect UI/UX Overhaul berdasarkan Mockup**
-- Ubah background seluruh halaman dari `#F0EDE8` → `#FCABB4`
-- Manager Dashboard, Pesanan, Lainnya, Attendance, Owner Dashboard: white header + white cards on pink bg
+### ✅ Manager — Order Detail `/manager/orders/[id]`
+- Header sticky dengan back button + status badge
+- Customer card, items card, payment card
+- Tombol "Tandai Selesai" dan "Void Order"
 
-### Feb 2026 — Manager Core Features
-**SELESAI: POS & Inventori Manager**
-- **Kasir/POS** rebuilt: katalog produk (search + category chips + 2-col grid) → variant selector bottom sheet → cart bottom bar (gradient pink pill) → checkout sheet (customer opsional, metode bayar, konfirmasi)
-- **Orders POST** diupdate: customerId opsional, customerName langsung, stok varian otomatis dikurangi
-- **Inventori** ditambah tab Produk Jadi: 3 tabs (Produk Jadi, Bahan Baku, Pengeluaran), stock opname, progress bars
-- `/api/variants/[id]` endpoint baru: PATCH untuk stock opname
-- `/api/seed` endpoint: seed data awal (variants, products, ingredients) via `POST /api/seed -H "Authorization: Bearer anchurpos-seed-2025"`
-- **Firebase Admin fix**: robust key parsing untuk Windows (strip quotes + handle escaped newlines)
+### ✅ Manager — Master Data `/manager/master-data`
+- 3 tab: Produk, Varian, Bahan Baku
+- Form tambah produk (name, code, price tiers bertingkat)
+- Form tambah varian (name, sortOrder, minStock)
+- Form tambah bahan baku (name, satuan, category, minStock)
 
----
+### ✅ Seed Data
+- POST /api/seed untuk isi data awal Firebase
 
-## ROADMAP
+## Prioritized Backlog
 
-### P0 (Kritis)
-- [x] Pixel-perfect UI/UX sesuai mockup
-- [x] Background #FCABB4, white header sections, underline tabs
-- [x] Circular clock-in button crew attendance
+### P1 — Manager (In Progress)
+- [ ] Edit/delete produk, varian, bahan baku (hanya tambah yang sudah ada)
+- [ ] Laporan harian/mingguan ke Owner
 
-### P1 (Prioritas Tinggi)
-- [ ] Verify Firestore Schema sesuai Firestore_Data_Model.md
-- [ ] Owner vs Manager dashboard feature differences
-- [ ] Multi-outlet support di Owner Dashboard
+### P2 — Crew & Owner Redesign
+- [ ] Crew: Absensi, production, checklist
+- [ ] Owner: Dashboard, stock opname review, approval pengeluaran
 
-### P2 (Prioritas Menengah)
-- [ ] Owner-only: laporan keuangan detail, approval pengeluaran
-- [ ] Manager: stock opname feature
-- [ ] Crew: riwayat produksi lengkap
+### P3 — Advanced Features
+- [ ] Export laporan ke Excel/PDF
+- [ ] Push notification low-stock alert
+- [ ] Multi-outlet support
 
-### P3 (Backlog)
-- [ ] Push notifications untuk low-stock alerts
-- [ ] Export data ke Google Sheets
-- [ ] Dark mode support
-- [ ] Animations/transitions between screens
+## Known Issues / Notes
+- Firestore composite index: Hindari `.where().orderBy()` pada field berbeda. Gunakan in-memory sort.
+- Windows `.env.local`: FIREBASE_PRIVATE_KEY harus satu baris dengan `\n`, dibungkus `"..."`.
+- Cloud routing: Kubernetes routes `/api/*` ke port 8001. Proxy di `/app/backend/server.py` forward ke port 3000.
