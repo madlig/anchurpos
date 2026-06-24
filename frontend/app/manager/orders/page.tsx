@@ -84,6 +84,8 @@ export default function OrdersListPage() {
                 fontWeight: tab === t.key ? "600" : "500",
                 color: tab === t.key ? "#E85D8C" : "#94A3B8",
                 background: "transparent",
+                border: "none",
+                borderBottom: tab === t.key ? "2px solid #E85D8C" : "2px solid transparent",
                 cursor: "pointer",
               }}
             >
