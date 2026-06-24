@@ -31,9 +31,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(customers.sort((a, b) => a.name.localeCompare(b.name)));
   } catch (err) {
     console.error("GET /api/customers error:", err);
-    return NextResponse.json(
-      { error: "Gagal mengambil data pelanggan" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Gagal mengambil data pelanggan" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const auth = await requireRole(req, ["owner", "manager"]);
+  if (auth instanceof NextResponse) return auth;
+
+  const body = await req.json();
+  const { name, channel = "retail", phoneNumber = null, createdVia = "manual" } = body as {
+    name: string; channel?: string; phoneNumber?: string | null; createdVia?: string;
+  };
+  if (!name?.trim()) return NextResponse.json({ error: "Nama pelanggan wajib diisi" }, { status: 400 });
+
+  try {
+    const ref = adminDb.collection("customers").doc();
+    await ref.set({ name: name.trim(), channel, phoneNumber, address: null, discountPerUnit: 0, notes: "", isActive: true, createdVia });
+    return NextResponse.json({ id: ref.id, name: name.trim(), channel }, { status: 201 });
+  } catch (err) {
+    console.error("POST /api/customers error:", err);
+    return NextResponse.json({ error: "Gagal menyimpan pelanggan" }, { status: 500 });
   }
 }

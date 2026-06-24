@@ -65,18 +65,36 @@ export default function CrewAttendancePage() {
 
   const todayLabel = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
 
+  // Hitung sudah berapa jam sejak check-in
+  const checkInTime = today?.checkIn?.time ? new Date(today.checkIn.time).getTime() : null;
+  const hoursWorked = checkInTime ? (Date.now() - checkInTime) / (1000 * 60 * 60) : 0;
+  const canCheckOut = hoursWorked >= 8;
+  const remainingMinutes = checkInTime ? Math.max(0, Math.ceil((8 * 60) - (hoursWorked * 60))) : 0;
+
   // Status config for the gradient card
   const statusCard = (() => {
     if (!hasCheckedIn) return { label: "Belum Absen", sub: "Tap tombol di bawah untuk absen masuk", gradient: "linear-gradient(135deg,#E85D8C,#F2A0B7)" };
-    if (!hasCheckedOut) return { label: "Sedang Bekerja", sub: `Masuk pukul ${formatTime(today!.checkIn.time)}`, gradient: "linear-gradient(135deg,#E85D8C,#F2A0B7)" };
+    if (!hasCheckedOut) return {
+      label: "Sedang Bekerja",
+      sub: `Masuk pukul ${formatTime(today!.checkIn.time)} · ${hoursWorked.toFixed(1)} jam`,
+      gradient: "linear-gradient(135deg,#3B82F6,#2563EB)",
+    };
     if (today!.status === "direview") return { label: "Perlu Review", sub: today!.flaggedReason ?? "Hubungi Manager", gradient: "linear-gradient(135deg,#F59E0B,#D97706)" };
     return { label: "Sudah Pulang", sub: today!.totalHours ? `Total ${today!.totalHours.toFixed(1)} jam` : "Terima kasih!", gradient: "linear-gradient(135deg,#22C55E,#16A34A)" };
   })();
 
-  // Button config
+  // Button config — tombol PULANG hanya aktif setelah 8 jam
   const btnConfig = (() => {
-    if (!hasCheckedIn) return { label: "MASUK", action: () => handleAction("check-in"), bg: "linear-gradient(135deg,#E85D8C,#C94A73)", shadow: "0 10px 40px rgba(232,93,140,0.4)", testId: "attendance-check-in-btn" };
-    if (!hasCheckedOut) return { label: "PULANG", action: () => handleAction("check-out"), bg: "linear-gradient(135deg,#EF4444,#DC2626)", shadow: "0 10px 40px rgba(220,38,38,0.35)", testId: "attendance-check-out-btn" };
+    if (!hasCheckedIn) return { label: "MASUK", action: () => handleAction("check-in"), bg: "linear-gradient(135deg,#E85D8C,#C94A73)", shadow: "0 10px 40px rgba(232,93,140,0.4)", testId: "attendance-check-in-btn", disabled: false, subLabel: "" };
+    if (!hasCheckedOut) return {
+      label: "PULANG",
+      action: () => handleAction("check-out"),
+      bg: canCheckOut ? "linear-gradient(135deg,#EF4444,#DC2626)" : "linear-gradient(135deg,#94A3B8,#64748B)",
+      shadow: canCheckOut ? "0 10px 40px rgba(220,38,38,0.35)" : "none",
+      testId: "attendance-check-out-btn",
+      disabled: !canCheckOut,
+      subLabel: canCheckOut ? "" : `Bisa pulang dalam ${remainingMinutes} menit lagi`,
+    };
     return null;
   })();
 
@@ -121,23 +139,15 @@ export default function CrewAttendancePage() {
         {btnConfig && (
           <div className="flex flex-col items-center gap-3" style={{ marginBottom: "20px" }}>
             <button
-              onClick={btnConfig.action}
-              disabled={submitting}
+              onClick={btnConfig.disabled ? undefined : btnConfig.action}
+              disabled={submitting || btnConfig.disabled}
               data-testid={btnConfig.testId}
               style={{
-                width: "120px",
-                height: "120px",
-                borderRadius: "50%",
-                background: btnConfig.bg,
-                boxShadow: btnConfig.shadow,
-                border: "none",
-                cursor: submitting ? "default" : "pointer",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: submitting ? 0.7 : 1,
-                transition: "transform 0.15s, opacity 0.15s",
+                width: "120px", height: "120px", borderRadius: "50%",
+                background: btnConfig.bg, boxShadow: btnConfig.shadow,
+                border: "none", cursor: (submitting || btnConfig.disabled) ? "default" : "pointer",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                opacity: submitting ? 0.7 : 1, transition: "transform 0.15s, opacity 0.15s",
               }}
               className="tap-target"
             >
@@ -152,9 +162,11 @@ export default function CrewAttendancePage() {
                 </>
               )}
             </button>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 text-center">
               <Wifi size={12} style={{ color: "#94A3B8" }} />
-              <p style={{ fontSize: "11px", color: "#64748B" }}>Tekan untuk absen {btnConfig.label === "MASUK" ? "masuk" : "pulang"}</p>
+              <p style={{ fontSize: "11px", color: "#64748B" }}>
+                {btnConfig.subLabel || `Tekan untuk absen ${btnConfig.label === "MASUK" ? "masuk" : "pulang"}`}
+              </p>
             </div>
           </div>
         )}

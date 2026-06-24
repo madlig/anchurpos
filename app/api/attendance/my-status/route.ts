@@ -31,11 +31,11 @@ export async function GET(req: NextRequest) {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const startDate = sevenDaysAgo.toISOString().split("T")[0];
 
-    // Use single equality filter to avoid composite index requirement, then sort in JS
+    // Ambil history hanya berdasarkan employeeId (satu field) lalu filter date di JS
+    // — menghindari kebutuhan composite index di Firestore
     const historySnap = await adminDb
       .collection("attendance")
       .where("employeeId", "==", user.uid)
-      .where("date", ">=", startDate)
       .get();
 
     const history = historySnap.docs

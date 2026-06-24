@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Search, ShoppingCart, X, Minus, Plus, ChevronDown } from "lucide-react";
+import { Loader2, Search, ShoppingCart, X, Minus, Plus, ChevronDown, UserPlus, CreditCard, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -13,6 +13,9 @@ interface ProductItem {
 }
 interface Variant {
   id: string; name: string; currentStock: number; minStock: number; sortOrder: number;
+}
+interface CustomerItem {
+  id: string; name: string; channel: string; phoneNumber: string | null;
 }
 interface CartItem {
   productId: string; productName: string;
@@ -50,6 +53,7 @@ export default function KasirPage() {
 
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
+  const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Semua");
@@ -61,13 +65,18 @@ export default function KasirPage() {
   // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  // Checkout sheet
+  // Checkout sheet state
   const [showCheckout, setShowCheckout] = useState(false);
-  const [customerName, setCustomerName] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [saveNewCustomer, setSaveNewCustomer] = useState(false);
   const [payMethod, setPayMethod] = useState<PayMethod>("cash");
+  const [isPaid, setIsPaid] = useState(true);
   const [orderNotes, setOrderNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const customerRef = useRef<HTMLDivElement>(null);
 
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
@@ -78,9 +87,11 @@ export default function KasirPage() {
     Promise.all([
       fetchWithAuth("/api/products").then(r => r.json()),
       fetchWithAuth("/api/variants").then(r => r.json()),
-    ]).then(([p, v]) => {
+      fetchWithAuth("/api/customers").then(r => r.json()),
+    ]).then(([p, v, c]) => {
       setProducts(Array.isArray(p) ? p : []);
       setVariants(Array.isArray(v) ? v : []);
+      setCustomers(Array.isArray(c) ? c : []);
     }).finally(() => setLoading(false));
   }, [fetchWithAuth]);
 
@@ -159,28 +170,52 @@ export default function KasirPage() {
   }
 
   // ── Checkout ───────────────────────────────────────────────────────────────
+  // Filter customers untuk dropdown
+  const filteredCustomers = useMemo(() => {
+    const q = customerSearch.toLowerCase().trim();
+    if (!q) return customers.slice(0, 8);
+    return customers.filter(c => c.name.toLowerCase().includes(q) || (c.phoneNumber ?? "").includes(q)).slice(0, 8);
+  }, [customers, customerSearch]);
+
+  const isNewCustomer = customerSearch.trim() && !selectedCustomer && !customers.some(c => c.name.toLowerCase() === customerSearch.toLowerCase().trim());
+  const finalCustomerName = selectedCustomer ? selectedCustomer.name : customerSearch.trim() || "Walk-in";
+  const isB2B = selectedCustomer?.channel === "b2b";
+
   async function handleCheckout() {
     if (!cart.length) return;
     setError(""); setSubmitting(true);
     try {
+      // Simpan pelanggan baru jika diminta
+      let customerId = selectedCustomer?.id ?? null;
+      if (isNewCustomer && saveNewCustomer && customerSearch.trim()) {
+        const saveRes = await fetchWithAuth("/api/customers", {
+          method: "POST",
+          body: JSON.stringify({ name: customerSearch.trim(), channel: "retail", createdVia: "pos" }),
+        });
+        if (saveRes.ok) {
+          const newC = await saveRes.json();
+          customerId = newC.id;
+          setCustomers(prev => [...prev, { id: newC.id, name: customerSearch.trim(), channel: "retail", phoneNumber: null }]);
+        }
+      }
+
       const res = await fetchWithAuth("/api/orders", {
         method: "POST",
         body: JSON.stringify({
-          customerName: customerName.trim() || "Walk-in",
+          customerName: finalCustomerName,
+          customerId,
           source: "walk_in",
           items: cart.map(c => ({ productId: c.productId, variantId: c.variantId, qty: c.qty })),
           paymentMethod: payMethod,
-          paymentStatus: "sudah_bayar",
+          paymentStatus: isPaid ? "sudah_bayar" : "belum_bayar",
           orderNotes: orderNotes.trim() || null,
         }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Gagal membuat order"); return; }
-      // Success
-      setCart([]);
-      setShowCheckout(false);
-      setCustomerName("");
-      setOrderNotes("");
+      if (!res.ok) { setError(data.error ?? "Gagal membuat pesanan"); return; }
+      // Reset
+      setCart([]); setShowCheckout(false); setCustomerSearch("");
+      setSelectedCustomer(null); setOrderNotes(""); setIsPaid(true); setSaveNewCustomer(false);
       router.push(`/manager/orders/${data.orderId}`);
     } catch { setError("Gagal menghubungi server"); } finally { setSubmitting(false); }
   }
@@ -407,29 +442,21 @@ export default function KasirPage() {
           style={{ background: "rgba(0,0,0,0.45)" }}
           onClick={e => { if (e.target === e.currentTarget) setShowCheckout(false); }}
         >
-          <div
-            className="overflow-y-auto"
-            style={{ background: "#fff", borderRadius: "20px 20px 0 0", padding: "20px 16px 32px", maxHeight: "90vh" }}
-          >
+          <div className="overflow-y-auto" style={{ background: "#fff", borderRadius: "20px 20px 0 0", padding: "20px 16px 32px", maxHeight: "92vh" }}>
             {/* Header */}
-            <div className="flex items-center justify-between mb-5">
-              <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#1C1C1E" }}>Konfirmasi Pesanan</h2>
-              <button
-                onClick={() => setShowCheckout(false)}
-                style={{ width: "30px", height: "30px", borderRadius: "10px", background: "#F8FAFC", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-              >
+            <div className="flex items-center justify-between mb-4">
+              <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#1C1C1E" }}>Input Pesanan</h2>
+              <button onClick={() => setShowCheckout(false)}
+                style={{ width: "30px", height: "30px", borderRadius: "10px", background: "#F8FAFC", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <X size={16} style={{ color: "#64748B" }} />
               </button>
             </div>
 
             {/* Cart summary */}
-            <div style={{ background: "#F8FAFC", borderRadius: "12px", padding: "12px 14px", marginBottom: "16px" }}>
+            <div style={{ background: "#F8FAFC", borderRadius: "12px", padding: "12px 14px", marginBottom: "14px" }}>
               {cart.map((item, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between"
-                  style={{ paddingBottom: i < cart.length - 1 ? "8px" : 0, marginBottom: i < cart.length - 1 ? "8px" : 0, borderBottom: i < cart.length - 1 ? "1px solid #F1F5F9" : "none" }}
-                >
+                <div key={i} className="flex items-center justify-between"
+                  style={{ paddingBottom: i < cart.length - 1 ? "8px" : 0, marginBottom: i < cart.length - 1 ? "8px" : 0, borderBottom: i < cart.length - 1 ? "1px solid #F1F5F9" : "none" }}>
                   <div className="flex items-center gap-2">
                     <div style={{ width: "28px", height: "28px", borderRadius: "8px", background: "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <span style={{ fontSize: "11px", fontWeight: "700", color: "#E85D8C" }}>{item.qty}x</span>
@@ -441,10 +468,8 @@ export default function KasirPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span style={{ fontSize: "12px", fontWeight: "700", color: "#1C1C1E" }}>{fmt(item.price * item.qty)}</span>
-                    <button
-                      onClick={() => removeFromCart(i)}
-                      style={{ width: "22px", height: "22px", borderRadius: "6px", background: "#FEE2E2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                    >
+                    <button onClick={() => removeFromCart(i)}
+                      style={{ width: "22px", height: "22px", borderRadius: "6px", background: "#FEE2E2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <X size={11} style={{ color: "#DC2626" }} />
                     </button>
                   </div>
@@ -452,86 +477,146 @@ export default function KasirPage() {
               ))}
             </div>
 
-            {/* Customer name */}
+            {/* ── Customer Picker ── */}
             <div style={{ marginBottom: "12px" }}>
               <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "6px" }}>
-                Nama Pelanggan
+                Pelanggan
               </label>
-              <input
-                type="text"
-                placeholder="Nama pelanggan (opsional)"
-                value={customerName}
-                onChange={e => setCustomerName(e.target.value)}
-                style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", border: "1px solid #E2E8F0", fontSize: "13px", color: "#1C1C1E", outline: "none", background: "#F8FAFC" }}
-                data-testid="checkout-customer-name"
-              />
+              <div ref={customerRef} style={{ position: "relative" }}>
+                {selectedCustomer ? (
+                  <div className="flex items-center justify-between"
+                    style={{ padding: "10px 12px", borderRadius: "12px", border: "1px solid #E85D8C", background: "#FEF1F5" }}>
+                    <div>
+                      <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>{selectedCustomer.name}</p>
+                      <p style={{ fontSize: "11px", color: "#E85D8C", textTransform: "uppercase" }}>{selectedCustomer.channel}</p>
+                    </div>
+                    <button onClick={() => { setSelectedCustomer(null); setCustomerSearch(""); }}
+                      style={{ width: "24px", height: "24px", borderRadius: "8px", background: "#FEE2E2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <X size={12} style={{ color: "#DC2626" }} />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input type="text" placeholder="Cari nama pelanggan atau ketik baru..."
+                      value={customerSearch}
+                      onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
+                      onFocus={() => setShowCustomerDropdown(true)}
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", border: "1px solid #E2E8F0", fontSize: "13px", outline: "none", background: "#F8FAFC" }}
+                      data-testid="checkout-customer-search" />
+                    {showCustomerDropdown && (filteredCustomers.length > 0 || isNewCustomer) && (
+                      <div style={{ position: "absolute", top: "44px", left: 0, right: 0, background: "#fff", borderRadius: "12px", border: "1px solid #E2E8F0", boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 10, overflow: "hidden" }}>
+                        {filteredCustomers.map(c => (
+                          <button key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearch(c.name); setShowCustomerDropdown(false); }}
+                            className="w-full flex items-center justify-between"
+                            style={{ padding: "10px 14px", border: "none", background: "transparent", cursor: "pointer", textAlign: "left", borderBottom: "1px solid #F8FAFC" }}
+                            data-testid={`customer-option-${c.id}`}>
+                            <div>
+                              <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{c.name}</p>
+                              {c.phoneNumber && <p style={{ fontSize: "11px", color: "#94A3B8" }}>{c.phoneNumber}</p>}
+                            </div>
+                            <span style={{ padding: "2px 8px", borderRadius: "6px", background: c.channel === "b2b" ? "#EFF6FF" : "#F8FAFC", border: "1px solid #E2E8F0", fontSize: "10px", fontWeight: "600", color: c.channel === "b2b" ? "#2563EB" : "#64748B" }}>
+                              {c.channel.toUpperCase()}
+                            </span>
+                          </button>
+                        ))}
+                        {customerSearch.trim() && (
+                          <div style={{ padding: "10px 14px", borderTop: filteredCustomers.length ? "1px solid #F1F5F9" : "none" }}>
+                            <p style={{ fontSize: "11px", color: "#64748B", marginBottom: "6px" }}>
+                              {isNewCustomer ? `"${customerSearch.trim()}" belum ada di master pelanggan` : "Gunakan nama ini:"}
+                            </p>
+                            <button onClick={() => setShowCustomerDropdown(false)}
+                              className="flex items-center gap-2 w-full"
+                              style={{ padding: "8px 0", border: "none", background: "transparent", cursor: "pointer" }}
+                              data-testid="use-custom-name-btn">
+                              <span style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>"{customerSearch.trim()}"</span>
+                              <span style={{ fontSize: "11px", color: "#94A3B8" }}>— tanpa simpan ke master</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              {/* Opsi simpan ke master jika nama baru */}
+              {isNewCustomer && !showCustomerDropdown && (
+                <label className="flex items-center gap-2" style={{ marginTop: "8px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={saveNewCustomer} onChange={e => setSaveNewCustomer(e.target.checked)}
+                    style={{ accentColor: "#E85D8C" }} data-testid="save-new-customer-checkbox" />
+                  <span style={{ fontSize: "12px", color: "#64748B" }}>Simpan "{customerSearch.trim()}" ke data master pelanggan</span>
+                </label>
+              )}
             </div>
 
-            {/* Payment method */}
-            <div style={{ marginBottom: "16px" }}>
+            {/* ── Status Bayar ── */}
+            <div style={{ marginBottom: "12px" }}>
               <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
-                Metode Pembayaran
+                Status Pembayaran
               </label>
               <div className="flex gap-2">
-                {(["cash", "transfer", "qris"] as PayMethod[]).map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setPayMethod(m)}
-                    style={{
-                      flex: 1, padding: "9px 0", borderRadius: "12px", fontSize: "12px", fontWeight: "600",
-                      color: payMethod === m ? "#fff" : "#64748B",
-                      background: payMethod === m ? "#E85D8C" : "#F1F5F9",
-                      border: payMethod === m ? "none" : "1px solid #E2E8F0",
-                      cursor: "pointer",
-                    }}
-                    data-testid={`pay-method-${m}`}
-                  >
-                    {m === "cash" ? "Tunai" : m === "transfer" ? "Transfer" : "QRIS"}
-                  </button>
-                ))}
+                <button onClick={() => setIsPaid(true)} data-testid="pay-status-paid"
+                  className="flex items-center justify-center gap-1.5 flex-1"
+                  style={{ padding: "9px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", border: "none", cursor: "pointer",
+                    color: isPaid ? "#fff" : "#16A34A", background: isPaid ? "#16A34A" : "#DCFCE7" }}>
+                  <CheckCircle2 size={13} /> Sudah Bayar
+                </button>
+                <button onClick={() => setIsPaid(false)} data-testid="pay-status-unpaid"
+                  className="flex items-center justify-center gap-1.5 flex-1"
+                  style={{ padding: "9px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", border: "none", cursor: "pointer",
+                    color: !isPaid ? "#fff" : "#DC2626", background: !isPaid ? "#DC2626" : "#FEE2E2" }}>
+                  <CreditCard size={13} /> Belum Bayar
+                </button>
               </div>
             </div>
 
+            {/* ── Metode Pembayaran (hanya tampil jika sudah bayar) ── */}
+            {isPaid && (
+              <div style={{ marginBottom: "12px" }}>
+                <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
+                  Metode Pembayaran
+                </label>
+                <div className="flex gap-2">
+                  {(["cash", "transfer", "qris"] as PayMethod[]).map(m => (
+                    <button key={m} onClick={() => setPayMethod(m)}
+                      style={{ flex: 1, padding: "9px 0", borderRadius: "12px", fontSize: "12px", fontWeight: "600", cursor: "pointer", border: "none",
+                        color: payMethod === m ? "#fff" : "#64748B", background: payMethod === m ? "#E85D8C" : "#F1F5F9" }}
+                      data-testid={`pay-method-${m}`}>
+                      {m === "cash" ? "Tunai" : m === "transfer" ? "Transfer" : "QRIS"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Notes */}
-            <div style={{ marginBottom: "16px" }}>
-              <input
-                type="text"
-                placeholder="Catatan pesanan (opsional)"
-                value={orderNotes}
+            <div style={{ marginBottom: "14px" }}>
+              <input type="text" placeholder="Catatan pesanan (opsional)" value={orderNotes}
                 onChange={e => setOrderNotes(e.target.value)}
-                style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", border: "1px solid #E2E8F0", fontSize: "13px", color: "#1C1C1E", outline: "none", background: "#F8FAFC" }}
-                data-testid="checkout-notes"
-              />
+                style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", border: "1px solid #E2E8F0", fontSize: "13px", outline: "none", background: "#F8FAFC" }}
+                data-testid="checkout-notes" />
             </div>
 
             {/* Total */}
-            <div
-              className="flex items-center justify-between"
-              style={{ padding: "12px 14px", borderRadius: "12px", background: "#FEF1F5", border: "1px solid #F2A0B7", marginBottom: "16px" }}
-            >
+            <div className="flex items-center justify-between"
+              style={{ padding: "12px 14px", borderRadius: "12px", background: "#FEF1F5", border: "1px solid #F2A0B7", marginBottom: "14px" }}>
               <span style={{ fontSize: "14px", fontWeight: "600", color: "#64748B" }}>Total</span>
               <span style={{ fontSize: "18px", fontWeight: "700", color: "#E85D8C" }}>{fmt(cartTotal)}</span>
             </div>
 
-            {/* Error */}
-            {error && (
-              <p style={{ fontSize: "12px", color: "#DC2626", textAlign: "center", marginBottom: "8px" }}>{error}</p>
+            {/* B2B invoice notice */}
+            {isB2B && (
+              <div className="flex items-center gap-2" style={{ padding: "10px 12px", borderRadius: "10px", background: "#EFF6FF", border: "1px solid #BFDBFE", marginBottom: "14px" }}>
+                <span style={{ fontSize: "12px", color: "#2563EB" }}>Invoice B2B bisa dicetak dari halaman detail pesanan setelah pesanan dibuat.</span>
+              </div>
             )}
 
-            {/* Confirm button */}
-            <button
-              onClick={handleCheckout}
-              disabled={submitting || !cart.length}
-              className="w-full"
-              style={{
-                padding: "15px", borderRadius: "14px", fontSize: "14px", fontWeight: "700",
-                color: "#fff", background: "#E85D8C", border: "none",
-                cursor: submitting ? "default" : "pointer",
-                opacity: submitting ? 0.7 : 1,
-              }}
-              data-testid="confirm-order-btn"
-            >
-              {submitting ? "Memproses..." : "Konfirmasi Pesanan"}
+            {error && <p style={{ fontSize: "12px", color: "#DC2626", textAlign: "center", marginBottom: "8px" }}>{error}</p>}
+
+            <button onClick={handleCheckout} disabled={submitting || !cart.length} className="w-full"
+              style={{ padding: "15px", borderRadius: "14px", fontSize: "14px", fontWeight: "700", color: "#fff",
+                background: isPaid ? "#E85D8C" : "#F59E0B", border: "none", cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1 }}
+              data-testid="confirm-order-btn">
+              {submitting ? "Memproses..." : isPaid ? "Konfirmasi & Catat Pesanan" : "Catat Pesanan (Belum Bayar)"}
             </button>
           </div>
         </div>

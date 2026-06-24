@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useParams, useRouter } from "next/navigation";
-import { Loader2, ArrowLeft, CheckCircle2, Clock, CreditCard, Ban, Package, User } from "lucide-react";
+import { Loader2, ArrowLeft, CheckCircle2, Clock, CreditCard, Ban, Package, User, Printer } from "lucide-react";
 
 interface OrderItem {
   id: string; productName: string; variantName: string;
@@ -209,6 +209,18 @@ export default function OrderDetailPage() {
         {!isVoid && (
           <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }} data-testid="action-card">
             <span style={{ fontSize: "11px", fontWeight: "600", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "10px" }}>Aksi</span>
+
+            {/* Print Invoice — tampil hanya untuk pelanggan B2B */}
+            {order.channel === "b2b" && (
+              <button
+                onClick={() => window.open(`/manager/orders/${order.id}/invoice`, "_blank")}
+                data-testid="print-invoice-btn"
+                className="w-full flex items-center justify-center gap-2 mb-2"
+                style={{ padding: "11px", borderRadius: "12px", background: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
+                <Printer size={14} />
+                Cetak Invoice B2B
+              </button>
+            )}
 
             {!isDone && (
               <button
