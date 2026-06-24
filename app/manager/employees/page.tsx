@@ -2,392 +2,475 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Loader2,
-  Lock,
-  AlertTriangle,
-  CheckCircle2,
-  RefreshCw,
+  Loader2, Plus, Pencil, Trash2, X, Check, KeyRound,
+  Users, CalendarDays, UserCheck, ChevronDown, ChevronUp,
 } from "lucide-react";
-import type { Attendance, Payroll } from "@/types";
+import { Input } from "@/components/ui/input";
 
-type Tab = "absensi" | "payroll";
+type Tab = "karyawan" | "absensi";
+type Role = "owner" | "manager" | "crew";
 
-function getMonthStr(offset = 0) {
-  const d = new Date();
-  d.setMonth(d.getMonth() + offset);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+interface Employee {
+  id: string; name: string; username: string; role: Role;
+  phone: string | null; joinDate: string | null; isActive: boolean;
+}
+interface AttendanceRecord {
+  id: string; employeeId: string; employeeName: string; date: string;
+  checkIn: { time: string } | null; checkOut: { time: string | null } | null;
+  totalHours: number | null; status: string;
 }
 
-function formatMonthLabel(m: string) {
-  const [y, mon] = m.split("-").map(Number);
-  return new Date(y, mon - 1).toLocaleDateString("id-ID", {
-    month: "long",
-    year: "numeric",
+const ROLE_LABEL: Record<string, string> = { owner: "Owner", manager: "Manager", crew: "Crew" };
+const ROLE_COLOR: Record<string, { bg: string; color: string }> = {
+  owner:   { bg: "#FEF3C7", color: "#D97706" },
+  manager: { bg: "#EFF6FF", color: "#2563EB" },
+  crew:    { bg: "#F0FDF4", color: "#16A34A" },
+};
+
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+}
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
+}
+
+// ─── Add/Edit Employee Form ────────────────────────────────────────────────────
+function EmployeeForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
+  initial?: Employee;
+  fetchWithAuth: (url: string, opts?: RequestInit) => Promise<Response>;
+  onSuccess: () => void; onCancel: () => void;
+}) {
+  const isEdit = !!initial;
+  const [form, setForm] = useState({
+    name: initial?.name ?? "",
+    username: initial?.username ?? "",
+    role: initial?.role ?? "crew" as Role,
+    phone: initial?.phone ?? "",
+    joinDate: initial?.joinDate ?? "",
   });
-}
+  const [password, setPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
 
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-  }).format(n);
-}
-
-export default function ManagerEmployeesPage() {
-  const { getToken } = useAuth();
-  const [tab, setTab] = useState<Tab>("absensi");
-  const [month, setMonth] = useState(getMonthStr());
-  const [monthOffset, setMonthOffset] = useState(0);
-
-  const [attendance, setAttendance] = useState<Attendance[]>([]);
-  const [payrollList, setPayrollList] = useState<Payroll[]>([]);
-
-  const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [genResult, setGenResult] = useState("");
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    setMonth(getMonthStr(monthOffset));
-  }, [monthOffset]);
-
-  const fetchWithAuth = useCallback(
-    async (url: string, options?: RequestInit) => {
-      const token = await getToken();
-      return fetch(url, {
-        ...options,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          ...options?.headers,
-        },
-      });
-    },
-    [getToken]
-  );
-
-  const loadAttendance = useCallback(async () => {
-    setLoading(true);
+  async function handleSave() {
+    if (!form.name.trim()) { setErr("Nama wajib diisi"); return; }
+    if (!isEdit && !form.username.trim()) { setErr("Username wajib diisi"); return; }
+    if (!isEdit && (!password || password.length < 6)) { setErr("Password minimal 6 karakter"); return; }
+    setSaving(true); setErr("");
     try {
-      const res = await fetchWithAuth(`/api/attendance?month=${month}`);
-      if (res.ok) setAttendance(await res.json());
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchWithAuth, month]);
-
-  const loadPayroll = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetchWithAuth(`/api/payroll?month=${month}`);
-      if (res.ok) setPayrollList(await res.json());
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchWithAuth, month]);
-
-  useEffect(() => {
-    if (tab === "absensi") loadAttendance();
-    else loadPayroll();
-  }, [tab, month, loadAttendance, loadPayroll]);
-
-  async function handleGenerate() {
-    setGenerating(true);
-    setGenResult("");
-    setError("");
-    try {
-      const res = await fetchWithAuth("/api/payroll/generate", {
-        method: "POST",
-        body: JSON.stringify({ month }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Gagal generate");
-        return;
-      }
-      setGenResult(
-        `Generated: ${data.generated.length}` +
-          (data.skippedLocked.length ? `, Terkunci: ${data.skippedLocked.length}` : "") +
-          (data.warnings.length ? ` — ${data.warnings.join("; ")}` : "")
-      );
-      await loadPayroll();
-    } catch {
-      setError("Gagal generate payroll");
-    } finally {
-      setGenerating(false);
-    }
-  }
-
-  async function handleUpdateBonus(id: string, bonus: number) {
-    try {
-      await fetchWithAuth(`/api/payroll/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ performanceBonus: bonus }),
-      });
-      await loadPayroll();
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  async function handlePay(p: Payroll) {
-    setError("");
-    if (p.dataStatus === "parsial") {
-      const ok = window.confirm(
-        `Data ${p.employeeName} masih ada ${p.pendingReview} absen belum direview. Tetap bayar dengan data ini?`
-      );
-      if (!ok) return;
-    }
-
-    try {
-      const res = await fetchWithAuth(`/api/payroll/${p.id}/pay`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          confirmedDespitePartial: p.dataStatus === "parsial",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Gagal");
-        return;
-      }
-      await loadPayroll();
-    } catch {
-      setError("Gagal update status bayar");
-    }
+      const url = isEdit ? `/api/employees/${initial!.id}` : "/api/employees";
+      const method = isEdit ? "PATCH" : "POST";
+      const body: Record<string, unknown> = { name: form.name.trim(), role: form.role, phone: form.phone || null, joinDate: form.joinDate || null };
+      if (!isEdit) { body.username = form.username.trim(); body.password = password; }
+      const res = await fetchWithAuth(url, { method, body: JSON.stringify(body) });
+      if (!res.ok) { setErr((await res.json()).error ?? "Gagal"); return; }
+      onSuccess();
+    } finally { setSaving(false); }
   }
 
   return (
-    <div className="p-5">
-      <h1 className="text-xl font-bold text-stone-900 mb-1">Karyawan</h1>
-      <p className="text-sm text-stone-500 mb-4">Absensi & Payroll</p>
+    <div style={{ background: "#F8FAFC", borderRadius: "14px", padding: "14px", border: "1px solid #E2E8F0", marginBottom: "12px" }}>
+      <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E", marginBottom: "12px" }}>
+        {isEdit ? "Edit Karyawan" : "Tambah Karyawan"}
+      </p>
+      <div className="flex flex-col gap-2.5">
+        <Input placeholder="Nama lengkap *" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+          className="h-10 rounded-xl border-slate-200 text-sm" data-testid="emp-name-input" />
 
-      <div className="flex gap-2 mb-4">
-        {(["absensi", "payroll"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              tab === t
-                ? "bg-emerald-600 text-white"
-                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-            }`}
-          >
-            {t === "absensi" ? "Absensi" : "Payroll"}
-          </button>
-        ))}
-      </div>
+        {!isEdit && (
+          <Input placeholder="Username *" value={form.username}
+            onChange={e => setForm(p => ({ ...p, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "") }))}
+            className="h-10 rounded-xl border-slate-200 text-sm font-mono" data-testid="emp-username-input" />
+        )}
 
-      <div className="flex items-center gap-2 mb-4">
-        <button
-          onClick={() => setMonthOffset((o) => o - 1)}
-          className="text-xs text-stone-500 hover:text-stone-700 px-2 py-1"
-        >
-          &larr;
-        </button>
-        <span className="text-sm font-medium text-stone-900 min-w-[140px] text-center">
-          {formatMonthLabel(month)}
-        </span>
-        <button
-          onClick={() => setMonthOffset((o) => Math.min(o + 1, 0))}
-          className="text-xs text-stone-500 hover:text-stone-700 px-2 py-1"
-        >
-          &rarr;
-        </button>
-      </div>
+        {isEdit && (
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: "#F1F5F9", border: "1px solid #E2E8F0" }}>
+            <span style={{ fontSize: "12px", color: "#94A3B8" }}>Username:</span>
+            <span style={{ fontSize: "13px", fontWeight: "600", fontFamily: "monospace", color: "#64748B" }}>{initial?.username}</span>
+          </div>
+        )}
 
-      {loading && (
-        <div className="flex justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
-        </div>
-      )}
-
-      {!loading && tab === "absensi" && (
-        <div className="space-y-2">
-          {attendance.length === 0 && (
-            <p className="text-sm text-stone-400 text-center py-8">
-              Belum ada data absensi bulan ini
-            </p>
-          )}
-          {attendance.map((a) => (
-            <Card key={a.id} className="p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-stone-900">
-                    {a.employeeName}
-                  </p>
-                  <p className="text-xs text-stone-500">
-                    {new Date(a.date + "T00:00:00").toLocaleDateString("id-ID", {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                    })}
-                    {" · "}
-                    {new Date(a.checkIn.time).toLocaleTimeString("id-ID", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {a.checkOut?.time
-                      ? ` — ${new Date(a.checkOut.time).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`
-                      : ""}
-                  </p>
-                </div>
-                <div className="text-right">
-                  {a.totalHours !== null && (
-                    <p className="text-sm font-mono text-stone-700">
-                      {a.totalHours.toFixed(1)}j
-                    </p>
-                  )}
-                  <span
-                    className={`text-xs ${
-                      a.status === "lengkap"
-                        ? "text-emerald-600"
-                        : a.status === "direview"
-                          ? "text-amber-600"
-                          : "text-stone-400"
-                    }`}
-                  >
-                    {a.status === "lengkap"
-                      ? "Lengkap"
-                      : a.status === "direview"
-                        ? "Direview"
-                        : "Belum lengkap"}
-                  </span>
-                </div>
-              </div>
-              {a.flaggedReason && (
-                <p className="text-xs text-amber-600 mt-1">{a.flaggedReason}</p>
-              )}
-            </Card>
+        {/* Role selector */}
+        <div className="flex gap-2">
+          {(["crew", "manager"] as Role[]).map(r => (
+            <button key={r} onClick={() => setForm(p => ({ ...p, role: r }))}
+              style={{ flex: 1, padding: "9px", borderRadius: "10px", fontSize: "12px", fontWeight: "600", border: "none", cursor: "pointer",
+                color: form.role === r ? "#fff" : "#64748B",
+                background: form.role === r ? (r === "manager" ? "#2563EB" : "#16A34A") : "#F1F5F9" }}
+              data-testid={`role-${r}`}>
+              {ROLE_LABEL[r]}
+            </button>
           ))}
         </div>
-      )}
 
-      {!loading && tab === "payroll" && (
-        <>
-          <Button
-            onClick={handleGenerate}
-            disabled={generating}
-            className="w-full mb-4 gap-2"
-            variant="outline"
-          >
-            {generating ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <RefreshCw size={16} />
-            )}
-            Generate Payroll {formatMonthLabel(month)}
-          </Button>
+        <div className="flex gap-2">
+          <Input placeholder="No. HP" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+            className="flex-1 h-10 rounded-xl border-slate-200 text-sm" data-testid="emp-phone-input" />
+          <Input type="date" value={form.joinDate} onChange={e => setForm(p => ({ ...p, joinDate: e.target.value }))}
+            className="flex-1 h-10 rounded-xl border-slate-200 text-sm" title="Tanggal bergabung" />
+        </div>
 
-          {genResult && (
-            <p className="text-sm text-emerald-600 mb-3">{genResult}</p>
-          )}
-          {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+        {!isEdit && (
+          <Input type="password" placeholder="Password (min 6 karakter) *" value={password}
+            onChange={e => setPassword(e.target.value)}
+            className="h-10 rounded-xl border-slate-200 text-sm" data-testid="emp-password-input" />
+        )}
 
-          <div className="space-y-3">
-            {payrollList.length === 0 && (
-              <p className="text-sm text-stone-400 text-center py-8">
-                Belum ada data payroll. Klik Generate di atas.
-              </p>
-            )}
-            {payrollList.map((p) => (
-              <Card key={p.id} className="p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="font-semibold text-stone-900">
-                      {p.employeeName}
-                    </p>
-                    <p className="text-xs text-stone-500">
-                      {p.workDays} hari kerja
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {p.isLocked && <Lock size={14} className="text-stone-400" />}
-                    {p.dataStatus === "parsial" ? (
-                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <AlertTriangle size={12} /> Parsial
-                      </span>
-                    ) : (
-                      <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <CheckCircle2 size={12} /> Final
-                      </span>
-                    )}
-                  </div>
-                </div>
+        {err && <p style={{ fontSize: "12px", color: "#DC2626" }}>{err}</p>}
 
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-stone-600 mb-3">
-                  <span>Gaji Pokok</span>
-                  <span className="text-right font-mono">
-                    {formatCurrency(p.totalRegularPay)}
-                  </span>
-                  <span>Lembur</span>
-                  <span className="text-right font-mono">
-                    {formatCurrency(p.totalOvertimeBonus)}
-                  </span>
-                  <span>Bonus</span>
-                  <span className="text-right font-mono">
-                    {formatCurrency(p.performanceBonus)}
-                  </span>
-                  <span className="font-semibold text-stone-900">Total</span>
-                  <span className="text-right font-mono font-semibold text-stone-900">
-                    {formatCurrency(p.totalPaid)}
-                  </span>
-                </div>
+        <div className="flex gap-2">
+          <button onClick={handleSave} disabled={saving} data-testid="save-emp-btn"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "#E85D8C" }}>
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Simpan
+          </button>
+          <button onClick={onCancel}
+            style={{ padding: "8px 16px", borderRadius: "12px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
+            Batal
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-                {!p.isLocked && (
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <label className="text-xs text-stone-400">
-                        Bonus Tambahan
-                      </label>
-                      <Input
-                        type="number"
-                        min="0"
-                        defaultValue={p.performanceBonus}
-                        onBlur={(e) =>
-                          handleUpdateBonus(
-                            p.id,
-                            parseInt(e.target.value) || 0
-                          )
-                        }
-                        className="text-sm"
-                      />
-                    </div>
-                    <Button
-                      onClick={() => handlePay(p)}
-                      size="sm"
-                      className="mt-4"
-                    >
-                      Tandai Dibayar
-                    </Button>
-                  </div>
-                )}
+// ─── Change Password Form ──────────────────────────────────────────────────────
+function ChangePasswordForm({ emp, fetchWithAuth, onSuccess, onCancel }: {
+  emp: Employee;
+  fetchWithAuth: (url: string, opts?: RequestInit) => Promise<Response>;
+  onSuccess: () => void; onCancel: () => void;
+}) {
+  const [pw, setPw] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
 
-                {p.isLocked && (
-                  <p className="text-xs text-emerald-600 flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Sudah dibayar
-                  </p>
-                )}
+  async function handleSave() {
+    if (!pw || pw.length < 6) { setErr("Password minimal 6 karakter"); return; }
+    setSaving(true); setErr("");
+    try {
+      const res = await fetchWithAuth(`/api/employees/${emp.id}/password`, {
+        method: "PATCH", body: JSON.stringify({ password: pw }),
+      });
+      if (!res.ok) { setErr((await res.json()).error ?? "Gagal"); return; }
+      onSuccess();
+    } finally { setSaving(false); }
+  }
 
-                {p.pendingReview > 0 && (
-                  <p className="text-xs text-amber-600 mt-1">
-                    {p.pendingReview} absen masih menunggu review
-                  </p>
-                )}
-              </Card>
-            ))}
+  return (
+    <div style={{ background: "#FEF3C7", borderRadius: "10px", padding: "12px", border: "1px solid #FDE68A", marginTop: "8px" }}>
+      <p style={{ fontSize: "12px", fontWeight: "700", color: "#D97706", marginBottom: "10px" }}>
+        Ganti password <span style={{ fontFamily: "monospace" }}>{emp.username}</span>
+      </p>
+      <div className="flex gap-2">
+        <Input type="password" placeholder="Password baru (min 6)" value={pw}
+          onChange={e => setPw(e.target.value)}
+          className="flex-1 h-9 rounded-xl border-yellow-200 text-sm" data-testid="new-password-input" />
+        <button onClick={handleSave} disabled={saving}
+          style={{ padding: "8px 14px", borderRadius: "10px", background: "#D97706", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "4px" }}
+          data-testid="save-password-btn">
+          {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Simpan
+        </button>
+        <button onClick={onCancel}
+          style={{ padding: "8px 12px", borderRadius: "10px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "12px" }}>
+          Batal
+        </button>
+      </div>
+      {err && <p style={{ fontSize: "11px", color: "#DC2626", marginTop: "6px" }}>{err}</p>}
+    </div>
+  );
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
+export default function ManagerEmployeesPage() {
+  const { getToken } = useAuth();
+  const [tab, setTab] = useState<Tab>("karyawan");
+  const [loading, setLoading] = useState(true);
+
+  // Karyawan state
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editEmp, setEditEmp] = useState<Employee | null>(null);
+  const [pwEmp, setPwEmp] = useState<Employee | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState("");
+
+  // Absensi state
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [attendanceMonth, setAttendanceMonth] = useState(() => {
+    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+
+  const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
+    const token = await getToken();
+    return fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...opts?.headers } });
+  }, [getToken]);
+
+  const loadEmployees = useCallback(async () => {
+    const res = await fetchWithAuth("/api/employees");
+    if (res.ok) setEmployees(await res.json());
+  }, [fetchWithAuth]);
+
+  const loadAttendance = useCallback(async () => {
+    const res = await fetchWithAuth(`/api/attendance?month=${attendanceMonth}`);
+    if (res.ok) setAttendance(await res.json());
+  }, [fetchWithAuth, attendanceMonth]);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([loadEmployees()]).finally(() => setLoading(false));
+  }, [loadEmployees]);
+
+  useEffect(() => {
+    if (tab === "absensi") loadAttendance();
+  }, [tab, loadAttendance]);
+
+  function showSuccess(msg: string) {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(""), 3000);
+  }
+
+  async function handleDelete(emp: Employee) {
+    setDeleting(true);
+    try {
+      const res = await fetchWithAuth(`/api/employees/${emp.id}`, { method: "DELETE" });
+      if (res.ok) { setDeleteTarget(null); await loadEmployees(); showSuccess("Karyawan dinonaktifkan"); }
+    } finally { setDeleting(false); }
+  }
+
+  const activeEmps = employees.filter(e => e.isActive);
+  const inactiveEmps = employees.filter(e => !e.isActive);
+
+  return (
+    <div className="min-h-screen" style={{ background: "#FCABB4" }}>
+
+      {/* ── Header ── */}
+      <div className="sticky top-0 z-20" style={{ background: "#fff", borderBottom: "1px solid #F1F5F9" }}>
+        <div className="px-5 pt-4 pb-2">
+          <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Karyawan</h1>
+        </div>
+        <div className="flex">
+          {(["karyawan", "absensi"] as Tab[]).map(t => {
+            const active = tab === t;
+            const Icon = t === "karyawan" ? Users : CalendarDays;
+            return (
+              <button key={t} onClick={() => { setTab(t); setShowAddForm(false); setEditEmp(null); }}
+                data-testid={`tab-${t}`}
+                className="flex-1 flex items-center justify-center gap-1.5"
+                style={{ paddingTop: "8px", paddingBottom: "10px", border: "none", background: "transparent", cursor: "pointer",
+                  borderBottom: active ? "2px solid #E85D8C" : "2px solid transparent",
+                  fontSize: "12px", fontWeight: active ? "600" : "500", color: active ? "#E85D8C" : "#94A3B8" }}>
+                <Icon size={13} /> {t === "karyawan" ? "Data Karyawan" : "Absensi"}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="px-4 pt-3 pb-24">
+
+        {/* Success toast */}
+        {successMsg && (
+          <div className="flex items-center gap-2" style={{ padding: "10px 14px", borderRadius: "12px", background: "#DCFCE7", border: "1px solid #86EFAC", marginBottom: "12px" }}>
+            <UserCheck size={14} style={{ color: "#16A34A" }} />
+            <span style={{ fontSize: "13px", color: "#16A34A", fontWeight: "600" }}>{successMsg}</span>
           </div>
-        </>
-      )}
+        )}
+
+        {/* ── Tab: DATA KARYAWAN ── */}
+        {tab === "karyawan" && (
+          <>
+            {/* Tambah button */}
+            {!showAddForm && !editEmp && (
+              <button onClick={() => setShowAddForm(true)} data-testid="add-emp-btn"
+                className="flex items-center gap-2 mb-3"
+                style={{ padding: "10px 16px", borderRadius: "12px", background: "#E85D8C", color: "#fff", fontSize: "13px", fontWeight: "600", border: "none", cursor: "pointer" }}>
+                <Plus size={15} /> Tambah Karyawan
+              </button>
+            )}
+
+            {showAddForm && (
+              <EmployeeForm fetchWithAuth={fetchWithAuth}
+                onSuccess={() => { setShowAddForm(false); loadEmployees(); showSuccess("Karyawan berhasil ditambahkan"); }}
+                onCancel={() => setShowAddForm(false)} />
+            )}
+
+            {loading ? (
+              <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin" style={{ color: "#E85D8C" }} /></div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-2.5">
+                  {activeEmps.length === 0 && !showAddForm && (
+                    <div style={{ background: "#fff", borderRadius: "14px", padding: "32px 16px", textAlign: "center", border: "1px solid #F1F5F9" }}>
+                      <p style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>Belum ada karyawan</p>
+                      <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "4px" }}>Tap tombol Tambah Karyawan</p>
+                    </div>
+                  )}
+
+                  {activeEmps.map(emp => {
+                    const rc = ROLE_COLOR[emp.role] ?? { bg: "#F1F5F9", color: "#64748B" };
+                    const expanded = expandedId === emp.id;
+                    const isEditing = editEmp?.id === emp.id;
+
+                    if (isEditing) return (
+                      <EmployeeForm key={emp.id} initial={emp} fetchWithAuth={fetchWithAuth}
+                        onSuccess={() => { setEditEmp(null); loadEmployees(); showSuccess("Data berhasil diperbarui"); }}
+                        onCancel={() => setEditEmp(null)} />
+                    );
+
+                    return (
+                      <div key={emp.id} data-testid={`emp-${emp.id}`}>
+                        <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }}>
+                          {/* Row utama */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div style={{ width: "38px", height: "38px", borderRadius: "12px", background: rc.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                <span style={{ fontSize: "15px", fontWeight: "800", color: rc.color }}>{emp.name[0].toUpperCase()}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>{emp.name}</p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span style={{ fontSize: "11px", fontFamily: "monospace", color: "#94A3B8" }}>@{emp.username}</span>
+                                  <span style={{ padding: "1px 7px", borderRadius: "100px", fontSize: "10px", fontWeight: "700", background: rc.bg, color: rc.color }}>
+                                    {ROLE_LABEL[emp.role]}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <button onClick={() => setExpandedId(expanded ? null : emp.id)}
+                                style={{ width: "30px", height: "30px", borderRadius: "9px", background: "#F8FAFC", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                {expanded ? <ChevronUp size={14} style={{ color: "#64748B" }} /> : <ChevronDown size={14} style={{ color: "#64748B" }} />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Expanded: action buttons */}
+                          {expanded && (
+                            <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #F1F5F9" }}>
+                              {emp.phone && <p style={{ fontSize: "12px", color: "#64748B", marginBottom: "10px" }}>HP: {emp.phone}</p>}
+                              {emp.joinDate && <p style={{ fontSize: "12px", color: "#94A3B8", marginBottom: "10px" }}>Bergabung: {new Date(emp.joinDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</p>}
+
+                              <div className="flex gap-2 flex-wrap">
+                                <button onClick={() => { setEditEmp(emp); setExpandedId(null); setPwEmp(null); setDeleteTarget(null); }}
+                                  className="flex items-center gap-1.5"
+                                  style={{ padding: "7px 12px", borderRadius: "10px", background: "#FEF1F5", color: "#E85D8C", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}
+                                  data-testid={`edit-emp-${emp.id}`}>
+                                  <Pencil size={12} /> Edit Data
+                                </button>
+                                <button onClick={() => { setPwEmp(pwEmp?.id === emp.id ? null : emp); setDeleteTarget(null); }}
+                                  className="flex items-center gap-1.5"
+                                  style={{ padding: "7px 12px", borderRadius: "10px", background: "#FEF3C7", color: "#D97706", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}
+                                  data-testid={`reset-pw-${emp.id}`}>
+                                  <KeyRound size={12} /> Ganti Password
+                                </button>
+                                <button onClick={() => { setDeleteTarget(deleteTarget?.id === emp.id ? null : emp); setPwEmp(null); }}
+                                  className="flex items-center gap-1.5"
+                                  style={{ padding: "7px 12px", borderRadius: "10px", background: "#FEE2E2", color: "#DC2626", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}
+                                  data-testid={`deactivate-emp-${emp.id}`}>
+                                  <Trash2 size={12} /> Nonaktifkan
+                                </button>
+                              </div>
+
+                              {pwEmp?.id === emp.id && (
+                                <ChangePasswordForm emp={emp} fetchWithAuth={fetchWithAuth}
+                                  onSuccess={() => { setPwEmp(null); showSuccess(`Password ${emp.username} berhasil diubah`); }}
+                                  onCancel={() => setPwEmp(null)} />
+                              )}
+
+                              {deleteTarget?.id === emp.id && (
+                                <div style={{ background: "#FEF2F2", borderRadius: "10px", padding: "12px", border: "1px solid #FECACA", marginTop: "8px" }}>
+                                  <p style={{ fontSize: "12px", fontWeight: "600", color: "#DC2626", marginBottom: "10px" }}>
+                                    Nonaktifkan akun {emp.name}? Mereka tidak bisa login lagi.
+                                  </p>
+                                  <div className="flex gap-2">
+                                    <button onClick={() => handleDelete(emp)} disabled={deleting} data-testid="confirm-deactivate-btn"
+                                      style={{ flex: 1, padding: "9px", borderRadius: "9px", background: "#DC2626", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                                      {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Nonaktifkan
+                                    </button>
+                                    <button onClick={() => setDeleteTarget(null)}
+                                      style={{ flex: 1, padding: "9px", borderRadius: "9px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "12px" }}>
+                                      Batal
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Karyawan nonaktif */}
+                {inactiveEmps.length > 0 && (
+                  <div style={{ marginTop: "16px" }}>
+                    <p style={{ fontSize: "11px", fontWeight: "600", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>
+                      Tidak Aktif ({inactiveEmps.length})
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {inactiveEmps.map(emp => (
+                        <div key={emp.id} style={{ background: "#fff", borderRadius: "12px", padding: "12px 14px", border: "1px solid #F1F5F9", opacity: 0.6 }}>
+                          <p style={{ fontSize: "13px", fontWeight: "600", color: "#94A3B8" }}>{emp.name}</p>
+                          <p style={{ fontSize: "11px", fontFamily: "monospace", color: "#CBD5E1" }}>@{emp.username}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {/* ── Tab: ABSENSI ── */}
+        {tab === "absensi" && (
+          <>
+            {/* Month picker */}
+            <div className="flex items-center gap-2 mb-3">
+              <button onClick={() => { const d = new Date(attendanceMonth + "-01"); d.setMonth(d.getMonth() - 1); setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+                style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>‹</button>
+              <p style={{ flex: 1, textAlign: "center", fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>
+                {new Date(attendanceMonth + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
+              </p>
+              <button onClick={() => { const d = new Date(attendanceMonth + "-01"); d.setMonth(d.getMonth() + 1); setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+                style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>›</button>
+            </div>
+
+            {attendance.length === 0 ? (
+              <div style={{ background: "#fff", borderRadius: "14px", padding: "32px 16px", textAlign: "center", border: "1px solid #F1F5F9" }}>
+                <p style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>Belum ada data absensi</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {attendance.map(a => (
+                  <div key={a.id} style={{ background: "#fff", borderRadius: "12px", padding: "12px 14px", border: "1px solid #F1F5F9" }}>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>{a.employeeName}</p>
+                        <p style={{ fontSize: "11px", color: "#94A3B8" }}>{fmtDate(a.date)}</p>
+                      </div>
+                      <span style={{ padding: "3px 9px", borderRadius: "100px", fontSize: "11px", fontWeight: "600",
+                        background: a.status === "hadir" ? "#DCFCE7" : a.status === "direview" ? "#FEF3C7" : "#F1F5F9",
+                        color: a.status === "hadir" ? "#16A34A" : a.status === "direview" ? "#D97706" : "#64748B" }}>
+                        {a.status === "hadir" ? "Hadir" : a.status === "direview" ? "Review" : a.status}
+                      </span>
+                    </div>
+                    <div className="flex gap-4 mt-2">
+                      {a.checkIn && <p style={{ fontSize: "11px", color: "#64748B" }}>Masuk: <strong>{fmtTime(a.checkIn.time)}</strong></p>}
+                      {a.checkOut?.time && <p style={{ fontSize: "11px", color: "#64748B" }}>Pulang: <strong>{fmtTime(a.checkOut.time)}</strong></p>}
+                      {a.totalHours && <p style={{ fontSize: "11px", color: "#64748B" }}>{a.totalHours.toFixed(1)} jam</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+      </div>
     </div>
   );
 }
