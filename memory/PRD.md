@@ -59,14 +59,16 @@ Bangun sistem AnchurPOS (fases 0-9) dengan UI/UX pixel-perfect sesuai mockup yan
 ### Feb 2026 — UI/UX Overhaul (fork ini)
 **SELESAI: Pixel-Perfect UI/UX Overhaul berdasarkan Mockup**
 - Ubah background seluruh halaman dari `#F0EDE8` → `#FCABB4`
-- **Manager Dashboard**: Restrukturisasi total → white greeting header + omzet card dengan progress bar + 2-col stat cards + Recent Orders section
-- **Manager Pesanan**: Tabs diganti underline style (Semua/Pending/Proses/Selesai), card layout dengan avatar+name+status badge
-- **Manager Inventori**: Search bar di white header, tabs underline style, progress bars pada ingredient cards dengan low-stock alert
-- **Manager POS**: White header "Kasir", customer select + cart dalam card
-- **Manager Lainnya**: White header, profile card, menu list card, logout dengan border merah
-- **Crew Attendance**: White header, gradient pink status card, tombol bulat 120px (MASUK/PULANG) dengan clock icon
-- **Crew Production**: White header, summary stats card (Selesai/Target/Progress), production items dengan progress bars
-- **Owner Dashboard**: White header, gradient pink revenue card, outlet card dengan progress bar
+- Manager Dashboard, Pesanan, Lainnya, Attendance, Owner Dashboard: white header + white cards on pink bg
+
+### Feb 2026 — Manager Core Features
+**SELESAI: POS & Inventori Manager**
+- **Kasir/POS** rebuilt: katalog produk (search + category chips + 2-col grid) → variant selector bottom sheet → cart bottom bar (gradient pink pill) → checkout sheet (customer opsional, metode bayar, konfirmasi)
+- **Orders POST** diupdate: customerId opsional, customerName langsung, stok varian otomatis dikurangi
+- **Inventori** ditambah tab Produk Jadi: 3 tabs (Produk Jadi, Bahan Baku, Pengeluaran), stock opname, progress bars
+- `/api/variants/[id]` endpoint baru: PATCH untuk stock opname
+- `/api/seed` endpoint: seed data awal (variants, products, ingredients) via `POST /api/seed -H "Authorization: Bearer anchurpos-seed-2025"`
+- **Firebase Admin fix**: robust key parsing untuk Windows (strip quotes + handle escaped newlines)
 
 ---
 
