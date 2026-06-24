@@ -315,7 +315,7 @@ export default function KasirPage() {
       {/* ── Bottom Cart Bar ── */}
       {cart.length > 0 && (
         <div
-          className="fixed left-0 right-0 z-40"
+          className="fixed left-0 right-0 z-50"
           style={{ bottom: "66px", padding: "10px 16px", background: "linear-gradient(to top, #FCABB4 60%, transparent)" }}
         >
           <button

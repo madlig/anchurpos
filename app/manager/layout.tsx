@@ -83,7 +83,7 @@ function MobileBottomNav() {
   return (
     <nav
       data-testid="manager-bottom-nav"
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-30 md:hidden"
       style={{
         background: "rgba(255,255,255,0.94)",
         backdropFilter: "blur(20px)",

@@ -92,7 +92,21 @@ Bangun sistem POS (Point of Sale) bernama AnchurPOS untuk usaha kuliner/bakery s
 ## Prioritized Backlog
 
 ### P1 — Manager (In Progress)
-- [ ] Laporan harian/mingguan ke Owner
+- [ ] Dashboard Manager (total pesanan, omset, pengeluaran, pemasukan bersih)
+- [ ] Employee CRUD + manage password login
+- [ ] Pengeluaran sebagai fitur standalone di sidebar
+- [ ] Inventori 4 kategori (Produk Jadi, Bahan Baku, Operasional, Add-On)
+- [ ] Data Resep → auto kurangi stok saat produksi crew
+
+### P2 — Crew Production Flow
+- [ ] Crew: Tab Produksi (input batch/adonan → kurangi bahan baku)
+- [ ] Crew: Tab Pre-Pack (loyang → thinwall pack)
+- [ ] Crew: Tab Packing (finalisasi per pesanan)
+- [ ] Crew: Stock Opname (tanpa shift, cukup tanggal)
+- [ ] Manager bisa akses semua fitur Crew (kecuali absensi)
+
+### P3 — Owner
+- [ ] Dashboard Owner lengkap + approval workflows
 
 ### P2 — Crew & Owner Redesign
 - [ ] Crew: Absensi, production, checklist
