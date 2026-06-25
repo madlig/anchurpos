@@ -6,8 +6,9 @@ import { requireRole } from "@/lib/auth-middleware";
 // PATCH /api/employees/[id] — edit info karyawan
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
 
@@ -19,7 +20,7 @@ export async function PATCH(
   if (name !== undefined && !name.trim()) return NextResponse.json({ error: "Nama tidak boleh kosong" }, { status: 400 });
 
   try {
-    const ref = adminDb.collection("users").doc(params.id);
+    const ref = adminDb.collection("users").doc(id);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Karyawan tidak ditemukan" }, { status: 404 });
 
@@ -34,10 +35,10 @@ export async function PATCH(
     // Update Firebase Auth jika ada perubahan nama atau role
     const authUpdates: Record<string, unknown> = {};
     if (name !== undefined) authUpdates.displayName = name.trim();
-    if (Object.keys(authUpdates).length) await adminAuth.updateUser(params.id, authUpdates);
-    if (role !== undefined) await adminAuth.setCustomUserClaims(params.id, { role });
+    if (Object.keys(authUpdates).length) await adminAuth.updateUser(id, authUpdates);
+    if (role !== undefined) await adminAuth.setCustomUserClaims(id, { role });
 
-    return NextResponse.json({ id: params.id, ...updates });
+    return NextResponse.json({ id, ...updates });
   } catch (err) {
     console.error("PATCH /api/employees/[id] error:", err);
     return NextResponse.json({ error: "Gagal mengubah data karyawan" }, { status: 500 });
@@ -47,18 +48,19 @@ export async function PATCH(
 // DELETE /api/employees/[id] — nonaktifkan karyawan
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const ref = adminDb.collection("users").doc(params.id);
+    const ref = adminDb.collection("users").doc(id);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Karyawan tidak ditemukan" }, { status: 404 });
 
     await ref.update({ isActive: false, updatedAt: FieldValue.serverTimestamp() });
-    await adminAuth.updateUser(params.id, { disabled: true });
+    await adminAuth.updateUser(id, { disabled: true });
 
     return NextResponse.json({ success: true });
   } catch (err) {
@@ -70,10 +72,11 @@ export async function DELETE(
 // GET /api/employees/[id]
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const snap = await adminDb.collection("users").doc(params.id).get();
+    const snap = await adminDb.collection("users").doc(id).get();
     if (!snap.exists) return NextResponse.json({ error: "Tidak ditemukan" }, { status: 404 });
     const d = snap.data()!;
     return NextResponse.json({ id: snap.id, name: d.name, username: d.username, role: d.role, phone: d.phone, isActive: d.isActive });

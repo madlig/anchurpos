@@ -5,10 +5,10 @@ import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
 import { formatRupiah } from "@/lib/utils";
 import { Loader2, Plus, X, Check, AlertTriangle, Search } from "lucide-react";
-import type { Ingredient, Expense } from "@/types";
+import type { Ingredient } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Tab = "produk" | "bahan" | "pengeluaran";
+type Tab = "produk" | "bahan" | "operasional" | "addon";
 
 interface VariantStock {
   id: string; name: string; currentStock: number; minStock: number; sortOrder: number;
@@ -16,92 +16,6 @@ interface VariantStock {
 
 function fmt(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
-}
-
-// ─── Expense Form Component ───────────────────────────────────────────────────
-function ExpenseForm({ ingredients, fetchWithAuth, onSuccess, onCancel }: {
-  ingredients: Ingredient[];
-  fetchWithAuth: (url: string, opts?: RequestInit) => Promise<Response>;
-  onSuccess: () => void;
-  onCancel: () => void;
-}) {
-  const [form, setForm] = useState({ ingredientId: "", qty: "", totalCost: "", supplier: "", notes: "" });
-  const [saving, setSaving] = useState(false);
-
-  async function handleSubmit() {
-    if (!form.ingredientId || !form.qty || !form.totalCost) return;
-    setSaving(true);
-    try {
-      const ing = ingredients.find(i => i.id === form.ingredientId);
-      const res = await fetchWithAuth("/api/expenses", {
-        method: "POST",
-        body: JSON.stringify({
-          type: "ingredient_purchase",
-          itemName: ing?.name ?? form.ingredientId,
-          ingredientId: form.ingredientId,
-          qty: parseFloat(form.qty),
-          unit: ing?.baseUnit ?? "-",
-          totalCost: parseFloat(form.totalCost),
-          supplier: form.supplier || null,
-          notes: form.notes || null,
-        }),
-      });
-      if (res.ok) onSuccess();
-    } finally { setSaving(false); }
-  }
-
-  return (
-    <div style={{ background: "#F8FAFC", borderRadius: "12px", padding: "14px", marginBottom: "12px", border: "1px solid #E2E8F0" }}>
-      <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "10px" }}>Catat Pengeluaran</p>
-      <div className="flex flex-col gap-2.5">
-        <select
-          value={form.ingredientId}
-          onChange={e => setForm(p => ({ ...p, ingredientId: e.target.value }))}
-          style={{ padding: "9px 12px", borderRadius: "10px", border: "1px solid #E2E8F0", fontSize: "13px", background: "#fff" }}
-          data-testid="expense-ingredient-select"
-        >
-          <option value="">Pilih bahan baku...</option>
-          {ingredients.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-        </select>
-        <div className="flex gap-2">
-          <Input
-            type="number" placeholder="Jumlah" value={form.qty}
-            onChange={e => setForm(p => ({ ...p, qty: e.target.value }))}
-            className="flex-1 h-10 rounded-xl border-slate-200 text-sm"
-          />
-          <Input
-            type="number" placeholder="Total biaya (Rp)" value={form.totalCost}
-            onChange={e => setForm(p => ({ ...p, totalCost: e.target.value }))}
-            className="flex-1 h-10 rounded-xl border-slate-200 text-sm"
-          />
-        </div>
-        <Input
-          placeholder="Supplier (opsional)" value={form.supplier}
-          onChange={e => setForm(p => ({ ...p, supplier: e.target.value }))}
-          className="h-10 rounded-xl border-slate-200 text-sm"
-        />
-        <div className="flex gap-2">
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white"
-            style={{ background: "#E85D8C" }}
-            data-testid="save-expense-btn"
-          >
-            {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-            Simpan
-          </button>
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 rounded-xl text-sm font-semibold"
-            style={{ background: "#F1F5F9", color: "#64748B" }}
-          >
-            Batal
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -123,10 +37,6 @@ export default function InventoryPage() {
   const [newStockValue, setNewStockValue] = useState("");
   const [stockNote, setStockNote] = useState("");
 
-  // Pengeluaran
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
-
   const [submitting, setSubmitting] = useState(false);
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
@@ -144,17 +54,10 @@ export default function InventoryPage() {
     if (res.ok) setIngredients(await res.json());
   }, [fetchWithAuth]);
 
-  const loadExpenses = useCallback(async () => {
-    const now = new Date();
-    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const res = await fetchWithAuth(`/api/expenses?month=${month}`);
-    if (res.ok) setExpenses(await res.json());
-  }, [fetchWithAuth]);
-
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadVariants(), loadIngredients(), loadExpenses()]).finally(() => setLoading(false));
-  }, [loadVariants, loadIngredients, loadExpenses]);
+    Promise.all([loadVariants(), loadIngredients()]).finally(() => setLoading(false));
+  }, [loadVariants, loadIngredients]);
 
   // Opname produk jadi
   async function handleVariantOpname(id: string) {
@@ -199,7 +102,8 @@ export default function InventoryPage() {
   const TABS: { key: Tab; label: string }[] = [
     { key: "produk", label: "Produk Jadi" },
     { key: "bahan", label: "Bahan Baku" },
-    { key: "pengeluaran", label: "Pengeluaran" },
+    { key: "operasional", label: "Stok Operasional" },
+    { key: "addon", label: "Stok Add-On" },
   ];
 
   const lowVariants = variants.filter(v => v.currentStock < v.minStock);
@@ -377,176 +281,120 @@ export default function InventoryPage() {
           </>
         )}
 
-        {/* ── TAB: Bahan Baku ── */}
-        {tab === "bahan" && (
-          <>
-            {lowIngredients.length > 0 && (
-              <div
-                style={{ padding: "10px 14px", borderRadius: "12px", background: "#FEF2F2", border: "1px solid #FECACA", display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}
-              >
-                <AlertTriangle size={15} style={{ color: "#DC2626", flexShrink: 0 }} />
-                <span style={{ fontSize: "12px", fontWeight: "500", color: "#DC2626" }}>
-                  {lowIngredients.length} bahan stok rendah
-                </span>
-              </div>
-            )}
+        {/* ── TAB: Bahan Baku / Operasional / Add-On ── */}
+        {(tab === "bahan" || tab === "operasional" || tab === "addon") && (
+          (() => {
+            const currentCategory = tab === "bahan" ? "bahan_baku" : tab === "operasional" ? "operasional" : "add_on";
+            const filteredIngredients = ingredients.filter(i => i.category === currentCategory);
+            const lowFiltered = filteredIngredients.filter(i => i.currentStock < i.minStock);
 
-            <div className="flex flex-col gap-2.5">
-              {ingredients
-                .filter(i => !searchQuery || i.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                .length === 0 ? (
-                  <div className="py-16 text-center">
-                    <p style={{ fontSize: "14px", color: "#94A3B8" }}>
-                      {searchQuery ? "Tidak ditemukan" : "Belum ada bahan baku"}
-                    </p>
+            return (
+              <>
+                {lowFiltered.length > 0 && (
+                  <div
+                    style={{ padding: "10px 14px", borderRadius: "12px", background: "#FEF2F2", border: "1px solid #FECACA", display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}
+                  >
+                    <AlertTriangle size={15} style={{ color: "#DC2626", flexShrink: 0 }} />
+                    <span style={{ fontSize: "12px", fontWeight: "500", color: "#DC2626" }}>
+                      {lowFiltered.length} item stok rendah
+                    </span>
                   </div>
-                ) : (
-                  ingredients
+                )}
+
+                <div className="flex flex-col gap-2.5">
+                  {filteredIngredients
                     .filter(i => !searchQuery || i.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                    .map(ing => {
-                      const isLow = ing.currentStock < ing.minStock;
-                      const barPct = Math.min(100, (ing.currentStock / Math.max(ing.minStock * 2, 1)) * 100);
-                      const barColor = isLow ? "#DC2626" : ing.currentStock < ing.minStock * 1.5 ? "#D97706" : "#16A34A";
-                      const isEditing = editingStock === ing.id;
-                      return (
-                        <div
-                          key={ing.id}
-                          style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: `1px solid ${isLow ? "#FECACA" : "#F1F5F9"}` }}
-                          data-testid={`ingredient-${ing.id}`}
-                        >
-                          <div className="flex items-center justify-between" style={{ marginBottom: "8px" }}>
-                            <span style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{ing.name}</span>
-                            <span style={{ fontSize: "16px", fontWeight: "700", color: isLow ? "#DC2626" : "#1C1C1E" }}>
-                              {ing.currentStock.toLocaleString("id-ID")} <span style={{ fontSize: "11px", fontWeight: "500", color: "#94A3B8" }}>{ing.baseUnit}</span>
-                            </span>
-                          </div>
-
-                          {!isEditing && (
-                            <>
-                              <div style={{ height: "6px", borderRadius: "3px", background: "#F1F5F9", marginBottom: "6px" }}>
-                                <div style={{ height: "6px", borderRadius: "3px", background: barColor, width: `${barPct}%`, transition: "width 0.4s" }} />
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span style={{ fontSize: "11px", color: "#94A3B8" }}>Min: {ing.minStock.toLocaleString("id-ID")} {ing.baseUnit}</span>
-                                <button
-                                  onClick={() => { setEditingStock(ing.id); setNewStockValue(String(ing.currentStock)); }}
-                                  style={{ fontSize: "11px", color: "#E85D8C", fontWeight: "600", background: "none", border: "none", cursor: "pointer" }}
-                                >
-                                  Edit stok
-                                </button>
-                              </div>
-                            </>
-                          )}
-
-                          {isEditing && (
-                            <div className="flex flex-col gap-2 mt-2">
-                              <div className="flex gap-2 items-center">
-                                <Input
-                                  type="number"
-                                  value={newStockValue}
-                                  onChange={e => setNewStockValue(e.target.value)}
-                                  placeholder={`Stok baru (${ing.baseUnit})`}
-                                  className="flex-1 h-10 rounded-xl border-slate-200 text-sm"
-                                />
-                                <span style={{ fontSize: "12px", color: "#64748B" }}>{ing.baseUnit}</span>
-                              </div>
-                              <Input
-                                value={stockNote}
-                                onChange={e => setStockNote(e.target.value)}
-                                placeholder="Catatan (opsional)"
-                                className="h-10 rounded-xl border-slate-200 text-sm"
-                              />
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => handleStockEdit(ing.id)}
-                                  disabled={submitting}
-                                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white"
-                                  style={{ background: "#E85D8C" }}
-                                >
-                                  {submitting ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                                  Simpan
-                                </button>
-                                <button
-                                  onClick={() => { setEditingStock(null); setNewStockValue(""); setStockNote(""); }}
-                                  className="px-4 py-2 rounded-xl text-sm font-semibold"
-                                  style={{ background: "#F1F5F9", color: "#64748B" }}
-                                >
-                                  Batal
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                )
-              }
-            </div>
-          </>
-        )}
-
-        {/* ── TAB: Pengeluaran ── */}
-        {tab === "pengeluaran" && (
-          <>
-            <button
-              onClick={() => setShowExpenseForm(!showExpenseForm)}
-              className="flex items-center gap-2 mb-4"
-              style={{ padding: "10px 16px", borderRadius: "12px", background: "#E85D8C", color: "#fff", fontSize: "13px", fontWeight: "600", border: "none", cursor: "pointer" }}
-              data-testid="add-expense-button"
-            >
-              <Plus size={15} /> Catat Pengeluaran
-            </button>
-
-            {showExpenseForm && (
-              <ExpenseForm
-                ingredients={ingredients}
-                fetchWithAuth={fetchWithAuth}
-                onSuccess={() => { setShowExpenseForm(false); loadExpenses(); loadIngredients(); }}
-                onCancel={() => setShowExpenseForm(false)}
-              />
-            )}
-
-            <div className="flex flex-col gap-2.5">
-              {expenses
-                .filter(e => !searchQuery || e.itemName.toLowerCase().includes(searchQuery.toLowerCase()))
-                .length === 0 ? (
-                  <div className="py-16 text-center">
-                    <p style={{ fontSize: "14px", color: "#94A3B8" }}>
-                      {searchQuery ? "Tidak ditemukan" : "Belum ada pengeluaran bulan ini"}
-                    </p>
-                  </div>
-                ) : (
-                  expenses
-                    .filter(e => !searchQuery || e.itemName.toLowerCase().includes(searchQuery.toLowerCase()))
-                    .map((exp, i) => (
-                      <div
-                        key={exp.id}
-                        style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }}
-                        data-testid={`expense-${i}`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{exp.itemName}</p>
-                            <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>
-                              {exp.qtyPurchased} {exp.purchaseUnit} {exp.supplier ? `· ${exp.supplier}` : ""}
-                            </p>
-                          </div>
-                          <span style={{ fontSize: "14px", fontWeight: "700", color: "#DC2626" }}>
-                            -{fmt(exp.totalPrice)}
-                          </span>
-                        </div>
-                        {exp.notes && (
-                          <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "6px" }}>{exp.notes}</p>
-                        )}
-                        <p style={{ fontSize: "11px", color: "#CBD5E1", marginTop: "4px" }}>
-                          {new Date(exp.date).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                    .length === 0 ? (
+                      <div className="py-16 text-center">
+                        <p style={{ fontSize: "14px", color: "#94A3B8" }}>
+                          {searchQuery ? "Tidak ditemukan" : "Belum ada data"}
                         </p>
                       </div>
-                    ))
-                )
-              }
-            </div>
-          </>
+                    ) : (
+                      filteredIngredients
+                        .filter(i => !searchQuery || i.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .map(ing => {
+                          const isLow = ing.currentStock < ing.minStock;
+                          const barPct = Math.min(100, (ing.currentStock / Math.max(ing.minStock * 2, 1)) * 100);
+                          const barColor = isLow ? "#DC2626" : ing.currentStock < ing.minStock * 1.5 ? "#D97706" : "#16A34A";
+                          const isEditing = editingStock === ing.id;
+                          return (
+                            <div
+                              key={ing.id}
+                              style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: `1px solid ${isLow ? "#FECACA" : "#F1F5F9"}` }}
+                              data-testid={`ingredient-${ing.id}`}
+                            >
+                              <div className="flex items-center justify-between" style={{ marginBottom: "8px" }}>
+                                <span style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{ing.name}</span>
+                                <span style={{ fontSize: "16px", fontWeight: "700", color: isLow ? "#DC2626" : "#1C1C1E" }}>
+                                  {ing.currentStock.toLocaleString("id-ID")} <span style={{ fontSize: "11px", fontWeight: "500", color: "#94A3B8" }}>{ing.baseUnit}</span>
+                                </span>
+                              </div>
+
+                              {!isEditing && (
+                                <>
+                                  <div style={{ height: "6px", borderRadius: "3px", background: "#F1F5F9", marginBottom: "6px" }}>
+                                    <div style={{ height: "6px", borderRadius: "3px", background: barColor, width: `${barPct}%`, transition: "width 0.4s" }} />
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span style={{ fontSize: "11px", color: "#94A3B8" }}>Min: {ing.minStock.toLocaleString("id-ID")} {ing.baseUnit}</span>
+                                    <button
+                                      onClick={() => { setEditingStock(ing.id); setNewStockValue(String(ing.currentStock)); }}
+                                      style={{ fontSize: "11px", color: "#E85D8C", fontWeight: "600", background: "none", border: "none", cursor: "pointer" }}
+                                    >
+                                      Edit stok
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+
+                              {isEditing && (
+                                <div className="flex flex-col gap-2 mt-2">
+                                  <div className="flex gap-2 items-center">
+                                    <Input
+                                      type="number"
+                                      value={newStockValue}
+                                      onChange={e => setNewStockValue(e.target.value)}
+                                      placeholder={`Stok baru (${ing.baseUnit})`}
+                                      className="flex-1 h-10 rounded-xl border-slate-200 text-sm"
+                                    />
+                                    <span style={{ fontSize: "12px", color: "#64748B" }}>{ing.baseUnit}</span>
+                                  </div>
+                                  <Input
+                                    value={stockNote}
+                                    onChange={e => setStockNote(e.target.value)}
+                                    placeholder="Catatan (opsional)"
+                                    className="h-10 rounded-xl border-slate-200 text-sm"
+                                  />
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => handleStockEdit(ing.id)}
+                                      disabled={submitting}
+                                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white"
+                                      style={{ background: "#E85D8C" }}
+                                    >
+                                      {submitting ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                                      Simpan
+                                    </button>
+                                    <button
+                                      onClick={() => { setEditingStock(null); setNewStockValue(""); setStockNote(""); }}
+                                      className="px-4 py-2 rounded-xl text-sm font-semibold"
+                                      style={{ background: "#F1F5F9", color: "#64748B" }}
+                                    >
+                                      Batal
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                    )
+                  }
+                </div>
+              </>
+            );
+          })()
         )}
 
       </div>

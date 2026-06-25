@@ -6,12 +6,12 @@ import { requireRole } from "@/lib/auth-middleware";
 // PATCH /api/ingredients/[id] — edit bahan baku
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { id } = params;
+  const { id } = await params;
   const body = await req.json();
   const { name, baseUnit, category, minStock } = body as {
     name?: string; baseUnit?: string; category?: string; minStock?: number;
@@ -44,13 +44,14 @@ export async function PATCH(
 // DELETE /api/ingredients/[id] — hapus bahan baku
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const ref = adminDb.collection("ingredients").doc(params.id);
+    const { id } = await params;
+    const ref = adminDb.collection("ingredients").doc(id);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Bahan tidak ditemukan" }, { status: 404 });
 

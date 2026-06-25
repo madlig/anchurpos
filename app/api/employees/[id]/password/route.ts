@@ -5,11 +5,12 @@ import { requireRole } from "@/lib/auth-middleware";
 // PATCH /api/employees/[id]/password — ganti password karyawan
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
 
+  const { id } = await params;
   const body = await req.json();
   const { password } = body as { password: string };
 
@@ -18,7 +19,7 @@ export async function PATCH(
   }
 
   try {
-    await adminAuth.updateUser(params.id, { password });
+    await adminAuth.updateUser(id, { password });
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("PATCH /api/employees/[id]/password error:", err);

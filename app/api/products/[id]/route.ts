@@ -6,12 +6,12 @@ import { requireRole } from "@/lib/auth-middleware";
 // PATCH /api/products/[id] — edit produk & price tiers
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { id } = params;
+  const { id } = await params;
   const body = await req.json();
   const { name, code, description, packPerBatch, priceTiers } = body as {
     name?: string; code?: string; description?: string; packPerBatch?: number;
@@ -61,13 +61,14 @@ export async function PATCH(
 // DELETE /api/products/[id] — non-aktifkan produk (soft delete)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const ref = adminDb.collection("products").doc(params.id);
+    const { id } = await params;
+    const ref = adminDb.collection("products").doc(id);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Produk tidak ditemukan" }, { status: 404 });
 
@@ -82,10 +83,11 @@ export async function DELETE(
 // GET /api/products/[id] — ambil satu produk beserta price tiers
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const ref = adminDb.collection("products").doc(params.id);
+    const { id } = await params;
+    const ref = adminDb.collection("products").doc(id);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Tidak ditemukan" }, { status: 404 });
     const d = snap.data()!;

@@ -207,7 +207,7 @@ export default function CrewProductionPage() {
                   <div style={{ height: "4px", borderRadius: "2px", background: "#F1F5F9" }}>
                     <div style={{ height: "4px", borderRadius: "2px", background: "#E85D8C", width: `${barPct}%`, transition: "width 0.4s" }} />
                   </div>
-                  <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "4px" }}>{p.batches} batch</p>
+                  <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "4px" }}>{p.batches} adonan</p>
                 </div>
               );
             })}
@@ -260,7 +260,7 @@ export default function CrewProductionPage() {
               <div className="space-y-4">
                 <div>
                   <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>
-                    Jumlah Batch / Adonan
+                    Jumlah Adonan
                   </label>
                   <Stepper
                     value={entry.batches}

@@ -28,7 +28,6 @@ interface OpnameItem {
 interface OpnameRecord {
   id: string;
   date: string;
-  shiftType: string;
   crewId: string;
   items: OpnameItem[];
   totalIngredientsChecked: number;
@@ -208,7 +207,6 @@ export default function StockOpnameReviewPage() {
                   >
                     <div>
                       <p className="text-sm font-medium text-stone-900">
-                        Shift {opname.shiftType} —{" "}
                         {formatDate(opname.date)}
                       </p>
                       <p className="text-xs text-stone-500">
@@ -336,7 +334,6 @@ export default function StockOpnameReviewPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-stone-900">
-                      Shift {opname.shiftType} —{" "}
                       {formatDate(opname.date)}
                     </p>
                     <p className="text-xs text-stone-500">

@@ -233,7 +233,7 @@ export default function KasirPage() {
       {/* ── Header (white, sticky) ── */}
       <div className="sticky top-0 z-30" style={{ background: "#fff", borderBottom: "1px solid #F1F5F9" }}>
         <div className="px-5 pt-4 pb-2">
-          <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Kasir</h1>
+          <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Input Pesanan</h1>
 
           {/* Search bar */}
           <div

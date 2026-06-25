@@ -4,7 +4,7 @@ import { RoleGuard } from "@/components/shared/RoleGuard";
 import { useAuth } from "@/lib/auth-context";
 import {
   LayoutDashboard, ShoppingCart, Package, MoreHorizontal,
-  ClipboardList, LogOut,
+  ClipboardList, LogOut, Banknote,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { label: "Kasir", href: "/manager/pos", icon: ShoppingCart },
   { label: "Pesanan", href: "/manager/orders", icon: ClipboardList },
   { label: "Inventori", href: "/manager/inventory", icon: Package },
+  { label: "Pengeluaran", href: "/manager/expenses", icon: Banknote },
   { label: "Lainnya", href: "/manager/more", icon: MoreHorizontal },
 ];
 

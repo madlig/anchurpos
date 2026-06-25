@@ -3,6 +3,8 @@ import { adminDb } from "@/lib/firebase-admin";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const auth = await requireRole(req, ["crew"]);
   if (auth instanceof NextResponse) return auth;

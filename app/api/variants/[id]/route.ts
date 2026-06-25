@@ -6,12 +6,12 @@ import { requireRole } from "@/lib/auth-middleware";
 // PATCH /api/variants/[id] — edit info varian ATAU stock opname
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { id } = params;
+  const { id } = await params;
   const body = await req.json();
   const { name, sortOrder, minStock, currentStock, adjustment, note } = body as {
     name?: string; sortOrder?: number; minStock?: number;  // edit info
@@ -55,13 +55,14 @@ export async function PATCH(
 // DELETE /api/variants/[id] — hapus varian
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const ref = adminDb.doc(`variants/${params.id}`);
+    const { id } = await params;
+    const ref = adminDb.doc(`variants/${id}`);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Varian tidak ditemukan" }, { status: 404 });
     await ref.delete();
@@ -75,10 +76,11 @@ export async function DELETE(
 // GET /api/variants/[id] — ambil satu varian
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const snap = await adminDb.doc(`variants/${params.id}`).get();
+    const { id } = await params;
+    const snap = await adminDb.doc(`variants/${id}`).get();
     if (!snap.exists) return NextResponse.json({ error: "Tidak ditemukan" }, { status: 404 });
     const d = snap.data()!;
     return NextResponse.json({

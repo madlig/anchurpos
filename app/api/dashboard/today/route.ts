@@ -62,6 +62,19 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const expensesSnap = await adminDb
+      .collection("expenses")
+      .where("date", ">=", startOfDay.toISOString())
+      .where("date", "<=", endOfDay.toISOString())
+      .get();
+
+    let operationalExpenses = 0;
+    for (const doc of expensesSnap.docs) {
+      operationalExpenses += doc.data().totalCost ?? 0;
+    }
+
+    const totalPengeluaran = hpp + operationalExpenses;
+
     const ingredientsSnap = await adminDb.collection("ingredients").get();
     const lowStockItems: { id: string; name: string; currentStock: number; minStock: number; baseUnit: string }[] = [];
     for (const doc of ingredientsSnap.docs) {
@@ -80,7 +93,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       omzet,
       hpp,
-      profit: omzet - hpp,
+      operationalExpenses,
+      totalPengeluaran,
+      profit: omzet - totalPengeluaran,
       orderCount,
       productionToday: productionSummary,
       lowStockItems,

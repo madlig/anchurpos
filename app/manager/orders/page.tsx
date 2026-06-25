@@ -79,7 +79,6 @@ export default function OrdersListPage() {
               style={{
                 paddingBottom: "8px",
                 paddingTop: "8px",
-                borderBottom: tab === t.key ? "2px solid #E85D8C" : "2px solid transparent",
                 fontSize: "12px",
                 fontWeight: tab === t.key ? "600" : "500",
                 color: tab === t.key ? "#E85D8C" : "#94A3B8",

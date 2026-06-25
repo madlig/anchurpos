@@ -72,9 +72,7 @@ export default function InvoicePage() {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "32px", borderBottom: "2px solid #E85D8C", paddingBottom: "24px" }}>
           <div>
-            <div style={{ width: "64px", height: "64px", borderRadius: "16px", background: "linear-gradient(135deg,#E85D8C,#FCABB4)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "12px" }}>
-              <span style={{ color: "#fff", fontSize: "22px", fontWeight: "800" }}>A</span>
-            </div>
+            <img src="/logo-bnw.png" alt="Anchur Logo" style={{ width: "auto", height: "64px", objectFit: "contain", marginBottom: "12px" }} />
             <h1 style={{ fontSize: "22px", fontWeight: "800", color: "#E85D8C", margin: 0 }}>AnchurPOS</h1>
             <p style={{ fontSize: "12px", color: "#94A3B8", margin: "2px 0 0" }}>Sistem Manajemen Produksi</p>
           </div>

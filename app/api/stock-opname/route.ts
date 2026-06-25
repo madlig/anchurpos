@@ -12,8 +12,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Hanya crew yang bisa submit opname" }, { status: 403 });
   }
 
-  const { shiftType, items } = (await req.json()) as {
-    shiftType: "pagi" | "siang" | "malam";
+  const { items } = (await req.json()) as {
     items: {
       ingredientId: string;
       physicalStock?: number | null;
@@ -22,7 +21,7 @@ export async function POST(req: NextRequest) {
     }[];
   };
 
-  if (!shiftType || !items?.length) {
+  if (!items?.length) {
     return NextResponse.json({ error: "Data opname tidak lengkap" }, { status: 400 });
   }
 
@@ -102,7 +101,6 @@ export async function POST(req: NextRequest) {
     await adminDb.runTransaction(async (tx) => {
       tx.set(opnameRef, {
         date: FieldValue.serverTimestamp(),
-        shiftType,
         crewId: auth.uid,
         items: processedItems,
         totalIngredientsChecked: processedItems.length,
@@ -120,7 +118,7 @@ export async function POST(req: NextRequest) {
           type: "stock_opname_discrepancy",
           severity: "warning",
           title: "Selisih stok ditemukan",
-          message: `Stock opname shift ${shiftType} oleh crew menemukan selisih (${processedItems.length} bahan dicek)`,
+          message: `Stock opname oleh crew menemukan selisih (${processedItems.length} bahan dicek)`,
           sourceCollection: "stockOpname",
           sourceId: opnameRef.id,
           isRead: false,
@@ -174,7 +172,6 @@ export async function GET(req: NextRequest) {
       return {
         id: doc.id,
         date: d.date?.toDate?.().toISOString() ?? d.date,
-        shiftType: d.shiftType,
         crewId: d.crewId,
         items: d.items,
         totalIngredientsChecked: d.totalIngredientsChecked,

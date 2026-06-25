@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Loader2, Scale, Clock, Wallet, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
-interface StockOpname { id: string; shiftType: string; submittedByName: string; hasDiscrepancy: boolean; reviewAction: string | null; createdAt: string; }
+interface StockOpname { id: string; submittedByName: string; hasDiscrepancy: boolean; reviewAction: string | null; createdAt: string; }
 interface AttendanceFlag { id: string; employeeName: string; date: string; issue: string; }
 interface PayrollPending { id: string; month: string; employeeName: string; totalPaid: number; status: string; }
 
@@ -84,7 +84,7 @@ export default function OwnerApprovalPage() {
                 <Link key={o.id} href="/manager/stock-opname-review">
                   <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: "#fff", border: "1px solid #F1F5F9" }}>
                     <div>
-                      <p className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>Shift {o.shiftType}</p>
+                      <p className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>Stock Opname</p>
                       <p className="text-xs" style={{ color: "#64748B" }}>oleh {o.submittedByName} · {formatDate(o.createdAt)}</p>
                     </div>
                     <div className="ml-auto flex items-center gap-2">

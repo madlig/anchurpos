@@ -44,7 +44,7 @@ export interface Variant {
 }
 
 // --- 4. ingredients/{ingredientId} ---
-export type IngredientCategory = "bahan_baku" | "packaging" | "operasional";
+export type IngredientCategory = "bahan_baku" | "packaging" | "operasional" | "add_on";
 export type OpnameMethod = "direct" | "packaged";
 
 export interface UnitAlternative {

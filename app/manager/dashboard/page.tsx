@@ -6,7 +6,7 @@ import { Loader2, Bell, AlertTriangle, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 interface DashboardData {
-  omzet: number; hpp: number; profit: number; orderCount: number;
+  omzet: number; hpp: number; operationalExpenses: number; totalPengeluaran: number; profit: number; orderCount: number;
   productionToday: { variantId: string; variantName: string; batches: number; loyangCount: number }[];
   lowStockItems: { id: string; name: string; currentStock: number; minStock: number; baseUnit: string }[];
 }
@@ -151,16 +151,29 @@ export default function ManagerDashboardPage() {
             </div>
           </div>
           <div
-            data-testid="hpp-card"
+            data-testid="expenses-card"
             className="flex-1"
             style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }}
           >
-            <p style={{ fontSize: "11px", fontWeight: "500", color: "#64748B", marginBottom: "6px" }}>HPP Hari Ini</p>
-            <p style={{ fontSize: "20px", fontWeight: "700", color: "#1C1C1E" }}>{data ? fmtShort(data.hpp) : "Rp 0"}</p>
+            <p style={{ fontSize: "11px", fontWeight: "500", color: "#64748B", marginBottom: "6px" }}>Pengeluaran Hari Ini</p>
+            <p style={{ fontSize: "20px", fontWeight: "700", color: "#1C1C1E" }}>{data ? fmtShort(data.totalPengeluaran) : "Rp 0"}</p>
             <div style={{ height: "4px", borderRadius: "2px", background: "#F1F5F9", marginTop: "8px" }}>
               <div style={{ height: "4px", borderRadius: "2px", background: "#D97706", width: "45%" }} />
             </div>
           </div>
+        </div>
+
+        {/* Profit Card */}
+        <div
+          data-testid="profit-card"
+          style={{ background: "#fff", borderRadius: "14px", padding: "14px 16px", border: "1px solid #F1F5F9" }}
+        >
+          <div className="flex justify-between items-center" style={{ marginBottom: "8px" }}>
+            <span style={{ fontSize: "12px", fontWeight: "500", color: "#64748B" }}>Pemasukan Bersih</span>
+          </div>
+          <p data-testid="profit-value" style={{ fontSize: "22px", fontWeight: "700", color: "#16A34A", marginBottom: "4px" }}>
+            {data ? fmt(data.profit) : "Rp 0"}
+          </p>
         </div>
       </div>
 

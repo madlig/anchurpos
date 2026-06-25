@@ -15,7 +15,6 @@ export default function CrewStockOpnamePage() {
   const { getToken } = useAuth();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
-  const [shiftType, setShiftType] = useState<"pagi" | "siang" | "malam" | "">("");
   const [entries, setEntries] = useState<Map<string, OpnameEntry>>(new Map());
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ totalChecked: number } | null>(null);
@@ -49,14 +48,13 @@ export default function CrewStockOpnamePage() {
   const filledCount = Array.from(entries.values()).filter((e) => e.filled).length;
 
   async function handleSubmit() {
-    if (!shiftType) { setError("Pilih shift dulu"); return; }
     const filledEntries = Array.from(entries.values()).filter((e) => e.filled);
     if (filledEntries.length === 0) { setError("Isi minimal 1 bahan"); return; }
     setError(""); setSubmitting(true);
     try {
       const res = await fetchWithAuth("/api/stock-opname", {
         method: "POST",
-        body: JSON.stringify({ shiftType, items: filledEntries.map((e) => ({ ingredientId: e.ingredientId, physicalStock: e.physicalStock ?? null, fullPackages: e.fullPackages ?? null, openPackageFullness: e.openPackageFullness ?? null })) }),
+        body: JSON.stringify({ items: filledEntries.map((e) => ({ ingredientId: e.ingredientId, physicalStock: e.physicalStock ?? null, fullPackages: e.fullPackages ?? null, openPackageFullness: e.openPackageFullness ?? null })) }),
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error ?? "Gagal menyimpan opname"); return; }
@@ -75,36 +73,9 @@ export default function CrewStockOpnamePage() {
           </div>
           <h2 className="text-xl font-extrabold mb-1" style={{ color: "#1C1C1E" }}>Opname Tersimpan!</h2>
           <p className="text-sm" style={{ color: "#64748B" }}>{result.totalChecked} bahan dicek</p>
-          <button onClick={() => { setResult(null); setEntries(new Map()); setShiftType(""); }} className="mt-5 w-full h-12 rounded-2xl text-sm font-bold tap-target" style={{ background: "#F1F5F9", color: "#334155" }}>
+          <button onClick={() => { setResult(null); setEntries(new Map()); }} className="mt-5 w-full h-12 rounded-2xl text-sm font-bold tap-target" style={{ background: "#F1F5F9", color: "#334155" }}>
             Opname Baru
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!shiftType) {
-    return (
-      <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
-            <ClipboardList size={16} style={{ color: "#E85D8C" }} />
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>Stock Opname</h1>
-        </div>
-        <p className="text-sm ml-10 mb-6" style={{ color: "#64748B" }}>Pilih shift untuk mulai</p>
-        <div className="space-y-3">
-          {(["pagi", "siang", "malam"] as const).map((s, i) => {
-            const icons = ["🌅", "☀️", "🌙"];
-            return (
-              <button key={s} onClick={() => setShiftType(s)} className={`w-full rounded-3xl p-5 text-left tap-target page-enter stagger-${i+1}`}
-                style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
-                data-testid={`shift-${s}`}>
-                <span className="text-xl mr-2">{icons[i]}</span>
-                <span className="text-base font-bold capitalize" style={{ color: "#1C1C1E" }}>Shift {s}</span>
-              </button>
-            );
-          })}
         </div>
       </div>
     );
@@ -115,7 +86,7 @@ export default function CrewStockOpnamePage() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>Stock Opname</h1>
-          <p className="text-sm capitalize" style={{ color: "#64748B" }}>Shift {shiftType} — {filledCount}/{ingredients.length} diisi</p>
+          <p className="text-sm capitalize" style={{ color: "#64748B" }}>{filledCount}/{ingredients.length} diisi</p>
         </div>
         <div className="rounded-2xl px-3 py-1.5" style={{ background: "#FEF1F5" }}>
           <span className="text-sm font-bold tabular-nums" style={{ color: "#E85D8C" }}>{filledCount}/{ingredients.length}</span>

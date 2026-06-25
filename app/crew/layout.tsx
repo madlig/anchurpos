@@ -2,15 +2,14 @@
 
 import { RoleGuard } from "@/components/shared/RoleGuard";
 import { useAuth } from "@/lib/auth-context";
-import { UserCheck, ChefHat, PackageOpen, ClipboardList, LogOut } from "lucide-react";
+import { UserCheck, ChefHat, PackageOpen, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { label: "Absen", href: "/crew/attendance", icon: UserCheck },
   { label: "Produksi", href: "/crew/production", icon: ChefHat },
-  { label: "Pre-Pack", href: "/crew/pre-packing", icon: PackageOpen },
-  { label: "Opname", href: "/crew/stock-opname", icon: ClipboardList },
+  { label: "Packing", href: "/crew/packing", icon: PackageOpen },
 ];
 
 function DesktopSidebar() {
