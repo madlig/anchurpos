@@ -5,11 +5,34 @@ import { useAuth } from "@/lib/auth-context";
 import {
   Loader2, Plus, Pencil, Trash2, X, Check, KeyRound,
   Users, CalendarDays, UserCheck, ChevronDown, ChevronUp,
+  Wallet, Banknote, AlertTriangle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
-type Tab = "karyawan" | "absensi";
+type Tab = "karyawan" | "absensi" | "payroll";
 type Role = "owner" | "manager" | "crew";
+
+interface PayrollRecord {
+  id: string;
+  month: string;
+  employeeId: string;
+  employeeName: string;
+  workDays: number;
+  dailyWage: number;
+  totalRegularPay: number;
+  totalOvertimeBonus: number;
+  performanceBonus: number;
+  totalPaid: number;
+  pendingReview: number;
+  dataStatus: "parsial" | "final";
+  status: "belum_dibayar" | "sudah_dibayar";
+  paidAt: string | null;
+  isLocked: boolean;
+}
+
+function fmtRupiah(n: number) {
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+}
 
 interface Employee {
   id: string; name: string; username: string; role: Role;
@@ -182,9 +205,10 @@ function ChangePasswordForm({ emp, fetchWithAuth, onSuccess, onCancel }: {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function ManagerEmployeesPage() {
-  const { getToken } = useAuth();
+  const { role, getToken } = useAuth();
   const [tab, setTab] = useState<Tab>("karyawan");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   // Karyawan state
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -202,10 +226,125 @@ export default function ManagerEmployeesPage() {
     const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
 
+  // Payroll state
+  const [payrolls, setPayrolls] = useState<PayrollRecord[]>([]);
+  const [payrollMonth, setPayrollMonth] = useState(() => {
+    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [loadingPayroll, setLoadingPayroll] = useState(false);
+  const [generatingPayroll, setGeneratingPayroll] = useState(false);
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [editingPayrollId, setEditingPayrollId] = useState<string | null>(null);
+  const [editPerformanceBonus, setEditPerformanceBonus] = useState("");
+  const [savingBonusId, setSavingBonusId] = useState<string | null>(null);
+  const [payrollWarnings, setPayrollWarnings] = useState<string[]>([]);
+
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
     return fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...opts?.headers } });
   }, [getToken]);
+
+  const loadPayroll = useCallback(async () => {
+    setLoadingPayroll(true);
+    setPayrollWarnings([]);
+    try {
+      const res = await fetchWithAuth(`/api/payroll?month=${payrollMonth}`);
+      if (res.ok) setPayrolls(await res.json());
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingPayroll(false);
+    }
+  }, [fetchWithAuth, payrollMonth]);
+
+  useEffect(() => {
+    if (tab === "payroll") loadPayroll();
+  }, [tab, loadPayroll]);
+
+  async function handleGeneratePayroll() {
+    setGeneratingPayroll(true);
+    setError("");
+    setPayrollWarnings([]);
+    try {
+      const res = await fetchWithAuth("/api/payroll/generate", {
+        method: "POST",
+        body: JSON.stringify({ month: payrollMonth })
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error || "Gagal membuat payroll");
+      } else {
+        if (d.warnings && d.warnings.length > 0) {
+          setPayrollWarnings(d.warnings);
+        }
+        showSuccess("Payroll berhasil dihitung & diperbarui!");
+        await loadPayroll();
+      }
+    } catch {
+      setError("Kesalahan jaringan");
+    } finally {
+      setGeneratingPayroll(false);
+    }
+  }
+
+  async function handleSavePerformanceBonus(id: string) {
+    const bonus = Number(editPerformanceBonus);
+    if (isNaN(bonus) || bonus < 0) {
+      alert("Bonus tidak valid");
+      return;
+    }
+    setSavingBonusId(id);
+    try {
+      const res = await fetchWithAuth(`/api/payroll/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ performanceBonus: bonus })
+      });
+      if (res.ok) {
+        setEditingPayrollId(null);
+        await loadPayroll();
+        showSuccess("Bonus prestasi berhasil diperbarui!");
+      } else {
+        const d = await res.json();
+        alert(d.error || "Gagal menyimpan bonus");
+      }
+    } catch {
+      alert("Kesalahan jaringan");
+    } finally {
+      setSavingBonusId(null);
+    }
+  }
+
+  async function handlePayPayroll(p: PayrollRecord, confirmedDespitePartial = false) {
+    if (p.dataStatus === "parsial" && !confirmedDespitePartial) {
+      if (window.confirm(`Ada ${p.pendingReview} absensi yang belum direview untuk bulan ini. Apakah Anda yakin ingin memproses pembayaran gaji?`)) {
+        handlePayPayroll(p, true);
+      }
+      return;
+    }
+    
+    if (!confirmedDespitePartial && !window.confirm(`Proses pembayaran gaji untuk ${p.employeeName}? Data gaji akan dikunci.`)) {
+      return;
+    }
+
+    setPayingId(p.id);
+    try {
+      const res = await fetchWithAuth(`/api/payroll/${p.id}/pay`, {
+        method: "PATCH",
+        body: JSON.stringify({ confirmedDespitePartial })
+      });
+      if (res.ok) {
+        showSuccess(`Gaji ${p.employeeName} ditandai sudah dibayar!`);
+        await loadPayroll();
+      } else {
+        const d = await res.json();
+        alert(d.error || "Gagal memproses pembayaran");
+      }
+    } catch {
+      alert("Kesalahan jaringan");
+    } finally {
+      setPayingId(null);
+    }
+  }
 
   const loadEmployees = useCallback(async () => {
     const res = await fetchWithAuth("/api/employees");
@@ -251,9 +390,9 @@ export default function ManagerEmployeesPage() {
           <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Karyawan</h1>
         </div>
         <div className="flex">
-          {(["karyawan", "absensi"] as Tab[]).map(t => {
+          {(["karyawan", "absensi", "payroll"] as Tab[]).map(t => {
             const active = tab === t;
-            const Icon = t === "karyawan" ? Users : CalendarDays;
+            const Icon = t === "karyawan" ? Users : t === "absensi" ? CalendarDays : Wallet;
             return (
               <button key={t} onClick={() => { setTab(t); setShowAddForm(false); setEditEmp(null); }}
                 data-testid={`tab-${t}`}
@@ -261,7 +400,7 @@ export default function ManagerEmployeesPage() {
                 style={{ paddingTop: "8px", paddingBottom: "10px", border: "none", background: "transparent", cursor: "pointer",
                   borderBottom: active ? "2px solid #E85D8C" : "2px solid transparent",
                   fontSize: "12px", fontWeight: active ? "600" : "500", color: active ? "#E85D8C" : "#94A3B8" }}>
-                <Icon size={13} /> {t === "karyawan" ? "Data Karyawan" : "Absensi"}
+                <Icon size={13} /> {t === "karyawan" ? "Data Karyawan" : t === "absensi" ? "Absensi" : "Gaji & Payroll"}
               </button>
             );
           })}
@@ -275,6 +414,13 @@ export default function ManagerEmployeesPage() {
           <div className="flex items-center gap-2" style={{ padding: "10px 14px", borderRadius: "12px", background: "#DCFCE7", border: "1px solid #86EFAC", marginBottom: "12px" }}>
             <UserCheck size={14} style={{ color: "#16A34A" }} />
             <span style={{ fontSize: "13px", color: "#16A34A", fontWeight: "600" }}>{successMsg}</span>
+          </div>
+        )}
+
+        {/* Error alert */}
+        {error && (
+          <div style={{ padding: "12px 14px", borderRadius: "12px", background: "#FEF2F2", border: "1px solid #FECACA", marginBottom: "12px" }} data-testid="payroll-error">
+            <p style={{ fontSize: "13px", color: "#DC2626" }}>{error}</p>
           </div>
         )}
 
@@ -465,6 +611,241 @@ export default function ManagerEmployeesPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Tab: PAYROLL ── */}
+        {tab === "payroll" && (
+          <>
+            {/* Month picker & Generate button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <button onClick={() => { const d = new Date(payrollMonth + "-01"); d.setMonth(d.getMonth() - 1); setPayrollMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+                  className="tap-target"
+                  style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>‹</button>
+                <p style={{ minWidth: "120px", textAlign: "center", fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>
+                  {new Date(payrollMonth + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
+                </p>
+                <button onClick={() => { const d = new Date(payrollMonth + "-01"); d.setMonth(d.getMonth() + 1); setPayrollMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+                  className="tap-target"
+                  style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>›</button>
+              </div>
+
+              <button
+                onClick={handleGeneratePayroll}
+                disabled={generatingPayroll}
+                className="tap-target"
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "12px",
+                  background: "#E85D8C",
+                  color: "#fff",
+                  fontSize: "12px",
+                  fontWeight: "700",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                {generatingPayroll ? <Loader2 size={13} className="animate-spin" /> : <Banknote size={13} />}
+                Hitung Ulang & Generate Gaji
+              </button>
+            </div>
+
+            {/* Warnings from generation */}
+            {payrollWarnings.length > 0 && (
+              <div className="rounded-2xl p-4 mb-4" style={{ background: "#FEF3C7", border: "1px solid #FDE68A" }}>
+                <div className="flex items-start gap-2">
+                  <AlertTriangle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-amber-800 uppercase tracking-wide">Peringatan Data Absensi</p>
+                    <ul className="list-disc pl-4 mt-1 space-y-1">
+                      {payrollWarnings.map((w, idx) => (
+                        <li key={idx} className="text-xxs text-amber-700 font-medium">{w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {loadingPayroll ? (
+              <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin" style={{ color: "#E85D8C" }} /></div>
+            ) : payrolls.length === 0 ? (
+              <div style={{ background: "#fff", borderRadius: "14px", padding: "32px 16px", textAlign: "center", border: "1px solid #F1F5F9" }} data-testid="payroll-empty">
+                <p style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>Belum ada data payroll untuk bulan ini</p>
+                <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "4px" }}>Klik tombol "Hitung Gaji / Generate Payroll" di atas</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {payrolls.map((p) => {
+                  const isEditing = editingPayrollId === p.id;
+                  const canPay = role === "owner" && p.status === "belum_dibayar";
+
+                  return (
+                    <div
+                      key={p.id}
+                      style={{ background: "#fff", borderRadius: "16px", padding: "16px", border: "1px solid #F1F5F9" }}
+                      data-testid={`payroll-card-${p.employeeId}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>{p.employeeName}</p>
+                          <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>
+                            {p.workDays} hari kerja valid @ {fmtRupiah(p.dailyWage)}/hari
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5">
+                          <span
+                            style={{
+                              padding: "3px 9px",
+                              borderRadius: "100px",
+                              fontSize: "10px",
+                              fontWeight: "700",
+                              background: p.status === "sudah_dibayar" ? "#DCFCE7" : "#F1F5F9",
+                              color: p.status === "sudah_dibayar" ? "#16A34A" : "#64748B"
+                            }}
+                          >
+                            {p.status === "sudah_dibayar" ? "Sudah Dibayar" : "Belum Dibayar"}
+                          </span>
+
+                          <span
+                            style={{
+                              padding: "3px 9px",
+                              borderRadius: "100px",
+                              fontSize: "10px",
+                              fontWeight: "700",
+                              background: p.dataStatus === "final" ? "#EFF6FF" : "#FEF3C7",
+                              color: p.dataStatus === "final" ? "#2563EB" : "#D97706"
+                            }}
+                          >
+                            {p.dataStatus === "final" ? "Final" : `Parsial (${p.pendingReview} absen direview)`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Gaji Breakdown */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 rounded-xl p-3 mt-3 text-xs">
+                        <div>
+                          <p style={{ color: "#94A3B8" }}>Gaji Pokok</p>
+                          <p style={{ fontWeight: "700", color: "#334155", marginTop: "2px" }}>{fmtRupiah(p.totalRegularPay)}</p>
+                        </div>
+                        <div>
+                          <p style={{ color: "#94A3B8" }}>Bonus Lembur</p>
+                          <p style={{ fontWeight: "700", color: "#334155", marginTop: "2px" }}>{fmtRupiah(p.totalOvertimeBonus)}</p>
+                        </div>
+                        <div>
+                          <p style={{ color: "#94A3B8" }}>Bonus Prestasi</p>
+                          <p style={{ fontWeight: "700", color: "#334155", marginTop: "2px" }}>{fmtRupiah(p.performanceBonus)}</p>
+                        </div>
+                        <div>
+                          <p style={{ color: "#E85D8C", fontWeight: "600" }}>Total Gaji</p>
+                          <p style={{ fontWeight: "800", color: "#E85D8C", marginTop: "2px" }}>{fmtRupiah(p.totalPaid)}</p>
+                        </div>
+                      </div>
+
+                      {/* Aksi Gaji */}
+                      {!p.isLocked && (
+                        <div className="flex items-center gap-2 mt-4 pt-3" style={{ borderTop: "1px solid #F8FAFC" }}>
+                          {!isEditing ? (
+                            <button
+                              onClick={() => {
+                                setEditingPayrollId(p.id);
+                                setEditPerformanceBonus(String(p.performanceBonus));
+                              }}
+                              className="tap-target"
+                              style={{
+                                padding: "6px 12px",
+                                borderRadius: "10px",
+                                background: "#FEF1F5",
+                                color: "#E85D8C",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: "11px",
+                                fontWeight: "700"
+                              }}
+                              data-testid={`edit-bonus-btn-${p.employeeId}`}
+                            >
+                              Edit Bonus
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-2 w-full">
+                              <Input
+                                type="number"
+                                placeholder="Bonus prestasi..."
+                                value={editPerformanceBonus}
+                                onChange={(e) => setEditPerformanceBonus(e.target.value)}
+                                className="h-8 w-36 rounded-lg text-xs"
+                                data-testid={`bonus-input-${p.employeeId}`}
+                              />
+                              <button
+                                onClick={() => handleSavePerformanceBonus(p.id)}
+                                disabled={savingBonusId === p.id}
+                                className="tap-target"
+                                style={{
+                                  padding: "6px 12px",
+                                  borderRadius: "8px",
+                                  background: "#E85D8C",
+                                  color: "#fff",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: "11px",
+                                  fontWeight: "700"
+                                }}
+                                data-testid={`save-bonus-btn-${p.employeeId}`}
+                              >
+                                {savingBonusId === p.id ? <Loader2 size={10} className="animate-spin" /> : "Simpan"}
+                              </button>
+                              <button
+                                onClick={() => setEditingPayrollId(null)}
+                                style={{
+                                  padding: "6px 12px",
+                                  borderRadius: "8px",
+                                  background: "#F1F5F9",
+                                  color: "#64748B",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: "11px"
+                                }}
+                              >
+                                Batal
+                              </button>
+                            </div>
+                          )}
+
+                          {canPay && !isEditing && (
+                            <button
+                              onClick={() => handlePayPayroll(p)}
+                              disabled={payingId === p.id}
+                              className="ml-auto tap-target"
+                              style={{
+                                padding: "6px 12px",
+                                borderRadius: "10px",
+                                background: "linear-gradient(135deg, #16A34A, #15803D)",
+                                color: "#fff",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: "11px",
+                                fontWeight: "700",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px"
+                              }}
+                              data-testid={`pay-salary-btn-${p.employeeId}`}
+                            >
+                              {payingId === p.id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                              Bayar Gaji
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </>
