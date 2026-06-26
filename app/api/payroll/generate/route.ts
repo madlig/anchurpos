@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
         .get();
 
       const workDays = lengkapSnap.size;
-      const dailyWage = userData.dailyWage ?? 0;
+      const dailyWage = userData.dailyWage || 60000;
       const totalRegularPay = workDays * dailyWage;
 
       let totalOvertimeBonus = 0;

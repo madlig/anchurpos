@@ -65,6 +65,80 @@ export async function PATCH(
 
     await attRef.update(updates);
 
+    // Automatic payroll sync for crew
+    const attData = snap.data()!;
+    const employeeId = attData.employeeId;
+    const date = attData.date;
+    const month = date.substring(0, 7);
+
+    const userSnap = await adminDb.doc(`users/${employeeId}`).get();
+    if (userSnap.exists && userSnap.data()?.role === "crew") {
+      const userData = userSnap.data()!;
+      const [year, mon] = month.split("-").map(Number);
+      const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
+      const endMonth = mon === 12 ? 1 : mon + 1;
+      const endYear = mon === 12 ? year + 1 : year;
+      const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
+
+      const lengkapSnap = await adminDb
+        .collection("attendance")
+        .where("employeeId", "==", employeeId)
+        .where("date", ">=", startDate)
+        .where("date", "<", endDate)
+        .where("status", "==", "lengkap")
+        .get();
+
+      const direviewSnap = await adminDb
+        .collection("attendance")
+        .where("employeeId", "==", employeeId)
+        .where("date", ">=", startDate)
+        .where("date", "<", endDate)
+        .where("status", "==", "direview")
+        .get();
+
+      const workDays = lengkapSnap.size;
+      const dailyWage = userData.dailyWage || 60000;
+      const totalRegularPay = workDays * dailyWage;
+
+      let totalOvertimeBonus = 0;
+      for (const doc of lengkapSnap.docs) {
+        totalOvertimeBonus += doc.data().overtimeBonus ?? 0;
+      }
+
+      const payrollId = `${month}_${employeeId}`;
+      const existingSnap = await adminDb.doc(`payroll/${payrollId}`).get();
+      if (!existingSnap.exists || !existingSnap.data()?.isLocked) {
+        const existingBonus = existingSnap.exists
+          ? (existingSnap.data()?.performanceBonus ?? 0)
+          : 0;
+
+        const pendingReview = direviewSnap.size;
+        const dataStatus = pendingReview > 0 ? "parsial" : "final";
+        const totalPaid = totalRegularPay + totalOvertimeBonus + existingBonus;
+
+        await adminDb.doc(`payroll/${payrollId}`).set(
+          {
+            month,
+            employeeId,
+            employeeName: userData.name ?? employeeId,
+            workDays,
+            dailyWage,
+            totalRegularPay,
+            totalOvertimeBonus,
+            performanceBonus: existingBonus,
+            totalPaid,
+            pendingReview,
+            dataStatus,
+            status: existingSnap.exists ? (existingSnap.data()?.status ?? "belum_dibayar") : "belum_dibayar",
+            paidAt: existingSnap.exists ? (existingSnap.data()?.paidAt ?? null) : null,
+            isLocked: false,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: false }
+        );
+      }
+    }
+
     // Resolve associated alerts
     const alertsSnap = await adminDb
       .collection("alerts")

@@ -22,11 +22,6 @@ export async function POST(req: NextRequest) {
   try {
     const configSnap = await adminDb.doc("settings/attendanceConfig").get();
     const config = configSnap.data();
-    const body = await req.json().catch(() => ({}));
-    const clientSsid = body?.wifiSsid ?? "";
-    const allowedSsid = config?.whitelistedSsid ?? "";
-    const ssidValid = !allowedSsid || (clientSsid.trim() === allowedSsid.trim());
-
     const whitelist: string[] = config?.whitelistedIps ?? [];
     const ipValid = whitelist.includes(ip);
 
@@ -67,7 +62,6 @@ export async function POST(req: NextRequest) {
     // Build list of anomalies
     const anomalies: string[] = [];
     if (!ipValid) anomalies.push("IP tidak dikenal");
-    if (!ssidValid) anomalies.push("SSID Wi-Fi tidak sesuai");
     if (totalHours < 8) anomalies.push("Check-out awal (<8 jam)");
 
     // Every check-out goes to status: "direview" as requested: "semua absen akan direview oleh oleh manager atau owner"

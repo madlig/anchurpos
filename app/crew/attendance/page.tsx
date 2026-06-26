@@ -27,13 +27,7 @@ export default function CrewAttendancePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [wifiSsidInput, setWifiSsidInput] = useState("");
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setWifiSsidInput(localStorage.getItem("crew_wifi_ssid") || "");
-    }
-  }, []);
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
@@ -64,8 +58,7 @@ export default function CrewAttendancePage() {
     setError(""); setSubmitting(true);
     try {
       const res = await fetchWithAuth(`/api/attendance/${type}`, { 
-        method: "POST", 
-        body: JSON.stringify({ wifiSsid: wifiSsidInput }) 
+        method: "POST"
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Gagal absen. Pastikan terhubung ke WiFi rumah produksi."); return; }
@@ -151,57 +144,7 @@ export default function CrewAttendancePage() {
           <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)" }}>{statusCard.sub}</p>
         </div>
 
-        {/* Wifi SSID Input for validation (shown only if check-out not complete) */}
-        {!isDone && (
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: "16px",
-              padding: "16px",
-              marginBottom: "24px",
-              border: "1px solid rgba(0,0,0,0.05)",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.02)"
-            }}
-          >
-            <label
-              style={{
-                fontSize: "11px",
-                fontWeight: "700",
-                color: "#64748B",
-                textTransform: "uppercase",
-                display: "block",
-                marginBottom: "8px",
-                letterSpacing: "0.5px"
-              }}
-            >
-              SSID Wi-Fi Terhubung
-            </label>
-            <input
-              type="text"
-              placeholder="Masukkan nama Wi-Fi..."
-              value={wifiSsidInput}
-              onChange={(e) => {
-                setWifiSsidInput(e.target.value);
-                localStorage.setItem("crew_wifi_ssid", e.target.value);
-              }}
-              style={{
-                width: "100%",
-                height: "42px",
-                borderRadius: "10px",
-                border: "1px solid #E2E8F0",
-                padding: "0 14px",
-                fontSize: "13px",
-                fontWeight: "600",
-                color: "#334155",
-                outline: "none",
-                background: "#F8FAFC"
-              }}
-            />
-            <p style={{ fontSize: "10px", color: "#94A3B8", marginTop: "6px", lineHeight: "1.4" }}>
-              *Koneksikan ke Wi-Fi rumah produksi dan masukkan nama SSID-nya untuk verifikasi absensi.
-            </p>
-          </div>
-        )}
+
 
         {/* Circular Clock-in/out Button */}
         {btnConfig && (
