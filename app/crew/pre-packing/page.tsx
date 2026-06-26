@@ -23,8 +23,6 @@ export default function CrewPrePackingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
-  const [sausGlazeOptions, setSausGlazeOptions] = useState<{id: string; name: string}[]>([]);
-  const [selectedSaus, setSelectedSaus] = useState("");
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
@@ -35,15 +33,6 @@ export default function CrewPrePackingPage() {
     fetchWithAuth("/api/variants").then(async (res) => {
       if (res.ok) { const d: Variant[] = await res.json(); setVariants(d.filter((v) => v.isProductionVariant)); }
     }).finally(() => setLoading(false));
-
-    fetchWithAuth("/api/ingredients").then(async (res) => {
-      if (res.ok) {
-        const d: any[] = await res.json();
-        const saus = d.filter((i: any) => i.category === "add_on" && i.id.startsWith("saus-"));
-        setSausGlazeOptions(saus);
-        if (saus.length > 0) setSelectedSaus(saus[0].id);
-      }
-    });
   }, [fetchWithAuth]);
 
   const loadPool = useCallback(async (variantId: string) => {
@@ -78,8 +67,7 @@ export default function CrewPrePackingPage() {
           variantId: selectedVariant, 
           totalLoyangUsed: loyang, 
           resultRegularPacks: parseInt(regularPacks) || 0, 
-          resultFullPacks: parseInt(fullPacks) || 0,
-          sausGlazeId: selectedSaus || undefined
+          resultFullPacks: parseInt(fullPacks) || 0
         }),
       });
       const d = await res.json();
@@ -166,34 +154,6 @@ export default function CrewPrePackingPage() {
                       </div>
                     </div>
                   ))}
-
-                  {(parseInt(regularPacks) > 0 || parseInt(fullPacks) > 0) && (
-                    <div className="rounded-2xl p-4 mt-2" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
-                      <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "#94A3B8" }}>Estimasi Bahan Terpotong</p>
-                      <div className="space-y-2 text-sm font-medium" style={{ color: "#334155" }}>
-                        <div className="flex justify-between">
-                          <span>Gula Halus Cinnamon</span>
-                          <span className="font-bold text-red-500">-{((parseInt(regularPacks) || 0) * 1) + ((parseInt(fullPacks) || 0) * 1)} gram (asumsi)</span>
-                        </div>
-                        {parseInt(regularPacks) > 0 && (
-                          <>
-                            <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-slate-200">
-                              <label className="text-xs font-bold uppercase" style={{ color: "#64748B" }}>Saus Glaze yang dipakai ({parseInt(regularPacks) * 2} pcs)</label>
-                              <select 
-                                value={selectedSaus} 
-                                onChange={(e) => setSelectedSaus(e.target.value)}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-pink-500"
-                              >
-                                {sausGlazeOptions.map(opt => (
-                                  <option key={opt.id} value={opt.id}>{opt.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
 
                   <button onClick={handleSubmit} disabled={submitting || !(parseInt(loyangUsed) > 0)} className="w-full min-h-[56px] rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 tap-target disabled:opacity-60"
                     style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)", boxShadow: "0 8px 20px rgba(232,93,140,0.3)" }} data-testid="submit-prepacking-button">
