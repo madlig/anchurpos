@@ -10,12 +10,14 @@ export async function POST(req: NextRequest) {
   const user = auth as AuthUser;
 
   const body = await req.json();
-  const { variantId, totalLoyangUsed, resultRegularPacks, resultFullPacks, leftoverPcs, crewId } = body as {
+  const { variantId, totalLoyangUsed, resultRegularPacks, resultFullPacks, resultTikTokPacks, leftoverPcs, type, crewId } = body as {
     variantId: string;
     totalLoyangUsed: number;
-    resultRegularPacks: number;
-    resultFullPacks: number;
+    resultRegularPacks?: number;
+    resultFullPacks?: number;
+    resultTikTokPacks?: number;
     leftoverPcs?: number;
+    type?: "standard" | "tiktok";
     crewId?: string;
   };
 
@@ -24,6 +26,7 @@ export async function POST(req: NextRequest) {
   }
 
   const effectiveCrewId = crewId || user.uid;
+  const activeType = type || "standard";
 
   try {
     const poolSnap = await adminDb
@@ -34,12 +37,15 @@ export async function POST(req: NextRequest) {
       .orderBy("date", "asc")
       .get();
 
-    const pool = poolSnap.docs.map((doc) => ({
-      ref: doc.ref,
-      id: doc.id,
-      date: doc.data().date?.toDate?.().toISOString() ?? "",
-      loyangRemaining: doc.data().loyangRemaining as number,
-    }));
+    const pool = poolSnap.docs
+      .map((doc) => ({
+        ref: doc.ref,
+        id: doc.id,
+        date: doc.data().date?.toDate?.().toISOString() ?? "",
+        loyangRemaining: doc.data().loyangRemaining as number,
+        type: doc.data().type ?? "standard",
+      }))
+      .filter((p) => p.type === activeType);
 
     const totalAvailable = pool.reduce((sum, p) => sum + p.loyangRemaining, 0);
     if (totalLoyangUsed > totalAvailable) {
@@ -85,21 +91,36 @@ export async function POST(req: NextRequest) {
       // Fetch regular stock document if regular packs produced
       let snapReg = null;
       const stockRegRef = adminDb.collection("productStocks").doc(`churros-frozen-regular_${variantId}`);
-      if (resultRegularPacks > 0) {
+      if (activeType === "standard" && (resultRegularPacks ?? 0) > 0) {
         snapReg = await tx.get(stockRegRef);
       }
 
       // Fetch full stock document if full packs produced
       let snapFull = null;
       const stockFullRef = adminDb.collection("productStocks").doc(`churros-frozen-full_${variantId}`);
-      if (resultFullPacks > 0) {
+      if (activeType === "standard" && (resultFullPacks ?? 0) > 0) {
         snapFull = await tx.get(stockFullRef);
       }
 
+      // Fetch TikTok stock document if TikTok packs produced
+      let snapTikTok = null;
+      const stockTikTokRef = adminDb.collection("productStocks").doc(`churros-frozen-tiktok_${variantId}`);
+      if (activeType === "tiktok" && (resultTikTokPacks ?? 0) > 0) {
+        snapTikTok = await tx.get(stockTikTokRef);
+      }
+
       // Fetch buffer stock document
-      const bufferRef = adminDb.collection("prePackingBuffer").doc(variantId);
+      const bufferRef = adminDb.collection("prePackingBuffer").doc(`${variantId}_${activeType}`);
       const bufferSnap = await tx.get(bufferRef);
-      const usedBufferPcs = bufferSnap.exists ? (bufferSnap.data()?.currentBufferPcs ?? 0) : 0;
+      let usedBufferPcs = 0;
+      if (bufferSnap.exists) {
+        usedBufferPcs = bufferSnap.data()?.currentBufferPcs ?? 0;
+      } else if (activeType === "standard") {
+        // Fallback to legacy document ID
+        const legacyRef = adminDb.collection("prePackingBuffer").doc(variantId);
+        const legacySnap = await tx.get(legacyRef);
+        usedBufferPcs = legacySnap.exists ? (legacySnap.data()?.currentBufferPcs ?? 0) : 0;
+      }
 
       // --- 2. WRITE OPERATIONS SECOND ---
 
@@ -120,10 +141,12 @@ export async function POST(req: NextRequest) {
       tx.set(prePackRef, {
         date: timestamp,
         variantId,
+        type: activeType,
         sourceProductions,
         totalLoyangUsed,
-        resultRegularPacks: resultRegularPacks ?? 0,
-        resultFullPacks: resultFullPacks ?? 0,
+        resultRegularPacks: activeType === "standard" ? (resultRegularPacks ?? 0) : 0,
+        resultFullPacks: activeType === "standard" ? (resultFullPacks ?? 0) : 0,
+        resultTikTokPacks: activeType === "tiktok" ? (resultTikTokPacks ?? 0) : 0,
         usedBufferPcs,
         leftoverPcs: leftoverPcs ?? 0,
         crewId: effectiveCrewId,
@@ -131,22 +154,32 @@ export async function POST(req: NextRequest) {
       });
 
       // Increment Product Stocks - Regular
-      if (resultRegularPacks > 0 && snapReg) {
+      if (activeType === "standard" && (resultRegularPacks ?? 0) > 0 && snapReg) {
         const currReg = snapReg.data()?.currentStock ?? 0;
         tx.set(stockRegRef, {
           productId: "churros-frozen-regular",
           variantId,
-          currentStock: currReg + resultRegularPacks,
+          currentStock: currReg + (resultRegularPacks ?? 0),
         }, { merge: true });
       }
 
       // Increment Product Stocks - Full
-      if (resultFullPacks > 0 && snapFull) {
+      if (activeType === "standard" && (resultFullPacks ?? 0) > 0 && snapFull) {
         const currFull = snapFull.data()?.currentStock ?? 0;
         tx.set(stockFullRef, {
           productId: "churros-frozen-full",
           variantId,
-          currentStock: currFull + resultFullPacks,
+          currentStock: currFull + (resultFullPacks ?? 0),
+        }, { merge: true });
+      }
+
+      // Increment Product Stocks - TikTok
+      if (activeType === "tiktok" && (resultTikTokPacks ?? 0) > 0 && snapTikTok) {
+        const currTikTok = snapTikTok.data()?.currentStock ?? 0;
+        tx.set(stockTikTokRef, {
+          productId: "churros-frozen-tiktok",
+          variantId,
+          currentStock: currTikTok + (resultTikTokPacks ?? 0),
         }, { merge: true });
       }
     });

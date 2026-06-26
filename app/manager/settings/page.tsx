@@ -23,6 +23,7 @@ interface AttendanceConfig {
 export default function ManagerSettingsPage() {
   const { getToken } = useAuth();
   const [config, setConfig] = useState<AttendanceConfig | null>(null);
+  const [dailyLoyangTarget, setDailyLoyangTarget] = useState<number>(8);
   const [loading, setLoading] = useState(true);
   const [newIp, setNewIp] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -46,8 +47,15 @@ export default function ManagerSettingsPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const res = await fetchWithAuth("/api/settings/attendance");
+      const [res, targetRes] = await Promise.all([
+        fetchWithAuth("/api/settings/attendance"),
+        fetchWithAuth("/api/settings/production"),
+      ]);
       if (res.ok) setConfig(await res.json());
+      if (targetRes.ok) {
+        const t = await targetRes.json();
+        setDailyLoyangTarget(t.dailyLoyangTarget ?? 8);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -104,6 +112,29 @@ export default function ManagerSettingsPage() {
     }
   }
 
+  async function updateTarget() {
+    setSubmitting(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetchWithAuth("/api/settings/production", {
+        method: "POST",
+        body: JSON.stringify({ dailyLoyangTarget: Number(dailyLoyangTarget) }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Gagal menyimpan target");
+        return;
+      }
+      setSuccess("Target produksi berhasil disimpan");
+      await loadConfig();
+    } catch {
+      setError("Gagal menyimpan target");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -115,7 +146,7 @@ export default function ManagerSettingsPage() {
   return (
     <div className="p-5">
       <h1 className="text-xl font-bold text-stone-900 mb-1">Pengaturan</h1>
-      <p className="text-sm text-stone-500 mb-5">Whitelist IP Absen</p>
+      <p className="text-sm text-stone-500 mb-5">Manajemen Toko & Absensi</p>
 
       {config?.lastDetectedIp && (
         <Card className="p-4 mb-4 bg-amber-50 border-amber-200">
@@ -145,6 +176,36 @@ export default function ManagerSettingsPage() {
           </div>
         </Card>
       )}
+
+      {/* Target Produksi Card */}
+      <Card className="p-4 mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <AlertCircle size={16} className="text-emerald-600" />
+          <h2 className="text-sm font-semibold text-stone-900">
+            Target Produksi Harian
+          </h2>
+        </div>
+        <p className="text-xs text-stone-400 mb-3">
+          Tentukan target jumlah cetak loyang harian untuk kru produksi.
+        </p>
+        <div className="flex gap-2">
+          <Input
+            type="number"
+            min="1"
+            placeholder="Target loyang harian..."
+            value={dailyLoyangTarget}
+            onChange={(e) => setDailyLoyangTarget(Number(e.target.value))}
+            className="flex-1 text-sm font-medium"
+          />
+          <Button
+            onClick={updateTarget}
+            disabled={submitting || dailyLoyangTarget <= 0}
+            size="sm"
+          >
+            Simpan Target
+          </Button>
+        </div>
+      </Card>
 
       <Card className="p-4 mb-4">
         <div className="flex items-center gap-2 mb-3">

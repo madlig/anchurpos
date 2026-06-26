@@ -23,6 +23,8 @@ export default function CrewProductionPage() {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loyangTarget, setLoyangTarget] = useState(8);
+  const [activeTab, setActiveTab] = useState<"standard" | "tiktok">("standard");
 
   const fetchWithAuth = useCallback(
     async (url: string, options?: RequestInit) => {
@@ -37,23 +39,37 @@ export default function CrewProductionPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [varRes, prodRes] = await Promise.all([
+      const [varRes, prodRes, targetRes] = await Promise.all([
         fetchWithAuth("/api/variants"),
-        fetchWithAuth(`/api/productions?date=${new Date().toISOString().split("T")[0]}`),
+        fetchWithAuth(`/api/productions?date=${new Date().toISOString().split("T")[0]}&type=${activeTab}`),
+        fetchWithAuth("/api/settings/production"),
       ]);
       if (varRes.ok) {
         const data: Variant[] = await varRes.json();
         setVariants(data.filter((v) => v.isProductionVariant));
       }
       if (prodRes.ok) setTodayProductions(await prodRes.json());
+      if (targetRes.ok) {
+        const t = await targetRes.json();
+        setLoyangTarget(t.dailyLoyangTarget ?? 8);
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [fetchWithAuth]);
+  }, [fetchWithAuth, activeTab]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Reset inputs when changing tabs
+  useEffect(() => {
+    setSelected(new Set());
+    setEntries(new Map());
+    setNotes("");
+    setSuccess("");
+    setError("");
+  }, [activeTab]);
 
   function toggleVariant(id: string) {
     const next = new Set(selected);
@@ -111,7 +127,7 @@ export default function CrewProductionPage() {
     try {
       const res = await fetchWithAuth("/api/productions/batch", {
         method: "POST",
-        body: JSON.stringify({ entries: batchEntries, notes }),
+        body: JSON.stringify({ entries: batchEntries, type: activeTab, notes }),
       });
 
       const data = await res.json();
@@ -144,21 +160,46 @@ export default function CrewProductionPage() {
   }
 
   const totalLoyang = todayProductions.reduce((s, p) => s + p.loyangCount, 0);
-  const LOYANG_TARGET = 8;
-  const progressPct = Math.round((totalLoyang / LOYANG_TARGET) * 100);
+  const progressPct = Math.round((totalLoyang / loyangTarget) * 100);
 
   return (
     <div className="page-enter min-h-screen" style={{ background: "#FCABB4" }}>
 
       {/* Header (white) */}
-      <div className="px-5 pt-4 pb-4" style={{ background: "#fff" }}>
+      <div className="px-5 pt-4 pb-4 mb-4" style={{ background: "#fff" }}>
         <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Produksi Hari Ini</h1>
         <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "2px" }}>
           {todayProductions.length} item produksi tercatat
         </p>
       </div>
 
-      <div className="px-4 pt-4 pb-4 md:px-8 md:max-w-3xl">
+      {/* Sub-tabs Selector */}
+      <div className="px-4 mb-4 md:px-8 md:max-w-3xl">
+        <div className="flex bg-white/20 backdrop-blur rounded-2xl p-1 gap-1" style={{ border: "1px solid rgba(255,255,255,0.2)" }}>
+          {[
+            { key: "standard", label: "Churros Standar (Mentah)" },
+            { key: "tiktok", label: "Churros TikTok (Setengah Matang)" },
+          ].map((t) => {
+            const active = activeTab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key as "standard" | "tiktok")}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all tap-target"
+                style={
+                  active
+                    ? { background: "#fff", color: "#E85D8C", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }
+                    : { color: "#fff" }
+                }
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="px-4 pb-4 md:px-8 md:max-w-3xl">
 
       {/* Summary stats card */}
       {todayProductions.length > 0 && (
@@ -169,7 +210,7 @@ export default function CrewProductionPage() {
           <div className="flex" style={{ borderBottom: "1px solid #F8FAFC" }}>
             {[
               { label: "Selesai", value: String(totalLoyang), color: "#E85D8C" },
-              { label: "Target", value: String(LOYANG_TARGET), color: "#64748B" },
+              { label: "Target", value: String(loyangTarget), color: "#64748B" },
               { label: "Progress", value: `${progressPct}%`, color: progressPct >= 100 ? "#16A34A" : "#D97706" },
             ].map((s, i) => (
               <div
@@ -191,7 +232,7 @@ export default function CrewProductionPage() {
           <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "10px" }}>Sudah Dicatat</p>
           <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden", border: "1px solid #F1F5F9" }}>
             {todayProductions.map((p, i) => {
-              const barPct = Math.min(100, (p.loyangCount / LOYANG_TARGET) * 100);
+              const barPct = Math.min(100, (p.loyangCount / loyangTarget) * 100);
               return (
                 <div
                   key={p.id}
@@ -217,7 +258,9 @@ export default function CrewProductionPage() {
 
       {/* Add Production Form */}
       <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9", marginBottom: "12px" }}>
-        <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "12px" }}>Tambah Produksi</p>
+        <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "12px" }}>
+          Tambah Produksi ({activeTab === "standard" ? "Standar" : "TikTok"})
+        </p>
 
       {/* Variant chips */}
       <div className="mb-5">

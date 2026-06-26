@@ -19,12 +19,14 @@ export default function CrewPrePackingPage() {
   const [loyangUsed, setLoyangUsed] = useState("");
   const [regularPacks, setRegularPacks] = useState("");
   const [fullPacks, setFullPacks] = useState("");
+  const [tiktokPacks, setTikTokPacks] = useState("");
   const [leftoverPcs, setLeftoverPcs] = useState("");
   const [loading, setLoading] = useState(true);
   const [poolLoading, setPoolLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<"standard" | "tiktok">("standard");
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
@@ -40,7 +42,7 @@ export default function CrewPrePackingPage() {
   const loadPool = useCallback(async (variantId: string) => {
     setPoolLoading(true);
     try {
-      const res = await fetchWithAuth(`/api/productions/loyang-pool?variantId=${variantId}`);
+      const res = await fetchWithAuth(`/api/productions/loyang-pool?variantId=${variantId}&type=${activeTab}`);
       if (res.ok) {
         const d = await res.json();
         setPool(d.pool);
@@ -48,10 +50,21 @@ export default function CrewPrePackingPage() {
         setBufferPcs(d.bufferPcs ?? 0);
       }
     } finally { setPoolLoading(false); }
-  }, [fetchWithAuth]);
+  }, [fetchWithAuth, activeTab]);
+
+  useEffect(() => {
+    setLoyangUsed("");
+    setRegularPacks("");
+    setFullPacks("");
+    setTikTokPacks("");
+    setLeftoverPcs("");
+    setSuccess("");
+    setError("");
+    if (selectedVariant) loadPool(selectedVariant);
+  }, [activeTab, selectedVariant, loadPool]);
 
   function selectVariant(id: string) {
-    setSelectedVariant(id); setLoyangUsed(""); setRegularPacks(""); setFullPacks(""); setLeftoverPcs("");
+    setSelectedVariant(id); setLoyangUsed(""); setRegularPacks(""); setFullPacks(""); setTikTokPacks(""); setLeftoverPcs("");
     setSuccess(""); setError(""); setShowDetail(false); loadPool(id);
   }
 
@@ -68,19 +81,26 @@ export default function CrewPrePackingPage() {
     if (loyang > totalAvailable) { setError(`Loyang tidak cukup, tersedia hanya ${totalAvailable}`); return; }
     setSubmitting(true);
     try {
+      const payload: any = {
+        variantId: selectedVariant,
+        totalLoyangUsed: loyang,
+        type: activeTab,
+        leftoverPcs: parseInt(leftoverPcs) || 0
+      };
+      if (activeTab === "standard") {
+        payload.resultRegularPacks = parseInt(regularPacks) || 0;
+        payload.resultFullPacks = parseInt(fullPacks) || 0;
+      } else {
+        payload.resultTikTokPacks = parseInt(tiktokPacks) || 0;
+      }
+
       const res = await fetchWithAuth("/api/pre-packing", {
         method: "POST",
-        body: JSON.stringify({ 
-          variantId: selectedVariant, 
-          totalLoyangUsed: loyang, 
-          resultRegularPacks: parseInt(regularPacks) || 0, 
-          resultFullPacks: parseInt(fullPacks) || 0,
-          leftoverPcs: parseInt(leftoverPcs) || 0
-        }),
+        body: JSON.stringify(payload),
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || "Gagal menyimpan"); return; }
-      setSuccess("Tersimpan!"); setLoyangUsed(""); setRegularPacks(""); setFullPacks(""); setLeftoverPcs("");
+      setSuccess("Tersimpan!"); setLoyangUsed(""); setRegularPacks(""); setFullPacks(""); setTikTokPacks(""); setLeftoverPcs("");
       if (selectedVariant) loadPool(selectedVariant);
     } catch { setError("Gagal menyimpan pre-packing"); } finally { setSubmitting(false); }
   }
@@ -96,6 +116,30 @@ export default function CrewPrePackingPage() {
         <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>Pre-Packing</h1>
       </div>
       <p className="text-sm mb-5 ml-10" style={{ color: "#64748B" }}>Loyang → Pack Regular & Full</p>
+
+      {/* Sub-tabs Selector */}
+      <div className="flex bg-slate-100 rounded-2xl p-1 gap-1 mb-5" style={{ border: "1px solid #E2E8F0" }}>
+        {[
+          { key: "standard", label: "Churros Standar (Mentah)" },
+          { key: "tiktok", label: "Churros TikTok (Setengah Matang)" },
+        ].map((t) => {
+          const active = activeTab === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key as "standard" | "tiktok")}
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all tap-target"
+              style={
+                active
+                  ? { background: "#fff", color: "#E85D8C", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }
+                  : { color: "#64748B" }
+              }
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
 
       {/* Variant chips */}
       <div className="flex flex-wrap gap-2 mb-5">
@@ -150,12 +194,19 @@ export default function CrewPrePackingPage() {
 
               {totalAvailable > 0 && (
                 <div className="space-y-4">
-                  {[
-                    { label: "Loyang dipakai sekarang", val: loyangUsed, set: setLoyangUsed, max: totalAvailable },
-                    { label: "Jadi pack Regular berapa", val: regularPacks, set: setRegularPacks, max: undefined },
-                    { label: "Jadi pack Full berapa", val: fullPacks, set: setFullPacks, max: undefined },
-                    { label: "Sisa pcs churros tidak masuk pack (buffer baru)", val: leftoverPcs, set: setLeftoverPcs, max: undefined },
-                  ].map(({ label, val, set, max }) => (
+                  {(activeTab === "standard" 
+                    ? [
+                        { label: "Loyang dipakai sekarang", val: loyangUsed, set: setLoyangUsed, max: totalAvailable },
+                        { label: "Jadi pack Regular berapa", val: regularPacks, set: setRegularPacks, max: undefined },
+                        { label: "Jadi pack Full berapa", val: fullPacks, set: setFullPacks, max: undefined },
+                        { label: "Sisa pcs churros tidak masuk pack (buffer baru)", val: leftoverPcs, set: setLeftoverPcs, max: undefined },
+                      ]
+                    : [
+                        { label: "Loyang dipakai sekarang", val: loyangUsed, set: setLoyangUsed, max: totalAvailable },
+                        { label: "Jadi pack TikTok berapa", val: tiktokPacks, set: setTikTokPacks, max: undefined },
+                        { label: "Sisa pcs churros tidak masuk pack (buffer baru)", val: leftoverPcs, set: setLeftoverPcs, max: undefined },
+                      ]
+                  ).map(({ label, val, set, max }) => (
                     <div key={label}>
                       <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>{label}</label>
                       <div className="flex items-center rounded-full p-1 gap-1" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
@@ -192,3 +243,4 @@ export default function CrewPrePackingPage() {
     </div>
   );
 }
+

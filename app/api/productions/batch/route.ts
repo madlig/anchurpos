@@ -16,8 +16,9 @@ export async function POST(req: NextRequest) {
   const user = auth as AuthUser;
 
   const body = await req.json();
-  const { entries, notes, crewId } = body as {
+  const { entries, type, notes, crewId } = body as {
     entries: BatchEntry[];
+    type?: "standard" | "tiktok";
     notes?: string;
     crewId?: string;
   };
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
           batches: entry.batches,
           loyangCount: entry.loyangCount,
           loyangRemaining: entry.loyangCount,
+          type: type || "standard",
           notes: notes ?? "",
           shiftCrewId: effectiveCrewId,
           createdAt: FieldValue.serverTimestamp(),

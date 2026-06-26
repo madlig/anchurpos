@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const dateStr = searchParams.get("date");
+  const type = searchParams.get("type");
 
   try {
     let query = adminDb.collection("productions").orderBy("date", "desc") as FirebaseFirestore.Query;
@@ -31,11 +32,16 @@ export async function GET(req: NextRequest) {
         batches: data.batches,
         loyangCount: data.loyangCount,
         loyangRemaining: data.loyangRemaining,
+        type: data.type ?? "standard",
         notes: data.notes ?? "",
         shiftCrewId: data.shiftCrewId,
         createdAt: data.createdAt?.toDate?.().toISOString() ?? "",
       };
     });
+
+    if (type) {
+      return NextResponse.json(productions.filter((p) => p.type === type));
+    }
 
     return NextResponse.json(productions);
   } catch (err) {

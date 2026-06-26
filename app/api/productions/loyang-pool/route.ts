@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const variantId = searchParams.get("variantId");
+  const type = searchParams.get("type") || "standard";
 
   if (!variantId) {
     return NextResponse.json({ error: "variantId wajib diisi" }, { status: 400 });
@@ -22,21 +23,32 @@ export async function GET(req: NextRequest) {
       .orderBy("date", "asc")
       .get();
 
-    const pool = snap.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        productionId: doc.id,
-        date: data.date?.toDate?.().toISOString() ?? "",
-        loyangRemaining: data.loyangRemaining,
-      };
-    });
+    const pool = snap.docs
+      .map((doc) => {
+        const data = doc.data();
+        return {
+          productionId: doc.id,
+          date: data.date?.toDate?.().toISOString() ?? "",
+          loyangRemaining: data.loyangRemaining,
+          type: data.type ?? "standard",
+        };
+      })
+      .filter((p) => p.type === type);
 
     const totalAvailable = pool.reduce((sum, p) => sum + p.loyangRemaining, 0);
 
-    // Fetch buffer stock for this variant
-    const bufferRef = adminDb.collection("prePackingBuffer").doc(variantId);
+    // Fetch buffer stock for this variant and type
+    const bufferRef = adminDb.collection("prePackingBuffer").doc(`${variantId}_${type}`);
     const bufferSnap = await bufferRef.get();
-    const bufferPcs = bufferSnap.exists ? (bufferSnap.data()?.currentBufferPcs ?? 0) : 0;
+    let bufferPcs = 0;
+    if (bufferSnap.exists) {
+      bufferPcs = bufferSnap.data()?.currentBufferPcs ?? 0;
+    } else if (type === "standard") {
+      // Fallback to legacy document ID
+      const legacyRef = adminDb.collection("prePackingBuffer").doc(variantId);
+      const legacySnap = await legacyRef.get();
+      bufferPcs = legacySnap.exists ? (legacySnap.data()?.currentBufferPcs ?? 0) : 0;
+    }
 
     return NextResponse.json({ pool, totalAvailable, bufferPcs });
   } catch (err) {
