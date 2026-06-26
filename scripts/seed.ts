@@ -402,6 +402,72 @@ const INGREDIENTS = [
     opnameMethod: "direct",
     packagedConfig: null,
   },
+  {
+    id: "gula-halus-cinnamon",
+    name: "Gula Halus Cinnamon",
+    category: "add_on",
+    baseUnit: "gram",
+    currentStock: 1000,
+    minStock: 200,
+    unitAlternatives: [{ unit: "sachet", conversionToBase: 10 }],
+    opnameMethod: "direct",
+    packagedConfig: null,
+  },
+  {
+    id: "saus-coklat",
+    name: "Saus Glaze Coklat",
+    category: "add_on",
+    baseUnit: "pcs",
+    currentStock: 50,
+    minStock: 10,
+    unitAlternatives: [],
+    opnameMethod: "direct",
+    packagedConfig: null,
+  },
+  {
+    id: "saus-greentea",
+    name: "Saus Glaze Green Tea",
+    category: "add_on",
+    baseUnit: "pcs",
+    currentStock: 50,
+    minStock: 10,
+    unitAlternatives: [],
+    opnameMethod: "direct",
+    packagedConfig: null,
+  },
+  {
+    id: "saus-keju",
+    name: "Saus Glaze Keju",
+    category: "add_on",
+    baseUnit: "pcs",
+    currentStock: 50,
+    minStock: 10,
+    unitAlternatives: [],
+    opnameMethod: "direct",
+    packagedConfig: null,
+  },
+  {
+    id: "saus-vanilla",
+    name: "Saus Glaze Vanilla",
+    category: "add_on",
+    baseUnit: "pcs",
+    currentStock: 50,
+    minStock: 10,
+    unitAlternatives: [],
+    opnameMethod: "direct",
+    packagedConfig: null,
+  },
+  {
+    id: "saus-tiramisu",
+    name: "Saus Glaze Tiramisu",
+    category: "add_on",
+    baseUnit: "pcs",
+    currentStock: 50,
+    minStock: 10,
+    unitAlternatives: [],
+    opnameMethod: "direct",
+    packagedConfig: null,
+  },
 ];
 
 async function seedIngredients() {
@@ -530,6 +596,29 @@ async function seedSettings() {
 }
 
 // ============================================================
+// 9. PRODUCT STOCKS
+// ============================================================
+const PRODUCT_STOCKS = [
+  { id: "churros-frozen-regular_original", productId: "churros-frozen-regular", variantId: "original", currentStock: 76, minStock: 10 },
+  { id: "churros-frozen-regular_charcoal", productId: "churros-frozen-regular", variantId: "charcoal", currentStock: 17, minStock: 10 },
+  { id: "churros-frozen-regular_red-velvet", productId: "churros-frozen-regular", variantId: "red-velvet", currentStock: 5, minStock: 10 },
+  { id: "churros-frozen-regular_taro", productId: "churros-frozen-regular", variantId: "taro", currentStock: 14, minStock: 10 },
+  { id: "churros-frozen-regular_coklat", productId: "churros-frozen-regular", variantId: "coklat", currentStock: 42, minStock: 10 },
+  { id: "churros-frozen-regular_greentea", productId: "churros-frozen-regular", variantId: "greentea", currentStock: 45, minStock: 10 },
+  { id: "churros-frozen-full_original", productId: "churros-frozen-full", variantId: "original", currentStock: 0, minStock: 10 },
+  { id: "churros-frozen-tiktok_original", productId: "churros-frozen-tiktok", variantId: "original", currentStock: 0, minStock: 10 },
+];
+
+async function seedProductStocks() {
+  console.log("\n=== Seeding Product Stocks ===");
+  for (const ps of PRODUCT_STOCKS) {
+    const { id, ...data } = ps;
+    await db.doc(`productStocks/${id}`).set(data, { merge: true });
+    console.log(`  [productStock] ${ps.productId} / ${ps.variantId}`);
+  }
+}
+
+// ============================================================
 // MAIN
 // ============================================================
 async function main() {
@@ -539,6 +628,7 @@ async function main() {
   await seedUsers();
   await seedProducts();
   await seedVariants();
+  await seedProductStocks();
   await seedIngredients();
   await seedRecipes();
   await seedCustomers();

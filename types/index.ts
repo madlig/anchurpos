@@ -39,8 +39,14 @@ export interface Variant {
   name: string;
   isProductionVariant: boolean;
   sortOrder: number;
-  currentStock: number;    // stok produk jadi (pcs/pack)
-  minStock: number;        // stok minimum peringatan
+}
+
+export interface ProductStock {
+  id: string; // e.g. "churros-frozen-regular_original"
+  productId: string;
+  variantId: string;
+  currentStock: number;
+  minStock: number;
 }
 
 // --- 4. ingredients/{ingredientId} ---
