@@ -126,37 +126,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    if (action === "repack_cinnamon") {
-      const { batchCount, producedQty } = body as {
+    if (action === "blender_cinnamon") {
+      const { batchCount } = body as {
         batchCount: number;
-        producedQty: number;
       };
 
-      if (!batchCount || batchCount <= 0 || !producedQty || producedQty <= 0) {
-        return NextResponse.json({ error: "Parameter repack_cinnamon tidak valid" }, { status: 400 });
+      if (!batchCount || batchCount <= 0) {
+        return NextResponse.json({ error: "Jumlah batch blender tidak valid" }, { status: 400 });
       }
 
       // Formula: 1 batch = 1500g Gula Pasir + 55g Kayu Manis Bubuk
       const sugarQty = batchCount * 1500;
       const cinnamonQty = batchCount * 55;
+      const bulkSugarProduced = batchCount * 1555;
 
       const sugarRef = adminDb.collection("ingredients").doc("gula-pasir");
       const cinnamonRef = adminDb.collection("ingredients").doc("bubuk-kayu-manis");
-      const finalSugarRef = adminDb.collection("ingredients").doc("gula-halus-cinnamon");
+      const bulkSugarRef = adminDb.collection("ingredients").doc("gula-cinnamon-bulk");
 
       await adminDb.runTransaction(async (tx) => {
         // 1. READS
         const sugarSnap = await tx.get(sugarRef);
         const cinnamonSnap = await tx.get(cinnamonRef);
-        const finalSugarSnap = await tx.get(finalSugarRef);
+        const bulkSugarSnap = await tx.get(bulkSugarRef);
 
         if (!sugarSnap.exists) throw new Error("Gula Pasir tidak ditemukan");
         if (!cinnamonSnap.exists) throw new Error("Kayu Manis Bubuk tidak ditemukan");
-        if (!finalSugarSnap.exists) throw new Error("Gula Halus Cinnamon tidak ditemukan");
+        if (!bulkSugarSnap.exists) throw new Error("Gula Cinnamon Curah tidak ditemukan");
 
         const sugarStock = sugarSnap.data()?.currentStock ?? 0;
         const cinnamonStock = cinnamonSnap.data()?.currentStock ?? 0;
-        const finalSugarStock = finalSugarSnap.data()?.currentStock ?? 0;
+        const bulkSugarStock = bulkSugarSnap.data()?.currentStock ?? 0;
 
         if (sugarStock < sugarQty) {
           throw new Error(`Stok Gula Pasir tidak mencukupi (tersedia: ${sugarStock}g, dibutuhkan: ${sugarQty}g)`);
@@ -167,12 +167,12 @@ export async function POST(req: NextRequest) {
 
         const nextSugarStock = sugarStock - sugarQty;
         const nextCinnamonStock = cinnamonStock - cinnamonQty;
-        const nextFinalSugarStock = finalSugarStock + producedQty;
+        const nextBulkSugarStock = bulkSugarStock + bulkSugarProduced;
 
         // 2. WRITES
         tx.update(sugarRef, { currentStock: nextSugarStock });
         tx.update(cinnamonRef, { currentStock: nextCinnamonStock });
-        tx.update(finalSugarRef, { currentStock: nextFinalSugarStock });
+        tx.update(bulkSugarRef, { currentStock: nextBulkSugarStock });
 
         const mSugar = adminDb.collection("stockMovements").doc();
         tx.set(mSugar, {
@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
           newStockAfter: nextSugarStock,
           sourceType: "production",
           sourceId: null,
-          note: `Blender Gula Cinnamon (${batchCount} batch, ${producedQty} pcs clip hasil)`,
+          note: `Blender Gula Cinnamon (${batchCount} batch, menghasilkan ${bulkSugarProduced}g curah)`,
           createdBy: user.uid,
           createdAt: FieldValue.serverTimestamp(),
         });
@@ -193,7 +193,72 @@ export async function POST(req: NextRequest) {
           newStockAfter: nextCinnamonStock,
           sourceType: "production",
           sourceId: null,
-          note: `Blender Gula Cinnamon (${batchCount} batch, ${producedQty} pcs clip hasil)`,
+          note: `Blender Gula Cinnamon (${batchCount} batch, menghasilkan ${bulkSugarProduced}g curah)`,
+          createdBy: user.uid,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+
+        const mBulk = adminDb.collection("stockMovements").doc();
+        tx.set(mBulk, {
+          ingredientId: "gula-cinnamon-bulk",
+          changeAmount: bulkSugarProduced,
+          newStockAfter: nextBulkSugarStock,
+          sourceType: "production",
+          sourceId: null,
+          note: `Hasil blender ${sugarQty}g gula pasir & ${cinnamonQty}g kayu manis`,
+          createdBy: user.uid,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "repack_cinnamon_clip") {
+      const { producedQty } = body as {
+        producedQty: number;
+      };
+
+      if (!producedQty || producedQty <= 0) {
+        return NextResponse.json({ error: "Jumlah kemasan clip tidak valid" }, { status: 400 });
+      }
+
+      // Formula: 1 clip = 5g Gula Cinnamon Curah
+      const bulkQtyNeeded = producedQty * 5;
+
+      const bulkSugarRef = adminDb.collection("ingredients").doc("gula-cinnamon-bulk");
+      const finalSugarRef = adminDb.collection("ingredients").doc("gula-halus-cinnamon");
+
+      await adminDb.runTransaction(async (tx) => {
+        // 1. READS
+        const bulkSugarSnap = await tx.get(bulkSugarRef);
+        const finalSugarSnap = await tx.get(finalSugarRef);
+
+        if (!bulkSugarSnap.exists) throw new Error("Gula Cinnamon Curah tidak ditemukan");
+        if (!finalSugarSnap.exists) throw new Error("Gula Halus Cinnamon tidak ditemukan");
+
+        const bulkSugarStock = bulkSugarSnap.data()?.currentStock ?? 0;
+        const finalSugarStock = finalSugarSnap.data()?.currentStock ?? 0;
+
+        if (bulkSugarStock < bulkQtyNeeded) {
+          throw new Error(`Stok gula curah di toples tidak mencukupi (tersedia: ${bulkSugarStock}g, dibutuhkan: ${bulkQtyNeeded}g). Silakan lakukan blender terlebih dahulu.`);
+        }
+
+        const nextBulkSugarStock = bulkSugarStock - bulkQtyNeeded;
+        const nextFinalSugarStock = finalSugarStock + producedQty;
+
+        // 2. WRITES
+        tx.update(bulkSugarRef, { currentStock: nextBulkSugarStock });
+        tx.update(finalSugarRef, { currentStock: nextFinalSugarStock });
+
+        const mBulk = adminDb.collection("stockMovements").doc();
+        tx.set(mBulk, {
+          ingredientId: "gula-cinnamon-bulk",
+          changeAmount: -bulkQtyNeeded,
+          newStockAfter: nextBulkSugarStock,
+          sourceType: "production",
+          sourceId: null,
+          note: `Repack gula cinnamon curah ke clip (${producedQty} pcs)`,
           createdBy: user.uid,
           createdAt: FieldValue.serverTimestamp(),
         });
@@ -205,10 +270,41 @@ export async function POST(req: NextRequest) {
           newStockAfter: nextFinalSugarStock,
           sourceType: "production",
           sourceId: null,
-          note: `Hasil repack blend ${sugarQty}g gula & ${cinnamonQty}g kayu manis`,
+          note: `Kemas clip gula cinnamon dari curah (${bulkQtyNeeded}g)`,
           createdBy: user.uid,
           createdAt: FieldValue.serverTimestamp(),
         });
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "clear_cinnamon_bulk") {
+      const bulkSugarRef = adminDb.collection("ingredients").doc("gula-cinnamon-bulk");
+
+      await adminDb.runTransaction(async (tx) => {
+        // 1. READS
+        const bulkSugarSnap = await tx.get(bulkSugarRef);
+        if (!bulkSugarSnap.exists) throw new Error("Gula Cinnamon Curah tidak ditemukan");
+
+        const bulkSugarStock = bulkSugarSnap.data()?.currentStock ?? 0;
+
+        if (bulkSugarStock > 0) {
+          // 2. WRITES
+          tx.update(bulkSugarRef, { currentStock: 0 });
+
+          const mBulk = adminDb.collection("stockMovements").doc();
+          tx.set(mBulk, {
+            ingredientId: "gula-cinnamon-bulk",
+            changeAmount: -bulkSugarStock,
+            newStockAfter: 0,
+            sourceType: "production",
+            sourceId: null,
+            note: "Penyelarasan stok: toples dikosongkan secara manual oleh crew",
+            createdBy: user.uid,
+            createdAt: FieldValue.serverTimestamp(),
+          });
+        }
       });
 
       return NextResponse.json({ success: true });

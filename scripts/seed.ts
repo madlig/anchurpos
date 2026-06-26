@@ -414,6 +414,17 @@ const INGREDIENTS = [
     packagedConfig: null,
   },
   {
+    id: "gula-cinnamon-bulk",
+    name: "Gula Cinnamon Curah (Toples)",
+    category: "bahan_baku",
+    baseUnit: "gram",
+    currentStock: 0,
+    minStock: 0,
+    unitAlternatives: [],
+    opnameMethod: "direct",
+    packagedConfig: null,
+  },
+  {
     id: "glaze-coklat-bulk",
     name: "Glaze Coklat (Bulk)",
     category: "bahan_baku",

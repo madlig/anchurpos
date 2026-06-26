@@ -325,6 +325,12 @@ export default function CrewPackingPage() {
     };
   }, [cinnamonBatchCount]);
 
+  // Live cinnamon sugar clip usage calculation
+  const cinnamonClipEstUsage = useMemo(() => {
+    const qty = parseInt(cinnamonProducedQty) || 0;
+    return qty * 5;
+  }, [cinnamonProducedQty]);
+
   // Live Repack Regular to Full Calculation
   const repackRegToFullCalc = useMemo(() => {
     const regularToUnpack = parseInt(regularPacksToUnpack) || 0;
@@ -486,15 +492,14 @@ export default function CrewPackingPage() {
     }
   }
 
-  // 3. Repack Cinnamon Submission
-  async function handleRepackCinnamon() {
+  // 3a. Blender Cinnamon Submission
+  async function handleBlenderCinnamon() {
     setError("");
     setSuccess("");
     const batches = parseInt(cinnamonBatchCount) || 0;
-    const produced = parseInt(cinnamonProducedQty) || 0;
 
-    if (batches <= 0 || produced <= 0) {
-      setError("Jumlah batch blender dan plastik clip dihasilkan harus lebih dari 0");
+    if (batches <= 0) {
+      setError("Jumlah batch blender harus lebih dari 0");
       return;
     }
 
@@ -503,19 +508,84 @@ export default function CrewPackingPage() {
       const res = await fetchWithAuth("/api/packing", {
         method: "POST",
         body: JSON.stringify({
-          action: "repack_cinnamon",
+          action: "blender_cinnamon",
           batchCount: batches,
+        }),
+      });
+
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error || "Gagal memproses blender gula cinnamon");
+      } else {
+        setSuccess(`Berhasil memblender gula cinnamon: ${batches} batch (mengurangi ${batches * 1500}g gula pasir & ${batches * 55}g kayu manis bubuk, menambah ${batches * 1555}g curah)!`);
+        setCinnamonBatchCount("1");
+        await loadInitialData();
+      }
+    } catch (err) {
+      setError("Terjadi kesalahan jaringan");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // 3b. Repack Cinnamon Clip Submission
+  async function handleRepackCinnamonClip() {
+    setError("");
+    setSuccess("");
+    const produced = parseInt(cinnamonProducedQty) || 0;
+
+    if (produced <= 0) {
+      setError("Jumlah kemasan clip dihasilkan harus lebih dari 0");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetchWithAuth("/api/packing", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "repack_cinnamon_clip",
           producedQty: produced,
         }),
       });
 
       const d = await res.json();
       if (!res.ok) {
-        setError(d.error || "Gagal memproses repack cinnamon sugar");
+        setError(d.error || "Gagal mengemas clip gula cinnamon");
       } else {
-        setSuccess(`Berhasil memblender & repacking gula cinnamon: ${batches} batch (mengurangi ${batches * 1500}g gula pasir & ${batches * 55}g kayu manis bubuk) menghasilkan ${produced} pcs clip plastik!`);
-        setCinnamonBatchCount("1");
+        setSuccess(`Berhasil mengemas ${produced} pcs clip gula cinnamon (mengurangi ${produced * 5}g curah)!`);
         setCinnamonProducedQty("");
+        await loadInitialData();
+      }
+    } catch (err) {
+      setError("Terjadi kesalahan jaringan");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // 3c. Clear Cinnamon Bulk Stock
+  async function handleClearCinnamonBulk() {
+    if (!window.confirm("Apakah Anda yakin ingin mengosongkan seluruh sisa stok gula cinnamon curah di toples?")) {
+      return;
+    }
+
+    setError("");
+    setSuccess("");
+    setSubmitting(true);
+    try {
+      const res = await fetchWithAuth("/api/packing", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "clear_cinnamon_bulk",
+        }),
+      });
+
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error || "Gagal mengosongkan stok toples");
+      } else {
+        setSuccess("Stok gula cinnamon curah di toples berhasil dikosongkan.");
         await loadInitialData();
       }
     } catch (err) {
@@ -997,91 +1067,154 @@ export default function CrewPackingPage() {
         {/* --- Tab Content: 3. Repack Cinnamon --- */}
         {activeTab === "repack_cinnamon" && (
           <div className="bg-white rounded-3xl p-5 shadow-sm border border-pink-100 border-opacity-40 space-y-4">
-            <h2 className="text-sm font-extrabold text-slate-800 mb-2">Blender Gula Cinnamon</h2>
+            <h2 className="text-sm font-extrabold text-slate-800 mb-2">Blender & Kemas Gula Cinnamon</h2>
             <p className="text-xs text-slate-400">
-              Blender Gula Pasir dan Kayu Manis Bubuk, lalu kemas ke dalam clip plastik (pcs).
+              Blender Gula Pasir dan Kayu Manis Bubuk menjadi stok curah di toples, lalu kemas ke plastik clip secara terpisah sesuai kebutuhan.
             </p>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {/* Display Stock Info */}
               {(() => {
                 const sugarIng = ingredientsMap.get("gula-pasir");
                 const powderIng = ingredientsMap.get("bubuk-kayu-manis");
+                const bulkIng = ingredientsMap.get("gula-cinnamon-bulk");
                 const finalIng = ingredientsMap.get("gula-halus-cinnamon");
                 return (
-                  <div className="grid grid-cols-3 gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xxs text-slate-500">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-50 border border-slate-100 rounded-xl text-xxs text-slate-500">
                     <div>
-                      <p className="font-bold text-slate-400">Stok Gula Pasir:</p>
+                      <p className="font-bold text-slate-400">Gula Pasir:</p>
                       <p className="text-xs font-bold text-slate-700">{sugarIng?.currentStock ?? 0}g</p>
                     </div>
                     <div>
-                      <p className="font-bold text-slate-400">Stok Kayu Manis:</p>
+                      <p className="font-bold text-slate-400">Kayu Manis Bubuk:</p>
                       <p className="text-xs font-bold text-slate-700">{powderIng?.currentStock ?? 0}g</p>
                     </div>
                     <div>
-                      <p className="font-bold text-slate-400">Stok Gula Cinnamon:</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-bold text-slate-400">Toples (Curah):</p>
+                        {(bulkIng?.currentStock ?? 0) > 0 && (
+                          <button
+                            onClick={handleClearCinnamonBulk}
+                            disabled={submitting}
+                            className="text-[9px] text-red-500 hover:text-red-700 underline font-bold active:scale-95 transition-all"
+                            title="Kosongkan sisa stok gula curah di toples"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs font-bold text-slate-700">{bulkIng?.currentStock ?? 0}g</p>
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-400">Plastik Clip:</p>
                       <p className="text-xs font-bold text-slate-700">{finalIng?.currentStock ?? 0} pcs</p>
                     </div>
                   </div>
                 );
               })()}
 
-              {/* Batch count and produced clip plastics */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Jumlah Blender (Batch)</label>
-                  <Input
-                    type="number"
-                    placeholder="Contoh: 1"
-                    value={cinnamonBatchCount}
-                    onChange={(e) => setCinnamonBatchCount(e.target.value)}
-                    className="h-12 rounded-xl text-sm border-slate-200"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1 font-medium">
-                    1 batch = 1.500g Gula Pasir & 55g Kayu Manis Bubuk
-                  </p>
-                </div>
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Kemasan Plastik Clip Dihasilkan (pcs)</label>
-                  <Input
-                    type="number"
-                    placeholder="Masukkan hasil clip"
-                    value={cinnamonProducedQty}
-                    onChange={(e) => setCinnamonProducedQty(e.target.value)}
-                    className="h-12 rounded-xl text-sm border-slate-200"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1 font-medium">
-                    Kapasitas isi sekitar 5 gram per clip
-                  </p>
-                </div>
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Form A: Blender */}
+                <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50 bg-opacity-40 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-1.5">
+                      1. Proses Blender Gula
+                    </h3>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      Campurkan Gula Pasir & Kayu Manis Bubuk untuk mengisi toples gula halus cinnamon curah.
+                    </p>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+                        Jumlah Blender (Batch)
+                      </label>
+                      <Input
+                        type="number"
+                        placeholder="Contoh: 1"
+                        value={cinnamonBatchCount}
+                        onChange={(e) => setCinnamonBatchCount(e.target.value)}
+                        className="h-10 rounded-xl text-xs border-slate-200"
+                      />
+                      <p className="text-[9px] text-slate-400 mt-1 font-medium">
+                        1 batch = 1.500g Gula & 55g Kayu Manis = 1.555g Curah
+                      </p>
+                    </div>
 
-              {/* Show raw ingredients to be deducted */}
-              <div className="p-3.5 bg-pink-50 bg-opacity-40 rounded-xl border border-pink-100 text-xxs text-pink-700 font-semibold space-y-1">
-                <p className="uppercase tracking-widest text-[9px] text-pink-500 font-bold mb-1">Bahan Baku Yang Akan Terpotong</p>
-                <div className="flex justify-between">
-                  <span>Gula Pasir:</span>
-                  <span>{cinnamonSugarEstUsage.sugarGrams} gram</span>
+                    {/* Show raw ingredients to be deducted */}
+                    <div className="p-2.5 bg-pink-50 bg-opacity-30 rounded-xl border border-pink-100 text-xxs text-pink-700 space-y-0.5">
+                      <div className="flex justify-between font-medium">
+                        <span>Gula Pasir Terpotong:</span>
+                        <span>{cinnamonSugarEstUsage.sugarGrams} gram</span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>Kayu Manis Terpotong:</span>
+                        <span>{cinnamonSugarEstUsage.cinnamonGrams} gram</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleBlenderCinnamon}
+                    disabled={submitting || !cinnamonBatchCount || parseInt(cinnamonBatchCount) <= 0}
+                    className="w-full min-h-[40px] rounded-xl text-white font-bold text-xs flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-70 mt-3"
+                    style={{
+                      background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)",
+                      boxShadow: "0 4px 12px rgba(232,93,140,0.15)",
+                    }}
+                  >
+                    {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                    Simpan Hasil Blender
+                  </button>
                 </div>
-                <div className="flex justify-between">
-                  <span>Kayu Manis Bubuk:</span>
-                  <span>{cinnamonSugarEstUsage.cinnamonGrams} gram</span>
+
+                {/* Form B: Repack to Clip */}
+                <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50 bg-opacity-40 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-1.5">
+                      2. Kemas Gula ke Clip
+                    </h3>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      Kemas gula curah dari toples ke dalam plastik clip untuk persediaan pack frozen.
+                    </p>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+                        Hasil Plastik Clip (pcs)
+                      </label>
+                      <Input
+                        type="number"
+                        placeholder="Masukkan jumlah pcs"
+                        value={cinnamonProducedQty}
+                        onChange={(e) => setCinnamonProducedQty(e.target.value)}
+                        className="h-10 rounded-xl text-xs border-slate-200"
+                      />
+                      <p className="text-[9px] text-slate-400 mt-1 font-medium">
+                        1 clip = 5 gram Gula Cinnamon Curah
+                      </p>
+                    </div>
+
+                    {/* Show bulk sugar to be deducted */}
+                    <div className="p-2.5 bg-slate-100 rounded-xl border border-slate-200 text-xxs text-slate-600 space-y-0.5">
+                      <div className="flex justify-between font-medium">
+                        <span>Gula Curah Terpotong:</span>
+                        <span>{cinnamonClipEstUsage} gram</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleRepackCinnamonClip}
+                    disabled={submitting || !cinnamonProducedQty || parseInt(cinnamonProducedQty) <= 0}
+                    className="w-full min-h-[40px] rounded-xl text-white font-bold text-xs flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-70 mt-3"
+                    style={{
+                      background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)",
+                      boxShadow: "0 4px 12px rgba(232,93,140,0.15)",
+                    }}
+                  >
+                    {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                    Simpan Kemasan Clip
+                  </button>
                 </div>
               </div>
             </div>
-
-            <button
-              onClick={handleRepackCinnamon}
-              disabled={submitting || !cinnamonBatchCount || !cinnamonProducedQty}
-              className="w-full min-h-[56px] rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 active:scale-[0.98] transition-all disabled:opacity-70 tap-target"
-              style={{
-                background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)",
-                boxShadow: "0 8px 20px rgba(232,93,140,0.3)",
-              }}
-            >
-              {submitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
-              Simpan Repack Gula Cinnamon
-            </button>
           </div>
         )}
 
