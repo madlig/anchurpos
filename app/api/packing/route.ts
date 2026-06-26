@@ -4,6 +4,41 @@ import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
 
+export async function GET(req: NextRequest) {
+  const auth = await requireRole(req, ["owner", "manager", "crew"]);
+  if (auth instanceof NextResponse) return auth;
+
+  const { searchParams } = new URL(req.url);
+  const action = searchParams.get("action");
+  const variantId = searchParams.get("variantId");
+
+  if (action === "get_repack_data") {
+    if (!variantId) {
+      return NextResponse.json({ error: "variantId wajib diisi" }, { status: 400 });
+    }
+
+    try {
+      const regStockRef = adminDb.collection("productStocks").doc(`churros-frozen-regular_${variantId}`);
+      const bufferRef = adminDb.collection("prePackingBuffer").doc(`${variantId}_standard`);
+
+      const [regSnap, bufferSnap] = await Promise.all([
+        regStockRef.get(),
+        bufferRef.get(),
+      ]);
+
+      const regularStock = regSnap.exists ? (regSnap.data()?.currentStock ?? 0) : 0;
+      const bufferPcs = bufferSnap.exists ? (bufferSnap.data()?.currentBufferPcs ?? 0) : 0;
+
+      return NextResponse.json({ regularStock, bufferPcs });
+    } catch (err) {
+      console.error("GET /api/packing repack data error:", err);
+      return NextResponse.json({ error: "Gagal mengambil data repack" }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json({ error: "Action tidak dikenali" }, { status: 400 });
+}
+
 export async function POST(req: NextRequest) {
   const auth = await requireRole(req, ["owner", "manager", "crew"]);
   if (auth instanceof NextResponse) return auth;
@@ -18,18 +53,21 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "repack_glaze") {
-      const { flavorId, bulkQty, cupQty } = body as {
+      const { flavorId, targetType, cupQty } = body as {
         flavorId: string;
-        bulkQty: number;
+        targetType: "cup" | "tiktok";
         cupQty: number;
       };
 
-      if (!flavorId || !bulkQty || bulkQty <= 0 || !cupQty || cupQty <= 0) {
+      if (!flavorId || !targetType || !cupQty || cupQty <= 0) {
         return NextResponse.json({ error: "Parameter repack_glaze tidak valid" }, { status: 400 });
       }
 
       const bulkId = `glaze-${flavorId}-bulk`;
-      const cupId = `saus-${flavorId}`;
+      // Target is standard cup or TikTok vacuum plastic
+      const cupId = targetType === "cup" ? `saus-${flavorId}` : `saus-${flavorId}-tiktok`;
+      const conversionGrams = targetType === "cup" ? 13 : 15;
+      const totalBulkQty = cupQty * conversionGrams;
 
       const bulkRef = adminDb.collection("ingredients").doc(bulkId);
       const cupRef = adminDb.collection("ingredients").doc(cupId);
@@ -43,17 +81,17 @@ export async function POST(req: NextRequest) {
           throw new Error(`Bahan bulk "${bulkId}" tidak ditemukan`);
         }
         if (!cupSnap.exists) {
-          throw new Error(`Bahan cup "${cupId}" tidak ditemukan`);
+          throw new Error(`Bahan target "${cupId}" tidak ditemukan`);
         }
 
         const bulkStock = bulkSnap.data()?.currentStock ?? 0;
         const cupStock = cupSnap.data()?.currentStock ?? 0;
 
-        if (bulkStock < bulkQty) {
-          throw new Error(`Stok curah ${bulkSnap.data()?.name} tidak mencukupi (tersedia: ${bulkStock}g)`);
+        if (bulkStock < totalBulkQty) {
+          throw new Error(`Stok curah ${bulkSnap.data()?.name} tidak mencukupi (tersedia: ${bulkStock}g, dibutuhkan: ${totalBulkQty}g)`);
         }
 
-        const nextBulkStock = bulkStock - bulkQty;
+        const nextBulkStock = bulkStock - totalBulkQty;
         const nextCupStock = cupStock + cupQty;
 
         // 2. WRITES
@@ -63,11 +101,11 @@ export async function POST(req: NextRequest) {
         const movementBulkRef = adminDb.collection("stockMovements").doc();
         tx.set(movementBulkRef, {
           ingredientId: bulkId,
-          changeAmount: -bulkQty,
+          changeAmount: -totalBulkQty,
           newStockAfter: nextBulkStock,
           sourceType: "production",
           sourceId: null,
-          note: `Repack glaze ${flavorId} curah menjadi ${cupQty} cup`,
+          note: `Repack glaze ${flavorId} curah menjadi ${cupQty} ${targetType === "cup" ? "cup" : "plastik tiktok"}`,
           createdBy: user.uid,
           createdAt: FieldValue.serverTimestamp(),
         });
@@ -79,7 +117,7 @@ export async function POST(req: NextRequest) {
           newStockAfter: nextCupStock,
           sourceType: "production",
           sourceId: null,
-          note: `Hasil repack dari ${bulkQty}g glaze curah`,
+          note: `Hasil repack dari ${totalBulkQty}g glaze curah (${conversionGrams}g per pc)`,
           createdBy: user.uid,
           createdAt: FieldValue.serverTimestamp(),
         });
@@ -89,15 +127,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "repack_cinnamon") {
-      const { sugarQty, cinnamonQty, producedQty } = body as {
-        sugarQty: number;
-        cinnamonQty: number;
+      const { batchCount, producedQty } = body as {
+        batchCount: number;
         producedQty: number;
       };
 
-      if (!sugarQty || sugarQty <= 0 || !cinnamonQty || cinnamonQty <= 0 || !producedQty || producedQty <= 0) {
+      if (!batchCount || batchCount <= 0 || !producedQty || producedQty <= 0) {
         return NextResponse.json({ error: "Parameter repack_cinnamon tidak valid" }, { status: 400 });
       }
+
+      // Formula: 1 batch = 1500g Gula Pasir + 55g Kayu Manis Bubuk
+      const sugarQty = batchCount * 1500;
+      const cinnamonQty = batchCount * 55;
 
       const sugarRef = adminDb.collection("ingredients").doc("gula-pasir");
       const cinnamonRef = adminDb.collection("ingredients").doc("bubuk-kayu-manis");
@@ -118,10 +159,10 @@ export async function POST(req: NextRequest) {
         const finalSugarStock = finalSugarSnap.data()?.currentStock ?? 0;
 
         if (sugarStock < sugarQty) {
-          throw new Error(`Stok Gula Pasir tidak mencukupi (tersedia: ${sugarStock}g)`);
+          throw new Error(`Stok Gula Pasir tidak mencukupi (tersedia: ${sugarStock}g, dibutuhkan: ${sugarQty}g)`);
         }
         if (cinnamonStock < cinnamonQty) {
-          throw new Error(`Stok Kayu Manis Bubuk tidak mencukupi (tersedia: ${cinnamonStock}g)`);
+          throw new Error(`Stok Kayu Manis Bubuk tidak mencukupi (tersedia: ${cinnamonStock}g, dibutuhkan: ${cinnamonQty}g)`);
         }
 
         const nextSugarStock = sugarStock - sugarQty;
@@ -140,7 +181,7 @@ export async function POST(req: NextRequest) {
           newStockAfter: nextSugarStock,
           sourceType: "production",
           sourceId: null,
-          note: `Blender Gula Cinnamon (${producedQty}g hasil)`,
+          note: `Blender Gula Cinnamon (${batchCount} batch, ${producedQty} pcs clip hasil)`,
           createdBy: user.uid,
           createdAt: FieldValue.serverTimestamp(),
         });
@@ -152,7 +193,7 @@ export async function POST(req: NextRequest) {
           newStockAfter: nextCinnamonStock,
           sourceType: "production",
           sourceId: null,
-          note: `Blender Gula Cinnamon (${producedQty}g hasil)`,
+          note: `Blender Gula Cinnamon (${batchCount} batch, ${producedQty} pcs clip hasil)`,
           createdBy: user.uid,
           createdAt: FieldValue.serverTimestamp(),
         });
@@ -171,6 +212,120 @@ export async function POST(req: NextRequest) {
       });
 
       return NextResponse.json({ success: true });
+    }
+
+    if (action === "repack_reg_to_full") {
+      const { variantId, regularPacksToUnpack } = body as {
+        variantId: string;
+        regularPacksToUnpack: number;
+      };
+
+      if (!variantId || !regularPacksToUnpack || regularPacksToUnpack <= 0) {
+        return NextResponse.json({ error: "Parameter repack_reg_to_full tidak valid" }, { status: 400 });
+      }
+
+      const regStockId = `churros-frozen-regular_${variantId}`;
+      const fullStockId = `churros-frozen-full_${variantId}`;
+      
+      const regStockRef = adminDb.collection("productStocks").doc(regStockId);
+      const fullStockRef = adminDb.collection("productStocks").doc(fullStockId);
+      const bufferRef = adminDb.collection("prePackingBuffer").doc(`${variantId}_standard`);
+      
+      const plastikFullRef = adminDb.collection("ingredients").doc("plastik-full");
+      const stikerRef = adminDb.collection("ingredients").doc("stiker-label");
+
+      let producedFullPacks = 0;
+      let newBufferPcs = 0;
+
+      await adminDb.runTransaction(async (tx) => {
+        // 1. READS
+        const regSnap = await tx.get(regStockRef);
+        const fullSnap = await tx.get(fullStockRef);
+        const bufferSnap = await tx.get(bufferRef);
+        const plastikFullSnap = await tx.get(plastikFullRef);
+        const stikerSnap = await tx.get(stikerRef);
+
+        if (!regSnap.exists) {
+          throw new Error("Stok produk Regular tidak ditemukan di database");
+        }
+        
+        const regStock = regSnap.data()?.currentStock ?? 0;
+        const fullStock = fullSnap.exists ? (fullSnap.data()?.currentStock ?? 0) : 0;
+        const currentBufferPcs = bufferSnap.exists ? (bufferSnap.data()?.currentBufferPcs ?? 0) : 0;
+
+        if (regStock < regularPacksToUnpack) {
+          throw new Error(`Stok Regular ${variantId} tidak mencukupi (tersedia: ${regStock} pack, diminta bongkar: ${regularPacksToUnpack} pack)`);
+        }
+
+        // Calculations
+        const totalPcs = (regularPacksToUnpack * 12) + currentBufferPcs;
+        producedFullPacks = Math.floor(totalPcs / 16);
+        newBufferPcs = totalPcs % 16;
+
+        // Check packaging stock
+        const plastikFullStock = plastikFullSnap.exists ? (plastikFullSnap.data()?.currentStock ?? 0) : 0;
+        const stikerStock = stikerSnap.exists ? (stikerSnap.data()?.currentStock ?? 0) : 0;
+
+        if (plastikFullStock < producedFullPacks) {
+          throw new Error(`Stok kemasan plastik full kurang (tersedia: ${plastikFullStock} pcs, dibutuhkan: ${producedFullPacks} pcs)`);
+        }
+        if (stikerStock < producedFullPacks) {
+          throw new Error(`Stok stiker label kurang (tersedia: ${stikerStock} lembar, dibutuhkan: ${producedFullPacks} lembar)`);
+        }
+
+        const nextRegStock = regStock - regularPacksToUnpack;
+        const nextFullStock = fullStock + producedFullPacks;
+
+        // 2. WRITES
+        tx.update(regStockRef, { currentStock: nextRegStock });
+        tx.set(fullStockRef, {
+          productId: "churros-frozen-full",
+          variantId,
+          currentStock: nextFullStock,
+        }, { merge: true });
+
+        tx.set(bufferRef, {
+          variantId,
+          currentBufferPcs: newBufferPcs,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+
+        // Deduct packaging
+        const nextPlastikStock = plastikFullStock - producedFullPacks;
+        const nextStikerStock = stikerStock - producedFullPacks;
+
+        tx.update(plastikFullRef, { currentStock: nextPlastikStock });
+        tx.update(stikerRef, { currentStock: nextStikerStock });
+
+        // Stock movements for packaging
+        if (producedFullPacks > 0) {
+          const mPlastik = adminDb.collection("stockMovements").doc();
+          tx.set(mPlastik, {
+            ingredientId: "plastik-full",
+            changeAmount: -producedFullPacks,
+            newStockAfter: nextPlastikStock,
+            sourceType: "production",
+            sourceId: null,
+            note: `Repack regular ke full variant ${variantId} (${regularPacksToUnpack} regular dibongkar)`,
+            createdBy: user.uid,
+            createdAt: FieldValue.serverTimestamp(),
+          });
+
+          const mStiker = adminDb.collection("stockMovements").doc();
+          tx.set(mStiker, {
+            ingredientId: "stiker-label",
+            changeAmount: -producedFullPacks,
+            newStockAfter: nextStikerStock,
+            sourceType: "production",
+            sourceId: null,
+            note: `Repack regular ke full variant ${variantId} (${regularPacksToUnpack} regular dibongkar)`,
+            createdBy: user.uid,
+            createdAt: FieldValue.serverTimestamp(),
+          });
+        }
+      });
+
+      return NextResponse.json({ success: true, producedFullPacks, leftoverBufferPcs: newBufferPcs });
     }
 
     if (action === "pack_order") {
@@ -313,16 +468,16 @@ export async function POST(req: NextRequest) {
               newStockAfter: nextStock,
               sourceType: "production",
               sourceId: orderId,
-              note: `Packing glaze cup untuk order ${orderNumber}`,
+              note: `Packing glaze cup/plastic untuk order ${orderNumber}`,
               createdBy: user.uid,
               createdAt: FieldValue.serverTimestamp(),
             });
           }
         }
 
-        // Deduct cinnamon sugar (10g per pack)
+        // Deduct cinnamon sugar (1 pc per pack)
         if (totalFrozenPacks > 0 && cinnamonSnap && cinnamonSnap.exists) {
-          const qtyNeeded = totalFrozenPacks * 10;
+          const qtyNeeded = totalFrozenPacks;
           const currStock = cinnamonSnap.data()?.currentStock ?? 0;
           const nextStock = currStock - qtyNeeded;
           tx.update(cinnamonRef, { currentStock: nextStock });
@@ -338,33 +493,6 @@ export async function POST(req: NextRequest) {
             createdBy: user.uid,
             createdAt: FieldValue.serverTimestamp(),
           });
-        }
-
-        // Deduct packaging
-        if (totalRegularPacks > 0 && plastikRegSnap && plastikRegSnap.exists) {
-          const currStock = plastikRegSnap.data()?.currentStock ?? 0;
-          const nextStock = currStock - totalRegularPacks;
-          tx.update(plastikRegRef, { currentStock: nextStock });
-
-          const movementRef = adminDb.collection("stockMovements").doc();
-          tx.set(movementRef, {
-            ingredientId: "plastik-regular",
-            changeAmount: -totalRegularPacks,
-            newStockAfter: nextStock,
-            sourceType: "production",
-            sourceId: orderId,
-            note: `Kemasan Regular order ${orderNumber}`,
-            createdBy: user.uid,
-            createdAt: FieldValue.serverTimestamp(),
-          });
-        }
-
-        // TikTok also uses regular plastic or vacuum plastic, since no vacuum plastic exists, we deduct plastik-regular for TikTok too
-        if (totalTikTokPacks > 0 && plastikRegSnap && plastikRegSnap.exists) {
-          const currStock = plastikRegSnap.data()?.currentStock ?? 0;
-          // Note: read from the latest updated value if already updated in regular packs, but inside transaction Firestore handles it sequentially if we do writes. Wait, since we are doing update in same transaction, we should calculate correct final stock.
-          // Wait! If both regular and tiktok use plastik-regular, we should do a single update to plastik-regular!
-          // Yes! Let's combine them into a single deduction.
         }
 
         // Combine plastik-regular updates
@@ -485,3 +613,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Gagal memproses packing" }, { status: 500 });
   }
 }
+
