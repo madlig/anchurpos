@@ -185,6 +185,8 @@ export interface PrePacking {
   totalLoyangUsed: number;
   resultRegularPacks: number;
   resultFullPacks: number;
+  usedBufferPcs?: number;
+  leftoverPcs?: number;
   crewId: string;
   createdAt: string;
 }

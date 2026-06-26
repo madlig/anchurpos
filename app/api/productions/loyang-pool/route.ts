@@ -33,7 +33,12 @@ export async function GET(req: NextRequest) {
 
     const totalAvailable = pool.reduce((sum, p) => sum + p.loyangRemaining, 0);
 
-    return NextResponse.json({ pool, totalAvailable });
+    // Fetch buffer stock for this variant
+    const bufferRef = adminDb.collection("prePackingBuffer").doc(variantId);
+    const bufferSnap = await bufferRef.get();
+    const bufferPcs = bufferSnap.exists ? (bufferSnap.data()?.currentBufferPcs ?? 0) : 0;
+
+    return NextResponse.json({ pool, totalAvailable, bufferPcs });
   } catch (err) {
     console.error("GET /api/productions/loyang-pool error:", err);
     return NextResponse.json({ error: "Gagal mengambil data loyang pool" }, { status: 500 });

@@ -14,10 +14,12 @@ export default function CrewPrePackingPage() {
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [pool, setPool] = useState<PoolItem[]>([]);
   const [totalAvailable, setTotalAvailable] = useState(0);
+  const [bufferPcs, setBufferPcs] = useState(0);
   const [showDetail, setShowDetail] = useState(false);
   const [loyangUsed, setLoyangUsed] = useState("");
   const [regularPacks, setRegularPacks] = useState("");
   const [fullPacks, setFullPacks] = useState("");
+  const [leftoverPcs, setLeftoverPcs] = useState("");
   const [loading, setLoading] = useState(true);
   const [poolLoading, setPoolLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -39,12 +41,17 @@ export default function CrewPrePackingPage() {
     setPoolLoading(true);
     try {
       const res = await fetchWithAuth(`/api/productions/loyang-pool?variantId=${variantId}`);
-      if (res.ok) { const d = await res.json(); setPool(d.pool); setTotalAvailable(d.totalAvailable); }
+      if (res.ok) {
+        const d = await res.json();
+        setPool(d.pool);
+        setTotalAvailable(d.totalAvailable);
+        setBufferPcs(d.bufferPcs ?? 0);
+      }
     } finally { setPoolLoading(false); }
   }, [fetchWithAuth]);
 
   function selectVariant(id: string) {
-    setSelectedVariant(id); setLoyangUsed(""); setRegularPacks(""); setFullPacks("");
+    setSelectedVariant(id); setLoyangUsed(""); setRegularPacks(""); setFullPacks(""); setLeftoverPcs("");
     setSuccess(""); setError(""); setShowDetail(false); loadPool(id);
   }
 
@@ -67,12 +74,13 @@ export default function CrewPrePackingPage() {
           variantId: selectedVariant, 
           totalLoyangUsed: loyang, 
           resultRegularPacks: parseInt(regularPacks) || 0, 
-          resultFullPacks: parseInt(fullPacks) || 0
+          resultFullPacks: parseInt(fullPacks) || 0,
+          leftoverPcs: parseInt(leftoverPcs) || 0
         }),
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || "Gagal menyimpan"); return; }
-      setSuccess("Tersimpan!"); setLoyangUsed(""); setRegularPacks(""); setFullPacks("");
+      setSuccess("Tersimpan!"); setLoyangUsed(""); setRegularPacks(""); setFullPacks(""); setLeftoverPcs("");
       if (selectedVariant) loadPool(selectedVariant);
     } catch { setError("Gagal menyimpan pre-packing"); } finally { setSubmitting(false); }
   }
@@ -114,6 +122,12 @@ export default function CrewPrePackingPage() {
                   <div>
                     <p className="text-3xl font-extrabold tabular-nums" style={{ color: "#1C1C1E" }}>{totalAvailable}</p>
                     <p className="text-sm" style={{ color: "#64748B" }}>loyang siap di-pack</p>
+                    {bufferPcs > 0 && (
+                      <div className="mt-2 text-xs font-semibold px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5" style={{ background: "#FEF1F5", color: "#E85D8C" }}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse"></span>
+                        Stok buffer: {bufferPcs} pcs (akan otomatis dipakai)
+                      </div>
+                    )}
                   </div>
                   {pool.length > 0 && (
                     <button onClick={() => setShowDetail(!showDetail)} className="flex items-center gap-1 text-xs font-semibold tap-target" style={{ color: "#E85D8C" }}>
@@ -140,6 +154,7 @@ export default function CrewPrePackingPage() {
                     { label: "Loyang dipakai sekarang", val: loyangUsed, set: setLoyangUsed, max: totalAvailable },
                     { label: "Jadi pack Regular berapa", val: regularPacks, set: setRegularPacks, max: undefined },
                     { label: "Jadi pack Full berapa", val: fullPacks, set: setFullPacks, max: undefined },
+                    { label: "Sisa pcs churros tidak masuk pack (buffer baru)", val: leftoverPcs, set: setLeftoverPcs, max: undefined },
                   ].map(({ label, val, set, max }) => (
                     <div key={label}>
                       <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>{label}</label>

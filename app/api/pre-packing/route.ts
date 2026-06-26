@@ -10,11 +10,12 @@ export async function POST(req: NextRequest) {
   const user = auth as AuthUser;
 
   const body = await req.json();
-  const { variantId, totalLoyangUsed, resultRegularPacks, resultFullPacks, crewId } = body as {
+  const { variantId, totalLoyangUsed, resultRegularPacks, resultFullPacks, leftoverPcs, crewId } = body as {
     variantId: string;
     totalLoyangUsed: number;
     resultRegularPacks: number;
     resultFullPacks: number;
+    leftoverPcs?: number;
     crewId?: string;
   };
 
@@ -95,6 +96,11 @@ export async function POST(req: NextRequest) {
         snapFull = await tx.get(stockFullRef);
       }
 
+      // Fetch buffer stock document
+      const bufferRef = adminDb.collection("prePackingBuffer").doc(variantId);
+      const bufferSnap = await tx.get(bufferRef);
+      const usedBufferPcs = bufferSnap.exists ? (bufferSnap.data()?.currentBufferPcs ?? 0) : 0;
+
       // --- 2. WRITE OPERATIONS SECOND ---
 
       // Deduct Loyang
@@ -102,6 +108,13 @@ export async function POST(req: NextRequest) {
         const currentRemaining = item.snap.data()?.loyangRemaining ?? 0;
         tx.update(item.ref, { loyangRemaining: currentRemaining - item.loyangUsed });
       }
+
+      // Update pre-packing buffer stock to the new leftover pcs
+      tx.set(bufferRef, {
+        variantId,
+        currentBufferPcs: leftoverPcs ?? 0,
+        updatedAt: timestamp,
+      }, { merge: true });
 
       // Add Pre-Packing record
       tx.set(prePackRef, {
@@ -111,6 +124,8 @@ export async function POST(req: NextRequest) {
         totalLoyangUsed,
         resultRegularPacks: resultRegularPacks ?? 0,
         resultFullPacks: resultFullPacks ?? 0,
+        usedBufferPcs,
+        leftoverPcs: leftoverPcs ?? 0,
         crewId: effectiveCrewId,
         createdAt: timestamp,
       });
