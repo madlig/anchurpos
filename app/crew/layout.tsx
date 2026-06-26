@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { label: "Absen", href: "/crew/attendance", icon: UserCheck },
   { label: "Produksi", href: "/crew/production", icon: ChefHat },
+  { label: "Pre-Packing", href: "/crew/pre-packing", icon: PackageOpen },
   { label: "Packing", href: "/crew/packing", icon: PackageOpen },
 ];
 
