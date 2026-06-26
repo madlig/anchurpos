@@ -5,7 +5,7 @@ import { requireRole, verifyAuth } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
 
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(req, ["owner", "manager"]);
+  const auth = await requireRole(req, ["owner", "manager", "crew"]);
   if (auth instanceof NextResponse) return auth;
 
   const { searchParams } = new URL(req.url);
