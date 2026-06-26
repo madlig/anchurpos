@@ -27,6 +27,13 @@ export default function CrewAttendancePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [wifiSsidInput, setWifiSsidInput] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setWifiSsidInput(localStorage.getItem("crew_wifi_ssid") || "");
+    }
+  }, []);
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
@@ -56,7 +63,10 @@ export default function CrewAttendancePage() {
   async function handleAction(type: "check-in" | "check-out") {
     setError(""); setSubmitting(true);
     try {
-      const res = await fetchWithAuth(`/api/attendance/${type}`, { method: "POST", body: JSON.stringify({}) });
+      const res = await fetchWithAuth(`/api/attendance/${type}`, { 
+        method: "POST", 
+        body: JSON.stringify({ wifiSsid: wifiSsidInput }) 
+      });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Gagal absen. Pastikan terhubung ke WiFi rumah produksi."); return; }
       await loadStatus();
@@ -68,8 +78,6 @@ export default function CrewAttendancePage() {
   // Hitung sudah berapa jam sejak check-in
   const checkInTime = today?.checkIn?.time ? new Date(today.checkIn.time).getTime() : null;
   const hoursWorked = checkInTime ? (Date.now() - checkInTime) / (1000 * 60 * 60) : 0;
-  const canCheckOut = hoursWorked >= 8;
-  const remainingMinutes = checkInTime ? Math.max(0, Math.ceil((8 * 60) - (hoursWorked * 60))) : 0;
 
   // Status config for the gradient card
   const statusCard = (() => {
@@ -83,17 +91,25 @@ export default function CrewAttendancePage() {
     return { label: "Sudah Pulang", sub: today!.totalHours ? `Total ${today!.totalHours.toFixed(1)} jam` : "Terima kasih!", gradient: "linear-gradient(135deg,#22C55E,#16A34A)" };
   })();
 
-  // Button config — tombol PULANG hanya aktif setelah 8 jam
+  // Button config — tombol PULANG selalu aktif
   const btnConfig = (() => {
     if (!hasCheckedIn) return { label: "MASUK", action: () => handleAction("check-in"), bg: "linear-gradient(135deg,#E85D8C,#C94A73)", shadow: "0 10px 40px rgba(232,93,140,0.4)", testId: "attendance-check-in-btn", disabled: false, subLabel: "" };
     if (!hasCheckedOut) return {
       label: "PULANG",
-      action: () => handleAction("check-out"),
-      bg: canCheckOut ? "linear-gradient(135deg,#EF4444,#DC2626)" : "linear-gradient(135deg,#94A3B8,#64748B)",
-      shadow: canCheckOut ? "0 10px 40px rgba(220,38,38,0.35)" : "none",
+      action: () => {
+        if (hoursWorked < 8) {
+          if (window.confirm("Anda baru shift kurang dari 8 jam. Ingin diakhiri?")) {
+            handleAction("check-out");
+          }
+        } else {
+          handleAction("check-out");
+        }
+      },
+      bg: "linear-gradient(135deg,#EF4444,#DC2626)",
+      shadow: "0 10px 40px rgba(220,38,38,0.35)",
       testId: "attendance-check-out-btn",
-      disabled: !canCheckOut,
-      subLabel: canCheckOut ? "" : `Bisa pulang dalam ${remainingMinutes} menit lagi`,
+      disabled: false,
+      subLabel: hoursWorked < 8 ? `Shift berjalan: ${hoursWorked.toFixed(1)} jam (Kurang dari 8 jam)` : `Shift berjalan: ${hoursWorked.toFixed(1)} jam`,
     };
     return null;
   })();
@@ -134,6 +150,58 @@ export default function CrewAttendancePage() {
           </p>
           <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)" }}>{statusCard.sub}</p>
         </div>
+
+        {/* Wifi SSID Input for validation (shown only if check-out not complete) */}
+        {!isDone && (
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "16px",
+              padding: "16px",
+              marginBottom: "24px",
+              border: "1px solid rgba(0,0,0,0.05)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.02)"
+            }}
+          >
+            <label
+              style={{
+                fontSize: "11px",
+                fontWeight: "700",
+                color: "#64748B",
+                textTransform: "uppercase",
+                display: "block",
+                marginBottom: "8px",
+                letterSpacing: "0.5px"
+              }}
+            >
+              SSID Wi-Fi Terhubung
+            </label>
+            <input
+              type="text"
+              placeholder="Masukkan nama Wi-Fi..."
+              value={wifiSsidInput}
+              onChange={(e) => {
+                setWifiSsidInput(e.target.value);
+                localStorage.setItem("crew_wifi_ssid", e.target.value);
+              }}
+              style={{
+                width: "100%",
+                height: "42px",
+                borderRadius: "10px",
+                border: "1px solid #E2E8F0",
+                padding: "0 14px",
+                fontSize: "13px",
+                fontWeight: "600",
+                color: "#334155",
+                outline: "none",
+                background: "#F8FAFC"
+              }}
+            />
+            <p style={{ fontSize: "10px", color: "#94A3B8", marginTop: "6px", lineHeight: "1.4" }}>
+              *Koneksikan ke Wi-Fi rumah produksi dan masukkan nama SSID-nya untuk verifikasi absensi.
+            </p>
+          </div>
+        )}
 
         {/* Circular Clock-in/out Button */}
         {btnConfig && (

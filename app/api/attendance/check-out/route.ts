@@ -22,6 +22,11 @@ export async function POST(req: NextRequest) {
   try {
     const configSnap = await adminDb.doc("settings/attendanceConfig").get();
     const config = configSnap.data();
+    const body = await req.json().catch(() => ({}));
+    const clientSsid = body?.wifiSsid ?? "";
+    const allowedSsid = config?.whitelistedSsid ?? "";
+    const ssidValid = !allowedSsid || (clientSsid.trim() === allowedSsid.trim());
+
     const whitelist: string[] = config?.whitelistedIps ?? [];
     const ipValid = whitelist.includes(ip);
 
@@ -59,8 +64,15 @@ export async function POST(req: NextRequest) {
     const overtimeBlocks = Math.floor(overtimeHours);
     const overtimeBonus = overtimeBlocks * 10000;
 
-    const status = ipValid ? "lengkap" : "direview";
-    const flaggedReason = ipValid ? null : "Check-out dari IP tidak dikenal";
+    // Build list of anomalies
+    const anomalies: string[] = [];
+    if (!ipValid) anomalies.push("IP tidak dikenal");
+    if (!ssidValid) anomalies.push("SSID Wi-Fi tidak sesuai");
+    if (totalHours < 8) anomalies.push("Check-out awal (<8 jam)");
+
+    // Every check-out goes to status: "direview" as requested: "semua absen akan direview oleh oleh manager atau owner"
+    const status = "direview";
+    const flaggedReason = anomalies.length > 0 ? anomalies.join(" & ") : "Selesai shift, menunggu review";
 
     await adminDb.doc(`attendance/${attendanceId}`).update({
       checkOut: {
@@ -77,13 +89,14 @@ export async function POST(req: NextRequest) {
       flaggedReason,
     });
 
-    if (!ipValid) {
+    // Alert created if there are flagged anomalies
+    if (anomalies.length > 0) {
       const alertRef = adminDb.collection("alerts").doc();
       await alertRef.set({
         type: "attendance_review",
         severity: "warning",
         title: `Absen ${data.employeeName} perlu review`,
-        message: `Check-out dari IP tidak dikenal (${ip})`,
+        message: flaggedReason,
         sourceCollection: "attendance",
         sourceId: attendanceId,
         isRead: false,

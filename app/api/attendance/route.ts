@@ -9,29 +9,35 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const month = searchParams.get("month");
   const employeeId = searchParams.get("employeeId");
+  const flagged = searchParams.get("flagged") === "true";
 
-  if (!month) {
-    return NextResponse.json({ error: "month wajib diisi (format: 2026-06)" }, { status: 400 });
+  if (!month && !flagged) {
+    return NextResponse.json({ error: "month atau flagged wajib diisi" }, { status: 400 });
   }
 
   try {
-    const [year, mon] = month.split("-").map(Number);
-    const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
-    const endMonth = mon === 12 ? 1 : mon + 1;
-    const endYear = mon === 12 ? year + 1 : year;
-    const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
+    const query = adminDb.collection("attendance");
+    let snap;
 
-    let query = adminDb
-      .collection("attendance")
-      .where("date", ">=", startDate)
-      .where("date", "<", endDate)
-      .orderBy("date", "desc");
+    if (flagged) {
+      // Query all records requiring review (status == "direview")
+      snap = await query.where("status", "==", "direview").get();
+    } else {
+      const [year, mon] = month!.split("-").map(Number);
+      const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
+      const endMonth = mon === 12 ? 1 : mon + 1;
+      const endYear = mon === 12 ? year + 1 : year;
+      const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
 
-    if (employeeId) {
-      query = query.where("employeeId", "==", employeeId);
+      let q = query
+        .where("date", ">=", startDate)
+        .where("date", "<", endDate);
+
+      if (employeeId) {
+        q = q.where("employeeId", "==", employeeId);
+      }
+      snap = await q.get();
     }
-
-    const snap = await query.get();
 
     const records = snap.docs.map((doc) => {
       const d = doc.data();
@@ -49,11 +55,15 @@ export async function GET(req: NextRequest) {
         overtimeBonus: d.overtimeBonus,
         status: d.status,
         flaggedReason: d.flaggedReason,
+        issue: d.flaggedReason ?? "Perlu review", // Map flaggedReason to issue for owner approval page
         reviewedBy: d.reviewedBy,
         reviewedAt: d.reviewedAt?.toDate?.().toISOString() ?? d.reviewedAt,
         createdAt: d.createdAt?.toDate?.().toISOString() ?? d.createdAt,
       };
     });
+
+    // Sort by date desc safely in-memory (avoids missing composite index errors in Firestore)
+    records.sort((a, b) => b.date.localeCompare(a.date));
 
     return NextResponse.json(records);
   } catch (err) {

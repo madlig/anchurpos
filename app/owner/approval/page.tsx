@@ -6,7 +6,18 @@ import { Loader2, Scale, Clock, Wallet, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 interface StockOpname { id: string; submittedByName: string; hasDiscrepancy: boolean; reviewAction: string | null; createdAt: string; }
-interface AttendanceFlag { id: string; employeeName: string; date: string; issue: string; }
+interface AttendanceFlag {
+  id: string;
+  employeeName: string;
+  date: string;
+  issue: string;
+  checkIn: { time: string; ipAddress: string; ipValid: boolean };
+  checkOut: { time: string; ipAddress: string; ipValid: boolean } | null;
+  totalHours: number | null;
+  overtimeHours: number | null;
+  overtimeBonus: number | null;
+  status: string;
+}
 interface PayrollPending { id: string; month: string; employeeName: string; totalPaid: number; status: string; }
 
 const TABS = [
@@ -21,6 +32,14 @@ function fmt(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 }
 
+function formatTimeOnly(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "-";
+  }
+}
+
 export default function OwnerApprovalPage() {
   const { getToken } = useAuth();
   const [tab, setTab] = useState<TabKey>("opname");
@@ -28,6 +47,13 @@ export default function OwnerApprovalPage() {
   const [attendanceFlags, setAttendanceFlags] = useState<AttendanceFlag[]>([]);
   const [payrolls, setPayrolls] = useState<PayrollPending[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Attendance Review States
+  const [expandedAttId, setExpandedAttId] = useState<string | null>(null);
+  const [editTotalHours, setEditTotalHours] = useState("");
+  const [editOvertimeHours, setEditOvertimeHours] = useState("");
+  const [editOvertimeBonus, setEditOvertimeBonus] = useState("");
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   const fetchWithAuth = useCallback(async (url: string) => {
     const token = await getToken();
@@ -46,6 +72,79 @@ export default function OwnerApprovalPage() {
       setPayrolls(Array.isArray(p) ? p : []);
     }).finally(() => setLoading(false));
   }, [fetchWithAuth]);
+
+  const handleExpandAtt = (a: AttendanceFlag) => {
+    if (expandedAttId === a.id) {
+      setExpandedAttId(null);
+    } else {
+      setExpandedAttId(a.id);
+      setEditTotalHours(String(a.totalHours ?? 8));
+      setEditOvertimeHours(String(a.overtimeHours ?? 0));
+      setEditOvertimeBonus(String(a.overtimeBonus ?? 0));
+    }
+  };
+
+  async function handleReviewAttendance(id: string, actionType: "approve" | "adjust" | "reject") {
+    setReviewingId(id);
+    try {
+      const token = await getToken();
+      let body: any = {};
+      
+      if (actionType === "approve") {
+        body = { status: "lengkap" };
+      } else if (actionType === "adjust") {
+        const tot = Number(editTotalHours) || 0;
+        const ovt = Number(editOvertimeHours) || 0;
+        const bonus = Number(editOvertimeBonus) || 0;
+        const reg = Math.min(tot, 8);
+        const blocks = Math.floor(ovt);
+        
+        body = {
+          status: "lengkap",
+          totalHours: tot,
+          regularHours: reg,
+          overtimeHours: ovt,
+          overtimeBlocks: blocks,
+          overtimeBonus: bonus,
+          flaggedReason: "Disetujui dengan penyesuaian oleh Manager/Owner"
+        };
+      } else if (actionType === "reject") {
+        body = {
+          status: "lengkap",
+          totalHours: 0,
+          regularHours: 0,
+          overtimeHours: 0,
+          overtimeBlocks: 0,
+          overtimeBonus: 0,
+          flaggedReason: "Ditolak oleh Manager/Owner"
+        };
+      }
+      
+      const res = await fetch(`/api/attendance/${id}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      });
+      
+      if (res.ok) {
+        setExpandedAttId(null);
+        // refresh data
+        const aRes = await fetchWithAuth("/api/attendance?flagged=true");
+        const aData = await aRes.json();
+        setAttendanceFlags(Array.isArray(aData) ? aData : []);
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Gagal menyimpan review");
+      }
+    } catch (err) {
+      alert("Kesalahan jaringan");
+    } finally {
+      setReviewingId(null);
+    }
+  }
 
   function formatDate(d: string) {
     return new Date(d).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
@@ -99,12 +198,125 @@ export default function OwnerApprovalPage() {
 
           {tab === "attendance" && (
             <div className="space-y-2">
-              {attendanceFlags.length === 0 ? <EmptyState label="Tidak ada absensi perlu review" /> : attendanceFlags.map((a) => (
-                <div key={a.id} className="rounded-2xl p-4" style={{ background: "#fff", border: "1px solid #F1F5F9" }}>
-                  <p className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>{a.employeeName}</p>
-                  <p className="text-xs mt-0.5" style={{ color: "#64748B" }}>{formatDate(a.date)} · {a.issue}</p>
-                </div>
-              ))}
+              {attendanceFlags.length === 0 ? (
+                <EmptyState label="Tidak ada absensi perlu review" />
+              ) : (
+                attendanceFlags.map((a) => {
+                  const expanded = expandedAttId === a.id;
+                  return (
+                    <div
+                      key={a.id}
+                      className="rounded-2xl p-4 transition-all"
+                      style={{ background: "#fff", border: "1px solid #F1F5F9" }}
+                    >
+                      <div
+                        className="flex items-center justify-between cursor-pointer"
+                        onClick={() => handleExpandAtt(a)}
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>{a.employeeName}</p>
+                          <p className="text-xs mt-0.5" style={{ color: "#64748B" }}>
+                            {formatDate(a.date)} · <span className="font-semibold text-amber-600">{a.issue}</span>
+                          </p>
+                        </div>
+                        <ChevronRight
+                          size={16}
+                          style={{
+                            color: "#CBD5E1",
+                            transform: expanded ? "rotate(90deg)" : "none",
+                            transition: "transform 0.2s"
+                          }}
+                        />
+                      </div>
+
+                      {expanded && (
+                        <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 text-xs">
+                          {/* Log check-in and check-out */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl">
+                            <div>
+                              <p className="text-slate-400 font-medium">Absen Masuk:</p>
+                              <p className="font-semibold text-slate-700">
+                                {formatTimeOnly(a.checkIn.time)} ({a.checkIn.ipAddress})
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-slate-400 font-medium">Absen Pulang:</p>
+                              <p className="font-semibold text-slate-700">
+                                {a.checkOut ? `${formatTimeOnly(a.checkOut.time)} (${a.checkOut.ipAddress})` : "-"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Adjustment fields */}
+                          <div className="space-y-3">
+                            <p className="font-bold text-slate-800 uppercase tracking-wider text-[10px]">
+                              Koreksi Absensi & Lembur
+                            </p>
+                            
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-400 block mb-1">Total Jam</label>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={editTotalHours}
+                                  onChange={(e) => setEditTotalHours(e.target.value)}
+                                  className="w-full h-9 rounded-lg border border-slate-200 px-2 font-semibold text-slate-700 focus:outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-400 block mb-1">Lembur (Jam)</label>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={editOvertimeHours}
+                                  onChange={(e) => setEditOvertimeHours(e.target.value)}
+                                  className="w-full h-9 rounded-lg border border-slate-200 px-2 font-semibold text-slate-700 focus:outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-400 block mb-1">Bonus Lembur (Rp)</label>
+                                <input
+                                  type="number"
+                                  step="1000"
+                                  value={editOvertimeBonus}
+                                  onChange={(e) => setEditOvertimeBonus(e.target.value)}
+                                  className="w-full h-9 rounded-lg border border-slate-200 px-2 font-semibold text-slate-700 focus:outline-none"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Action buttons */}
+                          <div className="flex flex-wrap gap-2 pt-2">
+                            <button
+                              disabled={reviewingId === a.id}
+                              onClick={() => handleReviewAttendance(a.id, "approve")}
+                              className="flex-1 min-h-[36px] px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs disabled:opacity-50 transition-all active:scale-95"
+                            >
+                              Setujui Sesuai Data
+                            </button>
+                            <button
+                              disabled={reviewingId === a.id}
+                              onClick={() => handleReviewAttendance(a.id, "adjust")}
+                              className="flex-1 min-h-[36px] px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold text-xs disabled:opacity-50 transition-all active:scale-95"
+                            >
+                              Simpan Koreksi & Setujui
+                            </button>
+                            <button
+                              disabled={reviewingId === a.id}
+                              onClick={() => handleReviewAttendance(a.id, "reject")}
+                              className="flex-shrink-0 min-h-[36px] px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs disabled:opacity-50 transition-all active:scale-95"
+                            >
+                              Tolak Absen
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           )}
 

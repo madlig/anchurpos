@@ -22,16 +22,31 @@ export async function POST(req: NextRequest) {
   try {
     const configSnap = await adminDb.doc("settings/attendanceConfig").get();
     const config = configSnap.data();
+    const body = await req.json().catch(() => ({}));
+    const clientSsid = body?.wifiSsid ?? "";
+    const allowedSsid = config?.whitelistedSsid ?? "";
+    const ssidValid = !allowedSsid || (clientSsid.trim() === allowedSsid.trim());
+
     const whitelist: string[] = config?.whitelistedIps ?? [];
     const ipValid = whitelist.includes(ip);
 
-    if (!ipValid) {
+    if (!ipValid || !ssidValid) {
       await adminDb.doc("settings/attendanceConfig").set(
         { lastDetectedIp: ip, lastDetectedAt: FieldValue.serverTimestamp() },
         { merge: true }
       );
+
+      let errorMsg = "Lokasi absen tidak valid.";
+      if (!ipValid && !ssidValid) {
+        errorMsg = "IP dan Wi-Fi SSID tidak dikenali, hubungi Manager";
+      } else if (!ipValid) {
+        errorMsg = "IP tidak dikenali, hubungi Manager";
+      } else {
+        errorMsg = `SSID Wi-Fi "${clientSsid}" tidak sesuai, hubungi Manager`;
+      }
+
       return NextResponse.json(
-        { error: "IP tidak dikenali, hubungi Manager" },
+        { error: errorMsg },
         { status: 403 }
       );
     }

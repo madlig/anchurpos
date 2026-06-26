@@ -16,6 +16,7 @@ import {
 
 interface AttendanceConfig {
   whitelistedIps: string[];
+  whitelistedSsid: string | null;
   lastDetectedIp: string | null;
   lastDetectedAt: string | null;
 }
@@ -26,6 +27,7 @@ export default function ManagerSettingsPage() {
   const [dailyLoyangTarget, setDailyLoyangTarget] = useState<number>(8);
   const [loading, setLoading] = useState(true);
   const [newIp, setNewIp] = useState("");
+  const [newSsid, setNewSsid] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
@@ -51,7 +53,11 @@ export default function ManagerSettingsPage() {
         fetchWithAuth("/api/settings/attendance"),
         fetchWithAuth("/api/settings/production"),
       ]);
-      if (res.ok) setConfig(await res.json());
+      if (res.ok) {
+        const c = await res.json();
+        setConfig(c);
+        setNewSsid(c.whitelistedSsid || "");
+      }
       if (targetRes.ok) {
         const t = await targetRes.json();
         setDailyLoyangTarget(t.dailyLoyangTarget ?? 8);
@@ -135,6 +141,29 @@ export default function ManagerSettingsPage() {
     }
   }
 
+  async function updateSsid() {
+    setSubmitting(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetchWithAuth("/api/settings/attendance", {
+        method: "POST",
+        body: JSON.stringify({ whitelistedSsid: newSsid }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Gagal menyimpan SSID");
+        return;
+      }
+      setSuccess("SSID Wi-Fi berhasil disimpan");
+      await loadConfig();
+    } catch {
+      setError("Gagal menyimpan SSID");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -203,6 +232,34 @@ export default function ManagerSettingsPage() {
             size="sm"
           >
             Simpan Target
+          </Button>
+        </div>
+      </Card>
+
+      <Card className="p-4 mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Wifi size={16} className="text-emerald-600" />
+          <h2 className="text-sm font-semibold text-stone-900">
+            Wi-Fi SSID Whitelist
+          </h2>
+        </div>
+        <p className="text-xs text-stone-400 mb-3">
+          Tentukan nama Wi-Fi (SSID) Rumah Produksi untuk membatasi lokasi absensi kru.
+        </p>
+        <div className="flex gap-2">
+          <Input
+            type="text"
+            placeholder="SSID Wi-Fi (misal: WiFi_Produksi)..."
+            value={newSsid}
+            onChange={(e) => setNewSsid(e.target.value)}
+            className="flex-1 text-sm"
+          />
+          <Button
+            onClick={updateSsid}
+            disabled={submitting}
+            size="sm"
+          >
+            Simpan SSID
           </Button>
         </div>
       </Card>
