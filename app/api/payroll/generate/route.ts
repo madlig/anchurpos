@@ -7,17 +7,31 @@ export async function POST(req: NextRequest) {
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { month } = (await req.json()) as { month: string };
+  const { month, startDate: reqStartDate, endDate: reqEndDate } = (await req.json()) as {
+    month: string;
+    startDate?: string;
+    endDate?: string;
+  };
+
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {
     return NextResponse.json({ error: "month wajib format YYYY-MM" }, { status: 400 });
   }
 
   try {
     const [year, mon] = month.split("-").map(Number);
-    const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
-    const endMonth = mon === 12 ? 1 : mon + 1;
-    const endYear = mon === 12 ? year + 1 : year;
-    const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
+
+    // Determine the date bounds for the query (inclusive)
+    let finalStartDate: string;
+    let finalEndDate: string;
+
+    if (reqStartDate && reqEndDate) {
+      finalStartDate = reqStartDate;
+      finalEndDate = reqEndDate;
+    } else {
+      finalStartDate = `${year}-${String(mon).padStart(2, "0")}-01`;
+      const daysInMonth = new Date(year, mon, 0).getDate();
+      finalEndDate = `${year}-${String(mon).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
+    }
 
     const usersSnap = await adminDb
       .collection("users")
@@ -28,6 +42,19 @@ export async function POST(req: NextRequest) {
     const generated: string[] = [];
     const skippedLocked: string[] = [];
     const warnings: string[] = [];
+
+    // Helper to format Indonesian dates
+    function formatIndoDate(dateStr: string) {
+      const parts = dateStr.split("-");
+      if (parts.length !== 3) return dateStr;
+      const [yy, mm, dd] = parts;
+      const monthNames = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+      ];
+      const mName = monthNames[parseInt(mm) - 1] || mm;
+      return `${parseInt(dd)} ${mName} ${yy}`;
+    }
 
     for (const userDoc of usersSnap.docs) {
       const userData = userDoc.data();
@@ -43,16 +70,16 @@ export async function POST(req: NextRequest) {
       const lengkapSnap = await adminDb
         .collection("attendance")
         .where("employeeId", "==", employeeId)
-        .where("date", ">=", startDate)
-        .where("date", "<", endDate)
+        .where("date", ">=", finalStartDate)
+        .where("date", "<=", finalEndDate)
         .where("status", "==", "lengkap")
         .get();
 
       const direviewSnap = await adminDb
         .collection("attendance")
         .where("employeeId", "==", employeeId)
-        .where("date", ">=", startDate)
-        .where("date", "<", endDate)
+        .where("date", ">=", finalStartDate)
+        .where("date", "<=", finalEndDate)
         .where("status", "==", "direview")
         .get();
 
@@ -69,14 +96,19 @@ export async function POST(req: NextRequest) {
         ? (existingSnap.data()?.performanceBonus ?? 0)
         : 0;
 
-      // Format default work period as e.g. "Juni 2026"
-      const [y, m] = month.split("-");
-      const monthNames = [
-        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-      ];
-      const monthName = monthNames[parseInt(m) - 1] || m;
-      const defaultWorkPeriod = `${monthName} ${y}`;
+      // Format default work period
+      let defaultWorkPeriod: string;
+      if (reqStartDate && reqEndDate) {
+        defaultWorkPeriod = `${formatIndoDate(finalStartDate)} - ${formatIndoDate(finalEndDate)}`;
+      } else {
+        const [y, m] = month.split("-");
+        const monthNames = [
+          "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+          "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+        ];
+        const monthName = monthNames[parseInt(m) - 1] || m;
+        defaultWorkPeriod = `${monthName} ${y}`;
+      }
 
       const existingWorkPeriod = existingSnap.exists
         ? (existingSnap.data()?.workPeriod ?? defaultWorkPeriod)

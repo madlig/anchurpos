@@ -250,6 +250,8 @@ export default function ManagerEmployeesPage() {
   const [payrollMonth, setPayrollMonth] = useState(() => {
     const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
+  const [generateStartDate, setGenerateStartDate] = useState("");
+  const [generateEndDate, setGenerateEndDate] = useState("");
   const [loadingPayroll, setLoadingPayroll] = useState(false);
   const [generatingPayroll, setGeneratingPayroll] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
@@ -261,6 +263,26 @@ export default function ManagerEmployeesPage() {
   const [editPerformanceBonusNote, setEditPerformanceBonusNote] = useState("");
   const [savingBonusId, setSavingBonusId] = useState<string | null>(null);
   const [payrollWarnings, setPayrollWarnings] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!payrollMonth) return;
+    const [yStr, mStr] = payrollMonth.split("-");
+    const year = parseInt(yStr);
+    const month = parseInt(mStr);
+
+    let prevMonth = month - 1;
+    let prevYear = year;
+    if (prevMonth === 0) {
+      prevMonth = 12;
+      prevYear = year - 1;
+    }
+
+    const startStr = `${prevYear}-${String(prevMonth).padStart(2, "0")}-29`;
+    const endStr = `${year}-${String(month).padStart(2, "0")}-28`;
+
+    setGenerateStartDate(startStr);
+    setGenerateEndDate(endStr);
+  }, [payrollMonth]);
 
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
@@ -367,7 +389,11 @@ export default function ManagerEmployeesPage() {
     try {
       const res = await fetchWithAuth("/api/payroll/generate", {
         method: "POST",
-        body: JSON.stringify({ month: payrollMonth })
+        body: JSON.stringify({
+          month: payrollMonth,
+          startDate: generateStartDate || undefined,
+          endDate: generateEndDate || undefined
+        })
       });
       const d = await res.json();
       if (!res.ok) {
@@ -1027,7 +1053,7 @@ export default function ManagerEmployeesPage() {
         {tab === "payroll" && (
           <>
             {/* Month picker & Generate button */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
                 <button onClick={() => { const d = new Date(payrollMonth + "-01"); d.setMonth(d.getMonth() - 1); setPayrollMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
                   className="tap-target"
@@ -1061,6 +1087,50 @@ export default function ManagerEmployeesPage() {
                 {generatingPayroll ? <Loader2 size={13} className="animate-spin" /> : <Banknote size={13} />}
                 Hitung Ulang & Generate Gaji
               </button>
+            </div>
+
+            {/* Custom Date Range picker */}
+            <div style={{ background: "#fff", borderRadius: "16px", padding: "16px", border: "1px solid #F1F5F9" }} className="flex flex-col sm:flex-row gap-3 mb-4">
+              <div className="flex-1">
+                <label style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", display: "block", marginBottom: "4px" }}>TANGGAL MULAI PERIODE</label>
+                <input
+                  type="date"
+                  value={generateStartDate}
+                  onChange={(e) => setGenerateStartDate(e.target.value)}
+                  style={{
+                    width: "100%",
+                    height: "36px",
+                    borderRadius: "10px",
+                    border: "1px solid #E2E8F0",
+                    padding: "0 12px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    outline: "none",
+                    background: "#F8FAFC",
+                    color: "#334155"
+                  }}
+                />
+              </div>
+              <div className="flex-1">
+                <label style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", display: "block", marginBottom: "4px" }}>TANGGAL SELESAI PERIODE</label>
+                <input
+                  type="date"
+                  value={generateEndDate}
+                  onChange={(e) => setGenerateEndDate(e.target.value)}
+                  style={{
+                    width: "100%",
+                    height: "36px",
+                    borderRadius: "10px",
+                    border: "1px solid #E2E8F0",
+                    padding: "0 12px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    outline: "none",
+                    background: "#F8FAFC",
+                    color: "#334155"
+                  }}
+                />
+              </div>
             </div>
 
             {/* Warnings from generation */}
