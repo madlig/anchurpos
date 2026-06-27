@@ -29,9 +29,8 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const startDate = sevenDaysAgo.toISOString().split("T")[0];
+    const { searchParams } = new URL(req.url);
+    const monthParam = searchParams.get("month") || today.substring(0, 7);
 
     // Ambil history hanya berdasarkan employeeId (satu field) lalu filter date di JS
     // — menghindari kebutuhan composite index di Firestore
@@ -52,9 +51,8 @@ export async function GET(req: NextRequest) {
           status: d.status,
         };
       })
-      .filter((h) => h.date <= today)
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .slice(0, 7);
+      .filter((h) => h.date.startsWith(monthParam))
+      .sort((a, b) => b.date.localeCompare(a.date));
 
     return NextResponse.json({ today: todayStatus, history });
   } catch (err) {

@@ -27,7 +27,9 @@ export default function CrewAttendancePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-
+  const [attendanceMonth, setAttendanceMonth] = useState(() => {
+    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
@@ -36,10 +38,10 @@ export default function CrewAttendancePage() {
 
   const loadStatus = useCallback(async () => {
     try {
-      const res = await fetchWithAuth("/api/attendance/my-status");
+      const res = await fetchWithAuth(`/api/attendance/my-status?month=${attendanceMonth}`);
       if (res.ok) { const d = await res.json(); setToday(d.today); setHistory(d.history); }
     } catch (err) { console.error(err); } finally { setLoading(false); }
-  }, [fetchWithAuth]);
+  }, [fetchWithAuth, attendanceMonth]);
 
   useEffect(() => { loadStatus(); }, [loadStatus]);
 
@@ -47,7 +49,7 @@ export default function CrewAttendancePage() {
     return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
   }
   function formatDate(dateStr: string) {
-    return new Date(dateStr + "T00:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
+    return new Date(dateStr + "T00:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   }
 
   const hasCheckedIn = !!today;
@@ -227,10 +229,42 @@ export default function CrewAttendancePage() {
           </div>
         )}
 
-        {/* Riwayat 7 Hari */}
-        {history.length > 0 && (
-          <div>
-            <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "10px" }}>Riwayat 7 Hari</p>
+        {/* Riwayat Absensi Bulanan */}
+        <div>
+          <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "10px" }}>Riwayat Absensi Bulanan</p>
+          
+          {/* Month picker */}
+          <div className="flex items-center gap-2 mb-3">
+            <button 
+              onClick={() => { 
+                const d = new Date(attendanceMonth + "-01"); 
+                d.setMonth(d.getMonth() - 1); 
+                setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); 
+              }}
+              style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}
+            >
+              ‹
+            </button>
+            <p style={{ flex: 1, textAlign: "center", fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>
+              {new Date(attendanceMonth + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
+            </p>
+            <button 
+              onClick={() => { 
+                const d = new Date(attendanceMonth + "-01"); 
+                d.setMonth(d.getMonth() + 1); 
+                setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); 
+              }}
+              style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}
+            >
+              ›
+            </button>
+          </div>
+
+          {history.length === 0 ? (
+            <div style={{ background: "#fff", borderRadius: "14px", padding: "24px 16px", textAlign: "center", border: "1px solid #F1F5F9" }}>
+              <p style={{ fontSize: "13px", fontWeight: "600", color: "#94A3B8" }}>Tidak ada riwayat absensi di bulan ini</p>
+            </div>
+          ) : (
             <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden", border: "1px solid #F1F5F9" }}>
               {history.map((h, i) => (
                 <div
@@ -257,14 +291,14 @@ export default function CrewAttendancePage() {
                       }}
                       data-testid={`history-status-${i}`}
                     >
-                      {h.status === "lengkap" ? "Lengkap" : h.status === "direview" ? "Review" : "Belum"}
+                      {h.status === "lengkap" ? "Lengkap" : h.status === "direview" ? "Review" : h.status === "belum_lengkap" ? "Aktif" : h.status}
                     </span>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
