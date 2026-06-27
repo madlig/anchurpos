@@ -52,9 +52,9 @@ interface AttendanceRecord {
 
 const ROLE_LABEL: Record<string, string> = { owner: "Owner", manager: "Manager", crew: "Crew" };
 const ROLE_COLOR: Record<string, { bg: string; color: string }> = {
-  owner:   { bg: "#FEF3C7", color: "#D97706" },
+  owner: { bg: "#FEF3C7", color: "#D97706" },
   manager: { bg: "#EFF6FF", color: "#2563EB" },
-  crew:    { bg: "#F0FDF4", color: "#16A34A" },
+  crew: { bg: "#F0FDF4", color: "#16A34A" },
 };
 
 function fmtTime(iso: string) {
@@ -131,9 +131,11 @@ function EmployeeForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
         <div className="flex gap-2">
           {(["crew", "manager"] as Role[]).map(r => (
             <button key={r} onClick={() => setForm(p => ({ ...p, role: r }))}
-              style={{ flex: 1, padding: "9px", borderRadius: "10px", fontSize: "12px", fontWeight: "600", border: "none", cursor: "pointer",
+              style={{
+                flex: 1, padding: "9px", borderRadius: "10px", fontSize: "12px", fontWeight: "600", border: "none", cursor: "pointer",
                 color: form.role === r ? "#fff" : "#64748B",
-                background: form.role === r ? (r === "manager" ? "#2563EB" : "#16A34A") : "#F1F5F9" }}
+                background: form.role === r ? (r === "manager" ? "#2563EB" : "#16A34A") : "#F1F5F9"
+              }}
               data-testid={`role-${r}`}>
               {ROLE_LABEL[r]}
             </button>
@@ -310,7 +312,7 @@ export default function ManagerEmployeesPage() {
     try {
       const token = await getToken();
       let body: any = {};
-      
+
       if (actionType === "approve") {
         body = { status: "lengkap" };
       } else if (actionType === "adjust") {
@@ -319,7 +321,7 @@ export default function ManagerEmployeesPage() {
         const bonus = Number(editOvertimeBonus) || 0;
         const reg = Math.min(tot, 8);
         const blocks = Math.floor(ovt);
-        
+
         body = {
           status: "lengkap",
           totalHours: tot,
@@ -340,7 +342,7 @@ export default function ManagerEmployeesPage() {
           flaggedReason: "Ditolak oleh Manager/Owner"
         };
       }
-      
+
       const res = await fetch(`/api/attendance/${id}`, {
         method: "PATCH",
         headers: {
@@ -349,7 +351,7 @@ export default function ManagerEmployeesPage() {
         },
         body: JSON.stringify(body)
       });
-      
+
       if (res.ok) {
         setExpandedAttId(null);
         showSuccess("Review absensi berhasil disimpan!");
@@ -464,7 +466,7 @@ export default function ManagerEmployeesPage() {
       }
       return;
     }
-    
+
     if (!confirmedDespitePartial && !window.confirm(`Proses pembayaran gaji untuk ${p.employeeName}? Data gaji akan dikunci.`)) {
       return;
     }
@@ -504,7 +506,7 @@ export default function ManagerEmployeesPage() {
 
     const bonusSection = p.performanceBonus > 0
       ? `<div class="row"><span>Bonus / Insentif:</span><strong>${performanceBonusFormatted}</strong></div>` +
-        (p.performanceBonusNote ? `<div class="note">* ${p.performanceBonusNote}</div>` : "")
+      (p.performanceBonusNote ? `<div class="note">* ${p.performanceBonusNote}</div>` : "")
       : "";
 
     printWindow.document.write(`
@@ -525,10 +527,11 @@ export default function ManagerEmployeesPage() {
             .note { font-size: 10px; font-style: italic; color: #333; margin-top: -3px; margin-bottom: 6px; padding-left: 8px; }
             .footer { text-align: center; margin-top: 15px; font-size: 11px; }
             .btn-print { display: block; width: 100%; text-align: center; margin-top: 15px; padding: 8px; background: #E85D8C; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; font-size: 12px; }
+            .btn-close { display: block; width: 100%; text-align: center; margin-top: 8px; padding: 8px; background: #64748B; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; font-size: 12px; }
             @media print {
               body { margin: 0; padding: 0; background-color: #fff; display: block; }
               .slip-container { max-width: 100%; border: none; padding: 0; box-shadow: none; }
-              .btn-print { display: none; }
+              .btn-print, .btn-close { display: none; }
             }
           </style>
         </head>
@@ -576,10 +579,11 @@ export default function ManagerEmployeesPage() {
             </div>
             
             <div class="footer">
-              <p>Terima kasih atas kerja kerasnya!</p>
+              <p>Makasih banyak untuk kontribusinya di Anchur.us! Kamu hebat!</p>
             </div>
             
             <button class="btn-print" onclick="window.print()">Cetak Slip Gaji</button>
+            <button class="btn-close" onclick="window.close()">Kembali ke Aplikasi</button>
           </div>
         </body>
       </html>
@@ -633,9 +637,11 @@ export default function ManagerEmployeesPage() {
               <button key={t} onClick={() => { setTab(t); setShowAddForm(false); setEditEmp(null); }}
                 data-testid={`tab-${t}`}
                 className="flex-1 flex items-center justify-center gap-1.5"
-                style={{ paddingTop: "8px", paddingBottom: "10px", border: "none", background: "transparent", cursor: "pointer",
+                style={{
+                  paddingTop: "8px", paddingBottom: "10px", border: "none", background: "transparent", cursor: "pointer",
                   borderBottom: active ? "2px solid #E85D8C" : "2px solid transparent",
-                  fontSize: "12px", fontWeight: active ? "600" : "500", color: active ? "#E85D8C" : "#94A3B8" }}>
+                  fontSize: "12px", fontWeight: active ? "600" : "500", color: active ? "#E85D8C" : "#94A3B8"
+                }}>
                 <Icon size={13} /> {t === "karyawan" ? "Data Karyawan" : t === "absensi" ? "Absensi" : "Gaji & Payroll"}
               </button>
             );
@@ -828,7 +834,7 @@ export default function ManagerEmployeesPage() {
 
               {/* Sub-tabs */}
               <div className="flex gap-2 mb-3 bg-slate-100 p-1 rounded-xl">
-                <button 
+                <button
                   onClick={() => setAttendanceSubTab("review")}
                   style={{
                     flex: 1,
@@ -845,7 +851,7 @@ export default function ManagerEmployeesPage() {
                 >
                   Perlu Review ({reviewCount})
                 </button>
-                <button 
+                <button
                   onClick={() => setAttendanceSubTab("riwayat")}
                   style={{
                     flex: 1,
@@ -874,11 +880,11 @@ export default function ManagerEmployeesPage() {
                     {reviewItems.map(a => {
                       const expanded = expandedAttId === a.id;
                       return (
-                        <div 
-                          key={a.id} 
+                        <div
+                          key={a.id}
                           style={{ background: "#fff", borderRadius: "12px", padding: "12px 14px", border: "1px solid #F1F5F9" }}
                         >
-                          <div 
+                          <div
                             className="flex items-start justify-between cursor-pointer select-none"
                             onClick={() => handleExpandAtt(a)}
                           >
@@ -893,8 +899,10 @@ export default function ManagerEmployeesPage() {
                                 {fmtDateFull(a.date)} {a.flaggedReason ? `· ${a.flaggedReason}` : ""}
                               </p>
                             </div>
-                            <span style={{ padding: "3px 9px", borderRadius: "100px", fontSize: "11px", fontWeight: "600",
-                              background: "#FEF3C7", color: "#D97706" }}>
+                            <span style={{
+                              padding: "3px 9px", borderRadius: "100px", fontSize: "11px", fontWeight: "600",
+                              background: "#FEF3C7", color: "#D97706"
+                            }}>
                               Review
                             </span>
                           </div>
@@ -925,7 +933,7 @@ export default function ManagerEmployeesPage() {
                                 <p className="font-bold text-slate-800 uppercase tracking-wider text-[10px]">
                                   Koreksi Absensi & Lembur
                                 </p>
-                                
+
                                 <div className="grid grid-cols-3 gap-2">
                                   <div>
                                     <label className="text-[10px] font-bold text-slate-400 block mb-1">Total Jam</label>
@@ -1005,8 +1013,8 @@ export default function ManagerEmployeesPage() {
                 ) : (
                   <div className="flex flex-col gap-2">
                     {riwayatItems.map(a => (
-                      <div 
-                        key={a.id} 
+                      <div
+                        key={a.id}
                         style={{ background: "#fff", borderRadius: "12px", padding: "12px 14px", border: "1px solid #F1F5F9" }}
                       >
                         <div className="flex items-start justify-between">
@@ -1016,9 +1024,11 @@ export default function ManagerEmployeesPage() {
                               {fmtDateFull(a.date)}
                             </p>
                           </div>
-                          <span style={{ padding: "3px 9px", borderRadius: "100px", fontSize: "11px", fontWeight: "600",
+                          <span style={{
+                            padding: "3px 9px", borderRadius: "100px", fontSize: "11px", fontWeight: "600",
                             background: a.status === "belum_lengkap" ? "#EFF6FF" : "#DCFCE7",
-                            color: a.status === "belum_lengkap" ? "#2563EB" : "#16A34A" }}>
+                            color: a.status === "belum_lengkap" ? "#2563EB" : "#16A34A"
+                          }}>
                             {a.status === "belum_lengkap" ? "Aktif" : "Lengkap"}
                           </span>
                         </div>
@@ -1305,7 +1315,7 @@ export default function ManagerEmployeesPage() {
                         ) : (
                           <div className="flex flex-col gap-3 w-full bg-slate-50 p-4 rounded-xl border border-slate-200">
                             <p className="text-xs font-bold text-slate-700">Edit Rincian Slip Gaji</p>
-                            
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div>
                                 <label className="text-[10px] font-bold text-slate-400 block mb-1">PERIODE KERJA</label>
@@ -1352,11 +1362,11 @@ export default function ManagerEmployeesPage() {
                             <div>
                               <label className="text-[10px] font-bold text-slate-400 block mb-1">DETAIL/KETERANGAN BONUS</label>
                               <Input
-                                  type="text"
-                                  placeholder="Contoh: Bonus rajin packing & target tercapai..."
-                                  value={editPerformanceBonusNote}
-                                  onChange={(e) => setEditPerformanceBonusNote(e.target.value)}
-                                  className="h-9 rounded-lg text-xs"
+                                type="text"
+                                placeholder="Contoh: Bonus rajin packing & target tercapai..."
+                                value={editPerformanceBonusNote}
+                                onChange={(e) => setEditPerformanceBonusNote(e.target.value)}
+                                className="h-9 rounded-lg text-xs"
                               />
                             </div>
 
