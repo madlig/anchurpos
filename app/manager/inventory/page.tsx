@@ -148,7 +148,7 @@ export default function InventoryPage() {
   }
 
   const loadVariants = useCallback(async () => {
-    const res = await fetchWithAuth("/api/variants");
+    const res = await fetchWithAuth("/api/products/stocks");
     if (res.ok) setVariants(await res.json());
   }, [fetchWithAuth]);
 
@@ -247,9 +247,9 @@ export default function InventoryPage() {
     if (isNaN(val) || val < 0) return;
     setSubmitting(true);
     try {
-      const res = await fetchWithAuth(`/api/variants/${id}`, {
+      const res = await fetchWithAuth(`/api/products/stocks`, {
         method: "PATCH",
-        body: JSON.stringify({ currentStock: val, note: opnameNote || null }),
+        body: JSON.stringify({ id, currentStock: val, note: opnameNote || null }),
       });
       if (res.ok) {
         setEditingVariantId(null); setOpnameValue(""); setOpnameNote("");
