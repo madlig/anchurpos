@@ -61,6 +61,13 @@ function fmtTime(iso: string) {
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
 }
+function fmtDateFull(d: string) {
+  try {
+    return new Date(d + "T00:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  } catch {
+    return d;
+  }
+}
 
 // ─── Add/Edit Employee Form ────────────────────────────────────────────────────
 function EmployeeForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
@@ -234,6 +241,7 @@ export default function ManagerEmployeesPage() {
   const [editOvertimeHours, setEditOvertimeHours] = useState("");
   const [editOvertimeBonus, setEditOvertimeBonus] = useState("");
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [attendanceSubTab, setAttendanceSubTab] = useState<"review" | "riwayat">("review");
 
   // Payroll state
   const [payrolls, setPayrolls] = useState<PayrollRecord[]>([]);
@@ -652,158 +660,246 @@ export default function ManagerEmployeesPage() {
         )}
 
         {/* ── Tab: ABSENSI ── */}
-        {tab === "absensi" && (
-          <>
-            {/* Month picker */}
-            <div className="flex items-center gap-2 mb-3">
-              <button onClick={() => { const d = new Date(attendanceMonth + "-01"); d.setMonth(d.getMonth() - 1); setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
-                style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>‹</button>
-              <p style={{ flex: 1, textAlign: "center", fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>
-                {new Date(attendanceMonth + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
-              </p>
-              <button onClick={() => { const d = new Date(attendanceMonth + "-01"); d.setMonth(d.getMonth() + 1); setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
-                style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>›</button>
-            </div>
+        {tab === "absensi" && (() => {
+          const reviewCount = attendance.filter(a => a.status === "direview").length;
+          const reviewItems = attendance.filter(a => a.status === "direview");
+          const riwayatItems = attendance.filter(a => a.status === "lengkap" || a.status === "hadir" || a.status === "belum_lengkap");
 
-            {attendance.length === 0 ? (
-              <div style={{ background: "#fff", borderRadius: "14px", padding: "32px 16px", textAlign: "center", border: "1px solid #F1F5F9" }}>
-                <p style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>Belum ada data absensi</p>
+          return (
+            <>
+              {/* Month picker */}
+              <div className="flex items-center gap-2 mb-3">
+                <button onClick={() => { const d = new Date(attendanceMonth + "-01"); d.setMonth(d.getMonth() - 1); setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+                  style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>‹</button>
+                <p style={{ flex: 1, textAlign: "center", fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>
+                  {new Date(attendanceMonth + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
+                </p>
+                <button onClick={() => { const d = new Date(attendanceMonth + "-01"); d.setMonth(d.getMonth() + 1); setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+                  style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>›</button>
               </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {attendance.map(a => {
-                  const expanded = expandedAttId === a.id;
-                  const isReview = a.status === "direview";
 
-                  return (
-                    <div 
-                      key={a.id} 
-                      style={{ background: "#fff", borderRadius: "12px", padding: "12px 14px", border: "1px solid #F1F5F9" }}
-                    >
-                      <div 
-                        className={`flex items-start justify-between ${isReview ? "cursor-pointer select-none" : ""}`}
-                        onClick={isReview ? () => handleExpandAtt(a) : undefined}
-                      >
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>{a.employeeName}</p>
-                            {isReview && (
-                              <span style={{ fontSize: "10px", color: "#64748B", fontWeight: "normal" }}>
-                                (klik untuk review)
-                              </span>
+              {/* Sub-tabs */}
+              <div className="flex gap-2 mb-3 bg-slate-100 p-1 rounded-xl">
+                <button 
+                  onClick={() => setAttendanceSubTab("review")}
+                  style={{
+                    flex: 1,
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    fontWeight: "700",
+                    background: attendanceSubTab === "review" ? "#fff" : "transparent",
+                    color: attendanceSubTab === "review" ? "#E85D8C" : "#64748B",
+                    border: "none",
+                    cursor: "pointer"
+                  }}
+                  data-testid="attendance-subtab-review"
+                >
+                  Perlu Review ({reviewCount})
+                </button>
+                <button 
+                  onClick={() => setAttendanceSubTab("riwayat")}
+                  style={{
+                    flex: 1,
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    fontWeight: "700",
+                    background: attendanceSubTab === "riwayat" ? "#fff" : "transparent",
+                    color: attendanceSubTab === "riwayat" ? "#E85D8C" : "#64748B",
+                    border: "none",
+                    cursor: "pointer"
+                  }}
+                  data-testid="attendance-subtab-riwayat"
+                >
+                  Riwayat Absensi
+                </button>
+              </div>
+
+              {attendanceSubTab === "review" ? (
+                reviewItems.length === 0 ? (
+                  <div style={{ background: "#fff", borderRadius: "14px", padding: "32px 16px", textAlign: "center", border: "1px solid #F1F5F9" }}>
+                    <p style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>Tidak ada absensi yang perlu direview</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {reviewItems.map(a => {
+                      const expanded = expandedAttId === a.id;
+                      return (
+                        <div 
+                          key={a.id} 
+                          style={{ background: "#fff", borderRadius: "12px", padding: "12px 14px", border: "1px solid #F1F5F9" }}
+                        >
+                          <div 
+                            className="flex items-start justify-between cursor-pointer select-none"
+                            onClick={() => handleExpandAtt(a)}
+                          >
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>{a.employeeName}</p>
+                                <span style={{ fontSize: "10px", color: "#64748B", fontWeight: "normal" }}>
+                                  (klik untuk review)
+                                </span>
+                              </div>
+                              <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>
+                                {fmtDateFull(a.date)} {a.flaggedReason ? `· ${a.flaggedReason}` : ""}
+                              </p>
+                            </div>
+                            <span style={{ padding: "3px 9px", borderRadius: "100px", fontSize: "11px", fontWeight: "600",
+                              background: "#FEF3C7", color: "#D97706" }}>
+                              Review
+                            </span>
+                          </div>
+
+                          <div className="flex gap-4 mt-2 cursor-pointer" onClick={() => handleExpandAtt(a)}>
+                            {a.checkIn && (
+                              <p style={{ fontSize: "11px", color: "#64748B" }}>
+                                Masuk: <strong>{fmtTime(a.checkIn.time)}</strong> {a.checkIn.ipAddress && `(${a.checkIn.ipAddress})`}
+                              </p>
+                            )}
+                            {a.checkOut?.time && (
+                              <p style={{ fontSize: "11px", color: "#64748B" }}>
+                                Pulang: <strong>{fmtTime(a.checkOut.time)}</strong> {a.checkOut.ipAddress && `(${a.checkOut.ipAddress})`}
+                              </p>
+                            )}
+                            {a.totalHours !== null && (
+                              <p style={{ fontSize: "11px", color: "#64748B" }}>
+                                {a.totalHours.toFixed(1)} jam
+                              </p>
                             )}
                           </div>
-                          <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>
-                            {fmtDate(a.date)} {a.flaggedReason ? `· ${a.flaggedReason}` : ""}
-                          </p>
-                        </div>
-                        <span style={{ padding: "3px 9px", borderRadius: "100px", fontSize: "11px", fontWeight: "600",
-                          background: a.status === "hadir" || a.status === "lengkap" ? "#DCFCE7" : a.status === "direview" ? "#FEF3C7" : "#F1F5F9",
-                          color: a.status === "hadir" || a.status === "lengkap" ? "#16A34A" : a.status === "direview" ? "#D97706" : "#64748B" }}>
-                          {a.status === "hadir" || a.status === "lengkap" ? "Lengkap" : a.status === "direview" ? "Review" : a.status}
-                        </span>
-                      </div>
 
-                      <div className="flex gap-4 mt-2" onClick={isReview ? () => handleExpandAtt(a) : undefined}>
-                        {a.checkIn && (
-                          <p style={{ fontSize: "11px", color: "#64748B" }}>
-                            Masuk: <strong>{fmtTime(a.checkIn.time)}</strong> {a.checkIn.ipAddress && `(${a.checkIn.ipAddress})`}
-                          </p>
-                        )}
-                        {a.checkOut?.time && (
-                          <p style={{ fontSize: "11px", color: "#64748B" }}>
-                            Pulang: <strong>{fmtTime(a.checkOut.time)}</strong> {a.checkOut.ipAddress && `(${a.checkOut.ipAddress})`}
-                          </p>
-                        )}
-                        {a.totalHours !== null && (
-                          <p style={{ fontSize: "11px", color: "#64748B" }}>
-                            {a.totalHours.toFixed(1)} jam
-                          </p>
-                        )}
-                      </div>
+                          {/* Expanded Review Panel */}
+                          {expanded && (
+                            <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 text-xs">
+                              {/* Adjustment fields */}
+                              <div className="space-y-3">
+                                <p className="font-bold text-slate-800 uppercase tracking-wider text-[10px]">
+                                  Koreksi Absensi & Lembur
+                                </p>
+                                
+                                <div className="grid grid-cols-3 gap-2">
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Total Jam</label>
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={editTotalHours}
+                                      onChange={(e) => setEditTotalHours(e.target.value)}
+                                      style={{ background: "#F8FAFC" }}
+                                      className="w-full h-9 rounded-lg border border-slate-200 px-2 font-semibold text-slate-700 focus:outline-none"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Lembur (Jam)</label>
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={editOvertimeHours}
+                                      onChange={(e) => setEditOvertimeHours(e.target.value)}
+                                      style={{ background: "#F8FAFC" }}
+                                      className="w-full h-9 rounded-lg border border-slate-200 px-2 font-semibold text-slate-700 focus:outline-none"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Bonus Lembur (Rp)</label>
+                                    <input
+                                      type="number"
+                                      step="1000"
+                                      value={editOvertimeBonus}
+                                      onChange={(e) => setEditOvertimeBonus(e.target.value)}
+                                      style={{ background: "#F8FAFC" }}
+                                      className="w-full h-9 rounded-lg border border-slate-200 px-2 font-semibold text-slate-700 focus:outline-none"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
 
-                      {/* Expanded Review Panel */}
-                      {expanded && isReview && (
-                        <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 text-xs">
-                          {/* Adjustment fields */}
-                          <div className="space-y-3">
-                            <p className="font-bold text-slate-800 uppercase tracking-wider text-[10px]">
-                              Koreksi Absensi & Lembur
-                            </p>
-                            
-                            <div className="grid grid-cols-3 gap-2">
-                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 block mb-1">Total Jam</label>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  value={editTotalHours}
-                                  onChange={(e) => setEditTotalHours(e.target.value)}
-                                  style={{ background: "#F8FAFC" }}
-                                  className="w-full h-9 rounded-lg border border-slate-200 px-2 font-semibold text-slate-700 focus:outline-none"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 block mb-1">Lembur (Jam)</label>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  value={editOvertimeHours}
-                                  onChange={(e) => setEditOvertimeHours(e.target.value)}
-                                  style={{ background: "#F8FAFC" }}
-                                  className="w-full h-9 rounded-lg border border-slate-200 px-2 font-semibold text-slate-700 focus:outline-none"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 block mb-1">Bonus Lembur (Rp)</label>
-                                <input
-                                  type="number"
-                                  step="1000"
-                                  value={editOvertimeBonus}
-                                  onChange={(e) => setEditOvertimeBonus(e.target.value)}
-                                  style={{ background: "#F8FAFC" }}
-                                  className="w-full h-9 rounded-lg border border-slate-200 px-2 font-semibold text-slate-700 focus:outline-none"
-                                />
+                              {/* Action buttons */}
+                              <div className="flex flex-wrap gap-2 pt-2">
+                                <button
+                                  disabled={reviewingId === a.id}
+                                  onClick={() => handleReviewAttendance(a.id, a, "approve")}
+                                  style={{ background: "#10B981" }}
+                                  className="flex-1 min-h-[36px] px-3 py-1.5 text-white rounded-xl font-bold text-xs disabled:opacity-50 transition-all active:scale-95"
+                                >
+                                  Setujui Sesuai Data
+                                </button>
+                                <button
+                                  disabled={reviewingId === a.id}
+                                  onClick={() => handleReviewAttendance(a.id, a, "adjust")}
+                                  style={{ background: "#0284C7" }}
+                                  className="flex-1 min-h-[36px] px-3 py-1.5 text-white rounded-xl font-bold text-xs disabled:opacity-50 transition-all active:scale-95"
+                                >
+                                  Simpan Koreksi & Setujui
+                                </button>
+                                <button
+                                  disabled={reviewingId === a.id}
+                                  onClick={() => handleReviewAttendance(a.id, a, "reject")}
+                                  style={{ background: "#EF4444" }}
+                                  className="flex-shrink-0 min-h-[36px] px-3 py-1.5 text-white rounded-xl font-bold text-xs disabled:opacity-50 transition-all active:scale-95"
+                                >
+                                  Tolak Absen
+                                </button>
                               </div>
                             </div>
-                          </div>
-
-                          {/* Action buttons */}
-                          <div className="flex flex-wrap gap-2 pt-2">
-                            <button
-                              disabled={reviewingId === a.id}
-                              onClick={() => handleReviewAttendance(a.id, a, "approve")}
-                              style={{ background: "#10B981" }}
-                              className="flex-1 min-h-[36px] px-3 py-1.5 text-white rounded-xl font-bold text-xs disabled:opacity-50 transition-all active:scale-95"
-                            >
-                              Setujui Sesuai Data
-                            </button>
-                            <button
-                              disabled={reviewingId === a.id}
-                              onClick={() => handleReviewAttendance(a.id, a, "adjust")}
-                              style={{ background: "#0284C7" }}
-                              className="flex-1 min-h-[36px] px-3 py-1.5 text-white rounded-xl font-bold text-xs disabled:opacity-50 transition-all active:scale-95"
-                            >
-                              Simpan Koreksi & Setujui
-                            </button>
-                            <button
-                              disabled={reviewingId === a.id}
-                              onClick={() => handleReviewAttendance(a.id, a, "reject")}
-                              style={{ background: "#EF4444" }}
-                              className="flex-shrink-0 min-h-[36px] px-3 py-1.5 text-white rounded-xl font-bold text-xs disabled:opacity-50 transition-all active:scale-95"
-                            >
-                              Tolak Absen
-                            </button>
-                          </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                riwayatItems.length === 0 ? (
+                  <div style={{ background: "#fff", borderRadius: "14px", padding: "32px 16px", textAlign: "center", border: "1px solid #F1F5F9" }}>
+                    <p style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>Belum ada riwayat absensi pada bulan ini</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {riwayatItems.map(a => (
+                      <div 
+                        key={a.id} 
+                        style={{ background: "#fff", borderRadius: "12px", padding: "12px 14px", border: "1px solid #F1F5F9" }}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>{a.employeeName}</p>
+                            <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>
+                              {fmtDateFull(a.date)}
+                            </p>
+                          </div>
+                          <span style={{ padding: "3px 9px", borderRadius: "100px", fontSize: "11px", fontWeight: "600",
+                            background: a.status === "belum_lengkap" ? "#EFF6FF" : "#DCFCE7",
+                            color: a.status === "belum_lengkap" ? "#2563EB" : "#16A34A" }}>
+                            {a.status === "belum_lengkap" ? "Aktif" : "Lengkap"}
+                          </span>
+                        </div>
+
+                        <div className="flex gap-4 mt-2">
+                          {a.checkIn && (
+                            <p style={{ fontSize: "11px", color: "#64748B" }}>
+                              Masuk: <strong>{fmtTime(a.checkIn.time)}</strong>
+                            </p>
+                          )}
+                          {a.checkOut?.time && (
+                            <p style={{ fontSize: "11px", color: "#64748B" }}>
+                              Pulang: <strong>{fmtTime(a.checkOut.time)}</strong>
+                            </p>
+                          )}
+                          {a.totalHours !== null && (
+                            <p style={{ fontSize: "11px", color: "#64748B" }}>
+                              {a.totalHours.toFixed(1)} jam
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </>
+          );
+        })()}
 
         {/* ── Tab: PAYROLL ── */}
         {tab === "payroll" && (
