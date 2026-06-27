@@ -71,15 +71,12 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="mb-10 flex flex-col items-center">
           <div
-            className="h-20 w-20 rounded-[28px] flex items-center justify-center mb-4"
+            className="h-20 w-20 rounded-[28px] overflow-hidden flex items-center justify-center mb-4 bg-white"
             style={{
-              background: "rgba(255,255,255,0.3)",
-              backdropFilter: "blur(16px)",
-              WebkitBackdropFilter: "blur(16px)",
-              boxShadow: "0 8px 32px rgba(232,93,140,0.3), inset 0 1px 0 rgba(255,255,255,0.5)"
+              boxShadow: "0 8px 32px rgba(232,93,140,0.3)"
             }}
           >
-            <span className="text-3xl font-extrabold text-white" style={{ textShadow: "0 2px 8px rgba(201,74,115,0.3)" }}>A</span>
+            <img src="/logo.png" alt="Logo" className="h-full w-full object-contain" />
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>AnchurPOS</h1>
           <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.75)" }}>Sistem manajemen produksi Anchur</p>
