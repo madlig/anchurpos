@@ -12,7 +12,7 @@ const MENU_ITEMS = [
   { label: "Karyawan", description: "Absensi & payroll", href: "/manager/employees", icon: Users },
   { label: "Riwayat Order", description: "Daftar semua pesanan", href: "/manager/orders", icon: ClipboardList },
   { label: "Rainbow Assembly", description: "Konfirmasi assembly Rainbow", href: "/manager/rainbow-assembly", icon: Palette },
-  { label: "Review Stock Opname", description: "Review & koreksi stok dari opname crew", href: "/manager/stock-opname-review", icon: Scale },
+  {label: "Review Stock Opname", description: "Review & koreksi stok dari opname crew", href: "/manager/inventory?tab=opname", icon: Scale },
   { label: "Pengeluaran Stok", description: "Sample, hadiah, rusak, konsumsi internal", href: "/manager/stock-adjustments", icon: PackageMinus },
   { label: "Pengaturan", description: "Whitelist IP absen", href: "/manager/settings", icon: Settings },
 ];

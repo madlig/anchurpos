@@ -14,7 +14,7 @@ const MENU_ITEMS = [
   { label: "Inventori", description: "Stok bahan baku & pengeluaran", href: "/manager/inventory", icon: Package },
   { label: "Master Data", description: "Produk, varian, bahan, resep", href: "/manager/master-data", icon: Database },
   { label: "Karyawan & Payroll", description: "Data karyawan, absensi, gaji", href: "/manager/employees", icon: Users },
-  { label: "Stock Opname Review", description: "Review & koreksi stok dari crew", href: "/manager/stock-opname-review", icon: Scale },
+  { label: "Stock Opname Review", description: "Review & koreksi stok dari crew", href: "/manager/inventory?tab=opname", icon: Scale },
   { label: "Pengeluaran Stok", description: "Sample, hadiah, rusak, konsumsi", href: "/manager/stock-adjustments", icon: PackageOpen },
   { label: "Laporan P&L", description: "Laporan laba rugi bulanan", href: "/owner/reports", icon: FileBarChart },
   { label: "Pengaturan", description: "Whitelist IP, konfigurasi", href: "/manager/settings", icon: Settings },

@@ -180,7 +180,7 @@ export default function OwnerApprovalPage() {
           {tab === "opname" && (
             <div className="space-y-2">
               {opnames.length === 0 ? <EmptyState label="Tidak ada opname bermasalah" /> : opnames.map((o) => (
-                <Link key={o.id} href="/manager/stock-opname-review">
+                <Link key={o.id} href="/manager/inventory?tab=opname">
                   <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: "#fff", border: "1px solid #F1F5F9" }}>
                     <div>
                       <p className="text-sm font-semibold" style={{ color: "#1C1C1E" }}>Stock Opname</p>
