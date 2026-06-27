@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Loader2, KeyRound, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default function CrewSettingsPage() {
-  const { user, getToken } = useAuth();
+  const { user, getToken, logout } = useAuth();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -157,6 +157,31 @@ export default function CrewSettingsPage() {
               {submitting ? <Loader2 size={16} className="animate-spin" /> : "Simpan Password Baru"}
             </button>
           </form>
+        </div>
+
+        <div className="mt-4" style={{ background: "#fff", borderRadius: "16px", padding: "20px", border: "1px solid #F1F5F9", boxShadow: "0 4px 12px rgba(0,0,0,0.02)" }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>Logout Akun</p>
+              <p style={{ fontSize: "11px", color: "#94A3B8" }}>Keluar dari sesi aplikasi di perangkat ini</p>
+            </div>
+            <button
+              onClick={logout}
+              className="tap-target"
+              style={{
+                padding: "8px 16px",
+                borderRadius: "10px",
+                background: "#FEF2F2",
+                color: "#DC2626",
+                border: "1px solid #FEE2E2",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: "700"
+              }}
+            >
+              Keluar
+            </button>
+          </div>
         </div>
       </div>
     </div>

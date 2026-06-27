@@ -486,21 +486,21 @@ export default function ManagerEmployeesPage() {
         <head>
           <title>Slip Gaji - ${p.employeeName}</title>
           <style>
-            body { padding: 40px; font-family: 'Courier New', Courier, monospace; background-color: #f1f5f9; display: flex; justify-content: center; }
-            .slip-container { background: #fff; max-width: 450px; width: 100%; border: 1px dashed #000; padding: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-            .header h1 { margin: 0; font-size: 20px; font-weight: bold; }
-            .header p { margin: 2px 0 0; font-size: 12px; }
-            .meta-info { margin-bottom: 15px; font-size: 13px; }
-            .meta-info div { margin-bottom: 4px; }
-            .divider { border-top: 1px dashed #000; margin: 12px 0; }
-            .row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
-            .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; border-top: 1px solid #000; margin-top: 10px; padding-top: 8px; }
-            .note { font-size: 11px; font-style: italic; color: #333; margin-top: -4px; margin-bottom: 8px; padding-left: 10px; }
-            .footer { text-align: center; margin-top: 25px; font-size: 12px; }
-            .btn-print { display: block; width: 100%; text-align: center; margin-top: 20px; padding: 10px; background: #E85D8C; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
+            body { padding: 20px; font-family: 'Courier New', Courier, monospace; background-color: #f1f5f9; display: flex; justify-content: center; }
+            .slip-container { background: #fff; max-width: 380px; width: 100%; border: 1px dashed #000; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+            .header { text-align: center; margin-bottom: 12px; border-bottom: 2px solid #000; padding-bottom: 6px; }
+            .header h1 { margin: 0; font-size: 18px; font-weight: bold; }
+            .header p { margin: 2px 0 0; font-size: 11px; }
+            .meta-info { margin-bottom: 10px; font-size: 12px; }
+            .meta-info div { margin-bottom: 3px; }
+            .divider { border-top: 1px dashed #000; margin: 8px 0; }
+            .row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px; }
+            .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; border-top: 1px solid #000; margin-top: 8px; padding-top: 6px; }
+            .note { font-size: 10px; font-style: italic; color: #333; margin-top: -3px; margin-bottom: 6px; padding-left: 8px; }
+            .footer { text-align: center; margin-top: 15px; font-size: 11px; }
+            .btn-print { display: block; width: 100%; text-align: center; margin-top: 15px; padding: 8px; background: #E85D8C; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; font-size: 12px; }
             @media print {
-              body { margin: 0; padding: 20px; background-color: #fff; display: block; }
+              body { margin: 0; padding: 0; background-color: #fff; display: block; }
               .slip-container { max-width: 100%; border: none; padding: 0; box-shadow: none; }
               .btn-print { display: none; }
             }
