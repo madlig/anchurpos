@@ -156,31 +156,70 @@ export async function POST(req: NextRequest) {
       // Increment Product Stocks - Regular
       if (activeType === "standard" && (resultRegularPacks ?? 0) > 0 && snapReg) {
         const currReg = snapReg.data()?.currentStock ?? 0;
+        const nextStock = currReg + (resultRegularPacks ?? 0);
         tx.set(stockRegRef, {
           productId: "churros-frozen-regular",
           variantId,
-          currentStock: currReg + (resultRegularPacks ?? 0),
+          currentStock: nextStock,
         }, { merge: true });
+
+        const movementRef = adminDb.collection("stockMovements").doc();
+        tx.set(movementRef, {
+          ingredientId: `product:churros-frozen-regular_${variantId}`,
+          changeAmount: resultRegularPacks ?? 0,
+          newStockAfter: nextStock,
+          sourceType: "production",
+          sourceId: prePackRef.id,
+          note: `Pre-packing standard dari ${totalLoyangUsed} loyang`,
+          createdBy: user.uid,
+          createdAt: timestamp,
+        });
       }
 
       // Increment Product Stocks - Full
       if (activeType === "standard" && (resultFullPacks ?? 0) > 0 && snapFull) {
         const currFull = snapFull.data()?.currentStock ?? 0;
+        const nextStock = currFull + (resultFullPacks ?? 0);
         tx.set(stockFullRef, {
           productId: "churros-frozen-full",
           variantId,
-          currentStock: currFull + (resultFullPacks ?? 0),
+          currentStock: nextStock,
         }, { merge: true });
+
+        const movementRef = adminDb.collection("stockMovements").doc();
+        tx.set(movementRef, {
+          ingredientId: `product:churros-frozen-full_${variantId}`,
+          changeAmount: resultFullPacks ?? 0,
+          newStockAfter: nextStock,
+          sourceType: "production",
+          sourceId: prePackRef.id,
+          note: `Pre-packing standard dari ${totalLoyangUsed} loyang`,
+          createdBy: user.uid,
+          createdAt: timestamp,
+        });
       }
 
       // Increment Product Stocks - TikTok
       if (activeType === "tiktok" && (resultTikTokPacks ?? 0) > 0 && snapTikTok) {
         const currTikTok = snapTikTok.data()?.currentStock ?? 0;
+        const nextStock = currTikTok + (resultTikTokPacks ?? 0);
         tx.set(stockTikTokRef, {
           productId: "churros-frozen-tiktok",
           variantId,
-          currentStock: currTikTok + (resultTikTokPacks ?? 0),
+          currentStock: nextStock,
         }, { merge: true });
+
+        const movementRef = adminDb.collection("stockMovements").doc();
+        tx.set(movementRef, {
+          ingredientId: `product:churros-frozen-tiktok_${variantId}`,
+          changeAmount: resultTikTokPacks ?? 0,
+          newStockAfter: nextStock,
+          sourceType: "production",
+          sourceId: prePackRef.id,
+          note: `Pre-packing TikTok dari ${totalLoyangUsed} loyang`,
+          createdBy: user.uid,
+          createdAt: timestamp,
+        });
       }
     });
 

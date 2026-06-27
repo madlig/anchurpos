@@ -380,6 +380,32 @@ export async function POST(req: NextRequest) {
           currentStock: nextFullStock,
         }, { merge: true });
 
+        const mReg = adminDb.collection("stockMovements").doc();
+        tx.set(mReg, {
+          ingredientId: `product:churros-frozen-regular_${variantId}`,
+          changeAmount: -regularPacksToUnpack,
+          newStockAfter: nextRegStock,
+          sourceType: "production",
+          sourceId: null,
+          note: `Bongkar ${regularPacksToUnpack} Regular untuk repack ke Full`,
+          createdBy: user.uid,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+
+        if (producedFullPacks > 0) {
+          const mFull = adminDb.collection("stockMovements").doc();
+          tx.set(mFull, {
+            ingredientId: `product:churros-frozen-full_${variantId}`,
+            changeAmount: producedFullPacks,
+            newStockAfter: nextFullStock,
+            sourceType: "production",
+            sourceId: null,
+            note: `Hasil repack dari ${regularPacksToUnpack} Regular`,
+            createdBy: user.uid,
+            createdAt: FieldValue.serverTimestamp(),
+          });
+        }
+
         tx.set(bufferRef, {
           variantId,
           currentBufferPcs: newBufferPcs,
@@ -538,11 +564,24 @@ export async function POST(req: NextRequest) {
             const stockId = `${item.productId}_${item.variantId}`;
             const target = productStockSnaps.get(stockId);
             const currStock = target?.snap?.exists ? (target.snap.data()?.currentStock ?? 0) : 0;
+            const newStock = currStock - item.qty;
             tx.set(target.ref, {
               productId: item.productId,
               variantId: item.variantId,
-              currentStock: currStock - item.qty,
+              currentStock: newStock,
             }, { merge: true });
+
+            const movementRef = adminDb.collection("stockMovements").doc();
+            tx.set(movementRef, {
+              ingredientId: `product:${stockId}`,
+              changeAmount: -item.qty,
+              newStockAfter: newStock,
+              sourceType: "sale",
+              sourceId: orderId,
+              note: `Pengepakan pesanan order ${orderNumber}`,
+              createdBy: user.uid,
+              createdAt: FieldValue.serverTimestamp(),
+            });
           }
         }
 

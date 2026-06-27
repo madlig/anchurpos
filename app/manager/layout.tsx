@@ -28,8 +28,8 @@ function DesktopSidebar() {
     >
       <div className="px-5 py-5" style={{ borderBottom: "1px solid #F1F5F9" }}>
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)" }}>
-            <span className="text-white font-black text-lg">A</span>
+          <div className="h-9 w-9 rounded-xl overflow-hidden flex items-center justify-center bg-slate-100">
+            <img src="/logo.png" alt="Logo" className="h-full w-full object-contain" />
           </div>
           <div>
             <p className="text-sm font-bold" style={{ color: "#1C1C1E" }}>AnchurPOS</p>

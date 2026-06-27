@@ -39,11 +39,38 @@ export async function PATCH(
     if (currentStock === undefined && adjustment === undefined) {
       return NextResponse.json({ error: "Berikan name (edit) atau currentStock/adjustment (opname)" }, { status: 400 });
     }
-    const prev = snap.data()?.currentStock ?? 0;
-    const newStock = currentStock !== undefined
-      ? Math.max(0, currentStock)
-      : Math.max(0, prev + (adjustment ?? 0));
-    await ref.update({ currentStock: newStock, lastOpnameAt: FieldValue.serverTimestamp(), lastOpnameNote: note ?? null });
+
+    let prev = 0;
+    let newStock = 0;
+
+    await adminDb.runTransaction(async (tx) => {
+      const variantSnap = await tx.get(ref);
+      if (!variantSnap.exists) throw new Error("Varian tidak ditemukan");
+
+      prev = variantSnap.data()?.currentStock ?? 0;
+      newStock = currentStock !== undefined
+        ? Math.max(0, currentStock)
+        : Math.max(0, prev + (adjustment ?? 0));
+
+      tx.update(ref, {
+        currentStock: newStock,
+        lastOpnameAt: FieldValue.serverTimestamp(),
+        lastOpnameNote: note ?? null,
+      });
+
+      const movementRef = adminDb.collection("stockMovements").doc();
+      tx.set(movementRef, {
+        ingredientId: id,
+        changeAmount: newStock - prev,
+        newStockAfter: newStock,
+        sourceType: "opname",
+        sourceId: null,
+        note: note || "Koreksi manual stok varian",
+        createdBy: auth.uid,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    });
+
     return NextResponse.json({ id, currentStock: newStock, previous: prev });
 
   } catch (err) {
