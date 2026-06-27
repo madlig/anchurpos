@@ -54,6 +54,7 @@ export default function KasirPage() {
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
+  const [productStocks, setProductStocks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Semua");
@@ -88,10 +89,12 @@ export default function KasirPage() {
       fetchWithAuth("/api/products").then(r => r.json()),
       fetchWithAuth("/api/variants").then(r => r.json()),
       fetchWithAuth("/api/customers").then(r => r.json()),
-    ]).then(([p, v, c]) => {
+      fetchWithAuth("/api/products/stocks").then(r => r.json()),
+    ]).then(([p, v, c, s]) => {
       setProducts(Array.isArray(p) ? p : []);
       setVariants(Array.isArray(v) ? v : []);
       setCustomers(Array.isArray(c) ? c : []);
+      setProductStocks(Array.isArray(s) ? s : []);
     }).finally(() => setLoading(false));
   }, [fetchWithAuth]);
 
@@ -375,7 +378,11 @@ export default function KasirPage() {
             <div className="flex flex-col gap-2">
               {variants.map(v => {
                 const qty = variantQtys[v.id] ?? 0;
-                const isLowStock = v.currentStock < v.minStock;
+                const stockId = `${selectedProduct.id}_${v.id}`;
+                const stockItem = productStocks.find(s => s.id === stockId);
+                const currentStock = stockItem ? stockItem.currentStock : 0;
+                const minStock = stockItem ? stockItem.minStock : v.minStock;
+                const isLowStock = currentStock < minStock;
                 return (
                   <div
                     key={v.id}
@@ -390,7 +397,7 @@ export default function KasirPage() {
                     <div>
                       <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{v.name}</p>
                       <p style={{ fontSize: "11px", color: isLowStock ? "#DC2626" : "#94A3B8", marginTop: "2px" }}>
-                        Stok: {v.currentStock} pcs {isLowStock ? "⚠ Rendah" : ""}
+                        Stok: {currentStock} pcs {isLowStock ? "⚠ Rendah" : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

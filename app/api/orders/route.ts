@@ -194,13 +194,13 @@ export async function POST(req: NextRequest) {
         customerName: resolvedCustomerName,
         customerPhone: resolvedCustomerPhone,
         channel: resolvedChannel,
-        status: "belum_selesai",
+        status: source === "walk_in" ? "selesai" : "belum_selesai",
         paymentStatus: inputPaymentStatus ?? "belum_bayar",
         paymentMethod: paymentMethod ?? null,
         needsProduction,
         createdBy: (user as AuthUser | null)?.uid ?? null,
         createdAt: FieldValue.serverTimestamp(),
-        completedAt: null,
+        completedAt: source === "walk_in" ? FieldValue.serverTimestamp() : null,
         shippingAddress: shippingAddress ?? null,
         requestedDeliveryDate: requestedDeliveryDate ?? null,
         orderNotes: orderNotes ?? null,
@@ -217,12 +217,37 @@ export async function POST(req: NextRequest) {
         tx.set(itemRef, itemData);
       }
 
-      // Kurangi stok produk jadi per varian
-      for (const item of items) {
-        const variantRef = adminDb.doc(`variants/${item.variantId}`);
-        tx.update(variantRef, {
-          currentStock: FieldValue.increment(-item.qty),
-        });
+      // Kurangi stok produk jadi jika walk-in langsung (POS)
+      if (source === "walk_in") {
+        for (const item of items) {
+          const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
+          if (!isRainbow) {
+            const stockId = `${item.productId}_${item.variantId}`;
+            const stockRef = adminDb.collection("productStocks").doc(stockId);
+            const stockSnap = await tx.get(stockRef);
+            const currStock = stockSnap.exists ? (stockSnap.data()?.currentStock ?? 0) : 0;
+            const nextStock = currStock - item.qty;
+
+            tx.set(stockRef, {
+              productId: item.productId,
+              variantId: item.variantId,
+              currentStock: nextStock,
+            }, { merge: true });
+
+            // Log stock movement
+            const movementRef = adminDb.collection("stockMovements").doc();
+            tx.set(movementRef, {
+              ingredientId: `product:${stockId}`,
+              changeAmount: -item.qty,
+              newStockAfter: nextStock,
+              sourceType: "sale",
+              sourceId: orderRef.id,
+              note: `Penjualan walk-in POS #${orderNumber}`,
+              createdBy: (user as AuthUser | null)?.uid ?? null,
+              createdAt: FieldValue.serverTimestamp(),
+            });
+          }
+        }
       }
 
       if (hasRainbow) {
