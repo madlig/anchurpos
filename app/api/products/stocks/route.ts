@@ -4,9 +4,6 @@ import { requireRole } from "@/lib/auth-middleware";
 import { FieldValue } from "firebase-admin/firestore";
 
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(req, ["owner", "manager"]);
-  if (auth instanceof NextResponse) return auth;
-
   try {
     const [productsSnap, variantsSnap, stocksSnap] = await Promise.all([
       adminDb.collection("products").where("isActive", "==", true).get(),

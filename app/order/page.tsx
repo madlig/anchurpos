@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import {
   Loader2, Plus, Trash2, Check, ShoppingBag, X,
@@ -19,6 +19,7 @@ const SELECT_CLS = "w-full h-11 rounded-2xl border px-4 pr-9 text-sm font-medium
 export default function PublicOrderPage() {
   const [products, setProducts] = useState<SimpleProduct[]>([]);
   const [variants, setVariants] = useState<SimpleVariant[]>([]);
+  const [productStocks, setProductStocks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [name, setName] = useState("");
@@ -38,10 +39,59 @@ export default function PublicOrderPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([fetch("/api/products").then((r) => r.json()), fetch("/api/variants").then((r) => r.json())])
-      .then(([p, v]) => { setProducts(p); setVariants(v); })
+    Promise.all([
+      fetch("/api/products").then((r) => r.json()),
+      fetch("/api/variants").then((r) => r.json()),
+      fetch("/api/products/stocks").then((r) => r.json()),
+    ])
+      .then(([p, v, s]) => {
+        setProducts(p);
+        setVariants(v);
+        setProductStocks(Array.isArray(s) ? s : []);
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  const availableVariants = useMemo(() => {
+    if (!addProductId) return [];
+
+    // 1. If it's a frozen product
+    if (addProductId.startsWith("churros-frozen")) {
+      const stocks = productStocks.filter(s => s.productId === addProductId);
+      return stocks.map(s => ({
+        id: s.variantId,
+        name: s.variantName,
+        stock: s.currentStock,
+      }));
+    }
+
+    // 2. If it's churros-rainbow
+    if (addProductId === "churros-rainbow") {
+      return [{ id: "rainbow", name: "Rainbow", stock: 999 }];
+    }
+
+    // 3. If it's Extra Dipping Sauce
+    if (addProductId === "QCPFbGabYGWAZRB9tesO" || addProductId === "EDS" || addProductId.toLowerCase().includes("sauce")) {
+      return [{ id: "original", name: "Default / Original", stock: 999 }];
+    }
+
+    // 4. For anything else (like Churros Matang)
+    return variants
+      .filter(v => v.id !== "rainbow")
+      .map(v => ({
+        id: v.id,
+        name: v.name,
+        stock: 999,
+      }));
+  }, [addProductId, productStocks, variants]);
+
+  useEffect(() => {
+    if (availableVariants.length === 1) {
+      setAddVariantId(availableVariants[0].id);
+    } else {
+      setAddVariantId("");
+    }
+  }, [availableVariants]);
 
   function addToCart() {
     if (!addProductId || !addVariantId || !addQty) return;
@@ -215,9 +265,16 @@ export default function PublicOrderPage() {
                     <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#94A3B8" }} />
                   </div>
                   <div className="relative">
-                    <select value={addVariantId} onChange={(e) => setAddVariantId(e.target.value)} className={SELECT_CLS} style={{ borderColor: "#E2E8F0", background: "#fff" }} data-testid="public-variant-select">
-                      <option value="">Pilih varian...</option>
-                      {variants.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                    <select value={addVariantId} onChange={(e) => setAddVariantId(e.target.value)} className={SELECT_CLS} style={{ borderColor: "#E2E8F0", background: "#fff" }} data-testid="public-variant-select" disabled={availableVariants.length === 0}>
+                      <option value="">{availableVariants.length === 0 ? "Pilih produk dahulu..." : "Pilih varian..."}</option>
+                      {availableVariants.map((v) => {
+                        const isOut = addProductId.startsWith("churros-frozen") && v.stock <= 0;
+                        return (
+                          <option key={v.id} value={v.id} disabled={isOut}>
+                            {v.name} {isOut ? "(Habis)" : addProductId.startsWith("churros-frozen") ? `(Stok: ${v.stock} pack)` : ""}
+                          </option>
+                        );
+                      })}
                     </select>
                     <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#94A3B8" }} />
                   </div>
