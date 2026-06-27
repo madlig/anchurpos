@@ -69,6 +69,23 @@ export async function POST(req: NextRequest) {
         ? (existingSnap.data()?.performanceBonus ?? 0)
         : 0;
 
+      // Format default work period as e.g. "Juni 2026"
+      const [y, m] = month.split("-");
+      const monthNames = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+      ];
+      const monthName = monthNames[parseInt(m) - 1] || m;
+      const defaultWorkPeriod = `${monthName} ${y}`;
+
+      const existingWorkPeriod = existingSnap.exists
+        ? (existingSnap.data()?.workPeriod ?? defaultWorkPeriod)
+        : defaultWorkPeriod;
+
+      const existingBonusNote = existingSnap.exists
+        ? (existingSnap.data()?.performanceBonusNote ?? "")
+        : "";
+
       const pendingReview = direviewSnap.size;
       const dataStatus = pendingReview > 0 ? "parsial" : "final";
       const totalPaid = totalRegularPay + totalOvertimeBonus + existingBonus;
@@ -83,6 +100,8 @@ export async function POST(req: NextRequest) {
           totalRegularPay,
           totalOvertimeBonus,
           performanceBonus: existingBonus,
+          performanceBonusNote: existingBonusNote,
+          workPeriod: existingWorkPeriod,
           totalPaid,
           pendingReview,
           dataStatus,

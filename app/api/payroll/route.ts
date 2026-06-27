@@ -32,6 +32,8 @@ export async function GET(req: NextRequest) {
         totalRegularPay: d.totalRegularPay,
         totalOvertimeBonus: d.totalOvertimeBonus,
         performanceBonus: d.performanceBonus ?? 0,
+        performanceBonusNote: d.performanceBonusNote ?? "",
+        workPeriod: d.workPeriod ?? "",
         totalPaid: d.totalPaid,
         pendingReview: d.pendingReview,
         dataStatus: d.dataStatus,

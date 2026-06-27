@@ -177,7 +177,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs mt-6" style={{ color: "rgba(255,255,255,0.6)" }}>AnchurPOS v1.0 · Anchur Bandung</p>
+        <p className="text-center text-xs mt-6" style={{ color: "rgba(255,255,255,0.6)" }}>AnchurPOS v1.0 · Anchur.us</p>
       </div>
     </div>
   );

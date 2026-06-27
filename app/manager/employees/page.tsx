@@ -22,6 +22,8 @@ interface PayrollRecord {
   totalRegularPay: number;
   totalOvertimeBonus: number;
   performanceBonus: number;
+  performanceBonusNote: string;
+  workPeriod: string;
   totalPaid: number;
   pendingReview: number;
   dataStatus: "parsial" | "final";
@@ -252,7 +254,11 @@ export default function ManagerEmployeesPage() {
   const [generatingPayroll, setGeneratingPayroll] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [editingPayrollId, setEditingPayrollId] = useState<string | null>(null);
+  const [editWorkPeriod, setEditWorkPeriod] = useState("");
+  const [editWorkDays, setEditWorkDays] = useState("");
+  const [editDailyWage, setEditDailyWage] = useState("");
   const [editPerformanceBonus, setEditPerformanceBonus] = useState("");
+  const [editPerformanceBonusNote, setEditPerformanceBonusNote] = useState("");
   const [savingBonusId, setSavingBonusId] = useState<string | null>(null);
   const [payrollWarnings, setPayrollWarnings] = useState<string[]>([]);
 
@@ -380,25 +386,43 @@ export default function ManagerEmployeesPage() {
     }
   }
 
-  async function handleSavePerformanceBonus(id: string) {
-    const bonus = Number(editPerformanceBonus);
-    if (isNaN(bonus) || bonus < 0) {
+  async function handleSavePayroll(id: string) {
+    const workDaysVal = Number(editWorkDays);
+    const dailyWageVal = Number(editDailyWage);
+    const bonusVal = Number(editPerformanceBonus);
+
+    if (isNaN(workDaysVal) || workDaysVal < 0) {
+      alert("Jumlah hari kerja / shift tidak valid");
+      return;
+    }
+    if (isNaN(dailyWageVal) || dailyWageVal < 0) {
+      alert("Rate per shift tidak valid");
+      return;
+    }
+    if (isNaN(bonusVal) || bonusVal < 0) {
       alert("Bonus tidak valid");
       return;
     }
+
     setSavingBonusId(id);
     try {
       const res = await fetchWithAuth(`/api/payroll/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ performanceBonus: bonus })
+        body: JSON.stringify({
+          workPeriod: editWorkPeriod,
+          workDays: workDaysVal,
+          dailyWage: dailyWageVal,
+          performanceBonus: bonusVal,
+          performanceBonusNote: editPerformanceBonusNote,
+        })
       });
       if (res.ok) {
         setEditingPayrollId(null);
         await loadPayroll();
-        showSuccess("Bonus prestasi berhasil diperbarui!");
+        showSuccess("Data payroll berhasil diperbarui!");
       } else {
         const d = await res.json();
-        alert(d.error || "Gagal menyimpan bonus");
+        alert(d.error || "Gagal menyimpan payroll");
       }
     } catch {
       alert("Kesalahan jaringan");
@@ -437,6 +461,104 @@ export default function ManagerEmployeesPage() {
     } finally {
       setPayingId(null);
     }
+  }
+
+  function printPayrollSlip(p: PayrollRecord) {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Popup blocker aktif. Mohon izinkan popup untuk mencetak slip.");
+      return;
+    }
+
+    const regularPayFormatted = fmtRupiah(p.totalRegularPay);
+    const overtimeBonusFormatted = fmtRupiah(p.totalOvertimeBonus);
+    const performanceBonusFormatted = fmtRupiah(p.performanceBonus);
+    const totalPaidFormatted = fmtRupiah(p.totalPaid);
+    const dailyWageFormatted = fmtRupiah(p.dailyWage);
+
+    const bonusSection = p.performanceBonus > 0
+      ? `<div class="row"><span>Bonus / Insentif:</span><strong>${performanceBonusFormatted}</strong></div>` +
+        (p.performanceBonusNote ? `<div class="note">* ${p.performanceBonusNote}</div>` : "")
+      : "";
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Slip Gaji - ${p.employeeName}</title>
+          <style>
+            body { padding: 40px; font-family: 'Courier New', Courier, monospace; background-color: #f1f5f9; display: flex; justify-content: center; }
+            .slip-container { background: #fff; max-width: 450px; width: 100%; border: 1px dashed #000; padding: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+            .header h1 { margin: 0; font-size: 20px; font-weight: bold; }
+            .header p { margin: 2px 0 0; font-size: 12px; }
+            .meta-info { margin-bottom: 15px; font-size: 13px; }
+            .meta-info div { margin-bottom: 4px; }
+            .divider { border-top: 1px dashed #000; margin: 12px 0; }
+            .row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+            .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; border-top: 1px solid #000; margin-top: 10px; padding-top: 8px; }
+            .note { font-size: 11px; font-style: italic; color: #333; margin-top: -4px; margin-bottom: 8px; padding-left: 10px; }
+            .footer { text-align: center; margin-top: 25px; font-size: 12px; }
+            .btn-print { display: block; width: 100%; text-align: center; margin-top: 20px; padding: 10px; background: #E85D8C; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
+            @media print {
+              body { margin: 0; padding: 20px; background-color: #fff; display: block; }
+              .slip-container { max-width: 100%; border: none; padding: 0; box-shadow: none; }
+              .btn-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="slip-container">
+            <div class="header">
+              <h1>Anchur.us</h1>
+              <p>SLIP GAJI KARYAWAN</p>
+            </div>
+            
+            <div class="meta-info">
+              <div><strong>Nama:</strong> ${p.employeeName}</div>
+              <div><strong>Jabatan:</strong> Crew Produksi</div>
+              <div><strong>Periode:</strong> ${p.workPeriod || p.month}</div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="row">
+              <span>Kehadiran (Shift):</span>
+              <strong>${p.workDays} shift</strong>
+            </div>
+            <div class="row">
+              <span>Rate per Shift:</span>
+              <strong>${dailyWageFormatted}</strong>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="row">
+              <span>Gaji Pokok (${p.workDays} shift):</span>
+              <strong>${regularPayFormatted}</strong>
+            </div>
+            
+            <div class="row">
+              <span>Bonus Lembur:</span>
+              <strong>${overtimeBonusFormatted}</strong>
+            </div>
+            
+            ${bonusSection}
+            
+            <div class="total-row">
+              <span>Total Diterima (THP):</span>
+              <span>${totalPaidFormatted}</span>
+            </div>
+            
+            <div class="footer">
+              <p>Terima kasih atas kerja kerasnya!</p>
+            </div>
+            
+            <button class="btn-print" onclick="window.print()">Cetak Slip Gaji</button>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   }
 
   const loadEmployees = useCallback(async () => {
@@ -969,7 +1091,7 @@ export default function ManagerEmployeesPage() {
               <div className="flex flex-col gap-3">
                 {payrolls.map((p) => {
                   const isEditing = editingPayrollId === p.id;
-                  const canPay = role === "owner" && p.status === "belum_dibayar";
+                  const canPay = (role === "owner" || role === "manager") && p.status === "belum_dibayar";
 
                   return (
                     <div
@@ -981,7 +1103,7 @@ export default function ManagerEmployeesPage() {
                         <div>
                           <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>{p.employeeName}</p>
                           <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>
-                            {p.workDays} hari kerja valid @ {fmtRupiah(p.dailyWage)}/hari
+                            {p.workPeriod ? `Periode: ${p.workPeriod} · ` : ""}{p.workDays} hari kerja valid @ {fmtRupiah(p.dailyWage)}/hari
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-1.5">
@@ -1033,46 +1155,148 @@ export default function ManagerEmployeesPage() {
                         </div>
                       </div>
 
+                      {p.performanceBonusNote && (
+                        <p style={{ fontSize: "10px", color: "#64748B", fontStyle: "italic", marginTop: "8px", paddingLeft: "4px" }}>
+                          * Detail Bonus: {p.performanceBonusNote}
+                        </p>
+                      )}
+
                       {/* Aksi Gaji */}
-                      {!p.isLocked && (
-                        <div className="flex items-center gap-2 mt-4 pt-3" style={{ borderTop: "1px solid #F8FAFC" }}>
-                          {!isEditing ? (
+                      <div className="flex items-center gap-2 mt-4 pt-3" style={{ borderTop: "1px solid #F8FAFC" }}>
+                        {!isEditing ? (
+                          <>
+                            {!p.isLocked && (
+                              <button
+                                onClick={() => {
+                                  setEditingPayrollId(p.id);
+                                  setEditWorkPeriod(p.workPeriod || "");
+                                  setEditWorkDays(String(p.workDays));
+                                  setEditDailyWage(String(p.dailyWage));
+                                  setEditPerformanceBonus(String(p.performanceBonus));
+                                  setEditPerformanceBonusNote(p.performanceBonusNote || "");
+                                }}
+                                className="tap-target"
+                                style={{
+                                  padding: "6px 12px",
+                                  borderRadius: "10px",
+                                  background: "#FEF1F5",
+                                  color: "#E85D8C",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: "11px",
+                                  fontWeight: "700"
+                                }}
+                                data-testid={`edit-bonus-btn-${p.employeeId}`}
+                              >
+                                Edit Gaji
+                              </button>
+                            )}
                             <button
-                              onClick={() => {
-                                setEditingPayrollId(p.id);
-                                setEditPerformanceBonus(String(p.performanceBonus));
-                              }}
+                              onClick={() => printPayrollSlip(p)}
                               className="tap-target"
                               style={{
                                 padding: "6px 12px",
                                 borderRadius: "10px",
-                                background: "#FEF1F5",
-                                color: "#E85D8C",
+                                background: "#F1F5F9",
+                                color: "#64748B",
                                 border: "none",
                                 cursor: "pointer",
                                 fontSize: "11px",
                                 fontWeight: "700"
                               }}
-                              data-testid={`edit-bonus-btn-${p.employeeId}`}
                             >
-                              Edit Bonus
+                              Cetak Slip
                             </button>
-                          ) : (
-                            <div className="flex items-center gap-2 w-full">
-                              <Input
-                                type="number"
-                                placeholder="Bonus prestasi..."
-                                value={editPerformanceBonus}
-                                onChange={(e) => setEditPerformanceBonus(e.target.value)}
-                                className="h-8 w-36 rounded-lg text-xs"
-                                data-testid={`bonus-input-${p.employeeId}`}
-                              />
+                            {canPay && (
                               <button
-                                onClick={() => handleSavePerformanceBonus(p.id)}
+                                onClick={() => handlePayPayroll(p)}
+                                disabled={payingId === p.id}
+                                className="ml-auto tap-target"
+                                style={{
+                                  padding: "6px 12px",
+                                  borderRadius: "10px",
+                                  background: "linear-gradient(135deg, #16A34A, #15803D)",
+                                  color: "#fff",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: "11px",
+                                  fontWeight: "700",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px"
+                                }}
+                                data-testid={`pay-salary-btn-${p.employeeId}`}
+                              >
+                                {payingId === p.id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                                Bayar Gaji
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <div className="flex flex-col gap-3 w-full bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <p className="text-xs font-bold text-slate-700">Edit Rincian Slip Gaji</p>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-400 block mb-1">PERIODE KERJA</label>
+                                <Input
+                                  type="text"
+                                  placeholder="Contoh: Juni 2026"
+                                  value={editWorkPeriod}
+                                  onChange={(e) => setEditWorkPeriod(e.target.value)}
+                                  className="h-9 rounded-lg text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-400 block mb-1">JUMLAH KEHADIRAN (SHIFT)</label>
+                                <Input
+                                  type="number"
+                                  placeholder="Total kehadiran..."
+                                  value={editWorkDays}
+                                  onChange={(e) => setEditWorkDays(e.target.value)}
+                                  className="h-9 rounded-lg text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-400 block mb-1">RATE PER SHIFT</label>
+                                <Input
+                                  type="number"
+                                  placeholder="Rate per shift..."
+                                  value={editDailyWage}
+                                  onChange={(e) => setEditDailyWage(e.target.value)}
+                                  className="h-9 rounded-lg text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-400 block mb-1">BONUS / INSENTIF</label>
+                                <Input
+                                  type="number"
+                                  placeholder="Bonus..."
+                                  value={editPerformanceBonus}
+                                  onChange={(e) => setEditPerformanceBonus(e.target.value)}
+                                  className="h-9 rounded-lg text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 block mb-1">DETAIL/KETERANGAN BONUS</label>
+                              <Input
+                                  type="text"
+                                  placeholder="Contoh: Bonus rajin packing & target tercapai..."
+                                  value={editPerformanceBonusNote}
+                                  onChange={(e) => setEditPerformanceBonusNote(e.target.value)}
+                                  className="h-9 rounded-lg text-xs"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-2 mt-1">
+                              <button
+                                onClick={() => handleSavePayroll(p.id)}
                                 disabled={savingBonusId === p.id}
                                 className="tap-target"
                                 style={{
-                                  padding: "6px 12px",
+                                  padding: "8px 16px",
                                   borderRadius: "8px",
                                   background: "#E85D8C",
                                   color: "#fff",
@@ -1083,51 +1307,27 @@ export default function ManagerEmployeesPage() {
                                 }}
                                 data-testid={`save-bonus-btn-${p.employeeId}`}
                               >
-                                {savingBonusId === p.id ? <Loader2 size={10} className="animate-spin" /> : "Simpan"}
+                                {savingBonusId === p.id ? <Loader2 size={11} className="animate-spin" /> : "Simpan Perubahan"}
                               </button>
                               <button
                                 onClick={() => setEditingPayrollId(null)}
                                 style={{
-                                  padding: "6px 12px",
+                                  padding: "8px 16px",
                                   borderRadius: "8px",
                                   background: "#F1F5F9",
                                   color: "#64748B",
                                   border: "none",
                                   cursor: "pointer",
-                                  fontSize: "11px"
+                                  fontSize: "11px",
+                                  fontWeight: "600"
                                 }}
                               >
                                 Batal
                               </button>
                             </div>
-                          )}
-
-                          {canPay && !isEditing && (
-                            <button
-                              onClick={() => handlePayPayroll(p)}
-                              disabled={payingId === p.id}
-                              className="ml-auto tap-target"
-                              style={{
-                                padding: "6px 12px",
-                                borderRadius: "10px",
-                                background: "linear-gradient(135deg, #16A34A, #15803D)",
-                                color: "#fff",
-                                border: "none",
-                                cursor: "pointer",
-                                fontSize: "11px",
-                                fontWeight: "700",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px"
-                              }}
-                              data-testid={`pay-salary-btn-${p.employeeId}`}
-                            >
-                              {payingId === p.id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-                              Bayar Gaji
-                            </button>
-                          )}
-                        </div>
-                      )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
