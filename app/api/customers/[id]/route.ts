@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireRole } from "@/lib/auth-middleware";
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { id } = params;
+  const { id } = await params;
   const body = await req.json();
 
   try {
@@ -32,11 +32,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { id } = params;
+  const { id } = await params;
   try {
     await adminDb.collection("customers").doc(id).update({ isActive: false });
     return NextResponse.json({ success: true });
@@ -45,3 +45,4 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: "Gagal menghapus pelanggan" }, { status: 500 });
   }
 }
+
