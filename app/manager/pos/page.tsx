@@ -15,7 +15,7 @@ interface Variant {
   id: string; name: string; currentStock: number; minStock: number; sortOrder: number;
 }
 interface CustomerItem {
-  id: string; name: string; channel: string; phoneNumber: string | null;
+  id: string; name: string; channel: string; customerType: string; phoneNumber: string | null;
 }
 interface CartItem {
   productId: string; productName: string;
@@ -68,13 +68,17 @@ export default function KasirPage() {
 
   // Checkout sheet state
   const [showCheckout, setShowCheckout] = useState(false);
+  const [orderChannel, setOrderChannel] = useState<"walkin" | "whatsapp" | "tiktok" | "shopee">("walkin");
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [saveNewCustomer, setSaveNewCustomer] = useState(false);
+  const [newCustomerType, setNewCustomerType] = useState<"reguler" | "b2b" | "reseller">("reguler");
   const [payMethod, setPayMethod] = useState<PayMethod>("cash");
   const [isPaid, setIsPaid] = useState(true);
   const [orderNotes, setOrderNotes] = useState("");
+  const [platformFeeOverride, setPlatformFeeOverride] = useState(""); // manual override if needed
+  const [marketplaceFees, setMarketplaceFees] = useState({ tiktok: 0, shopee: 0 });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const customerRef = useRef<HTMLDivElement>(null);
@@ -90,21 +94,26 @@ export default function KasirPage() {
       fetchWithAuth("/api/variants").then(r => r.json()),
       fetchWithAuth("/api/customers").then(r => r.json()),
       fetchWithAuth("/api/products/stocks").then(r => r.json()),
-    ]).then(([p, v, c, s]) => {
+      fetchWithAuth("/api/settings/marketplace-fee").then(r => r.ok ? r.json() : { tiktok: 0, shopee: 0 }),
+    ]).then(([p, v, c, s, fees]) => {
       setProducts(Array.isArray(p) ? p : []);
       setVariants(Array.isArray(v) ? v : []);
       setCustomers(Array.isArray(c) ? c : []);
       setProductStocks(Array.isArray(s) ? s : []);
+      setMarketplaceFees({ tiktok: fees.tiktok ?? 0, shopee: fees.shopee ?? 0 });
     }).finally(() => setLoading(false));
   }, [fetchWithAuth]);
 
   // ── Filtered products ──────────────────────────────────────────────────────
   const filteredProducts = useMemo(() => {
+    // TikTok: hanya tampilkan produk TikTok (nama mengandung "tiktok" atau "TikTok")
+    const isTicktokChannel = orderChannel === "tiktok";
     return products.filter(p =>
+      (isTicktokChannel ? p.name.toLowerCase().includes("tiktok") : !p.name.toLowerCase().includes("tiktok")) &&
       (activeCategory === "Semua" || p.name === activeCategory) &&
       (!search || p.name.toLowerCase().includes(search.toLowerCase()))
     );
-  }, [products, activeCategory, search]);
+  }, [products, activeCategory, search, orderChannel]);
 
   // ── Cart calculations ──────────────────────────────────────────────────────
   const cartTotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart]);
@@ -172,8 +181,19 @@ export default function KasirPage() {
     }));
   }
 
+  // ── Fee calculations ────────────────────────────────────────────────────────
+  const activeFeePercent = useMemo(() => {
+    if (platformFeeOverride !== "") return parseFloat(platformFeeOverride) || 0;
+    if (orderChannel === "tiktok") return marketplaceFees.tiktok;
+    if (orderChannel === "shopee") return marketplaceFees.shopee;
+    return 0;
+  }, [orderChannel, marketplaceFees, platformFeeOverride]);
+
+  const feeAmount = useMemo(() => Math.round(cartTotal * activeFeePercent / 100), [cartTotal, activeFeePercent]);
+  const netRevenue = useMemo(() => cartTotal - feeAmount, [cartTotal, feeAmount]);
+
   // ── Checkout ───────────────────────────────────────────────────────────────
-  // Filter customers untuk dropdown
+  // Filter customers untuk dropdown — untuk WA tampilkan semua, untuk channel lain tersembunyi
   const filteredCustomers = useMemo(() => {
     const q = customerSearch.toLowerCase().trim();
     if (!q) return customers.slice(0, 8);
@@ -182,7 +202,8 @@ export default function KasirPage() {
 
   const isNewCustomer = customerSearch.trim() && !selectedCustomer && !customers.some(c => c.name.toLowerCase() === customerSearch.toLowerCase().trim());
   const finalCustomerName = selectedCustomer ? selectedCustomer.name : customerSearch.trim() || "Walk-in";
-  const isB2B = selectedCustomer?.channel === "b2b";
+  const effectiveCustomerType = selectedCustomer?.customerType ?? (isNewCustomer ? newCustomerType : "reguler");
+  const isB2B = effectiveCustomerType === "b2b" || effectiveCustomerType === "reseller";
 
   async function handleCheckout() {
     if (!cart.length) return;
@@ -193,12 +214,17 @@ export default function KasirPage() {
       if (isNewCustomer && saveNewCustomer && customerSearch.trim()) {
         const saveRes = await fetchWithAuth("/api/customers", {
           method: "POST",
-          body: JSON.stringify({ name: customerSearch.trim(), channel: "retail", createdVia: "pos" }),
+          body: JSON.stringify({
+            name: customerSearch.trim(),
+            customerType: newCustomerType,
+            channel: orderChannel === "whatsapp" ? "whatsapp" : "walk_in",
+            createdVia: "pos"
+          }),
         });
         if (saveRes.ok) {
           const newC = await saveRes.json();
           customerId = newC.id;
-          setCustomers(prev => [...prev, { id: newC.id, name: customerSearch.trim(), channel: "retail", phoneNumber: null }]);
+          setCustomers(prev => [...prev, { id: newC.id, name: customerSearch.trim(), channel: "whatsapp", customerType: newCustomerType, phoneNumber: null }]);
         }
       }
 
@@ -207,10 +233,14 @@ export default function KasirPage() {
         body: JSON.stringify({
           customerName: finalCustomerName,
           customerId,
-          source: "walk_in",
+          customerType: isNewCustomer ? newCustomerType : (selectedCustomer?.customerType ?? null),
+          source: orderChannel === "walkin" ? "walk_in" : orderChannel === "whatsapp" ? "wa_form" : "marketplace_manual",
+          orderChannel,
           items: cart.map(c => ({ productId: c.productId, variantId: c.variantId, qty: c.qty })),
-          paymentMethod: payMethod,
+          paymentMethod: isPaid ? payMethod : null,
           paymentStatus: isPaid ? "sudah_bayar" : "belum_bayar",
+          platformFeePercent: activeFeePercent,
+          platformFee: feeAmount,
           orderNotes: orderNotes.trim() || null,
         }),
       });
@@ -219,6 +249,7 @@ export default function KasirPage() {
       // Reset
       setCart([]); setShowCheckout(false); setCustomerSearch("");
       setSelectedCustomer(null); setOrderNotes(""); setIsPaid(true); setSaveNewCustomer(false);
+      setPlatformFeeOverride(""); setNewCustomerType("reguler");
       router.push(`/manager/orders/${data.orderId}`);
     } catch { setError("Gagal menghubungi server"); } finally { setSubmitting(false); }
   }
@@ -459,6 +490,29 @@ export default function KasirPage() {
               </button>
             </div>
 
+            {/* ── Sumber Pesanan ── */}
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
+                Sumber Pesanan
+              </label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {([
+                  { key: "walkin", label: "Walk-in", emoji: "🏪" },
+                  { key: "whatsapp", label: "WhatsApp", emoji: "💬" },
+                  { key: "tiktok", label: "TikTok", emoji: "🎵" },
+                  { key: "shopee", label: "Shopee", emoji: "🛍️" },
+                ] as const).map(ch => (
+                  <button key={ch.key} onClick={() => { setOrderChannel(ch.key); setCart([]); setSelectedCustomer(null); setCustomerSearch(""); setPlatformFeeOverride(""); }}
+                    style={{ padding: "8px 4px", borderRadius: "10px", fontSize: "11px", fontWeight: "600", border: "none", cursor: "pointer", textAlign: "center",
+                      color: orderChannel === ch.key ? "#fff" : "#64748B",
+                      background: orderChannel === ch.key ? "#E85D8C" : "#F1F5F9" }}>
+                    <div style={{ fontSize: "14px", marginBottom: "2px" }}>{ch.emoji}</div>
+                    {ch.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Cart summary */}
             <div style={{ background: "#F8FAFC", borderRadius: "12px", padding: "12px 14px", marginBottom: "14px" }}>
               {cart.map((item, i) => (
@@ -484,100 +538,142 @@ export default function KasirPage() {
               ))}
             </div>
 
-            {/* ── Customer Picker ── */}
-            <div style={{ marginBottom: "12px" }}>
-              <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "6px" }}>
-                Pelanggan
-              </label>
-              <div ref={customerRef} style={{ position: "relative" }}>
-                {selectedCustomer ? (
-                  <div className="flex items-center justify-between"
-                    style={{ padding: "10px 12px", borderRadius: "12px", border: "1px solid #E85D8C", background: "#FEF1F5" }}>
-                    <div>
-                      <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>{selectedCustomer.name}</p>
-                      <p style={{ fontSize: "11px", color: "#E85D8C", textTransform: "uppercase" }}>{selectedCustomer.channel}</p>
+            {/* ── Customer Picker — hanya untuk WhatsApp ── */}
+            {orderChannel === "whatsapp" && (
+              <div style={{ marginBottom: "12px" }}>
+                <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "6px" }}>
+                  Pelanggan
+                </label>
+                <div ref={customerRef} style={{ position: "relative" }}>
+                  {selectedCustomer ? (
+                    <div className="flex items-center justify-between"
+                      style={{ padding: "10px 12px", borderRadius: "12px", border: "1px solid #E85D8C", background: "#FEF1F5" }}>
+                      <div>
+                        <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>{selectedCustomer.name}</p>
+                        <p style={{ fontSize: "11px", color: "#E85D8C", textTransform: "uppercase" }}>{selectedCustomer.customerType}</p>
+                      </div>
+                      <button onClick={() => { setSelectedCustomer(null); setCustomerSearch(""); }}
+                        style={{ width: "24px", height: "24px", borderRadius: "8px", background: "#FEE2E2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <X size={12} style={{ color: "#DC2626" }} />
+                      </button>
                     </div>
-                    <button onClick={() => { setSelectedCustomer(null); setCustomerSearch(""); }}
-                      style={{ width: "24px", height: "24px", borderRadius: "8px", background: "#FEE2E2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <X size={12} style={{ color: "#DC2626" }} />
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <input type="text" placeholder="Cari nama pelanggan atau ketik baru..."
-                      value={customerSearch}
-                      onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
-                      onFocus={() => setShowCustomerDropdown(true)}
-                      style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", border: "1px solid #E2E8F0", fontSize: "13px", outline: "none", background: "#F8FAFC" }}
-                      data-testid="checkout-customer-search" />
-                    {showCustomerDropdown && (filteredCustomers.length > 0 || isNewCustomer) && (
-                      <div style={{ position: "absolute", top: "44px", left: 0, right: 0, background: "#fff", borderRadius: "12px", border: "1px solid #E2E8F0", boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 10, overflow: "hidden" }}>
-                        {filteredCustomers.map(c => (
-                          <button key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearch(c.name); setShowCustomerDropdown(false); }}
-                            className="w-full flex items-center justify-between"
-                            style={{ padding: "10px 14px", border: "none", background: "transparent", cursor: "pointer", textAlign: "left", borderBottom: "1px solid #F8FAFC" }}
-                            data-testid={`customer-option-${c.id}`}>
-                            <div>
-                              <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{c.name}</p>
-                              {c.phoneNumber && <p style={{ fontSize: "11px", color: "#94A3B8" }}>{c.phoneNumber}</p>}
+                  ) : (
+                    <>
+                      <input type="text" placeholder="Cari nama pelanggan atau ketik baru..."
+                        value={customerSearch}
+                        onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
+                        onFocus={() => setShowCustomerDropdown(true)}
+                        style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", border: "1px solid #E2E8F0", fontSize: "13px", outline: "none", background: "#F8FAFC" }}
+                        data-testid="checkout-customer-search" />
+                      {showCustomerDropdown && (filteredCustomers.length > 0 || isNewCustomer) && (
+                        <div style={{ position: "absolute", top: "44px", left: 0, right: 0, background: "#fff", borderRadius: "12px", border: "1px solid #E2E8F0", boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 10, overflow: "hidden" }}>
+                          {filteredCustomers.map(c => (
+                            <button key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearch(c.name); setShowCustomerDropdown(false); }}
+                              className="w-full flex items-center justify-between"
+                              style={{ padding: "10px 14px", border: "none", background: "transparent", cursor: "pointer", textAlign: "left", borderBottom: "1px solid #F8FAFC" }}
+                              data-testid={`customer-option-${c.id}`}>
+                              <div>
+                                <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{c.name}</p>
+                                {c.phoneNumber && <p style={{ fontSize: "11px", color: "#94A3B8" }}>{c.phoneNumber}</p>}
+                              </div>
+                              <span style={{ padding: "2px 8px", borderRadius: "6px", background: c.customerType === "b2b" ? "#EFF6FF" : c.customerType === "reseller" ? "#FEF3C7" : "#F8FAFC", border: "1px solid #E2E8F0", fontSize: "10px", fontWeight: "600", color: c.customerType === "b2b" ? "#2563EB" : c.customerType === "reseller" ? "#D97706" : "#64748B" }}>
+                                {c.customerType?.toUpperCase()}
+                              </span>
+                            </button>
+                          ))}
+                          {customerSearch.trim() && (
+                            <div style={{ padding: "10px 14px", borderTop: filteredCustomers.length ? "1px solid #F1F5F9" : "none" }}>
+                              <p style={{ fontSize: "11px", color: "#64748B", marginBottom: "6px" }}>
+                                {isNewCustomer ? `"${customerSearch.trim()}" belum ada di master pelanggan` : "Gunakan nama ini:"}
+                              </p>
+                              <button onClick={() => setShowCustomerDropdown(false)}
+                                className="flex items-center gap-2 w-full"
+                                style={{ padding: "8px 0", border: "none", background: "transparent", cursor: "pointer" }}
+                                data-testid="use-custom-name-btn">
+                                <span style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>"{customerSearch.trim()}"</span>
+                                <span style={{ fontSize: "11px", color: "#94A3B8" }}>— tanpa simpan ke master</span>
+                              </button>
                             </div>
-                            <span style={{ padding: "2px 8px", borderRadius: "6px", background: c.channel === "b2b" ? "#EFF6FF" : "#F8FAFC", border: "1px solid #E2E8F0", fontSize: "10px", fontWeight: "600", color: c.channel === "b2b" ? "#2563EB" : "#64748B" }}>
-                              {c.channel.toUpperCase()}
-                            </span>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+                {/* Opsi simpan ke master jika nama baru */}
+                {isNewCustomer && !showCustomerDropdown && (
+                  <div style={{ marginTop: "8px" }}>
+                    <label className="flex items-center gap-2" style={{ cursor: "pointer", marginBottom: "6px" }}>
+                      <input type="checkbox" checked={saveNewCustomer} onChange={e => setSaveNewCustomer(e.target.checked)}
+                        style={{ accentColor: "#E85D8C" }} data-testid="save-new-customer-checkbox" />
+                      <span style={{ fontSize: "12px", color: "#64748B" }}>Simpan "{customerSearch.trim()}" ke master pelanggan</span>
+                    </label>
+                    {saveNewCustomer && (
+                      <div className="flex gap-1.5">
+                        {(["reguler", "b2b", "reseller"] as const).map(ct => (
+                          <button key={ct} onClick={() => setNewCustomerType(ct)}
+                            style={{ flex: 1, padding: "6px", borderRadius: "8px", fontSize: "11px", fontWeight: "600", border: "none", cursor: "pointer",
+                              color: newCustomerType === ct ? "#fff" : "#64748B",
+                              background: newCustomerType === ct ? "#E85D8C" : "#F1F5F9" }}>
+                            {ct.charAt(0).toUpperCase() + ct.slice(1)}
                           </button>
                         ))}
-                        {customerSearch.trim() && (
-                          <div style={{ padding: "10px 14px", borderTop: filteredCustomers.length ? "1px solid #F1F5F9" : "none" }}>
-                            <p style={{ fontSize: "11px", color: "#64748B", marginBottom: "6px" }}>
-                              {isNewCustomer ? `"${customerSearch.trim()}" belum ada di master pelanggan` : "Gunakan nama ini:"}
-                            </p>
-                            <button onClick={() => setShowCustomerDropdown(false)}
-                              className="flex items-center gap-2 w-full"
-                              style={{ padding: "8px 0", border: "none", background: "transparent", cursor: "pointer" }}
-                              data-testid="use-custom-name-btn">
-                              <span style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>"{customerSearch.trim()}"</span>
-                              <span style={{ fontSize: "11px", color: "#94A3B8" }}>— tanpa simpan ke master</span>
-                            </button>
-                          </div>
-                        )}
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
-              {/* Opsi simpan ke master jika nama baru */}
-              {isNewCustomer && !showCustomerDropdown && (
-                <label className="flex items-center gap-2" style={{ marginTop: "8px", cursor: "pointer" }}>
-                  <input type="checkbox" checked={saveNewCustomer} onChange={e => setSaveNewCustomer(e.target.checked)}
-                    style={{ accentColor: "#E85D8C" }} data-testid="save-new-customer-checkbox" />
-                  <span style={{ fontSize: "12px", color: "#64748B" }}>Simpan "{customerSearch.trim()}" ke data master pelanggan</span>
-                </label>
-              )}
-            </div>
+            )}
 
-            {/* ── Status Bayar ── */}
-            <div style={{ marginBottom: "12px" }}>
-              <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
-                Status Pembayaran
-              </label>
-              <div className="flex gap-2">
-                <button onClick={() => setIsPaid(true)} data-testid="pay-status-paid"
-                  className="flex items-center justify-center gap-1.5 flex-1"
-                  style={{ padding: "9px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", border: "none", cursor: "pointer",
-                    color: isPaid ? "#fff" : "#16A34A", background: isPaid ? "#16A34A" : "#DCFCE7" }}>
-                  <CheckCircle2 size={13} /> Sudah Bayar
-                </button>
-                <button onClick={() => setIsPaid(false)} data-testid="pay-status-unpaid"
-                  className="flex items-center justify-center gap-1.5 flex-1"
-                  style={{ padding: "9px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", border: "none", cursor: "pointer",
-                    color: !isPaid ? "#fff" : "#DC2626", background: !isPaid ? "#DC2626" : "#FEE2E2" }}>
-                  <CreditCard size={13} /> Belum Bayar
-                </button>
+            {/* ── Fee Marketplace (TikTok/Shopee) ── */}
+            {(orderChannel === "tiktok" || orderChannel === "shopee") && (
+              <div style={{ marginBottom: "12px", padding: "12px", borderRadius: "12px", background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                <p style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", marginBottom: "8px" }}>Potongan Platform</p>
+                <div className="flex items-center gap-2">
+                  <input type="number" step="0.1" min="0" max="100"
+                    placeholder={`Default: ${orderChannel === "tiktok" ? marketplaceFees.tiktok : marketplaceFees.shopee}%`}
+                    value={platformFeeOverride}
+                    onChange={e => setPlatformFeeOverride(e.target.value)}
+                    style={{ flex: 1, padding: "8px 12px", borderRadius: "10px", border: "1px solid #E2E8F0", fontSize: "13px", outline: "none", background: "#fff" }} />
+                  <span style={{ fontSize: "13px", color: "#64748B" }}>%</span>
+                  {platformFeeOverride !== "" && (
+                    <button onClick={() => setPlatformFeeOverride("")}
+                      style={{ width: "28px", height: "28px", borderRadius: "8px", background: "#FEE2E2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <X size={12} style={{ color: "#DC2626" }} />
+                    </button>
+                  )}
+                </div>
+                <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "6px" }}>Fee aktif: {activeFeePercent}% → Potongan: {fmt(feeAmount)}</p>
               </div>
-            </div>
+            )}
 
-            {/* ── Metode Pembayaran (hanya tampil jika sudah bayar) ── */}
-            {isPaid && (
+
+            {/* ── Status Bayar — hanya untuk WhatsApp ── */}
+            {orderChannel === "whatsapp" && (
+              <div style={{ marginBottom: "12px" }}>
+                <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
+                  Status Pembayaran
+                </label>
+                <div className="flex gap-2">
+                  <button onClick={() => setIsPaid(true)} data-testid="pay-status-paid"
+                    className="flex items-center justify-center gap-1.5 flex-1"
+                    style={{ padding: "9px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", border: "none", cursor: "pointer",
+                      color: isPaid ? "#fff" : "#16A34A", background: isPaid ? "#16A34A" : "#DCFCE7" }}>
+                    <CheckCircle2 size={13} /> Sudah Bayar
+                  </button>
+                  <button onClick={() => setIsPaid(false)} data-testid="pay-status-unpaid"
+                    className="flex items-center justify-center gap-1.5 flex-1"
+                    style={{ padding: "9px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", border: "none", cursor: "pointer",
+                      color: !isPaid ? "#fff" : "#DC2626", background: !isPaid ? "#DC2626" : "#FEE2E2" }}>
+                    <CreditCard size={13} /> Belum Bayar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Metode Pembayaran (hanya tampil jika sudah bayar & bukan marketplace record only) ── */}
+            {(orderChannel === "walkin" || (orderChannel === "whatsapp" && isPaid)) && (
+
               <div style={{ marginBottom: "12px" }}>
                 <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
                   Metode Pembayaran
@@ -603,11 +699,24 @@ export default function KasirPage() {
                 data-testid="checkout-notes" />
             </div>
 
-            {/* Total */}
-            <div className="flex items-center justify-between"
-              style={{ padding: "12px 14px", borderRadius: "12px", background: "#FEF1F5", border: "1px solid #F2A0B7", marginBottom: "14px" }}>
-              <span style={{ fontSize: "14px", fontWeight: "600", color: "#64748B" }}>Total</span>
-              <span style={{ fontSize: "18px", fontWeight: "700", color: "#E85D8C" }}>{fmt(cartTotal)}</span>
+            {/* Total + Net Revenue */}
+            <div style={{ padding: "12px 14px", borderRadius: "12px", background: "#FEF1F5", border: "1px solid #F2A0B7", marginBottom: "14px" }}>
+              <div className="flex items-center justify-between">
+                <span style={{ fontSize: "14px", fontWeight: "600", color: "#64748B" }}>Total Pesanan</span>
+                <span style={{ fontSize: "18px", fontWeight: "700", color: "#E85D8C" }}>{fmt(cartTotal)}</span>
+              </div>
+              {feeAmount > 0 && (
+                <>
+                  <div className="flex items-center justify-between" style={{ marginTop: "4px" }}>
+                    <span style={{ fontSize: "12px", color: "#94A3B8" }}>Fee {orderChannel} ({activeFeePercent}%)</span>
+                    <span style={{ fontSize: "12px", color: "#DC2626" }}>- {fmt(feeAmount)}</span>
+                  </div>
+                  <div className="flex items-center justify-between" style={{ marginTop: "4px", paddingTop: "6px", borderTop: "1px solid #F2A0B7" }}>
+                    <span style={{ fontSize: "13px", fontWeight: "700", color: "#64748B" }}>Pendapatan Bersih</span>
+                    <span style={{ fontSize: "16px", fontWeight: "700", color: "#16A34A" }}>{fmt(netRevenue)}</span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* B2B invoice notice */}

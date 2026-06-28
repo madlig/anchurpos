@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
       return {
         id: doc.id,
         name: data.name,
-        channel: data.channel,
+        channel: data.channel ?? "walk_in",
+        customerType: data.customerType ?? "reguler",
         phoneNumber: data.phoneNumber ?? null,
         address: data.address ?? null,
         discountPerUnit: data.discountPerUnit ?? 0,
@@ -40,15 +41,41 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const { name, channel = "retail", phoneNumber = null, createdVia = "manual" } = body as {
-    name: string; channel?: string; phoneNumber?: string | null; createdVia?: string;
+  const {
+    name,
+    channel = "walk_in",
+    customerType = "reguler",
+    phoneNumber = null,
+    address = null,
+    notes = "",
+    createdVia = "manual"
+  } = body as {
+    name: string;
+    channel?: string;
+    customerType?: string;
+    phoneNumber?: string | null;
+    address?: string | null;
+    notes?: string;
+    createdVia?: string;
   };
+
   if (!name?.trim()) return NextResponse.json({ error: "Nama pelanggan wajib diisi" }, { status: 400 });
 
   try {
     const ref = adminDb.collection("customers").doc();
-    await ref.set({ name: name.trim(), channel, phoneNumber, address: null, discountPerUnit: 0, notes: "", isActive: true, createdVia });
-    return NextResponse.json({ id: ref.id, name: name.trim(), channel }, { status: 201 });
+    await ref.set({
+      name: name.trim(),
+      channel,
+      customerType,
+      phoneNumber,
+      address,
+      notes,
+      discountPerUnit: 0,
+      isActive: true,
+      createdVia,
+      createdAt: new Date().toISOString()
+    });
+    return NextResponse.json({ id: ref.id, name: name.trim(), channel, customerType }, { status: 201 });
   } catch (err) {
     console.error("POST /api/customers error:", err);
     return NextResponse.json({ error: "Gagal menyimpan pelanggan" }, { status: 500 });

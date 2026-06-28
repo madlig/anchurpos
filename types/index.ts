@@ -123,6 +123,7 @@ export interface Customer {
   id: string;
   name: string;
   channel: CustomerChannel;
+  customerType: "reguler" | "b2b" | "reseller";
   phoneNumber: string | null;
   address: string | null;
   discountPerUnit: number;
@@ -313,6 +314,7 @@ export interface Alert {
 
 // --- 10. orders/{orderId} ---
 export type OrderSource = "marketplace_manual" | "wa_form" | "walk_in";
+export type OrderChannel = "walkin" | "whatsapp" | "tiktok" | "shopee";
 export type OrderStatus = "belum_selesai" | "selesai" | "void";
 export type PaymentStatus = "belum_bayar" | "sudah_bayar";
 
@@ -320,13 +322,18 @@ export interface Order {
   id: string;
   orderNumber: string;
   source: OrderSource;
-  customerId: string;
+  orderChannel: OrderChannel;
+  customerId: string | null;
   customerName: string;
+  customerType: "reguler" | "b2b" | "reseller" | null;
   customerPhone: string | null;
   channel: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod | null;
+  platformFeePercent: number;
+  platformFee: number;
+  netRevenue: number | null;
   needsProduction: boolean;
   createdBy: string | null;
   createdAt: string;

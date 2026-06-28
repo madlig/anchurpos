@@ -28,13 +28,18 @@ export async function GET(
       id: orderSnap.id,
       orderNumber: d.orderNumber,
       source: d.source,
-      customerId: d.customerId,
+      orderChannel: d.orderChannel ?? "walkin",
+      customerId: d.customerId ?? null,
       customerName: d.customerName,
+      customerType: d.customerType ?? null,
       customerPhone: d.customerPhone,
       channel: d.channel,
       status: d.status,
       paymentStatus: d.paymentStatus,
       paymentMethod: d.paymentMethod,
+      platformFeePercent: d.platformFeePercent ?? 0,
+      platformFee: d.platformFee ?? 0,
+      netRevenue: d.netRevenue ?? null,
       needsProduction: d.needsProduction ?? false,
       shippingAddress: d.shippingAddress,
       requestedDeliveryDate: d.requestedDeliveryDate,
@@ -49,6 +54,7 @@ export async function GET(
       completedAt: d.completedAt?.toDate?.().toISOString() ?? d.completedAt,
       items,
     });
+
   } catch (err) {
     console.error("GET /api/orders/[id] error:", err);
     return NextResponse.json({ error: "Gagal mengambil detail order" }, { status: 500 });

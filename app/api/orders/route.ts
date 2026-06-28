@@ -28,14 +28,20 @@ export async function GET(req: NextRequest) {
         id: doc.id,
         orderNumber: d.orderNumber,
         source: d.source,
-        customerId: d.customerId,
+        orderChannel: d.orderChannel ?? "walkin",
+        customerId: d.customerId ?? null,
         customerName: d.customerName,
+        customerType: d.customerType ?? null,
         customerPhone: d.customerPhone,
         channel: d.channel,
         status: d.status,
         paymentStatus: d.paymentStatus,
         paymentMethod: d.paymentMethod,
+        platformFeePercent: d.platformFeePercent ?? 0,
+        platformFee: d.platformFee ?? 0,
+        netRevenue: d.netRevenue ?? null,
         needsProduction: d.needsProduction ?? false,
+        orderNotes: d.orderNotes ?? null,
         shippingCost: d.shippingCost,
         shippingCostConfirmed: d.shippingCostConfirmed ?? false,
         invoiceNumber: d.invoiceNumber,
@@ -100,23 +106,31 @@ export async function POST(req: NextRequest) {
   const {
     customerId,
     customerName: directCustomerName,
+    customerType: inputCustomerType,
     source,
+    orderChannel,
     items,
     paymentMethod,
     paymentStatus: inputPaymentStatus,
     shippingAddress,
     requestedDeliveryDate,
     orderNotes,
+    platformFeePercent: inputFeePercent,
+    platformFee: inputFeeAmount,
   } = body as {
     customerId?: string;
     customerName?: string;
+    customerType?: string;
     source: string;
+    orderChannel?: string;
     items: { productId: string; variantId: string; qty: number }[];
     paymentMethod?: string;
     paymentStatus?: string;
     shippingAddress?: string;
     requestedDeliveryDate?: string;
     orderNotes?: string;
+    platformFeePercent?: number;
+    platformFee?: number;
   };
 
   if (!items?.length) {
@@ -129,6 +143,7 @@ export async function POST(req: NextRequest) {
     let resolvedCustomerPhone: string | null = null;
     let resolvedChannel = "walk_in";
     let resolvedCustomerId = customerId ?? null;
+    let resolvedCustomerType = inputCustomerType ?? null;
     let discountPerUnit = 0;
 
     if (customerId) {
@@ -138,6 +153,7 @@ export async function POST(req: NextRequest) {
         resolvedCustomerName = customer.name ?? resolvedCustomerName;
         resolvedCustomerPhone = customer.phoneNumber ?? null;
         resolvedChannel = customer.channel ?? "walk_in";
+        resolvedCustomerType = customer.customerType ?? resolvedCustomerType;
         discountPerUnit = customer.discountPerUnit ?? 0;
       }
     }
@@ -187,20 +203,35 @@ export async function POST(req: NextRequest) {
     }
 
     await adminDb.runTransaction(async (tx) => {
+      // Determine order channel
+      const finalOrderChannel = orderChannel ?? "walkin";
+      const isImmediate = ["walkin", "tiktok", "shopee"].includes(finalOrderChannel);
+
+      // Calculate platform fee & net revenue
+      const totalOrderValue = processedItems.reduce((sum, item) => sum + ((item.totalPrice as number) ?? 0), 0);
+      const finalFeePercent = inputFeePercent ?? 0;
+      const finalFeeAmount = inputFeeAmount ?? (totalOrderValue * finalFeePercent / 100);
+      const netRevenue = totalOrderValue - finalFeeAmount;
+
       tx.set(orderRef, {
         orderNumber,
         source: source ?? "walk_in",
+        orderChannel: finalOrderChannel,
         customerId: resolvedCustomerId,
         customerName: resolvedCustomerName,
+        customerType: resolvedCustomerType,
         customerPhone: resolvedCustomerPhone,
         channel: resolvedChannel,
-        status: source === "walk_in" ? "selesai" : "belum_selesai",
-        paymentStatus: inputPaymentStatus ?? "belum_bayar",
+        status: isImmediate ? "selesai" : "belum_selesai",
+        paymentStatus: inputPaymentStatus ?? "sudah_bayar",
         paymentMethod: paymentMethod ?? null,
+        platformFeePercent: finalFeePercent,
+        platformFee: finalFeeAmount,
+        netRevenue,
         needsProduction,
         createdBy: (user as AuthUser | null)?.uid ?? null,
         createdAt: FieldValue.serverTimestamp(),
-        completedAt: source === "walk_in" ? FieldValue.serverTimestamp() : null,
+        completedAt: isImmediate ? FieldValue.serverTimestamp() : null,
         shippingAddress: shippingAddress ?? null,
         requestedDeliveryDate: requestedDeliveryDate ?? null,
         orderNotes: orderNotes ?? null,
@@ -217,8 +248,8 @@ export async function POST(req: NextRequest) {
         tx.set(itemRef, itemData);
       }
 
-      // Kurangi stok produk jadi jika walk-in langsung (POS)
-      if (source === "walk_in") {
+      // Kurangi stok produk jadi jika orderChannel langsung (walkin, tiktok, shopee)
+      if (isImmediate) {
         for (const item of items) {
           const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
           if (!isRainbow) {
@@ -242,7 +273,7 @@ export async function POST(req: NextRequest) {
               newStockAfter: nextStock,
               sourceType: "sale",
               sourceId: orderRef.id,
-              note: `Penjualan walk-in POS #${orderNumber}`,
+              note: `Penjualan ${finalOrderChannel} #${orderNumber}`,
               createdBy: (user as AuthUser | null)?.uid ?? null,
               createdAt: FieldValue.serverTimestamp(),
             });

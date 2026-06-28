@@ -32,6 +32,11 @@ export default function ManagerSettingsPage() {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
+  // Marketplace fee state
+  const [marketplaceFees, setMarketplaceFees] = useState({ tiktok: "", shopee: "" });
+  const [savingFees, setSavingFees] = useState(false);
+  const [feeSaved, setFeeSaved] = useState("");
+
   const fetchWithAuth = useCallback(
     async (url: string, options?: RequestInit) => {
       const token = await getToken();
@@ -49,15 +54,21 @@ export default function ManagerSettingsPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const [res, targetRes] = await Promise.all([
+      const [res, targetRes, feeRes] = await Promise.all([
         fetchWithAuth("/api/settings/attendance"),
         fetchWithAuth("/api/settings/production"),
+        fetchWithAuth("/api/settings/marketplace-fee"),
       ]);
       if (res.ok) {
         const c = await res.json();
         setConfig(c);
         setNewSsid(c.whitelistedSsid || "");
       }
+      if (feeRes.ok) {
+        const fees = await feeRes.json();
+        setMarketplaceFees({ tiktok: String(fees.tiktok ?? 0), shopee: String(fees.shopee ?? 0) });
+      }
+
       if (targetRes.ok) {
         const t = await targetRes.json();
         setDailyLoyangTarget(t.dailyLoyangTarget ?? 8);
@@ -318,6 +329,57 @@ export default function ManagerSettingsPage() {
 
       {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
       {success && <p className="text-sm text-emerald-600 mt-2">{success}</p>}
+
+      {/* ── Fee Platform Marketplace ── */}
+      <Card className="p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <div style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: "15px" }}>🏷️</span>
+          </div>
+          <div>
+            <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>Fee Platform Marketplace</p>
+            <p style={{ fontSize: "11px", color: "#94A3B8" }}>Potongan platform yang dikurangi dari pendapatan di laporan</p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <label style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", display: "block", marginBottom: "4px" }}>FEE TIKTOK (%)</label>
+            <Input type="number" step="0.1" min="0" max="100"
+              placeholder="Contoh: 5.5"
+              value={marketplaceFees.tiktok}
+              onChange={e => setMarketplaceFees(p => ({ ...p, tiktok: e.target.value }))}
+              className="h-10 text-sm" />
+          </div>
+          <div className="flex-1">
+            <label style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", display: "block", marginBottom: "4px" }}>FEE SHOPEE (%)</label>
+            <Input type="number" step="0.1" min="0" max="100"
+              placeholder="Contoh: 3.0"
+              value={marketplaceFees.shopee}
+              onChange={e => setMarketplaceFees(p => ({ ...p, shopee: e.target.value }))}
+              className="h-10 text-sm" />
+          </div>
+        </div>
+        <Button
+          onClick={async () => {
+            setSavingFees(true);
+            setFeeSaved("");
+            try {
+              const res = await fetchWithAuth("/api/settings/marketplace-fee", {
+                method: "PATCH",
+                body: JSON.stringify({ tiktok: parseFloat(marketplaceFees.tiktok) || 0, shopee: parseFloat(marketplaceFees.shopee) || 0 })
+              });
+              if (res.ok) setFeeSaved("Fee berhasil disimpan!");
+            } finally { setSavingFees(false); }
+          }}
+          disabled={savingFees}
+          className="w-full"
+          style={{ background: "#E85D8C", color: "#fff" }}
+        >
+          {savingFees ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+          Simpan Fee Marketplace
+        </Button>
+        {feeSaved && <p style={{ fontSize: "12px", color: "#16A34A", fontWeight: "600" }}>✓ {feeSaved}</p>}
+      </Card>
     </div>
   );
 }

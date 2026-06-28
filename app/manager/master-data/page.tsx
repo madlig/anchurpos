@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Plus, X, Check, Package, Layers, Beaker, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Plus, X, Check, Package, Layers, Beaker, Pencil, Trash2, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
-type Tab = "produk" | "varian" | "bahan";
+type Tab = "produk" | "varian" | "bahan" | "pelanggan";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -245,6 +245,15 @@ export default function MasterDataPage() {
   const [variants, setVariants] = useState<VariantItem[]>([]);
   const [ingredients, setIngredients] = useState<IngredientItem[]>([]);
 
+  // ── Pelanggan state ──
+  interface CustomerItem { id: string; name: string; customerType: string; phoneNumber: string | null; address: string | null; notes: string; }
+  const [customers, setCustomers] = useState<CustomerItem[]>([]);
+  const [editingCustomer, setEditingCustomer] = useState<CustomerItem | null>(null);
+  const [customerForm, setCustomerForm] = useState({ name: "", customerType: "reguler", phoneNumber: "", address: "", notes: "" });
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [customerDeleteTarget, setCustomerDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState(false);
+
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
     return fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...opts?.headers } });
@@ -253,45 +262,90 @@ export default function MasterDataPage() {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, v, i] = await Promise.all([
+      const [p, v, i, c] = await Promise.all([
         fetchWithAuth("/api/products").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/variants").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/ingredients").then(r => r.ok ? r.json() : []),
+        fetchWithAuth("/api/customers").then(r => r.ok ? r.json() : []),
       ]);
       setProducts(Array.isArray(p) ? p : []);
       setVariants(Array.isArray(v) ? v : []);
       setIngredients(Array.isArray(i) ? i : []);
+      setCustomers(Array.isArray(c) ? c : []);
     } finally { setLoading(false); }
   }, [fetchWithAuth]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
   // Reset forms when switching tab
-  function switchTab(t: Tab) { setTab(t); setShowAddForm(false); setEditItem(null); setDeleteTarget(null); setSearch(""); }
+  function switchTab(t: Tab) { setTab(t); setShowAddForm(false); setEditItem(null); setDeleteTarget(null); setSearch(""); setEditingCustomer(null); setCustomerDeleteTarget(null); }
 
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const urlMap = { produk: "products", varian: "variants", bahan: "ingredients" };
+      const urlMap: Record<string, string> = { produk: "products", varian: "variants", bahan: "ingredients" };
       const res = await fetchWithAuth(`/api/${urlMap[tab]}/${deleteTarget.id}`, { method: "DELETE" });
       if (res.ok) { setDeleteTarget(null); await loadAll(); }
     } finally { setDeleting(false); }
   }
 
+  async function handleSaveCustomer() {
+    if (!customerForm.name.trim()) return;
+    setSavingCustomer(true);
+    try {
+      const url = editingCustomer ? `/api/customers/${editingCustomer.id}` : "/api/customers";
+      const method = editingCustomer ? "PATCH" : "POST";
+      const res = await fetchWithAuth(url, {
+        method,
+        body: JSON.stringify({
+          name: customerForm.name,
+          customerType: customerForm.customerType,
+          phoneNumber: customerForm.phoneNumber || null,
+          address: customerForm.address || null,
+          notes: customerForm.notes
+        })
+      });
+      if (res.ok) {
+        setShowAddForm(false);
+        setEditingCustomer(null);
+        setCustomerForm({ name: "", customerType: "reguler", phoneNumber: "", address: "", notes: "" });
+        await loadAll();
+      }
+    } finally { setSavingCustomer(false); }
+  }
+
+  async function handleDeleteCustomer() {
+    if (!customerDeleteTarget) return;
+    setDeletingCustomer(true);
+    try {
+      const res = await fetchWithAuth(`/api/customers/${customerDeleteTarget.id}`, { method: "DELETE" });
+      if (res.ok) { setCustomerDeleteTarget(null); await loadAll(); }
+    } finally { setDeletingCustomer(false); }
+  }
+
   const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "produk", label: "Produk", icon: Package },
     { key: "varian", label: "Varian", icon: Layers },
-    { key: "bahan", label: "Bahan Baku", icon: Beaker },
+    { key: "bahan", label: "Bahan", icon: Beaker },
+    { key: "pelanggan", label: "Pelanggan", icon: Users },
   ];
 
-  const tabLabel = tab === "produk" ? "Produk" : tab === "varian" ? "Varian" : "Bahan Baku";
+  const tabLabel = tab === "produk" ? "Produk" : tab === "varian" ? "Varian" : tab === "bahan" ? "Bahan Baku" : "Pelanggan";
   const q = search.toLowerCase();
   const filteredProducts = products.filter(p => !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q));
   const filteredVariants = variants.filter(v => !q || v.name.toLowerCase().includes(q));
   const filteredIngredients = ingredients.filter(i => !q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q));
+  const filteredCustomers = customers.filter(c => !q || c.name.toLowerCase().includes(q) || (c.customerType ?? "").toLowerCase().includes(q));
 
   const onSuccess = () => { setShowAddForm(false); setEditItem(null); loadAll(); };
+
+  const CTYPE_LABEL: Record<string, string> = { reguler: "Reguler", b2b: "B2B", reseller: "Reseller" };
+  const CTYPE_COLOR: Record<string, { bg: string; color: string }> = {
+    reguler: { bg: "#F0FDF4", color: "#16A34A" },
+    b2b: { bg: "#EFF6FF", color: "#2563EB" },
+    reseller: { bg: "#FEF3C7", color: "#D97706" },
+  };
 
   return (
     <div className="min-h-screen" style={{ background: "#FCABB4" }}>
@@ -340,6 +394,41 @@ export default function MasterDataPage() {
         {showAddForm && tab === "produk" && <ProductForm fetchWithAuth={fetchWithAuth} onSuccess={onSuccess} onCancel={() => setShowAddForm(false)} />}
         {showAddForm && tab === "varian" && <VariantForm fetchWithAuth={fetchWithAuth} onSuccess={onSuccess} onCancel={() => setShowAddForm(false)} />}
         {showAddForm && tab === "bahan" && <IngredientForm fetchWithAuth={fetchWithAuth} onSuccess={onSuccess} onCancel={() => setShowAddForm(false)} />}
+
+        {/* ── Customer Add/Edit Form ── */}
+        {(showAddForm || editingCustomer) && tab === "pelanggan" && (
+          <div style={{ background: "#F8FAFC", borderRadius: "14px", padding: "14px", border: "1px solid #E2E8F0", marginBottom: "12px" }}>
+            <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E", marginBottom: "12px" }}>{editingCustomer ? "Edit Pelanggan" : "Tambah Pelanggan"}</p>
+            <div className="flex flex-col gap-2.5">
+              <Input placeholder="Nama pelanggan *" value={customerForm.name} onChange={e => setCustomerForm(p => ({ ...p, name: e.target.value }))}
+                className="h-10 rounded-xl border-slate-200 text-sm" />
+              <div className="flex gap-2">
+                {(["reguler", "b2b", "reseller"] as const).map(ct => (
+                  <button key={ct} onClick={() => setCustomerForm(p => ({ ...p, customerType: ct }))}
+                    style={{ flex: 1, padding: "8px", borderRadius: "10px", fontSize: "12px", fontWeight: "600", border: "none", cursor: "pointer",
+                      color: customerForm.customerType === ct ? "#fff" : "#64748B",
+                      background: customerForm.customerType === ct ? CTYPE_COLOR[ct].color : "#F1F5F9" }}>
+                    {CTYPE_LABEL[ct]}
+                  </button>
+                ))}
+              </div>
+              <Input placeholder="No. HP (opsional)" value={customerForm.phoneNumber} onChange={e => setCustomerForm(p => ({ ...p, phoneNumber: e.target.value }))}
+                className="h-10 rounded-xl border-slate-200 text-sm" />
+              <Input placeholder="Alamat (opsional)" value={customerForm.address} onChange={e => setCustomerForm(p => ({ ...p, address: e.target.value }))}
+                className="h-10 rounded-xl border-slate-200 text-sm" />
+              <Input placeholder="Catatan (opsional)" value={customerForm.notes} onChange={e => setCustomerForm(p => ({ ...p, notes: e.target.value }))}
+                className="h-10 rounded-xl border-slate-200 text-sm" />
+              <div className="flex gap-2">
+                <button onClick={handleSaveCustomer} disabled={savingCustomer}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "#E85D8C" }}>
+                  {savingCustomer ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Simpan
+                </button>
+                <button onClick={() => { setShowAddForm(false); setEditingCustomer(null); setCustomerForm({ name: "", customerType: "reguler", phoneNumber: "", address: "", notes: "" }); }}
+                  style={{ padding: "8px 16px", borderRadius: "12px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>Batal</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" style={{ color: "#E85D8C" }} /></div>

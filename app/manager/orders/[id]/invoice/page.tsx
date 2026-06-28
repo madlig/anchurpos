@@ -8,10 +8,13 @@ import { Loader2 } from "lucide-react";
 interface OrderItem { productName: string; variantName: string; qty: number; basePrice: number; totalPrice: number; }
 interface OrderDetail {
   id: string; orderNumber: string; customerName: string; customerPhone: string | null;
-  channel: string; createdAt: string; completedAt: string | null;
+  channel: string; orderChannel: string; customerType: string | null;
+  createdAt: string; completedAt: string | null;
   paymentStatus: string; paymentMethod: string | null; shippingCost: number | null;
+  platformFee: number; netRevenue: number | null;
   orderNotes: string | null; items: OrderItem[];
 }
+
 
 function fmt(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -51,6 +54,8 @@ export default function InvoicePage() {
   const shipping = order.shippingCost ?? 0;
   const total = subtotal + shipping;
   const isPaid = order.paymentStatus === "sudah_bayar";
+  const isB2B = order.customerType === "b2b" || order.customerType === "reseller";
+  const docTitle = isB2B ? "INVOICE" : "NOTA";
 
   return (
     <>
@@ -77,13 +82,13 @@ export default function InvoicePage() {
             <p style={{ fontSize: "12px", color: "#94A3B8", margin: "2px 0 0" }}>Sistem Manajemen Produksi</p>
           </div>
           <div style={{ textAlign: "right" }}>
-            <h2 style={{ fontSize: "28px", fontWeight: "800", color: "#1C1C1E", margin: "0 0 6px" }}>INVOICE</h2>
+            <h2 style={{ fontSize: "28px", fontWeight: "800", color: "#1C1C1E", margin: "0 0 6px" }}>{docTitle}</h2>
             <p style={{ fontSize: "13px", fontFamily: "monospace", color: "#64748B", margin: "0 0 4px" }}>{order.orderNumber}</p>
             <p style={{ fontSize: "12px", color: "#94A3B8", margin: 0 }}>Tanggal: {fmtDate(order.createdAt)}</p>
             <div style={{ marginTop: "8px", display: "inline-block", padding: "4px 12px", borderRadius: "100px",
-              background: isPaid ? "#DCFCE7" : "#FEF3C7",
-              color: isPaid ? "#16A34A" : "#D97706", fontSize: "11px", fontWeight: "700" }}>
-              {isPaid ? "LUNAS" : "BELUM DIBAYAR"}
+              background: isPaid ? "#DCFCE7" : "#FEE2E2",
+              color: isPaid ? "#16A34A" : "#DC2626", fontSize: "11px", fontWeight: "700" }}>
+              {isPaid ? "SUDAH BAYAR" : "BELUM BAYAR"}
             </div>
           </div>
         </div>
@@ -144,6 +149,11 @@ export default function InvoicePage() {
               <span style={{ fontSize: "16px", fontWeight: "700", color: "#1C1C1E" }}>Total</span>
               <span style={{ fontSize: "18px", fontWeight: "800", color: "#E85D8C" }}>{fmt(total)}</span>
             </div>
+            {!isPaid && (
+              <div style={{ marginTop: "12px", padding: "10px 12px", borderRadius: "8px", background: "#FEE2E2", border: "1px solid #FECACA" }}>
+                <p style={{ fontSize: "12px", fontWeight: "600", color: "#DC2626", margin: 0 }}>⚠ Mohon segera melakukan pembayaran.</p>
+              </div>
+            )}
           </div>
         </div>
 

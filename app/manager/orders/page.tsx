@@ -6,8 +6,8 @@ import { Loader2, ClipboardList, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 interface OrderSummary {
-  id: string; orderNumber: string; customerName: string;
-  status: string; paymentStatus: string; source: string; createdAt: string;
+  id: string; orderNumber: string; customerName: string; customerType: string | null;
+  status: string; paymentStatus: string; source: string; orderChannel: string; createdAt: string;
 }
 
 const TABS = [
@@ -27,6 +27,12 @@ function getStatusLabel(status: string) {
   if (status === "proses") return "Proses";
   return "Pending";
 }
+const CHANNEL_EMOJI: Record<string, string> = {
+  walkin: "🏪 Walk-in",
+  whatsapp: "💬 WhatsApp",
+  tiktok: "🎵 TikTok",
+  shopee: "🛍️ Shopee",
+};
 
 export default function OrdersListPage() {
   const { getToken } = useAuth();
@@ -136,9 +142,18 @@ export default function OrdersListPage() {
                   </span>
                 </div>
 
-                {/* Row 2: source + time */}
+                {/* Row 2: channel + payment status + time */}
                 <div className="flex items-center justify-between">
-                  <span style={{ fontSize: "12px", color: "#64748B" }}>{order.source?.replace(/_/g, " ") ?? "-"}</span>
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontSize: "11px", color: "#64748B" }}>
+                      {CHANNEL_EMOJI[order.orderChannel] ?? order.source?.replace(/_/g, " ") ?? "-"}
+                    </span>
+                    {order.paymentStatus === "belum_bayar" && (
+                      <span style={{ padding: "2px 7px", borderRadius: "6px", background: "#FEE2E2", fontSize: "10px", fontWeight: "700", color: "#DC2626" }}>
+                        Belum Bayar
+                      </span>
+                    )}
+                  </div>
                   <span style={{ fontSize: "11px", color: "#94A3B8" }}>{formatTime(order.createdAt)}</span>
                 </div>
               </div>
