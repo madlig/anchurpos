@@ -237,10 +237,6 @@ export default function KasirPage() {
           source: orderChannel === "walkin" ? "walk_in" : orderChannel === "whatsapp" ? "wa_form" : "marketplace_manual",
           orderChannel,
           items: cart.map(c => ({ productId: c.productId, variantId: c.variantId, qty: c.qty })),
-          paymentMethod: isPaid ? payMethod : null,
-          paymentStatus: isPaid ? "sudah_bayar" : "belum_bayar",
-          platformFeePercent: activeFeePercent,
-          platformFee: feeAmount,
           orderNotes: orderNotes.trim() || null,
         }),
       });
@@ -267,7 +263,27 @@ export default function KasirPage() {
       {/* ── Header (white, sticky) ── */}
       <div className="sticky top-0 z-30" style={{ background: "#fff", borderBottom: "1px solid #F1F5F9" }}>
         <div className="px-5 pt-4 pb-2">
-          <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Input Pesanan</h1>
+          <div className="flex items-center justify-between">
+            <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Input Pesanan</h1>
+          </div>
+
+          {/* ── Sumber Pesanan (Channel Selector) ── */}
+          <div className="grid grid-cols-4 gap-1.5 mt-3 mb-2">
+            {([
+              { key: "walkin", label: "Walk-in", emoji: "🏪" },
+              { key: "whatsapp", label: "WhatsApp", emoji: "💬" },
+              { key: "tiktok", label: "TikTok", emoji: "🎵" },
+              { key: "shopee", label: "Shopee", emoji: "🛍️" },
+            ] as const).map(ch => (
+              <button key={ch.key} onClick={() => { setOrderChannel(ch.key); setCart([]); setSelectedCustomer(null); setCustomerSearch(""); setPlatformFeeOverride(""); }}
+                style={{ padding: "8px 4px", borderRadius: "10px", fontSize: "11px", fontWeight: "600", border: "none", cursor: "pointer", textAlign: "center",
+                  color: orderChannel === ch.key ? "#fff" : "#64748B",
+                  background: orderChannel === ch.key ? "#E85D8C" : "#F1F5F9" }}>
+                <span style={{ marginRight: "4px" }}>{ch.emoji}</span>
+                {ch.label}
+              </button>
+            ))}
+          </div>
 
           {/* Search bar */}
           <div
@@ -316,6 +332,7 @@ export default function KasirPage() {
           ))}
         </div>
       </div>
+
 
       {/* ── Product Grid ── */}
       <div className="p-4" style={{ paddingBottom: cart.length > 0 ? "120px" : "24px" }}>
@@ -483,35 +500,16 @@ export default function KasirPage() {
           <div className="overflow-y-auto" style={{ background: "#fff", borderRadius: "20px 20px 0 0", padding: "20px 16px 32px", maxHeight: "92vh" }}>
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
-              <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#1C1C1E" }}>Input Pesanan</h2>
+              <div>
+                <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#1C1C1E" }}>Checkout Pesanan</h2>
+                <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>Sumber: <strong style={{ color: "#E85D8C" }}>{orderChannel === "walkin" ? "Walk-in 🏪" : orderChannel === "whatsapp" ? "WhatsApp 💬" : orderChannel === "tiktok" ? "TikTok 🎵" : "Shopee 🛍️"}</strong></p>
+              </div>
               <button onClick={() => setShowCheckout(false)}
                 style={{ width: "30px", height: "30px", borderRadius: "10px", background: "#F8FAFC", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <X size={16} style={{ color: "#64748B" }} />
               </button>
             </div>
 
-            {/* ── Sumber Pesanan ── */}
-            <div style={{ marginBottom: "14px" }}>
-              <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
-                Sumber Pesanan
-              </label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {([
-                  { key: "walkin", label: "Walk-in", emoji: "🏪" },
-                  { key: "whatsapp", label: "WhatsApp", emoji: "💬" },
-                  { key: "tiktok", label: "TikTok", emoji: "🎵" },
-                  { key: "shopee", label: "Shopee", emoji: "🛍️" },
-                ] as const).map(ch => (
-                  <button key={ch.key} onClick={() => { setOrderChannel(ch.key); setCart([]); setSelectedCustomer(null); setCustomerSearch(""); setPlatformFeeOverride(""); }}
-                    style={{ padding: "8px 4px", borderRadius: "10px", fontSize: "11px", fontWeight: "600", border: "none", cursor: "pointer", textAlign: "center",
-                      color: orderChannel === ch.key ? "#fff" : "#64748B",
-                      background: orderChannel === ch.key ? "#E85D8C" : "#F1F5F9" }}>
-                    <div style={{ fontSize: "14px", marginBottom: "2px" }}>{ch.emoji}</div>
-                    {ch.label}
-                  </button>
-                ))}
-              </div>
-            </div>
 
             {/* Cart summary */}
             <div style={{ background: "#F8FAFC", borderRadius: "12px", padding: "12px 14px", marginBottom: "14px" }}>
