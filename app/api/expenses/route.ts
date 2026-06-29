@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
     supplier,
     notes,
     customDate,
+    forceCreateNew,
   } = body;
 
   if (!itemName || !category || !totalPrice || !paymentMethod) {
@@ -114,28 +115,31 @@ export async function POST(req: NextRequest) {
 
     // Run transaction to resolve ingredient, create if new, and record expense
     await adminDb.runTransaction(async (tx) => {
-      // 1. Jika ini adalah bahan baku / packaging dan belum ada ID terlampir, cari secara fuzzy
+      // 1. Jika ini adalah bahan baku / packaging dan belum ada ID terlampir, cari secara fuzzy (kecuali dipaksa buat baru)
       if ((category === "bahan_baku" || category === "packaging") && !finalIngredientId) {
-        const ingredientsSnap = await tx.get(
-          adminDb.collection("ingredients").where("category", "==", category)
-        );
-
+        let shouldSearchFuzzy = !forceCreateNew;
         let closestMatch: { id: string; name: string; baseUnit: string; unitAlternatives: any[] } | null = null;
         let highestSim = 0;
 
-        ingredientsSnap.docs.forEach((doc) => {
-          const data = doc.data();
-          const sim = getSimilarity(itemName, data.name || "");
-          if (sim > highestSim) {
-            highestSim = sim;
-            closestMatch = {
-              id: doc.id,
-              name: data.name,
-              baseUnit: data.baseUnit,
-              unitAlternatives: data.unitAlternatives || [],
-            };
-          }
-        });
+        if (shouldSearchFuzzy) {
+          const ingredientsSnap = await tx.get(
+            adminDb.collection("ingredients").where("category", "==", category)
+          );
+
+          ingredientsSnap.docs.forEach((doc) => {
+            const data = doc.data();
+            const sim = getSimilarity(itemName, data.name || "");
+            if (sim > highestSim) {
+              highestSim = sim;
+              closestMatch = {
+                id: doc.id,
+                name: data.name,
+                baseUnit: data.baseUnit,
+                unitAlternatives: data.unitAlternatives || [],
+              };
+            }
+          });
+        }
 
         // Threshold kecocokan fuzzy: 85% mirip
         if (highestSim >= 0.85 && closestMatch) {

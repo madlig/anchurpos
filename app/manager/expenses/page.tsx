@@ -43,6 +43,29 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 };
 
 // Form pencatatan pengeluaran premium
+function clientGetSimilarity(s1: string, s2: string): number {
+  const a = s1.toLowerCase().trim();
+  const b = s2.toLowerCase().trim();
+  const longer = a.length > b.length ? a : b;
+  const shorter = a.length > b.length ? b : a;
+  if (longer.length === 0) return 1.0;
+
+  // Simple Levenshtein inline
+  const tmp: number[][] = [];
+  for (let i = 0; i <= a.length; i++) tmp[i] = [i];
+  for (let j = 0; j <= b.length; j++) tmp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      tmp[i][j] = a[i - 1] === b[j - 1] 
+        ? tmp[i - 1][j - 1] 
+        : Math.min(tmp[i - 1][j] + 1, tmp[i][j - 1] + 1, tmp[i - 1][j - 1] + 1);
+    }
+  }
+  const distance = tmp[a.length][b.length];
+  return (longer.length - distance) / longer.length;
+}
+
+// Form pencatatan pengeluaran premium
 function ExpenseForm({
   ingredients,
   fetchWithAuth,
@@ -121,14 +144,52 @@ function ExpenseForm({
       return;
     }
 
+    // Resolving fuzzy matches interactively if manually entered
+    let postIngredientId: string | null = (isProductCategory && !isManualInput) ? ingredientId : null;
+    let postItemName = (isProductCategory && !isManualInput)
+      ? (ingredients.find((i) => i.id === ingredientId)?.name ?? itemName)
+      : itemName.trim();
+    let forceCreateNew = false;
+
+    if (isProductCategory && isManualInput) {
+      let highestSim = 0;
+      let closestMatch: Ingredient | null = null;
+
+      ingredients
+        .filter((i) => i.category === category)
+        .forEach((i) => {
+          const sim = clientGetSimilarity(itemName, i.name);
+          if (sim > highestSim) {
+            highestSim = sim;
+            closestMatch = i;
+          }
+        });
+
+      if (highestSim >= 0.85 && closestMatch) {
+        const confirmUseExisting = window.confirm(
+          `Apakah Anda bermaksud menginput barang berikut yang sudah ada di database?\n- Nama: "${(closestMatch as Ingredient).name}"\n\nKlik "OK" untuk menggunakan "${(closestMatch as Ingredient).name}"\nKlik "Batal/Cancel" jika Anda ingin membuat bahan baru.`
+        );
+
+        if (confirmUseExisting) {
+          postIngredientId = (closestMatch as Ingredient).id;
+          postItemName = (closestMatch as Ingredient).name;
+          forceCreateNew = false;
+        } else {
+          postIngredientId = null;
+          forceCreateNew = true;
+        }
+      } else {
+        forceCreateNew = true;
+      }
+    }
+
     setSaving(true);
     try {
-      const ing = ingredients.find((i) => i.id === ingredientId);
       const res = await fetchWithAuth("/api/expenses", {
         method: "POST",
         body: JSON.stringify({
-          ingredientId: (isProductCategory && !isManualInput) ? ingredientId : null,
-          itemName: (isProductCategory && !isManualInput) ? (ing?.name ?? itemName) : itemName.trim(),
+          ingredientId: postIngredientId,
+          itemName: postItemName,
           category,
           qtyPurchased: isProductCategory ? parseFloat(qty) : null,
           purchaseUnit: isProductCategory ? purchaseUnit.trim() : null,
@@ -137,6 +198,7 @@ function ExpenseForm({
           supplier: supplier.trim() || null,
           notes: notes.trim() || null,
           customDate: customDate || null,
+          forceCreateNew,
         }),
       });
 
