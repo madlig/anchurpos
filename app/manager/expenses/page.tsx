@@ -66,6 +66,9 @@ function ExpenseForm({
   const [customDate, setCustomDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  
+  // Toggle input manual untuk bahan baku / packaging
+  const [isManualInput, setIsManualInput] = useState(false);
 
   // Auto-fill nama barang jika memilih bahan baku
   const handleIngredientChange = (id: string) => {
@@ -82,13 +85,28 @@ function ExpenseForm({
 
   async function handleSubmit() {
     setError("");
-    if (category === "bahan_baku" || category === "packaging") {
+    const isProductCategory = category === "bahan_baku" || category === "packaging";
+
+    if (isProductCategory && !isManualInput) {
       if (!ingredientId) {
-        setError("Pilih bahan baku terlebih dahulu");
+        setError("Pilih bahan baku/kemasan terlebih dahulu");
         return;
       }
       if (!qty || parseFloat(qty) <= 0) {
         setError("Jumlah pembelian harus lebih dari 0");
+        return;
+      }
+    } else if (isProductCategory && isManualInput) {
+      if (!itemName.trim()) {
+        setError("Nama bahan baru wajib diisi");
+        return;
+      }
+      if (!qty || parseFloat(qty) <= 0) {
+        setError("Jumlah pembelian harus lebih dari 0");
+        return;
+      }
+      if (!purchaseUnit.trim()) {
+        setError("Satuan pembelian wajib diisi (misal: kg, gram, pcs)");
         return;
       }
     } else {
@@ -109,11 +127,11 @@ function ExpenseForm({
       const res = await fetchWithAuth("/api/expenses", {
         method: "POST",
         body: JSON.stringify({
-          ingredientId: (category === "bahan_baku" || category === "packaging") ? ingredientId : null,
-          itemName: (category === "bahan_baku" || category === "packaging") ? (ing?.name ?? itemName) : itemName.trim(),
+          ingredientId: (isProductCategory && !isManualInput) ? ingredientId : null,
+          itemName: (isProductCategory && !isManualInput) ? (ing?.name ?? itemName) : itemName.trim(),
           category,
-          qtyPurchased: (category === "bahan_baku" || category === "packaging") ? parseFloat(qty) : null,
-          purchaseUnit: (category === "bahan_baku" || category === "packaging") ? purchaseUnit : null,
+          qtyPurchased: isProductCategory ? parseFloat(qty) : null,
+          purchaseUnit: isProductCategory ? purchaseUnit.trim() : null,
           totalPrice: parseFloat(totalCost),
           paymentMethod,
           supplier: supplier.trim() || null,
@@ -164,6 +182,7 @@ function ExpenseForm({
                 setItemName("");
                 setQty("");
                 setPurchaseUnit("");
+                setIsManualInput(false);
               }}
               style={{
                 padding: "8px",
@@ -190,24 +209,55 @@ function ExpenseForm({
         {(category === "bahan_baku" || category === "packaging") ? (
           <>
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
-                Pilih Bahan / Kemasan
-              </label>
-              <select
-                value={ingredientId}
-                onChange={(e) => handleIngredientChange(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs bg-white outline-none focus:border-pink-300"
-                data-testid="expense-ingredient-select"
-              >
-                <option value="">-- Pilih dari database --</option>
-                {ingredients
-                  .filter((i) => i.category === category && (i as any).isActive !== false)
-                  .map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {i.name} ({i.baseUnit})
-                    </option>
-                  ))}
-              </select>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  {isManualInput ? "Nama Bahan Baru (Manual)" : "Pilih Bahan / Kemasan"}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsManualInput(!isManualInput);
+                    setIngredientId("");
+                    setItemName("");
+                    setPurchaseUnit("");
+                  }}
+                  className="text-[10px] font-bold text-pink-600 hover:text-pink-700 underline"
+                >
+                  {isManualInput ? "Pilih dari database" : "✍ Tulis manual bahan baru"}
+                </button>
+              </div>
+
+              {isManualInput ? (
+                <div>
+                  <Input
+                    type="text"
+                    placeholder="Contoh: Gula Halus Super"
+                    value={itemName}
+                    onChange={(e) => setItemName(e.target.value)}
+                    className="h-10 rounded-xl text-xs border-slate-200"
+                    data-testid="expense-manual-item-name"
+                  />
+                  <p className="text-[9px] text-slate-400 mt-1">
+                    * Sistem akan mencocokkan kemiripan nama secara otomatis. Jika tidak ada yang mirip, akan dibuatkan master data bahan baku baru di database.
+                  </p>
+                </div>
+              ) : (
+                <select
+                  value={ingredientId}
+                  onChange={(e) => handleIngredientChange(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs bg-white outline-none focus:border-pink-300"
+                  data-testid="expense-ingredient-select"
+                >
+                  <option value="">-- Pilih dari database --</option>
+                  {ingredients
+                    .filter((i) => i.category === category && (i as any).isActive !== false)
+                    .map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.name} ({i.baseUnit})
+                      </option>
+                    ))}
+                </select>
+              )}
             </div>
 
             <div className="flex gap-2">
@@ -232,7 +282,8 @@ function ExpenseForm({
                   placeholder="kg / gram / pcs"
                   value={purchaseUnit}
                   onChange={(e) => setPurchaseUnit(e.target.value)}
-                  className="h-10 rounded-xl text-xs border-slate-200 bg-slate-50"
+                  disabled={!isManualInput && !!ingredientId}
+                  className={`h-10 rounded-xl text-xs border-slate-200 ${(!isManualInput && !!ingredientId) ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
                 />
               </div>
             </div>
