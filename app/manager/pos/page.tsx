@@ -48,7 +48,7 @@ function startingPrice(product: ProductItem): number {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function KasirPage() {
-  const { getToken } = useAuth();
+  const { getToken, role } = useAuth();
   const router = useRouter();
 
   const [products, setProducts] = useState<ProductItem[]>([]);
@@ -82,6 +82,11 @@ export default function KasirPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const customerRef = useRef<HTMLDivElement>(null);
+
+  // Back-dated order states
+  const [enableCustomDate, setEnableCustomDate] = useState(false);
+  const [customOrderDate, setCustomOrderDate] = useState("");
+
 
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
@@ -238,6 +243,7 @@ export default function KasirPage() {
           orderChannel,
           items: cart.map(c => ({ productId: c.productId, variantId: c.variantId, qty: c.qty })),
           orderNotes: orderNotes.trim() || null,
+          customDate: enableCustomDate && customOrderDate ? customOrderDate : undefined,
         }),
       });
       const data = await res.json();
@@ -246,6 +252,7 @@ export default function KasirPage() {
       setCart([]); setShowCheckout(false); setCustomerSearch("");
       setSelectedCustomer(null); setOrderNotes(""); setIsPaid(true); setSaveNewCustomer(false);
       setPlatformFeeOverride(""); setNewCustomerType("reguler");
+      setEnableCustomDate(false); setCustomOrderDate("");
       router.push(`/manager/orders/${data.orderId}`);
     } catch { setError("Gagal menghubungi server"); } finally { setSubmitting(false); }
   }
@@ -686,6 +693,25 @@ export default function KasirPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* ── Tanggal Transaksi Mundur (Hanya Owner/Manager) ── */}
+            {role && (role === "owner" || role === "manager") && (
+              <div style={{ marginBottom: "14px", padding: "10px 12px", borderRadius: "12px", background: "#FEF1F5", border: "1px solid #F2A0B7" }}>
+                <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
+                  <input type="checkbox" checked={enableCustomDate} onChange={e => {
+                    setEnableCustomDate(e.target.checked);
+                    if (e.target.checked && !customOrderDate) {
+                      setCustomOrderDate(new Date().toISOString().split("T")[0]);
+                    }
+                  }} style={{ accentColor: "#E85D8C" }} />
+                  <span style={{ fontSize: "12px", fontWeight: "600", color: "#E85D8C" }}>Catat Tanggal Mundur (Masa Lalu)</span>
+                </label>
+                {enableCustomDate && (
+                  <input type="date" value={customOrderDate} onChange={e => setCustomOrderDate(e.target.value)}
+                    style={{ width: "100%", marginTop: "8px", padding: "8px 12px", borderRadius: "10px", border: "1px solid #F2A0B7", fontSize: "13px", outline: "none", color: "#1C1C1E", background: "#fff" }} />
+                )}
               </div>
             )}
 

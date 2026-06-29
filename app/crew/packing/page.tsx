@@ -285,6 +285,11 @@ export default function CrewPackingPage() {
     return new Map(ingredients.map((i) => [i.id, i]));
   }, [ingredients]);
 
+  const bulkCinnamonStock = useMemo(() => {
+    return ingredients.find(i => i.id === "gula-cinnamon-bulk")?.currentStock ?? 0;
+  }, [ingredients]);
+
+
   // Standard glaze options (cups)
   const glazeStandardOptions = useMemo(() => {
     return [
@@ -321,15 +326,21 @@ export default function CrewPackingPage() {
     if (batches <= 0) return { sugarGrams: 0, cinnamonGrams: 0 };
     return {
       sugarGrams: batches * 1500,
-      cinnamonGrams: batches * 55,
+      cinnamonGrams: batches * 40,
     };
   }, [cinnamonBatchCount]);
 
-  // Live cinnamon sugar clip usage calculation
+  // Live cinnamon sugar clip usage calculation (user inputs raw bulk weight in grams)
   const cinnamonClipEstUsage = useMemo(() => {
-    const qty = parseInt(cinnamonProducedQty) || 0;
-    return qty * 5;
+    const grams = parseInt(cinnamonProducedQty) || 0;
+    return grams;
   }, [cinnamonProducedQty]);
+
+  const cinnamonClipEstProduced = useMemo(() => {
+    const grams = parseInt(cinnamonProducedQty) || 0;
+    return Math.floor(grams / 5);
+  }, [cinnamonProducedQty]);
+
 
   // Live Repack Regular to Full Calculation
   const repackRegToFullCalc = useMemo(() => {
@@ -528,14 +539,19 @@ export default function CrewPackingPage() {
     }
   }
 
-  // 3b. Repack Cinnamon Clip Submission
+  // 3b. Repack Cinnamon Clip Submission (cinnamonProducedQty is interpreted as Grams to kemas)
   async function handleRepackCinnamonClip() {
     setError("");
     setSuccess("");
-    const produced = parseInt(cinnamonProducedQty) || 0;
+    const grams = parseInt(cinnamonProducedQty) || 0;
+    const produced = Math.floor(grams / 5);
 
+    if (grams <= 0) {
+      setError("Jumlah berat gula curah dikemas harus lebih dari 0");
+      return;
+    }
     if (produced <= 0) {
-      setError("Jumlah kemasan clip dihasilkan harus lebih dari 0");
+      setError("Jumlah berat gula curah harus minimal 5 gram untuk menghasilkan minimal 1 clip");
       return;
     }
 
@@ -1135,7 +1151,7 @@ export default function CrewPackingPage() {
                         className="h-10 rounded-xl text-xs border-slate-200"
                       />
                       <p className="text-[9px] text-slate-400 mt-1 font-medium">
-                        1 batch = 1.500g Gula & 55g Kayu Manis = 1.555g Curah
+                        1 batch = 1.500g Gula & 40g Kayu Manis = 1.540g Curah
                       </p>
                     </div>
 
@@ -1169,25 +1185,34 @@ export default function CrewPackingPage() {
                 {/* Form B: Repack to Clip */}
                 <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50 bg-opacity-40 space-y-3 flex flex-col justify-between">
                   <div className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-1.5">
-                      2. Kemas Gula ke Clip
-                    </h3>
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                        2. Kemas Gula ke Clip
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setCinnamonProducedQty(String(bulkCinnamonStock))}
+                        className="text-[10px] font-bold text-pink-600 hover:text-pink-700 bg-pink-50 px-2 py-0.5 rounded-md"
+                      >
+                        Kemas Semua ({bulkCinnamonStock}g)
+                      </button>
+                    </div>
                     <p className="text-[10px] text-slate-400 leading-relaxed">
-                      Kemas gula curah dari toples ke dalam plastik clip untuk persediaan pack frozen.
+                      Masukkan berat gula curah dari toples untuk dikemas secara otomatis ke plastik clip.
                     </p>
                     <div>
                       <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
-                        Hasil Plastik Clip (pcs)
+                        Gula Curah Dikemas (gram)
                       </label>
                       <Input
                         type="number"
-                        placeholder="Masukkan jumlah pcs"
+                        placeholder="Contoh: 500"
                         value={cinnamonProducedQty}
                         onChange={(e) => setCinnamonProducedQty(e.target.value)}
                         className="h-10 rounded-xl text-xs border-slate-200"
                       />
-                      <p className="text-[9px] text-slate-400 mt-1 font-medium">
-                        1 clip = 5 gram Gula Cinnamon Curah
+                      <p className="text-[9px] text-slate-400 mt-1 font-medium text-pink-600">
+                        Hasil Estimasi: {cinnamonClipEstProduced} pcs plastik clip (1 clip = 5g)
                       </p>
                     </div>
 

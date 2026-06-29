@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
     paymentMethod,
     supplier,
     notes,
+    customDate,
   } = body;
 
   if (!itemName || !category || !totalPrice || !paymentMethod) {
@@ -104,10 +105,11 @@ export async function POST(req: NextRequest) {
     }
 
     const expenseRef = adminDb.collection("expenses").doc();
+    const dateToUse = customDate ? new Date(customDate) : new Date();
 
     await adminDb.runTransaction(async (tx) => {
       tx.set(expenseRef, {
-        date: FieldValue.serverTimestamp(),
+        date: dateToUse,
         category,
         ingredientId: ingredientId ?? null,
         itemName,
@@ -140,7 +142,7 @@ export async function POST(req: NextRequest) {
           sourceId: expenseRef.id,
           note: null,
           createdBy: user.uid,
-          createdAt: FieldValue.serverTimestamp(),
+          createdAt: dateToUse, // use transaction date to reflect correct historical movements
         });
       }
     });

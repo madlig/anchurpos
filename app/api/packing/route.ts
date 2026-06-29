@@ -135,10 +135,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Jumlah batch blender tidak valid" }, { status: 400 });
       }
 
-      // Formula: 1 batch = 1500g Gula Pasir + 55g Kayu Manis Bubuk
+      // Formula: 1 batch = 1500g Gula Pasir + 40g Kayu Manis Bubuk
       const sugarQty = batchCount * 1500;
-      const cinnamonQty = batchCount * 55;
-      const bulkSugarProduced = batchCount * 1555;
+      const cinnamonQty = batchCount * 40;
+      const bulkSugarProduced = batchCount * 1540;
 
       const sugarRef = adminDb.collection("ingredients").doc("gula-pasir");
       const cinnamonRef = adminDb.collection("ingredients").doc("bubuk-kayu-manis");

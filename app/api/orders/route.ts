@@ -57,8 +57,8 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function generateOrderNumber(): Promise<string> {
-  const today = new Date();
+async function generateOrderNumber(customDate?: Date): Promise<string> {
+  const today = customDate || new Date();
   const dateStr = today.toISOString().split("T")[0].replace(/-/g, "");
   const prefix = `ORD-${dateStr}-`;
 
@@ -117,6 +117,7 @@ export async function POST(req: NextRequest) {
     orderNotes,
     platformFeePercent: inputFeePercent,
     platformFee: inputFeeAmount,
+    customDate,
   } = body as {
     customerId?: string;
     customerName?: string;
@@ -131,10 +132,18 @@ export async function POST(req: NextRequest) {
     orderNotes?: string;
     platformFeePercent?: number;
     platformFee?: number;
+    customDate?: string;
   };
 
   if (!items?.length) {
     return NextResponse.json({ error: "Pilih minimal 1 item" }, { status: 400 });
+  }
+
+  // Security: Only owner/manager can set custom date
+  if (customDate) {
+    if (isPublic) {
+      return NextResponse.json({ error: "Akses ditolak: Hanya Manager/Owner yang dapat mencatat tanggal mundur" }, { status: 403 });
+    }
   }
 
   try {
@@ -158,7 +167,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const orderNumber = await generateOrderNumber();
+    const dateToUse = customDate ? new Date(customDate) : new Date();
+    // Maintain correct timezone date prefix
+    const orderNumber = await generateOrderNumber(dateToUse);
     const orderRef = adminDb.collection("orders").doc();
     let needsProduction = false;
     let hasRainbow = false;
@@ -230,8 +241,8 @@ export async function POST(req: NextRequest) {
         netRevenue,
         needsProduction,
         createdBy: (user as AuthUser | null)?.uid ?? null,
-        createdAt: FieldValue.serverTimestamp(),
-        completedAt: isImmediate ? FieldValue.serverTimestamp() : null,
+        createdAt: dateToUse,
+        completedAt: isImmediate ? dateToUse : null,
         shippingAddress: shippingAddress ?? null,
         requestedDeliveryDate: requestedDeliveryDate ?? null,
         orderNotes: orderNotes ?? null,
