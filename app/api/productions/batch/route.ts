@@ -16,15 +16,24 @@ export async function POST(req: NextRequest) {
   const user = auth as AuthUser;
 
   const body = await req.json();
-  const { entries, type, notes, crewId } = body as {
+  const { entries, type, notes, crewId, customDate } = body as {
     entries: BatchEntry[];
     type?: "standard" | "tiktok";
     notes?: string;
     crewId?: string;
+    customDate?: string;
   };
 
   if (!entries || entries.length === 0) {
     return NextResponse.json({ error: "Minimal 1 varian harus diisi" }, { status: 400 });
+  }
+
+  // Security: Only owner/manager can back-date production
+  if (customDate) {
+    const isPrivileged = user.role === "owner" || user.role === "manager";
+    if (!isPrivileged) {
+      return NextResponse.json({ error: "Akses ditolak: Hanya Manager/Owner yang dapat mencatat produksi mundur" }, { status: 403 });
+    }
   }
 
   const effectiveCrewId = crewId || user.uid;
@@ -63,6 +72,7 @@ export async function POST(req: NextRequest) {
     }
 
     const productionRefs = entries.map(() => adminDb.collection("productions").doc());
+    const dateToUse = customDate ? new Date(customDate) : new Date();
 
     await adminDb.runTransaction(async (tx) => {
       const ingredientSnaps = new Map<string, FirebaseFirestore.DocumentSnapshot>();
@@ -74,7 +84,7 @@ export async function POST(req: NextRequest) {
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
         tx.set(productionRefs[i], {
-          date: FieldValue.serverTimestamp(),
+          date: dateToUse,
           variantId: entry.variantId,
           batches: entry.batches,
           loyangCount: entry.loyangCount,
@@ -82,7 +92,7 @@ export async function POST(req: NextRequest) {
           type: type || "standard",
           notes: notes ?? "",
           shiftCrewId: effectiveCrewId,
-          createdAt: FieldValue.serverTimestamp(),
+          createdAt: dateToUse,
         });
       }
 
@@ -104,7 +114,7 @@ export async function POST(req: NextRequest) {
           sourceId: productionRefs[0].id,
           note: null,
           createdBy: user.uid,
-          createdAt: FieldValue.serverTimestamp(),
+          createdAt: dateToUse,
         });
 
         if (newStock < 0) {

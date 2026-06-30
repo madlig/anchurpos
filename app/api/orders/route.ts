@@ -286,7 +286,7 @@ export async function POST(req: NextRequest) {
               sourceId: orderRef.id,
               note: `Penjualan ${finalOrderChannel} #${orderNumber}`,
               createdBy: (user as AuthUser | null)?.uid ?? null,
-              createdAt: FieldValue.serverTimestamp(),
+              createdAt: dateToUse,
             });
           }
         }

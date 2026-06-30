@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   const user = auth as AuthUser;
 
   const body = await req.json();
-  const { variantId, totalLoyangUsed, resultRegularPacks, resultFullPacks, resultTikTokPacks, leftoverPcs, type, crewId } = body as {
+  const { variantId, totalLoyangUsed, resultRegularPacks, resultFullPacks, resultTikTokPacks, leftoverPcs, type, crewId, customDate } = body as {
     variantId: string;
     totalLoyangUsed: number;
     resultRegularPacks?: number;
@@ -19,10 +19,19 @@ export async function POST(req: NextRequest) {
     leftoverPcs?: number;
     type?: "standard" | "tiktok";
     crewId?: string;
+    customDate?: string;
   };
 
   if (!variantId || !totalLoyangUsed || totalLoyangUsed <= 0) {
     return NextResponse.json({ error: "Data pre-packing tidak lengkap" }, { status: 400 });
+  }
+
+  // Security: Only owner/manager can back-date packing
+  if (customDate) {
+    const isPrivileged = user.role === "owner" || user.role === "manager";
+    if (!isPrivileged) {
+      return NextResponse.json({ error: "Akses ditolak: Hanya Manager/Owner yang dapat mencatat pengemasan mundur" }, { status: 403 });
+    }
   }
 
   const effectiveCrewId = crewId || user.uid;
@@ -70,9 +79,10 @@ export async function POST(req: NextRequest) {
     }
 
     const prePackRef = adminDb.collection("prePacking").doc();
+    const dateToUse = customDate ? new Date(customDate) : new Date();
 
     await adminDb.runTransaction(async (tx) => {
-      const timestamp = FieldValue.serverTimestamp();
+      const timestamp = dateToUse;
 
       // --- 1. READ OPERATIONS FIRST ---
       

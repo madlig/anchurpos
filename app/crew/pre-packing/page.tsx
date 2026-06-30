@@ -9,7 +9,7 @@ import type { Variant } from "@/types";
 interface PoolItem { productionId: string; date: string; loyangRemaining: number; }
 
 export default function CrewPrePackingPage() {
-  const { getToken } = useAuth();
+  const { getToken, role } = useAuth();
   const [variants, setVariants] = useState<Variant[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [pool, setPool] = useState<PoolItem[]>([]);
@@ -27,6 +27,11 @@ export default function CrewPrePackingPage() {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<"standard" | "tiktok">("standard");
+
+  // Back-dated packing states
+  const [enableCustomDate, setEnableCustomDate] = useState(false);
+  const [customDate, setCustomDate] = useState("");
+
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
@@ -85,7 +90,8 @@ export default function CrewPrePackingPage() {
         variantId: selectedVariant,
         totalLoyangUsed: loyang,
         type: activeTab,
-        leftoverPcs: parseInt(leftoverPcs) || 0
+        leftoverPcs: parseInt(leftoverPcs) || 0,
+        customDate: enableCustomDate && customDate ? customDate : undefined
       };
       if (activeTab === "standard") {
         payload.resultRegularPacks = parseInt(regularPacks) || 0;
@@ -109,11 +115,42 @@ export default function CrewPrePackingPage() {
 
   return (
     <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
-      <div className="flex items-center gap-2 mb-1">
-        <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
-          <PackageOpen size={16} style={{ color: "#E85D8C" }} />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-3">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
+            <PackageOpen size={16} style={{ color: "#E85D8C" }} />
+          </div>
+          <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>
+            {enableCustomDate && customDate ? `Pre-Packing: ${customDate}` : "Pre-Packing"}
+          </h1>
         </div>
-        <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>Pre-Packing</h1>
+
+        {role && (role === "owner" || role === "manager") && (
+          <div className="flex items-center gap-2">
+            <label className="text-xxs font-bold text-slate-500 flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enableCustomDate}
+                onChange={(e) => {
+                  setEnableCustomDate(e.target.checked);
+                  if (e.target.checked && !customDate) {
+                    setCustomDate(new Date().toISOString().split("T")[0]);
+                  }
+                }}
+                className="accent-pink-600"
+              />
+              Tanggal Mundur
+            </label>
+            {enableCustomDate && (
+              <input
+                type="date"
+                value={customDate}
+                onChange={(e) => setCustomDate(e.target.value)}
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-700 bg-white"
+              />
+            )}
+          </div>
+        )}
       </div>
       <p className="text-sm mb-5 ml-10" style={{ color: "#64748B" }}>Loyang → Pack Regular & Full</p>
 

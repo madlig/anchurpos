@@ -13,7 +13,7 @@ interface EntryInput {
 }
 
 export default function CrewProductionPage() {
-  const { getToken } = useAuth();
+  const { getToken, role } = useAuth();
   const [variants, setVariants] = useState<Variant[]>([]);
   const [todayProductions, setTodayProductions] = useState<Production[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -25,6 +25,11 @@ export default function CrewProductionPage() {
   const [loading, setLoading] = useState(true);
   const [loyangTarget, setLoyangTarget] = useState(8);
   const [activeTab, setActiveTab] = useState<"standard" | "tiktok">("standard");
+
+  // Back-dated production states
+  const [enableCustomDate, setEnableCustomDate] = useState(false);
+  const [customDate, setCustomDate] = useState("");
+
 
   const fetchWithAuth = useCallback(
     async (url: string, options?: RequestInit) => {
@@ -39,9 +44,10 @@ export default function CrewProductionPage() {
 
   const loadData = useCallback(async () => {
     try {
+      const activeDate = enableCustomDate && customDate ? customDate : new Date().toISOString().split("T")[0];
       const [varRes, prodRes, targetRes] = await Promise.all([
         fetchWithAuth("/api/variants"),
-        fetchWithAuth(`/api/productions?date=${new Date().toISOString().split("T")[0]}&type=${activeTab}`),
+        fetchWithAuth(`/api/productions?date=${activeDate}&type=${activeTab}`),
         fetchWithAuth("/api/settings/production"),
       ]);
       if (varRes.ok) {
@@ -58,7 +64,7 @@ export default function CrewProductionPage() {
     } finally {
       setLoading(false);
     }
-  }, [fetchWithAuth, activeTab]);
+  }, [fetchWithAuth, activeTab, enableCustomDate, customDate]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -127,7 +133,12 @@ export default function CrewProductionPage() {
     try {
       const res = await fetchWithAuth("/api/productions/batch", {
         method: "POST",
-        body: JSON.stringify({ entries: batchEntries, type: activeTab, notes }),
+        body: JSON.stringify({
+          entries: batchEntries,
+          type: activeTab,
+          notes,
+          customDate: enableCustomDate && customDate ? customDate : undefined,
+        }),
       });
 
       const data = await res.json();
@@ -167,7 +178,37 @@ export default function CrewProductionPage() {
 
       {/* Header (white) */}
       <div className="px-5 pt-4 pb-4 mb-4" style={{ background: "#fff" }}>
-        <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Produksi Hari Ini</h1>
+        <div className="flex items-center justify-between">
+          <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>
+            {enableCustomDate && customDate ? `Produksi: ${customDate}` : "Produksi Hari Ini"}
+          </h1>
+          {role && (role === "owner" || role === "manager") && (
+            <div className="flex items-center gap-2">
+              <label className="text-xxs font-bold text-slate-500 flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enableCustomDate}
+                  onChange={(e) => {
+                    setEnableCustomDate(e.target.checked);
+                    if (e.target.checked && !customDate) {
+                      setCustomDate(new Date().toISOString().split("T")[0]);
+                    }
+                  }}
+                  className="accent-pink-600"
+                />
+                Tanggal Mundur
+              </label>
+              {enableCustomDate && (
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={(e) => setCustomDate(e.target.value)}
+                  className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-700 bg-white"
+                />
+              )}
+            </div>
+          )}
+        </div>
         <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "2px" }}>
           {todayProductions.length} item produksi tercatat
         </p>
