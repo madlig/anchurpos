@@ -87,6 +87,10 @@ export default function KasirPage() {
   const [enableCustomDate, setEnableCustomDate] = useState(false);
   const [customOrderDate, setCustomOrderDate] = useState("");
 
+  // WhatsApp shipping cost states
+  const [shippingCost, setShippingCost] = useState("");
+  const [shippingBorneBy, setShippingBorneBy] = useState<"seller" | "customer">("customer");
+
 
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
@@ -267,6 +271,8 @@ export default function KasirPage() {
           items: cart.map(c => ({ productId: c.productId, variantId: c.variantId, qty: c.qty })),
           orderNotes: orderNotes.trim() || null,
           customDate: enableCustomDate && customOrderDate ? customOrderDate : undefined,
+          shippingCost: orderChannel === "whatsapp" ? (parseInt(shippingCost) || 0) : null,
+          shippingBorneBy: orderChannel === "whatsapp" ? shippingBorneBy : null,
         }),
       });
       const data = await res.json();
@@ -276,6 +282,7 @@ export default function KasirPage() {
       setSelectedCustomer(null); setOrderNotes(""); setIsPaid(true); setSaveNewCustomer(false);
       setPlatformFeeOverride(""); setNewCustomerType("reguler");
       setEnableCustomDate(false); setCustomOrderDate("");
+      setShippingCost(""); setShippingBorneBy("customer");
       router.push(`/manager/orders/${data.orderId}`);
     } catch { setError("Gagal menghubungi server"); } finally { setSubmitting(false); }
   }
@@ -478,21 +485,45 @@ export default function KasirPage() {
                         Stok: {currentStock} pcs {isLowStock ? "⚠ Rendah" : ""}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {qty > 0 && (
-                        <>
-                          <button
-                            onClick={() => adjustVariantQty(v.id, -1)}
-                            style={{ width: "28px", height: "28px", borderRadius: "8px", background: "#F1F5F9", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                          >
-                            <Minus size={13} style={{ color: "#64748B" }} />
-                          </button>
-                          <span style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E", minWidth: "20px", textAlign: "center" }}>{qty}</span>
-                        </>
+                    <div className="flex items-center gap-1.5">
+                      {qty > 0 ? (
+                        <button
+                          onClick={() => adjustVariantQty(v.id, -1)}
+                          style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#F1F5F9", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        >
+                          <Minus size={13} style={{ color: "#64748B" }} />
+                        </button>
+                      ) : (
+                        <div style={{ width: "30px" }} />
                       )}
+
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={qty || ""}
+                        placeholder="0"
+                        onChange={e => {
+                          const val = Math.max(0, parseInt(e.target.value) || 0);
+                          setVariantQtys(prev => ({ ...prev, [v.id]: val }));
+                        }}
+                        style={{
+                          width: "54px",
+                          height: "30px",
+                          borderRadius: "8px",
+                          border: "1px solid #E2E8F0",
+                          textAlign: "center",
+                          fontSize: "13px",
+                          fontWeight: "700",
+                          color: "#1C1C1E",
+                          background: "#fff",
+                          outline: "none",
+                        }}
+                      />
+
                       <button
                         onClick={() => adjustVariantQty(v.id, 1)}
-                        style={{ width: "28px", height: "28px", borderRadius: "8px", background: "#E85D8C", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#E85D8C", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                         data-testid={`add-variant-${v.id}`}
                       >
                         <Plus size={13} style={{ color: "#fff" }} strokeWidth={2.5} />
@@ -699,6 +730,52 @@ export default function KasirPage() {
               </div>
             )}
 
+            {/* ── Biaya Ongkir — hanya untuk WhatsApp ── */}
+            {orderChannel === "whatsapp" && (
+              <div style={{ marginBottom: "12px", padding: "12px", borderRadius: "12px", background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
+                  Biaya Ongkir (WhatsApp)
+                </label>
+                <div className="flex items-center gap-2 mb-2">
+                  <span style={{ fontSize: "13px", color: "#64748B", fontWeight: "600" }}>Rp</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="0"
+                    value={shippingCost}
+                    onChange={e => setShippingCost(e.target.value)}
+                    style={{ flex: 1, padding: "8px 12px", borderRadius: "10px", border: "1px solid #E2E8F0", fontSize: "13px", outline: "none", background: "#fff", color: "#1C1C1E" }}
+                  />
+                  {shippingCost !== "" && (
+                    <button onClick={() => setShippingCost("")}
+                      style={{ width: "28px", height: "28px", borderRadius: "8px", background: "#FEE2E2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <X size={12} style={{ color: "#DC2626" }} />
+                    </button>
+                  )}
+                </div>
+                {parseInt(shippingCost) > 0 && (
+                  <div>
+                    <p style={{ fontSize: "10px", color: "#94A3B8", marginBottom: "6px" }}>Ditanggung Oleh:</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => setShippingBorneBy("customer")}
+                        style={{ flex: 1, padding: "6px", borderRadius: "8px", fontSize: "11px", fontWeight: "600", border: "none", cursor: "pointer",
+                          color: shippingBorneBy === "customer" ? "#fff" : "#64748B",
+                          background: shippingBorneBy === "customer" ? "#E85D8C" : "#E2E8F0" }}>
+                        Pembeli 👤
+                      </button>
+                      <button onClick={() => setShippingBorneBy("seller")}
+                        style={{ flex: 1, padding: "6px", borderRadius: "8px", fontSize: "11px", fontWeight: "600", border: "none", cursor: "pointer",
+                          color: shippingBorneBy === "seller" ? "#fff" : "#64748B",
+                          background: shippingBorneBy === "seller" ? "#E85D8C" : "#E2E8F0" }}>
+                        Kita (Penjual) 🏪
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ── Metode Pembayaran (hanya tampil jika sudah bayar & bukan marketplace record only) ── */}
             {(orderChannel === "walkin" || (orderChannel === "whatsapp" && isPaid)) && (
 
@@ -752,17 +829,37 @@ export default function KasirPage() {
                 <span style={{ fontSize: "14px", fontWeight: "600", color: "#64748B" }}>Total Pesanan</span>
                 <span style={{ fontSize: "18px", fontWeight: "700", color: "#E85D8C" }}>{fmt(cartTotal)}</span>
               </div>
+              {orderChannel === "whatsapp" && (parseInt(shippingCost) || 0) > 0 && (
+                <div className="flex items-center justify-between" style={{ marginTop: "4px" }}>
+                  <span style={{ fontSize: "12px", color: "#94A3B8" }}>
+                    Ongkir ({shippingBorneBy === "customer" ? "Ditanggung Pembeli" : "Ditanggung Kita"})
+                  </span>
+                  <span style={{ fontSize: "12px", fontWeight: "600", color: shippingBorneBy === "customer" ? "#16A34A" : "#DC2626" }}>
+                    {shippingBorneBy === "customer" ? "+" : "-"} {fmt(parseInt(shippingCost) || 0)}
+                  </span>
+                </div>
+              )}
               {feeAmount > 0 && (
-                <>
-                  <div className="flex items-center justify-between" style={{ marginTop: "4px" }}>
-                    <span style={{ fontSize: "12px", color: "#94A3B8" }}>Fee {orderChannel} ({activeFeePercent}%)</span>
-                    <span style={{ fontSize: "12px", color: "#DC2626" }}>- {fmt(feeAmount)}</span>
-                  </div>
-                  <div className="flex items-center justify-between" style={{ marginTop: "4px", paddingTop: "6px", borderTop: "1px solid #F2A0B7" }}>
-                    <span style={{ fontSize: "13px", fontWeight: "700", color: "#64748B" }}>Pendapatan Bersih</span>
-                    <span style={{ fontSize: "16px", fontWeight: "700", color: "#16A34A" }}>{fmt(netRevenue)}</span>
-                  </div>
-                </>
+                <div className="flex items-center justify-between" style={{ marginTop: "4px" }}>
+                  <span style={{ fontSize: "12px", color: "#94A3B8" }}>Fee {orderChannel} ({activeFeePercent}%)</span>
+                  <span style={{ fontSize: "12px", color: "#DC2626" }}>- {fmt(feeAmount)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between" style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px solid #F2A0B7" }}>
+                <span style={{ fontSize: "13px", fontWeight: "700", color: "#64748B" }}>
+                  {shippingBorneBy === "customer" && (parseInt(shippingCost) || 0) > 0 ? "Total Tagihan (inc. Ongkir)" : "Pendapatan Bersih"}
+                </span>
+                <span style={{ fontSize: "16px", fontWeight: "700", color: "#16A34A" }}>
+                  {fmt(
+                    (cartTotal - feeAmount) + 
+                    (orderChannel === "whatsapp" && shippingBorneBy === "customer" ? (parseInt(shippingCost) || 0) : 0)
+                  )}
+                </span>
+              </div>
+              {orderChannel === "whatsapp" && (parseInt(shippingCost) || 0) > 0 && shippingBorneBy === "seller" && (
+                <p style={{ fontSize: "10px", color: "#64748B", marginTop: "6px", textAlign: "right", fontStyle: "italic" }}>
+                  * Ongkir ditanggung kita akan otomatis dicatat sebagai pengeluaran operasional.
+                </p>
               )}
             </div>
 

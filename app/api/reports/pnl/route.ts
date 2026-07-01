@@ -27,7 +27,14 @@ export async function GET(req: NextRequest) {
       .get();
 
     for (const doc of ordersSnap.docs) {
-      if (doc.data().status === "void") continue;
+      const data = doc.data();
+      if (data.status === "void") continue;
+
+      // Add shipping cost as income if borne by the customer
+      if (data.shippingBorneBy === "customer" && (data.shippingCost ?? 0) > 0) {
+        pemasukan += data.shippingCost;
+      }
+
       const itemsSnap = await doc.ref.collection("items").get();
       for (const itemDoc of itemsSnap.docs) {
         const item = itemDoc.data();

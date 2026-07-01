@@ -118,6 +118,8 @@ export async function POST(req: NextRequest) {
     platformFeePercent: inputFeePercent,
     platformFee: inputFeeAmount,
     customDate,
+    shippingCost,
+    shippingBorneBy,
   } = body as {
     customerId?: string;
     customerName?: string;
@@ -133,6 +135,8 @@ export async function POST(req: NextRequest) {
     platformFeePercent?: number;
     platformFee?: number;
     customDate?: string;
+    shippingCost?: number;
+    shippingBorneBy?: "seller" | "customer";
   };
 
   if (!items?.length) {
@@ -230,7 +234,8 @@ export async function POST(req: NextRequest) {
       const totalOrderValue = processedItems.reduce((sum, item) => sum + ((item.totalPrice as number) ?? 0), 0);
       const finalFeePercent = inputFeePercent ?? 0;
       const finalFeeAmount = inputFeeAmount ?? (totalOrderValue * finalFeePercent / 100);
-      const netRevenue = totalOrderValue - finalFeeAmount;
+      // Net revenue includes shipping if borne by customer
+      const netRevenue = (totalOrderValue - finalFeeAmount) + (shippingBorneBy === "customer" ? (shippingCost ?? 0) : 0);
 
       tx.set(orderRef, {
         orderNumber,
@@ -255,12 +260,34 @@ export async function POST(req: NextRequest) {
         requestedDeliveryDate: requestedDeliveryDate ?? null,
         orderNotes: orderNotes ?? null,
         proofOfTransferUrl: null,
-        shippingCost: null,
-        shippingCostConfirmed: false,
+        shippingCost: shippingCost ?? null,
+        shippingBorneBy: shippingBorneBy ?? null,
+        shippingCostConfirmed: true,
         invoiceNumber: null,
         invoiceGeneratedAt: null,
         invoiceUrl: null,
       });
+
+      // Jika ongkir ditanggung penjual, otomatis catat sebagai pengeluaran (expense)
+      if (finalOrderChannel === "whatsapp" && (shippingCost ?? 0) > 0 && shippingBorneBy === "seller") {
+        const expenseRef = adminDb.collection("expenses").doc();
+        tx.set(expenseRef, {
+          date: dateToUse,
+          category: "operasional",
+          ingredientId: null,
+          itemName: `Ongkir Order #${orderNumber}`,
+          qtyPurchased: 1,
+          purchaseUnit: "kali",
+          qtyInBaseUnit: 1,
+          totalPrice: shippingCost,
+          pricePerBaseUnit: shippingCost,
+          paymentMethod: "transfer",
+          supplier: "Ekspedisi / Kurir",
+          notes: `Ditanggung penjual untuk order #${orderNumber}`,
+          createdBy: (user as AuthUser | null)?.uid ?? null,
+          createdAt: dateToUse,
+        });
+      }
 
       for (const itemData of processedItems) {
         const itemRef = orderRef.collection("items").doc();
