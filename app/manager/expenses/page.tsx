@@ -66,6 +66,16 @@ function clientGetSimilarity(s1: string, s2: string): number {
 }
 
 // Form pencatatan pengeluaran premium
+interface ExpenseItem {
+  id: string;
+  ingredientId: string | null;
+  itemName: string;
+  qty: string;
+  purchaseUnit: string;
+  totalCost: string;
+  forceCreateNew?: boolean;
+}
+
 function ExpenseForm({
   ingredients,
   fetchWithAuth,
@@ -78,20 +88,23 @@ function ExpenseForm({
   onCancel: () => void;
 }) {
   const [category, setCategory] = useState<"bahan_baku" | "packaging" | "operasional" | "lain_lain">("bahan_baku");
-  const [ingredientId, setIngredientId] = useState("");
-  const [itemName, setItemName] = useState("");
-  const [qty, setQty] = useState("");
-  const [purchaseUnit, setPurchaseUnit] = useState("");
-  const [totalCost, setTotalCost] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer" | "qris">("cash");
   const [supplier, setSupplier] = useState("");
   const [notes, setNotes] = useState("");
   const [customDate, setCustomDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  
-  // Toggle input manual untuk bahan baku / packaging
+
+  // States untuk input item aktif saat ini
+  const [ingredientId, setIngredientId] = useState("");
+  const [itemName, setItemName] = useState("");
+  const [qty, setQty] = useState("");
+  const [purchaseUnit, setPurchaseUnit] = useState("");
+  const [totalCost, setTotalCost] = useState("");
   const [isManualInput, setIsManualInput] = useState(false);
+
+  // Keranjang belanja item untuk pengeluaran bulk
+  const [itemsList, setItemsList] = useState<ExpenseItem[]>([]);
 
   // Auto-fill nama barang jika memilih bahan baku
   const handleIngredientChange = (id: string) => {
@@ -106,47 +119,44 @@ function ExpenseForm({
     }
   };
 
-  async function handleSubmit() {
-    setError("");
-    const isProductCategory = category === "bahan_baku" || category === "packaging";
+  const isProductCategory = category === "bahan_baku" || category === "packaging";
 
-    if (isProductCategory && !isManualInput) {
-      if (!ingredientId) {
+  // Tambah item aktif ke keranjang belanja
+  function handleAddItem() {
+    setError("");
+
+    if (isProductCategory) {
+      if (!isManualInput && !ingredientId) {
         setError("Pilih bahan baku/kemasan terlebih dahulu");
         return;
       }
-      if (!qty || parseFloat(qty) <= 0) {
-        setError("Jumlah pembelian harus lebih dari 0");
-        return;
-      }
-    } else if (isProductCategory && isManualInput) {
-      if (!itemName.trim()) {
+      if (isManualInput && !itemName.trim()) {
         setError("Nama bahan baru wajib diisi");
         return;
       }
       if (!qty || parseFloat(qty) <= 0) {
-        setError("Jumlah pembelian harus lebih dari 0");
+        setError("Jumlah pembelian (Qty) harus lebih dari 0");
         return;
       }
-      if (!purchaseUnit.trim()) {
-        setError("Satuan pembelian wajib diisi (misal: kg, gram, pcs)");
+      if (isManualInput && !purchaseUnit.trim()) {
+        setError("Satuan wajib diisi (misal: kg, gram, pcs)");
         return;
       }
     } else {
       if (!itemName.trim()) {
-        setError("Nama pengeluaran wajib diisi");
+        setError("Deskripsi pengeluaran wajib diisi");
         return;
       }
     }
 
     if (!totalCost || parseFloat(totalCost) <= 0) {
-      setError("Total biaya harus lebih dari 0");
+      setError("Biaya item harus lebih dari 0");
       return;
     }
 
     // Resolving fuzzy matches interactively if manually entered
-    let postIngredientId: string | null = (isProductCategory && !isManualInput) ? ingredientId : null;
-    let postItemName = (isProductCategory && !isManualInput)
+    let postIngredientId: string | null = (!isManualInput) ? ingredientId : null;
+    let postItemName = (!isManualInput)
       ? (ingredients.find((i) => i.id === ingredientId)?.name ?? itemName)
       : itemName.trim();
     let forceCreateNew = false;
@@ -183,31 +193,110 @@ function ExpenseForm({
       }
     }
 
+    const newItem: ExpenseItem = {
+      id: Math.random().toString(),
+      ingredientId: postIngredientId,
+      itemName: postItemName,
+      qty: isProductCategory ? qty : "1",
+      purchaseUnit: isProductCategory ? purchaseUnit.trim() : "",
+      totalCost,
+      forceCreateNew,
+    };
+
+    setItemsList([...itemsList, newItem]);
+    
+    // Reset Form Input Item Aktif
+    setIngredientId("");
+    setItemName("");
+    setQty("");
+    if (!isManualInput) setPurchaseUnit("");
+    setTotalCost("");
+  }
+
+  // Hapus item dari keranjang belanja
+  function handleRemoveItem(idToRemove: string) {
+    setItemsList(itemsList.filter((item) => item.id !== idToRemove));
+  }
+
+  // Hitung total akumulasi pengeluaran
+  const computedTotalCost = useMemo(() => {
+    if (isProductCategory) {
+      return itemsList.reduce((acc, item) => acc + (parseFloat(item.totalCost) || 0), 0);
+    }
+    return parseFloat(totalCost) || 0;
+  }, [itemsList, totalCost, isProductCategory]);
+
+  async function handleSubmit() {
+    setError("");
+
+    if (isProductCategory && itemsList.length === 0) {
+      setError("Silakan tambah minimal 1 bahan/item belanja terlebih dahulu");
+      return;
+    }
+
+    if (!isProductCategory && (!itemName.trim() || !totalCost || parseFloat(totalCost) <= 0)) {
+      setError("Nama pengeluaran dan total biaya wajib diisi dengan benar");
+      return;
+    }
+
     setSaving(true);
     try {
-      const res = await fetchWithAuth("/api/expenses", {
-        method: "POST",
-        body: JSON.stringify({
-          ingredientId: postIngredientId,
-          itemName: postItemName,
-          category,
-          qtyPurchased: isProductCategory ? parseFloat(qty) : null,
-          purchaseUnit: isProductCategory ? purchaseUnit.trim() : null,
-          totalPrice: parseFloat(totalCost),
-          paymentMethod,
-          supplier: supplier.trim() || null,
-          notes: notes.trim() || null,
-          customDate: customDate || null,
-          forceCreateNew,
-        }),
-      });
+      if (isProductCategory) {
+        // Simpan semua item bahan baku / packaging secara bulk menggunakan Promise.all
+        const promises = itemsList.map((item) => {
+          return fetchWithAuth("/api/expenses", {
+            method: "POST",
+            body: JSON.stringify({
+              ingredientId: item.ingredientId,
+              itemName: item.itemName,
+              category,
+              qtyPurchased: parseFloat(item.qty),
+              purchaseUnit: item.purchaseUnit,
+              totalPrice: parseFloat(item.totalCost),
+              paymentMethod,
+              supplier: supplier.trim() || null,
+              notes: notes.trim() || null,
+              customDate: customDate || null,
+              forceCreateNew: item.forceCreateNew ?? false,
+            }),
+          });
+        });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Gagal menyimpan pengeluaran");
+        const results = await Promise.all(promises);
+        const allOk = results.every((r) => r.ok);
+        if (!allOk) {
+          setError("Beberapa item belanja gagal disimpan. Periksa koneksi internet Anda.");
+          setSaving(false);
+          return;
+        }
       } else {
-        onSuccess();
+        // Simpan single item operasional / lain-lain
+        const res = await fetchWithAuth("/api/expenses", {
+          method: "POST",
+          body: JSON.stringify({
+            ingredientId: null,
+            itemName: itemName.trim(),
+            category,
+            qtyPurchased: null,
+            purchaseUnit: null,
+            totalPrice: parseFloat(totalCost),
+            paymentMethod,
+            supplier: supplier.trim() || null,
+            notes: notes.trim() || null,
+            customDate: customDate || null,
+            forceCreateNew: false,
+          }),
+        });
+
+        if (!res.ok) {
+          const resData = await res.json();
+          setError(resData.error ?? "Gagal menyimpan pengeluaran");
+          setSaving(false);
+          return;
+        }
       }
+
+      onSuccess();
     } catch (err) {
       setError("Gagal menghubungi server");
     } finally {
@@ -244,7 +333,9 @@ function ExpenseForm({
                 setItemName("");
                 setQty("");
                 setPurchaseUnit("");
+                setTotalCost("");
                 setIsManualInput(false);
+                setItemsList([]);
               }}
               style={{
                 padding: "8px",
@@ -266,9 +357,40 @@ function ExpenseForm({
         </div>
       </div>
 
-      {/* Fields berdasarkan Kategori */}
-      <div className="space-y-3">
-        {(category === "bahan_baku" || category === "packaging") ? (
+      {/* Detail Global / Nota */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+            Tanggal Transaksi
+          </label>
+          <Input
+            type="date"
+            value={customDate}
+            onChange={(e) => setCustomDate(e.target.value)}
+            className="h-10 rounded-xl text-xs border-slate-200"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+            Supplier / Toko (Opsional)
+          </label>
+          <Input
+            type="text"
+            placeholder="Nama Supplier"
+            value={supplier}
+            onChange={(e) => setSupplier(e.target.value)}
+            className="h-10 rounded-xl text-xs border-slate-200"
+          />
+        </div>
+      </div>
+
+      {/* Form Input Item/Bahan */}
+      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
+        <p className="text-xxs font-extrabold text-slate-400 uppercase tracking-widest">
+          {isProductCategory ? "Input Bahan / Kemasan Belanja" : "Detail Pengeluaran"}
+        </p>
+
+        {isProductCategory ? (
           <>
             <div>
               <div className="flex justify-between items-center mb-1">
@@ -296,11 +418,10 @@ function ExpenseForm({
                     placeholder="Contoh: Gula Halus Super"
                     value={itemName}
                     onChange={(e) => setItemName(e.target.value)}
-                    className="h-10 rounded-xl text-xs border-slate-200"
-                    data-testid="expense-manual-item-name"
+                    className="h-10 rounded-xl text-xs border-slate-200 bg-white"
                   />
                   <p className="text-[9px] text-slate-400 mt-1">
-                    * Sistem akan mencocokkan kemiripan nama secara otomatis. Jika tidak ada yang mirip, akan dibuatkan master data bahan baku baru di database.
+                    * Sistem akan mencocokkan kemiripan secara otomatis. Jika tidak ada yang mirip, akan dibuatkan master data bahan baku baru di database.
                   </p>
                 </div>
               ) : (
@@ -308,7 +429,6 @@ function ExpenseForm({
                   value={ingredientId}
                   onChange={(e) => handleIngredientChange(e.target.value)}
                   className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs bg-white outline-none focus:border-pink-300"
-                  data-testid="expense-ingredient-select"
                 >
                   <option value="">-- Pilih dari database --</option>
                   {ingredients
@@ -322,143 +442,182 @@ function ExpenseForm({
               )}
             </div>
 
-            <div className="flex gap-2">
-              <div className="flex-1">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
-                  Jumlah (Qty)
+                  Jumlah (Qty) & Satuan
+                </label>
+                <div className="flex gap-1.5">
+                  <Input
+                    type="number"
+                    placeholder="Contoh: 10"
+                    value={qty}
+                    onChange={(e) => setQty(e.target.value)}
+                    className="h-10 rounded-xl text-xs border-slate-200 bg-white flex-1"
+                  />
+                  <Input
+                    type="text"
+                    placeholder="kg/gram"
+                    value={purchaseUnit}
+                    onChange={(e) => setPurchaseUnit(e.target.value)}
+                    disabled={!isManualInput && !!ingredientId}
+                    className={`h-10 rounded-xl text-xs border-slate-200 w-20 ${(!isManualInput && !!ingredientId) ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+                  Harga (Rp)
                 </label>
                 <Input
                   type="number"
-                  placeholder="Contoh: 10"
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                  className="h-10 rounded-xl text-xs border-slate-200"
-                />
-              </div>
-              <div className="w-1/3">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
-                  Satuan
-                </label>
-                <Input
-                  type="text"
-                  placeholder="kg / gram / pcs"
-                  value={purchaseUnit}
-                  onChange={(e) => setPurchaseUnit(e.target.value)}
-                  disabled={!isManualInput && !!ingredientId}
-                  className={`h-10 rounded-xl text-xs border-slate-200 ${(!isManualInput && !!ingredientId) ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
+                  placeholder="25000"
+                  value={totalCost}
+                  onChange={(e) => setTotalCost(e.target.value)}
+                  className="h-10 rounded-xl text-xs border-slate-200 bg-white"
                 />
               </div>
             </div>
+
+            <Button
+              type="button"
+              onClick={handleAddItem}
+              className="w-full h-9 rounded-xl text-xxs font-bold bg-slate-800 text-white flex items-center justify-center gap-1 active:scale-[0.99] transition-all"
+            >
+              ➕ Tambah Bahan ke Daftar Nota
+            </Button>
           </>
         ) : (
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
-              Nama Pengeluaran / Deskripsi
-            </label>
-            <Input
-              type="text"
-              placeholder="Contoh: Bayar Listrik Toko Juni"
-              value={itemName}
-              onChange={(e) => setItemName(e.target.value)}
-              className="h-10 rounded-xl text-xs border-slate-200"
-            />
+          <div className="space-y-3">
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+                Nama Pengeluaran / Deskripsi
+              </label>
+              <Input
+                type="text"
+                placeholder="Contoh: Bayar Listrik Toko Juni"
+                value={itemName}
+                onChange={(e) => setItemName(e.target.value)}
+                className="h-10 rounded-xl text-xs border-slate-200 bg-white"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+                Total Biaya (Rp)
+              </label>
+              <Input
+                type="number"
+                placeholder="Contoh: 250000"
+                value={totalCost}
+                onChange={(e) => setTotalCost(e.target.value)}
+                className="h-10 rounded-xl text-xs border-slate-200 font-semibold bg-white"
+              />
+            </div>
           </div>
         )}
+      </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
-              Total Biaya (Rp)
-            </label>
-            <Input
-              type="number"
-              placeholder="Contoh: 250000"
-              value={totalCost}
-              onChange={(e) => setTotalCost(e.target.value)}
-              className="h-10 rounded-xl text-xs border-slate-200 font-semibold"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
-              Tanggal Transaksi
-            </label>
-            <Input
-              type="date"
-              value={customDate}
-              onChange={(e) => setCustomDate(e.target.value)}
-              className="h-10 rounded-xl text-xs border-slate-200"
-            />
-          </div>
-        </div>
-
-        {/* Metode Pembayaran */}
-        <div>
-          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">
-            Metode Pembayaran
-          </label>
-          <div className="flex gap-2">
-            {(["cash", "transfer", "qris"] as const).map((method) => (
-              <button
-                key={method}
-                type="button"
-                onClick={() => setPaymentMethod(method)}
-                style={{
-                  flex: 1,
-                  padding: "9px",
-                  borderRadius: "12px",
-                  fontSize: "11px",
-                  fontWeight: "700",
-                  border: "none",
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                  color: paymentMethod === method ? "#fff" : "#64748B",
-                  background: paymentMethod === method ? "#E85D8C" : "#F1F5F9",
-                }}
+      {/* Daftar Item / Cart (Hanya tampil untuk bahan baku / packaging) */}
+      {isProductCategory && itemsList.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daftar Bahan Yang Akan Disimpan ({itemsList.length})</p>
+          <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
+            {itemsList.map((item) => (
+              <div 
+                key={item.id} 
+                className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 text-xs"
               >
-                {PAYMENT_METHOD_LABELS[method]}
-              </button>
+                <div className="min-w-0 flex-1 pr-2">
+                  <p className="font-semibold text-slate-800 truncate">{item.itemName}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">{item.qty} {item.purchaseUnit}</p>
+                </div>
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <span className="font-bold text-slate-700">{fmt(parseFloat(item.totalCost))}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveItem(item.id)}
+                    className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 active:scale-90 transition-all"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </div>
+      )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
-              Supplier / Toko (Opsional)
-            </label>
-            <Input
-              type="text"
-              placeholder="Nama Supplier"
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-              className="h-10 rounded-xl text-xs border-slate-200"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
-              Catatan Keterangan (Opsional)
-            </label>
-            <Input
-              type="text"
-              placeholder="Catatan tambahan"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="h-10 rounded-xl text-xs border-slate-200"
-            />
-          </div>
+      {/* Metode Pembayaran */}
+      <div>
+        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">
+          Metode Pembayaran
+        </label>
+        <div className="flex gap-2">
+          {(["cash", "transfer", "qris"] as const).map((method) => (
+            <button
+              key={method}
+              type="button"
+              onClick={() => setPaymentMethod(method)}
+              style={{
+                flex: 1,
+                padding: "9px",
+                borderRadius: "12px",
+                fontSize: "11px",
+                fontWeight: "700",
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.2s",
+                color: paymentMethod === method ? "#fff" : "#64748B",
+                background: paymentMethod === method ? "#E85D8C" : "#F1F5F9",
+              }}
+            >
+              {PAYMENT_METHOD_LABELS[method]}
+            </button>
+          ))}
         </div>
       </div>
 
+      {/* Keterangan & Total Ringkasan Biaya */}
+      <div className="space-y-3">
+        <div>
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+            Catatan Tambahan (Opsional)
+          </label>
+          <Input
+            type="text"
+            placeholder="Catatan tambahan nota"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="h-10 rounded-xl text-xs border-slate-200"
+          />
+        </div>
+
+        {/* Total Keseluruhan Ringkasan */}
+        <div className="p-3.5 rounded-2xl bg-pink-50/70 border border-pink-100 flex justify-between items-center">
+          <span className="text-xs font-bold text-slate-600">Total Pengeluaran Nota:</span>
+          <span className="text-base font-extrabold text-pink-600 tabular-nums">{fmt(computedTotalCost)}</span>
+        </div>
+      </div>
+
+      {/* Button Submit / Cancel */}
       <div className="flex gap-2.5 pt-2">
         <Button
           onClick={handleSubmit}
           disabled={saving}
-          className="flex-1 h-11 rounded-xl text-xs font-bold text-white"
+          className="flex-1 h-11 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98]"
           style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)" }}
-          data-testid="save-expense-btn"
         >
-          {saving ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Check size={14} className="mr-1.5" />}
-          Simpan Transaksi
+          {saving ? (
+            <>
+              <Loader2 size={14} className="animate-spin mr-1.5" />
+              Menyimpan ({itemsList.length || 1} Item)...
+            </>
+          ) : (
+            <>
+              <Check size={14} className="mr-1.5" />
+              Simpan Transaksi
+            </>
+          )}
         </Button>
         <button
           type="button"
