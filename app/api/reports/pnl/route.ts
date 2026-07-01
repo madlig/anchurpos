@@ -20,6 +20,9 @@ export async function GET(req: NextRequest) {
     let pemasukan = 0;
     let hppProduk = 0;
 
+    let totalCashIn = 0;
+    let totalBankIn = 0;
+
     const ordersSnap = await adminDb
       .collection("orders")
       .where("createdAt", ">=", startOfMonth)
@@ -30,22 +33,38 @@ export async function GET(req: NextRequest) {
       const data = doc.data();
       if (data.status === "void") continue;
 
+      let orderPemasukan = 0;
       // Add shipping cost as income if borne by the customer
       if (data.shippingBorneBy === "customer" && (data.shippingCost ?? 0) > 0) {
-        pemasukan += data.shippingCost;
+        orderPemasukan += data.shippingCost;
       }
 
       const itemsSnap = await doc.ref.collection("items").get();
       for (const itemDoc of itemsSnap.docs) {
         const item = itemDoc.data();
-        pemasukan += item.totalPrice ?? 0;
+        orderPemasukan += item.totalPrice ?? 0;
         hppProduk += item.totalHpp ?? 0;
+      }
+
+      pemasukan += orderPemasukan;
+
+      // Classify payment method for cash flow
+      if (data.paymentStatus === "sudah_bayar") {
+        const method = data.paymentMethod ?? "cash";
+        if (method === "cash") {
+          totalCashIn += orderPemasukan;
+        } else if (method === "transfer" || method === "qris") {
+          totalBankIn += orderPemasukan;
+        }
       }
     }
 
     const labaKotor = pemasukan - hppProduk;
 
     let biayaOperasional = 0;
+    let totalCashOut = 0;
+    let totalBankOut = 0;
+
     const expensesSnap = await adminDb
       .collection("expenses")
       .where("date", ">=", startOfMonth)
@@ -56,6 +75,13 @@ export async function GET(req: NextRequest) {
       const d = doc.data();
       if (d.category === "operasional") {
         biayaOperasional += d.totalPrice ?? 0;
+      }
+      
+      const method = d.paymentMethod ?? "cash";
+      if (method === "cash") {
+        totalCashOut += d.totalPrice ?? 0;
+      } else {
+        totalBankOut += d.totalPrice ?? 0;
       }
     }
 
@@ -68,6 +94,7 @@ export async function GET(req: NextRequest) {
 
     for (const doc of adjustmentsSnap.docs) {
       biayaPromosi += doc.data().totalCost ?? 0;
+      // Stock adjustment decreases inventory asset value, but if it has cash flow effect? No, it's non-cash writeoff.
     }
 
     let gajiBonus = 0;
@@ -78,9 +105,34 @@ export async function GET(req: NextRequest) {
 
     for (const doc of payrollSnap.docs) {
       gajiBonus += doc.data().totalPaid ?? 0;
+      // Payroll is typically bank transfer
+      totalBankOut += doc.data().totalPaid ?? 0;
+    }
+
+    // Query internal cash transfers
+    let mutasiCashToBank = 0;
+    let mutasiBankToCash = 0;
+    
+    const transfersSnap = await adminDb
+      .collection("cashTransfers")
+      .where("date", ">=", startOfMonth)
+      .where("date", "<=", endOfMonth)
+      .get();
+
+    for (const doc of transfersSnap.docs) {
+      const d = doc.data();
+      if (d.from === "cash" && d.to === "bank") {
+        mutasiCashToBank += d.amount ?? 0;
+      } else if (d.from === "bank" && d.to === "cash") {
+        mutasiBankToCash += d.amount ?? 0;
+      }
     }
 
     const labaBersih = labaKotor - biayaOperasional - biayaPromosi - gajiBonus;
+
+    // Calculate final cash flow ledger estimates
+    const saldoBukuCash = totalCashIn - totalCashOut - mutasiCashToBank + mutasiBankToCash;
+    const saldoBukuBank = totalBankIn - totalBankOut + mutasiCashToBank - mutasiBankToCash;
 
     return NextResponse.json({
       month,
@@ -91,6 +143,15 @@ export async function GET(req: NextRequest) {
       biayaPromosi,
       gajiBonus,
       labaBersih,
+      // Cash Flow extensions
+      totalCashIn,
+      totalCashOut,
+      totalBankIn,
+      totalBankOut,
+      mutasiCashToBank,
+      mutasiBankToCash,
+      saldoBukuCash,
+      saldoBukuBank,
     });
   } catch (err) {
     console.error("GET /api/reports/pnl error:", err);

@@ -11,10 +11,9 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/manager/dashboard", icon: LayoutDashboard },
-  { label: "Kasir", href: "/manager/pos", icon: ShoppingCart },
-  { label: "Pesanan", href: "/manager/orders", icon: ClipboardList },
+  { label: "Transaksi", href: "/manager/orders", icon: ClipboardList },
+  { label: "Kasir", href: "/manager/pos", icon: ShoppingCart, isPosButton: true },
   { label: "Inventori", href: "/manager/inventory", icon: Package },
-  { label: "Pengeluaran", href: "/manager/expenses", icon: Banknote },
   { label: "Lainnya", href: "/manager/more", icon: MoreHorizontal },
 ];
 
@@ -84,25 +83,54 @@ function MobileBottomNav() {
   return (
     <nav
       data-testid="manager-bottom-nav"
-      className="fixed bottom-0 left-0 right-0 z-30 md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-30 md:hidden animate-fade-in"
       style={{
-        background: "rgba(255,255,255,0.94)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
+        background: "rgba(255,255,255,0.96)",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
         borderTop: "1px solid rgba(0,0,0,0.06)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
-      <div className="flex items-center justify-around px-1 pt-2 pb-2">
+      <div className="relative flex items-end justify-around px-1 pt-1.5 pb-2 min-h-[58px]">
         {NAV_ITEMS.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;
+
+          if (item.isPosButton) {
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                data-testid={`manager-nav-${item.label.toLowerCase()}`}
+                className="relative flex flex-col items-center justify-center tap-target -translate-y-4"
+                style={{ zIndex: 35 }}
+              >
+                <div
+                  className="flex items-center justify-center rounded-full transition-all duration-300 active:scale-95"
+                  style={{
+                    width: "56px",
+                    height: "56px",
+                    background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)",
+                    boxShadow: "0 6px 20px rgba(232,93,140,0.45)",
+                    border: "4px solid #fff"
+                  }}
+                >
+                  <Icon size={22} className="text-white" strokeWidth={2.5} />
+                </div>
+                <span className="text-[10px] font-bold mt-1" style={{ color: active ? "#E85D8C" : "#94A3B8" }}>
+                  {item.label}
+                </span>
+              </Link>
+            );
+          }
+
           return (
             <Link
               key={item.href}
               href={item.href}
               data-testid={`manager-nav-${item.label.toLowerCase()}`}
-              className="flex flex-col items-center gap-0.5 min-w-[52px] min-h-[50px] justify-center tap-target"
+              className="flex flex-col items-center gap-0.5 min-w-[50px] min-h-[50px] justify-center tap-target"
             >
               <div
                 className="flex items-center justify-center h-8 w-8 rounded-xl transition-all duration-200"
