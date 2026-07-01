@@ -91,6 +91,9 @@ export default function KasirPage() {
   const [shippingCost, setShippingCost] = useState("");
   const [shippingBorneBy, setShippingBorneBy] = useState<"seller" | "customer">("customer");
 
+  // Dynamic Addon Sauce States
+  const [addOns, setAddOns] = useState<any[]>([]);
+  const [sauceDist, setSauceDist] = useState<Record<string, number>>({});
 
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
@@ -104,12 +107,14 @@ export default function KasirPage() {
       fetchWithAuth("/api/customers").then(r => r.json()),
       fetchWithAuth("/api/products/stocks").then(r => r.json()),
       fetchWithAuth("/api/settings/marketplace-fee").then(r => r.ok ? r.json() : { tiktok: 0, shopee: 0 }),
-    ]).then(([p, v, c, s, fees]) => {
+      fetchWithAuth("/api/addons").then(r => r.json()),
+    ]).then(([p, v, c, s, fees, addonsData]) => {
       setProducts(Array.isArray(p) ? p : []);
       setVariants(Array.isArray(v) ? v : []);
       setCustomers(Array.isArray(c) ? c : []);
       setProductStocks(Array.isArray(s) ? s : []);
       setMarketplaceFees({ tiktok: fees.tiktok ?? 0, shopee: fees.shopee ?? 0 });
+      setAddOns(Array.isArray(addonsData) ? addonsData : []);
     }).finally(() => setLoading(false));
   }, [fetchWithAuth]);
 
@@ -127,6 +132,51 @@ export default function KasirPage() {
   // ── Cart calculations ──────────────────────────────────────────────────────
   const cartTotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart]);
   const cartCount = useMemo(() => cart.reduce((s, i) => s + i.qty, 0), [cart]);
+
+  // Kalkulasi total saos glaze yang didapat (Regular: 2 cup, Full: 3 cup, Tiktok: 2 cup)
+  const totalSaucesNeeded = useMemo(() => {
+    let total = 0;
+    cart.forEach(item => {
+      const vName = item.variantName.toLowerCase();
+      if (vName.includes("regular") || vName.includes("tiktok")) {
+        total += item.qty * 2;
+      } else if (vName.includes("full")) {
+        total += item.qty * 3;
+      }
+    });
+    return total;
+  }, [cart]);
+
+  // Auto-fill default saos saat checkout dibuka
+  useEffect(() => {
+    if (showCheckout && totalSaucesNeeded > 0 && addOns.length > 0) {
+      // Cari saos cokelat
+      const cokelatAddon = addOns.find(a => a.name.toLowerCase().includes("cokelat") || a.id === "cokelat");
+      // Cari saos tiramisu sebagai default pilihan kedua
+      const tiramisuAddon = addOns.find(a => a.name.toLowerCase().includes("tiramisu") || a.id === "tiramisu") || addOns[0];
+
+      const initialDist: Record<string, number> = {};
+      // Inisialisasi semua add-ons ke 0
+      addOns.forEach(a => {
+        initialDist[a.id] = 0;
+      });
+
+      if (cokelatAddon) {
+        // Regular include 1 Cokelat & 1 Pilihan. Berarti Cokelat = totalSaucesNeeded / 2
+        const half = Math.floor(totalSaucesNeeded / 2);
+        initialDist[cokelatAddon.id] = half;
+        if (tiramisuAddon) {
+          initialDist[tiramisuAddon.id] = totalSaucesNeeded - half;
+        }
+      } else {
+        // Jika tidak ada cokelat, masukkan ke add-on pertama
+        initialDist[addOns[0].id] = totalSaucesNeeded;
+      }
+      setSauceDist(initialDist);
+    } else if (!showCheckout) {
+      setSauceDist({});
+    }
+  }, [showCheckout, totalSaucesNeeded, addOns]);
 
   // ── Variant sheet helpers ──────────────────────────────────────────────────
   function openVariantSheet(product: ProductItem) {
@@ -273,6 +323,7 @@ export default function KasirPage() {
           customDate: enableCustomDate && customOrderDate ? customOrderDate : undefined,
           shippingCost: orderChannel === "whatsapp" ? (parseInt(shippingCost) || 0) : null,
           shippingBorneBy: orderChannel === "whatsapp" ? shippingBorneBy : null,
+          sauceDistribution: totalSaucesNeeded > 0 ? sauceDist : undefined,
         }),
       });
       const data = await res.json();
@@ -285,6 +336,20 @@ export default function KasirPage() {
       setShippingCost(""); setShippingBorneBy("customer");
       router.push(`/manager/orders/${data.orderId}`);
     } catch { setError("Gagal menghubungi server"); } finally { setSubmitting(false); }
+  }
+
+  function adjustSauceQty(sauceId: string, delta: number) {
+    setSauceDist(prev => {
+      const curr = prev[sauceId] ?? 0;
+      const next = Math.max(0, curr + delta);
+      const totalWithNext = Object.entries(prev).reduce((sum, [id, val]) => {
+        return sum + (id === sauceId ? next : val);
+      }, 0);
+      if (totalWithNext > totalSaucesNeeded) {
+        return prev; // don't exceed total needed limit
+      }
+      return { ...prev, [sauceId]: next };
+    });
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -815,6 +880,60 @@ export default function KasirPage() {
               </div>
             )}
 
+            {/* ── Distribusi Saos Glaze (Custom B2B / standard) ── */}
+            {totalSaucesNeeded > 0 && addOns.length > 0 && (() => {
+              const allocated = Object.values(sauceDist).reduce((s, v) => s + v, 0);
+              const isMatched = allocated === totalSaucesNeeded;
+              return (
+                <div style={{ marginBottom: "12px", padding: "12px", borderRadius: "12px", background: "#FFFBF0", border: isMatched ? "1px solid #FCD34D" : "1px solid #F87171" }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span style={{ fontSize: "11px", fontWeight: "700", color: "#B45309", textTransform: "uppercase" }}>Pilihan Rasa Saos Glaze</span>
+                    <span style={{ fontSize: "11px", fontWeight: "850", padding: "2px 8px", borderRadius: "6px",
+                      color: isMatched ? "#15803D" : "#B91C1C", background: isMatched ? "#DCFCE7" : "#FEE2E2" }}>
+                      {allocated} / {totalSaucesNeeded} Cup
+                    </span>
+                  </div>
+                  <p style={{ fontSize: "10px", color: "#78350F", marginBottom: "8px", lineHeight: "1.3" }}>
+                    Tentukan jumlah cup per rasa saos yang disajikan untuk pesanan ini.
+                  </p>
+
+                  <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto pr-1">
+                    {addOns.map(addon => {
+                      const qty = sauceDist[addon.id] ?? 0;
+                      return (
+                        <div key={addon.id} className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100">
+                          <span style={{ fontSize: "12px", fontWeight: "600", color: "#1C1C1E" }}>🍮 {addon.name}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => adjustSauceQty(addon.id, -1)}
+                              style={{ width: "24px", height: "24px", borderRadius: "6px", background: "#F1F5F9", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "700", color: "#64748B" }}
+                            >
+                              -
+                            </button>
+                            <span style={{ fontSize: "12px", fontWeight: "700", color: "#1C1C1E", width: "20px", textAlign: "center" }}>{qty}</span>
+                            <button
+                              type="button"
+                              onClick={() => adjustSauceQty(addon.id, 1)}
+                              disabled={allocated >= totalSaucesNeeded}
+                              style={{ width: "24px", height: "24px", borderRadius: "6px", background: allocated >= totalSaucesNeeded ? "#F1F5F9" : "#FEF1F5", border: "none", cursor: allocated >= totalSaucesNeeded ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "700", color: allocated >= totalSaucesNeeded ? "#94A3B8" : "#E85D8C" }}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {!isMatched && (
+                    <p style={{ fontSize: "10px", color: "#DC2626", fontWeight: "750", marginTop: "6px", textAlign: "center" }}>
+                      * Jumlah saos harus pas {totalSaucesNeeded} cup sebelum Anda dapat checkout.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Notes */}
             <div style={{ marginBottom: "14px" }}>
               <input type="text" placeholder="Catatan pesanan (opsional)" value={orderNotes}
@@ -872,12 +991,18 @@ export default function KasirPage() {
 
             {error && <p style={{ fontSize: "12px", color: "#DC2626", textAlign: "center", marginBottom: "8px" }}>{error}</p>}
 
-            <button onClick={handleCheckout} disabled={submitting || !cart.length} className="w-full"
-              style={{ padding: "15px", borderRadius: "14px", fontSize: "14px", fontWeight: "700", color: "#fff",
-                background: isPaid ? "#E85D8C" : "#F59E0B", border: "none", cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1 }}
-              data-testid="confirm-order-btn">
-              {submitting ? "Memproses..." : isPaid ? "Konfirmasi & Catat Pesanan" : "Catat Pesanan (Belum Bayar)"}
-            </button>
+            {(() => {
+              const allocated = Object.values(sauceDist).reduce((s, v) => s + v, 0);
+              const isMatched = totalSaucesNeeded === 0 || allocated === totalSaucesNeeded;
+              return (
+                <button onClick={handleCheckout} disabled={submitting || !cart.length || !isMatched} className="w-full"
+                  style={{ padding: "15px", borderRadius: "14px", fontSize: "14px", fontWeight: "700", color: "#fff",
+                    background: !isMatched ? "#94A3B8" : isPaid ? "#E85D8C" : "#F59E0B", border: "none", cursor: submitting || !isMatched ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1 }}
+                  data-testid="confirm-order-btn">
+                  {submitting ? "Memproses..." : !isMatched ? `Saos Kurang (${allocated}/${totalSaucesNeeded})` : isPaid ? "Konfirmasi & Catat Pesanan" : "Catat Pesanan (Belum Bayar)"}
+                </button>
+              );
+            })()}
           </div>
         </div>
       )}

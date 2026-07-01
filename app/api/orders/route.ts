@@ -120,6 +120,7 @@ export async function POST(req: NextRequest) {
     customDate,
     shippingCost,
     shippingBorneBy,
+    sauceDistribution,
   } = body as {
     customerId?: string;
     customerName?: string;
@@ -137,6 +138,7 @@ export async function POST(req: NextRequest) {
     customDate?: string;
     shippingCost?: number;
     shippingBorneBy?: "seller" | "customer";
+    sauceDistribution?: Record<string, number>;
   };
 
   if (!items?.length) {
@@ -266,7 +268,34 @@ export async function POST(req: NextRequest) {
         invoiceNumber: null,
         invoiceGeneratedAt: null,
         invoiceUrl: null,
+        sauceDistribution: sauceDistribution ?? null,
       });
+
+      // Kurangi stok add-on saos/glaze secara dinamis jika terlampir
+      if (sauceDistribution && typeof sauceDistribution === "object") {
+        for (const [sauceId, cupCount] of Object.entries(sauceDistribution)) {
+          if (typeof cupCount === "number" && cupCount > 0) {
+            const addOnRef = adminDb.collection("addOns").doc(sauceId);
+            const addOnSnap = await tx.get(addOnRef);
+            if (addOnSnap.exists) {
+              const currAddonStock = addOnSnap.data()?.currentStock ?? 0;
+              const nextAddonStock = currAddonStock - cupCount;
+              tx.update(addOnRef, { currentStock: nextAddonStock });
+
+              // Log stock movement for addon
+              const movementRef = adminDb.collection("stockMovements").doc();
+              tx.set(movementRef, {
+                ingredientId: `addon:${sauceId}`,
+                changeAmount: -cupCount,
+                newStockAfter: nextAddonStock,
+                sourceType: "sale",
+                notes: `Penjualan saos untuk order #${orderNumber}`,
+                createdAt: dateToUse,
+              });
+            }
+          }
+        }
+      }
 
       // Jika ongkir ditanggung penjual, otomatis catat sebagai pengeluaran (expense)
       if (finalOrderChannel === "whatsapp" && (shippingCost ?? 0) > 0 && shippingBorneBy === "seller") {
