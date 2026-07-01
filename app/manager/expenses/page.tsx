@@ -78,18 +78,21 @@ interface ExpenseItem {
 
 function ExpenseForm({
   ingredients,
+  suppliers,
+  loadSuppliers,
   fetchWithAuth,
   onSuccess,
   onCancel,
 }: {
   ingredients: Ingredient[];
+  suppliers: Supplier[];
+  loadSuppliers: () => Promise<void>;
   fetchWithAuth: (url: string, opts?: RequestInit) => Promise<Response>;
   onSuccess: () => void;
   onCancel: () => void;
 }) {
   const [category, setCategory] = useState<"bahan_baku" | "packaging" | "operasional" | "lain_lain">("bahan_baku");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer" | "qris">("cash");
-  const [supplier, setSupplier] = useState("");
   const [notes, setNotes] = useState("");
   const [customDate, setCustomDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [saving, setSaving] = useState(false);
@@ -105,6 +108,24 @@ function ExpenseForm({
 
   // Keranjang belanja item untuk pengeluaran bulk
   const [itemsList, setItemsList] = useState<ExpenseItem[]>([]);
+
+  // Autocomplete Supplier States
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  const [saveNewSupplier, setSaveNewSupplier] = useState(false);
+
+  // Filter supplier untuk dropdown pencarian
+  const filteredSuppliers = useMemo(() => {
+    const q = supplierSearch.toLowerCase().trim();
+    if (!q) return suppliers.slice(0, 8);
+    return suppliers.filter((s) => s.name.toLowerCase().includes(q)).slice(0, 8);
+  }, [suppliers, supplierSearch]);
+
+  const isNewSupplier = useMemo(() => {
+    const q = supplierSearch.toLowerCase().trim();
+    return q && !selectedSupplier && !suppliers.some((s) => s.name.toLowerCase() === q);
+  }, [suppliers, supplierSearch, selectedSupplier]);
 
   // Auto-fill nama barang jika memilih bahan baku
   const handleIngredientChange = (id: string) => {
@@ -241,6 +262,20 @@ function ExpenseForm({
 
     setSaving(true);
     try {
+      // 1. Simpan supplier baru terlebih dahulu jika dicentang dan di-input baru
+      let finalSupplierName = selectedSupplier ? selectedSupplier.name : supplierSearch.trim();
+      if (isNewSupplier && saveNewSupplier && supplierSearch.trim()) {
+        const supRes = await fetchWithAuth("/api/suppliers", {
+          method: "POST",
+          body: JSON.stringify({ name: supplierSearch.trim() }),
+        });
+        if (supRes.ok) {
+          const newSup = await supRes.json();
+          finalSupplierName = newSup.name;
+          await loadSuppliers();
+        }
+      }
+
       if (isProductCategory) {
         // Simpan semua item bahan baku / packaging secara bulk menggunakan Promise.all
         const promises = itemsList.map((item) => {
@@ -254,7 +289,7 @@ function ExpenseForm({
               purchaseUnit: item.purchaseUnit,
               totalPrice: parseFloat(item.totalCost),
               paymentMethod,
-              supplier: supplier.trim() || null,
+              supplier: finalSupplierName || null,
               notes: notes.trim() || null,
               customDate: customDate || null,
               forceCreateNew: item.forceCreateNew ?? false,
@@ -281,7 +316,7 @@ function ExpenseForm({
             purchaseUnit: null,
             totalPrice: parseFloat(totalCost),
             paymentMethod,
-            supplier: supplier.trim() || null,
+            supplier: finalSupplierName || null,
             notes: notes.trim() || null,
             customDate: customDate || null,
             forceCreateNew: false,
@@ -370,17 +405,77 @@ function ExpenseForm({
             className="h-10 rounded-xl text-xs border-slate-200"
           />
         </div>
-        <div>
+        <div style={{ position: "relative" }}>
           <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
             Supplier / Toko (Opsional)
           </label>
-          <Input
-            type="text"
-            placeholder="Nama Supplier"
-            value={supplier}
-            onChange={(e) => setSupplier(e.target.value)}
-            className="h-10 rounded-xl text-xs border-slate-200"
-          />
+          {selectedSupplier ? (
+            <div className="flex items-center justify-between h-10 px-3.5 rounded-xl border border-slate-200 bg-slate-50 text-xs">
+              <span className="font-semibold text-slate-700">{selectedSupplier.name}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSupplier(null);
+                  setSupplierSearch("");
+                }}
+                className="text-slate-400 hover:text-red-500 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <div>
+              <Input
+                type="text"
+                placeholder="Cari atau ketik nama supplier..."
+                value={supplierSearch}
+                onChange={(e) => {
+                  setSupplierSearch(e.target.value);
+                  setShowSupplierDropdown(true);
+                }}
+                onFocus={() => setShowSupplierDropdown(true)}
+                className="h-10 rounded-xl text-xs border-slate-200"
+              />
+              {showSupplierDropdown && supplierSearch.trim() && (
+                <div 
+                  className="absolute left-0 right-0 mt-1 z-30 max-h-48 overflow-y-auto bg-white border border-slate-100 rounded-xl shadow-xl"
+                  onMouseLeave={() => setShowSupplierDropdown(false)}
+                >
+                  {filteredSuppliers.map((s) => (
+                    <div
+                      key={s.id}
+                      onClick={() => {
+                        setSelectedSupplier(s);
+                        setSupplierSearch(s.name);
+                        setShowSupplierDropdown(false);
+                      }}
+                      className="px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
+                      🏢 {s.name}
+                    </div>
+                  ))}
+                  {filteredSuppliers.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-slate-400 italic">
+                      Supplier tidak ditemukan
+                    </div>
+                  )}
+                </div>
+              )}
+              {isNewSupplier && (
+                <label className="flex items-center gap-1.5 mt-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={saveNewSupplier}
+                    onChange={(e) => setSaveNewSupplier(e.target.checked)}
+                    className="accent-pink-600 rounded"
+                  />
+                  <span className="text-[10px] font-bold text-pink-600">
+                    Simpan & Daftarkan Master Supplier Baru
+                  </span>
+                </label>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -640,6 +735,13 @@ function ExpenseForm({
   );
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  phoneNumber?: string;
+}
+
 export default function ExpensesPage() {
   const { getToken } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -648,6 +750,7 @@ export default function ExpensesPage() {
 
   // States data
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
 
   // Filter Tanggal Range (Default: Tanggal 15 bulan ini s.d Hari ini)
@@ -679,6 +782,11 @@ export default function ExpensesPage() {
     if (res.ok) setIngredients(await res.json());
   }, [fetchWithAuth]);
 
+  const loadSuppliers = useCallback(async () => {
+    const res = await fetchWithAuth("/api/suppliers");
+    if (res.ok) setSuppliers(await res.json());
+  }, [fetchWithAuth]);
+
   // Load all expenses between date range
   const loadExpenses = useCallback(async () => {
     setLoading(true);
@@ -700,7 +808,8 @@ export default function ExpensesPage() {
 
   useEffect(() => {
     loadIngredients();
-  }, [loadIngredients]);
+    loadSuppliers();
+  }, [loadIngredients, loadSuppliers]);
 
   useEffect(() => {
     loadExpenses();
@@ -854,11 +963,14 @@ export default function ExpensesPage() {
         {showExpenseForm && (
           <ExpenseForm
             ingredients={ingredients}
+            suppliers={suppliers}
+            loadSuppliers={loadSuppliers}
             fetchWithAuth={fetchWithAuth}
             onSuccess={() => {
               setShowExpenseForm(false);
               loadExpenses();
               loadIngredients();
+              loadSuppliers();
             }}
             onCancel={() => setShowExpenseForm(false)}
           />
