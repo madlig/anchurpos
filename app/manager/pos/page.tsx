@@ -135,6 +135,7 @@ export default function KasirPage() {
 
   // Kalkulasi total saos glaze yang didapat (Regular: 2 cup, Full: 3 cup, Tiktok: 2 cup)
   const totalSaucesNeeded = useMemo(() => {
+    if (orderChannel !== "whatsapp") return 0;
     let total = 0;
     cart.forEach(item => {
       const vName = item.variantName.toLowerCase();
@@ -145,7 +146,7 @@ export default function KasirPage() {
       }
     });
     return total;
-  }, [cart]);
+  }, [cart, orderChannel]);
 
   // Auto-fill default saos saat checkout dibuka
   useEffect(() => {
