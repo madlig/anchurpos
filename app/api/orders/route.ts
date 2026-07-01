@@ -174,6 +174,13 @@ export async function POST(req: NextRequest) {
     let needsProduction = false;
     let hasRainbow = false;
 
+    // Accumulate quantity per product to apply cumulative price tiers
+    const productQtyMap = new Map<string, number>();
+    for (const item of items) {
+      const current = productQtyMap.get(item.productId) ?? 0;
+      productQtyMap.set(item.productId, current + item.qty);
+    }
+
     const processedItems: Record<string, unknown>[] = [];
 
     for (const item of items) {
@@ -185,7 +192,8 @@ export async function POST(req: NextRequest) {
 
       const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
 
-      const basePrice = await getApplicableTier(item.productId, item.qty);
+      const totalProductQty = productQtyMap.get(item.productId) ?? item.qty;
+      const basePrice = await getApplicableTier(item.productId, totalProductQty);
       const totalPrice = (basePrice - discountPerUnit) * item.qty;
       const hppPerUnit = 0;
       const totalHpp = 0;
@@ -198,7 +206,7 @@ export async function POST(req: NextRequest) {
         variantName: variant?.name ?? item.variantId,
         qty: item.qty,
         basePrice,
-        appliedTier: `${item.qty} pcs`,
+        appliedTier: `${totalProductQty} pcs`,
         discountPerUnit,
         totalPrice,
         hppPerUnit,

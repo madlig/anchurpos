@@ -139,6 +139,23 @@ export default function KasirPage() {
 
   const totalVariantSelected = Object.values(variantQtys).reduce((s, n) => s + n, 0);
 
+  // Recalculate unit prices in cart dynamically based on accumulated quantity per product
+  const recalculateCartPrices = useCallback((currentCart: CartItem[]): CartItem[] => {
+    const productQtyMap = new Map<string, number>();
+    for (const item of currentCart) {
+      const current = productQtyMap.get(item.productId) ?? 0;
+      productQtyMap.set(item.productId, current + item.qty);
+    }
+
+    return currentCart.map(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (!product) return item;
+      const accumulatedQty = productQtyMap.get(item.productId) ?? item.qty;
+      const price = getPrice(product, accumulatedQty);
+      return { ...item, price };
+    });
+  }, [products]);
+
   function addToCart() {
     if (!selectedProduct) return;
     const newItems: CartItem[] = [];
@@ -167,23 +184,29 @@ export default function KasirPage() {
           next.push(ni);
         }
       }
-      return next;
+      return recalculateCartPrices(next);
     });
     setSelectedProduct(null);
     setVariantQtys({});
   }
 
   function removeFromCart(idx: number) {
-    setCart(prev => prev.filter((_, i) => i !== idx));
+    setCart(prev => {
+      const next = prev.filter((_, i) => i !== idx);
+      return recalculateCartPrices(next);
+    });
   }
 
   function updateCartQty(idx: number, delta: number) {
-    setCart(prev => prev.map((item, i) => {
-      if (i !== idx) return item;
-      const newQty = item.qty + delta;
-      if (newQty <= 0) return item; // use removeFromCart instead
-      return { ...item, qty: newQty, price: getPrice(products.find(p => p.id === item.productId)!, newQty) };
-    }));
+    setCart(prev => {
+      const next = prev.map((item, i) => {
+        if (i !== idx) return item;
+        const newQty = item.qty + delta;
+        if (newQty <= 0) return item; // use removeFromCart instead
+        return { ...item, qty: newQty };
+      });
+      return recalculateCartPrices(next);
+    });
   }
 
   // ── Fee calculations ────────────────────────────────────────────────────────
