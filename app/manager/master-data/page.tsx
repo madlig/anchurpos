@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Loader2, Plus, X, Check, Package, Layers, Beaker, Pencil, Trash2, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
-type Tab = "produk" | "varian" | "bahan" | "pelanggan";
+type Tab = "produk" | "varian" | "bahan" | "pelanggan" | "addons" | "suppliers";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -15,6 +15,8 @@ interface PriceTier { minQty: number; maxQty: number | null; price: number; }
 interface ProductItem { id: string; name: string; code: string; description: string; packPerBatch: number; priceTiers: PriceTier[]; }
 interface VariantItem { id: string; name: string; sortOrder: number; currentStock: number; minStock: number; }
 interface IngredientItem { id: string; name: string; category: string; baseUnit: string; currentStock: number; minStock: number; }
+interface AddonItem { id: string; name: string; price: number; currentStock: number; minStock: number; }
+interface SupplierItem { id: string; name: string; contactPerson?: string; phoneNumber?: string; }
 
 // ─── Reusable Confirm Delete Dialog ───────────────────────────────────────────
 function ConfirmDelete({ label, onConfirm, onCancel, loading }: {
@@ -35,6 +37,8 @@ function ConfirmDelete({ label, onConfirm, onCancel, loading }: {
     </div>
   );
 }
+// Note: We skip down past ProductForm, VariantForm, IngredientForm and customer handlers to continue layout
+
 
 // ─── Product Form (Add & Edit) ─────────────────────────────────────────────────
 function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
@@ -254,6 +258,21 @@ export default function MasterDataPage() {
   const [customerDeleteTarget, setCustomerDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState(false);
 
+  // ── Add-on & Supplier states ──
+  const [addOns, setAddOns] = useState<AddonItem[]>([]);
+  const [editingAddon, setEditingAddon] = useState<AddonItem | null>(null);
+  const [addonForm, setAddonForm] = useState({ name: "", price: "", minStock: "10" });
+  const [savingAddon, setSavingAddon] = useState(false);
+  const [addonDeleteTarget, setAddonDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deletingAddon, setDeletingAddon] = useState(false);
+
+  const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
+  const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
+  const [supplierForm, setSupplierForm] = useState({ name: "", contactPerson: "", phoneNumber: "" });
+  const [savingSupplier, setSavingSupplier] = useState(false);
+  const [supplierDeleteTarget, setSupplierDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deletingSupplier, setDeletingSupplier] = useState(false);
+
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
     return fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...opts?.headers } });
@@ -262,23 +281,39 @@ export default function MasterDataPage() {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, v, i, c] = await Promise.all([
+      const [p, v, i, c, a, s] = await Promise.all([
         fetchWithAuth("/api/products").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/variants").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/ingredients").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/customers").then(r => r.ok ? r.json() : []),
+        fetchWithAuth("/api/addons").then(r => r.ok ? r.json() : []),
+        fetchWithAuth("/api/suppliers").then(r => r.ok ? r.json() : []),
       ]);
       setProducts(Array.isArray(p) ? p : []);
       setVariants(Array.isArray(v) ? v : []);
       setIngredients(Array.isArray(i) ? i : []);
       setCustomers(Array.isArray(c) ? c : []);
+      setAddOns(Array.isArray(a) ? a : []);
+      setSuppliers(Array.isArray(s) ? s : []);
     } finally { setLoading(false); }
   }, [fetchWithAuth]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
   // Reset forms when switching tab
-  function switchTab(t: Tab) { setTab(t); setShowAddForm(false); setEditItem(null); setDeleteTarget(null); setSearch(""); setEditingCustomer(null); setCustomerDeleteTarget(null); }
+  function switchTab(t: Tab) {
+    setTab(t);
+    setShowAddForm(false);
+    setEditItem(null);
+    setDeleteTarget(null);
+    setSearch("");
+    setEditingCustomer(null);
+    setCustomerDeleteTarget(null);
+    setEditingAddon(null);
+    setAddonDeleteTarget(null);
+    setEditingSupplier(null);
+    setSupplierDeleteTarget(null);
+  }
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -315,13 +350,68 @@ export default function MasterDataPage() {
     } finally { setSavingCustomer(false); }
   }
 
-  async function handleDeleteCustomer() {
-    if (!customerDeleteTarget) return;
-    setDeletingCustomer(true);
+  async function handleSaveAddon() {
+    if (!addonForm.name.trim() || !addonForm.price) return;
+    setSavingAddon(true);
     try {
-      const res = await fetchWithAuth(`/api/customers/${customerDeleteTarget.id}`, { method: "DELETE" });
-      if (res.ok) { setCustomerDeleteTarget(null); await loadAll(); }
-    } finally { setDeletingCustomer(false); }
+      const url = editingAddon ? `/api/addons/${editingAddon.id}` : "/api/addons";
+      const method = editingAddon ? "PATCH" : "POST";
+      const res = await fetchWithAuth(url, {
+        method,
+        body: JSON.stringify({
+          name: addonForm.name,
+          price: Number(addonForm.price),
+          minStock: Number(addonForm.minStock || 10)
+        })
+      });
+      if (res.ok) {
+        setShowAddForm(false);
+        setEditingAddon(null);
+        setAddonForm({ name: "", price: "", minStock: "10" });
+        await loadAll();
+      }
+    } finally { setSavingAddon(false); }
+  }
+
+  async function handleDeleteAddon() {
+    if (!addonDeleteTarget) return;
+    setDeletingAddon(true);
+    try {
+      const res = await fetchWithAuth(`/api/addons/${addonDeleteTarget.id}`, { method: "DELETE" });
+      if (res.ok) { setAddonDeleteTarget(null); await loadAll(); }
+    } finally { setDeletingAddon(false); }
+  }
+
+  async function handleSaveSupplier() {
+    if (!supplierForm.name.trim()) return;
+    setSavingSupplier(true);
+    try {
+      const url = editingSupplier ? `/api/suppliers/${editingSupplier.id}` : "/api/suppliers";
+      const method = editingSupplier ? "PATCH" : "POST";
+      const res = await fetchWithAuth(url, {
+        method,
+        body: JSON.stringify({
+          name: supplierForm.name,
+          contactPerson: supplierForm.contactPerson || null,
+          phoneNumber: supplierForm.phoneNumber || null
+        })
+      });
+      if (res.ok) {
+        setShowAddForm(false);
+        setEditingSupplier(null);
+        setSupplierForm({ name: "", contactPerson: "", phoneNumber: "" });
+        await loadAll();
+      }
+    } finally { setSavingSupplier(false); }
+  }
+
+  async function handleDeleteSupplier() {
+    if (!supplierDeleteTarget) return;
+    setDeletingSupplier(true);
+    try {
+      const res = await fetchWithAuth(`/api/suppliers/${supplierDeleteTarget.id}`, { method: "DELETE" });
+      if (res.ok) { setSupplierDeleteTarget(null); await loadAll(); }
+    } finally { setDeletingSupplier(false); }
   }
 
   const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
@@ -329,14 +419,18 @@ export default function MasterDataPage() {
     { key: "varian", label: "Varian", icon: Layers },
     { key: "bahan", label: "Bahan", icon: Beaker },
     { key: "pelanggan", label: "Pelanggan", icon: Users },
+    { key: "addons", label: "Add-on", icon: Plus },
+    { key: "suppliers", label: "Supplier", icon: Users },
   ];
 
-  const tabLabel = tab === "produk" ? "Produk" : tab === "varian" ? "Varian" : tab === "bahan" ? "Bahan Baku" : "Pelanggan";
+  const tabLabel = tab === "produk" ? "Produk" : tab === "varian" ? "Varian" : tab === "bahan" ? "Bahan Baku" : tab === "pelanggan" ? "Pelanggan" : tab === "addons" ? "Add-on & Saos" : "Supplier";
   const q = search.toLowerCase();
   const filteredProducts = products.filter(p => !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q));
   const filteredVariants = variants.filter(v => !q || v.name.toLowerCase().includes(q));
   const filteredIngredients = ingredients.filter(i => !q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q));
   const filteredCustomers = customers.filter(c => !q || c.name.toLowerCase().includes(q) || (c.customerType ?? "").toLowerCase().includes(q));
+  const filteredAddOns = addOns.filter(a => !q || a.name.toLowerCase().includes(q));
+  const filteredSuppliers = suppliers.filter(s => !q || s.name.toLowerCase().includes(q) || (s.contactPerson ?? "").toLowerCase().includes(q));
 
   const onSuccess = () => { setShowAddForm(false); setEditItem(null); loadAll(); };
 
@@ -424,6 +518,54 @@ export default function MasterDataPage() {
                   {savingCustomer ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Simpan
                 </button>
                 <button onClick={() => { setShowAddForm(false); setEditingCustomer(null); setCustomerForm({ name: "", customerType: "reguler", phoneNumber: "", address: "", notes: "" }); }}
+                  style={{ padding: "8px 16px", borderRadius: "12px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>Batal</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Addon Add/Edit Form ── */}
+        {(showAddForm || editingAddon) && tab === "addons" && (
+          <div style={{ background: "#F8FAFC", borderRadius: "14px", padding: "14px", border: "1px solid #E2E8F0", marginBottom: "12px" }}>
+            <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E", marginBottom: "12px" }}>{editingAddon ? "Edit Add-on" : "Tambah Add-on / Saos"}</p>
+            <div className="flex flex-col gap-2.5">
+              <Input placeholder="Nama add-on (misal: Saos Keju Cup, Extra Gula Halus) *" value={addonForm.name} onChange={e => setAddonForm(p => ({ ...p, name: e.target.value }))}
+                className="h-10 rounded-xl border-slate-200 text-sm" />
+              <div className="flex gap-2">
+                <Input type="number" placeholder="Harga Jual *" value={addonForm.price} onChange={e => setAddonForm(p => ({ ...p, price: e.target.value }))}
+                  className="flex-1 h-10 rounded-xl border-slate-200 text-sm" />
+                <Input type="number" placeholder="Stok Minimum" value={addonForm.minStock} onChange={e => setAddonForm(p => ({ ...p, minStock: e.target.value }))}
+                  className="w-28 h-10 rounded-xl border-slate-200 text-sm" />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleSaveAddon} disabled={savingAddon}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "#E85D8C" }}>
+                  {savingAddon ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Simpan
+                </button>
+                <button onClick={() => { setShowAddForm(false); setEditingAddon(null); setAddonForm({ name: "", price: "", minStock: "10" }); }}
+                  style={{ padding: "8px 16px", borderRadius: "12px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>Batal</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Supplier Add/Edit Form ── */}
+        {(showAddForm || editingSupplier) && tab === "suppliers" && (
+          <div style={{ background: "#F8FAFC", borderRadius: "14px", padding: "14px", border: "1px solid #E2E8F0", marginBottom: "12px" }}>
+            <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E", marginBottom: "12px" }}>{editingSupplier ? "Edit Supplier" : "Tambah Supplier"}</p>
+            <div className="flex flex-col gap-2.5">
+              <Input placeholder="Nama supplier/toko *" value={supplierForm.name} onChange={e => setSupplierForm(p => ({ ...p, name: e.target.value }))}
+                className="h-10 rounded-xl border-slate-200 text-sm" />
+              <Input placeholder="Nama kontak (contact person)" value={supplierForm.contactPerson} onChange={e => setSupplierForm(p => ({ ...p, contactPerson: e.target.value }))}
+                className="h-10 rounded-xl border-slate-200 text-sm" />
+              <Input placeholder="No. HP / Telepon" value={supplierForm.phoneNumber} onChange={e => setSupplierForm(p => ({ ...p, phoneNumber: e.target.value }))}
+                className="h-10 rounded-xl border-slate-200 text-sm" />
+              <div className="flex gap-2">
+                <button onClick={handleSaveSupplier} disabled={savingSupplier}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "#E85D8C" }}>
+                  {savingSupplier ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Simpan
+                </button>
+                <button onClick={() => { setShowAddForm(false); setEditingSupplier(null); setSupplierForm({ name: "", contactPerson: "", phoneNumber: "" }); }}
                   style={{ padding: "8px 16px", borderRadius: "12px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>Batal</button>
               </div>
             </div>
@@ -547,6 +689,95 @@ export default function MasterDataPage() {
                       <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "4px" }}>Min: {ing.minStock.toLocaleString("id-ID")} {ing.baseUnit}</p>
                       {deleteTarget?.id === ing.id && (
                         <ConfirmDelete label={ing.name} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} loading={deleting} />
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }))}
+
+            {/* ── ADD-ON & SAOS ── */}
+            {tab === "addons" && (filteredAddOns.length === 0 ? (
+              <EmptyState label={search ? "Tidak ada hasil" : "Belum ada add-on / saos"} sub={search ? "Coba kata kunci lain" : "Tap tombol Tambah"} />
+            ) : filteredAddOns.map(a => {
+              const isLow = a.currentStock < a.minStock;
+              return (
+                <div key={a.id} data-testid={`addon-${a.id}`}>
+                  {editingAddon && editingAddon.id === a.id ? (
+                    <div style={{ background: "#F8FAFC", borderRadius: "14px", padding: "14px", border: "1px solid #E2E8F0" }}>
+                      <p style={{ fontSize: "12px", fontWeight: "700", color: "#1C1C1E", marginBottom: "8px" }}>Edit Add-on</p>
+                      <div className="flex flex-col gap-2.5">
+                        <Input value={addonForm.name} onChange={e => setAddonForm(p => ({ ...p, name: e.target.value }))} className="h-9 text-xs" />
+                        <div className="flex gap-2">
+                          <Input type="number" value={addonForm.price} onChange={e => setAddonForm(p => ({ ...p, price: e.target.value }))} className="h-9 text-xs flex-1" />
+                          <Input type="number" value={addonForm.minStock} onChange={e => setAddonForm(p => ({ ...p, minStock: e.target.value }))} className="h-9 text-xs w-20" />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={handleSaveAddon} className="px-3 py-1.5 rounded-lg text-white text-xs font-bold bg-pink-500">Simpan</button>
+                          <button onClick={() => setEditingAddon(null)} className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold">Batal</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: `1px solid ${isLow ? "#FECACA" : "#F1F5F9"}` }}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>{a.name}</p>
+                          <p style={{ fontSize: "11px", color: "#E85D8C", fontWeight: "600", marginTop: "2px" }}>{fmt(a.price)}</p>
+                          <p style={{ fontSize: "10px", color: "#94A3B8", marginTop: "1px" }}>Stok Min: {a.minStock} cup</p>
+                        </div>
+                        <div className="flex items-start gap-1.5 ml-2">
+                          <div className="text-right mr-1">
+                            <p style={{ fontSize: "16px", fontWeight: "700", color: isLow ? "#DC2626" : "#1C1C1E" }}>{a.currentStock}</p>
+                            <p style={{ fontSize: "10px", color: "#94A3B8" }}>cup</p>
+                          </div>
+                          <ActionBtn icon={<Pencil size={12} />} color="#E85D8C" bg="#FEF1F5" onClick={() => { setEditingAddon(a); setAddonForm({ name: a.name, price: String(a.price), minStock: String(a.minStock) }); setShowAddForm(false); setAddonDeleteTarget(null); }} testId={`edit-addon-${a.id}`} />
+                          <ActionBtn icon={<Trash2 size={12} />} color="#DC2626" bg="#FEE2E2" onClick={() => { setAddonDeleteTarget({ id: a.id, name: a.name }); setEditingAddon(null); }} testId={`delete-addon-${a.id}`} />
+                        </div>
+                      </div>
+                      {addonDeleteTarget?.id === a.id && (
+                        <ConfirmDelete label={a.name} onConfirm={handleDeleteAddon} onCancel={() => setAddonDeleteTarget(null)} loading={deletingAddon} />
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }))}
+
+            {/* ── SUPPLIER ── */}
+            {tab === "suppliers" && (filteredSuppliers.length === 0 ? (
+              <EmptyState label={search ? "Tidak ada hasil" : "Belum ada supplier"} sub={search ? "Coba kata kunci lain" : "Tap tombol Tambah"} />
+            ) : filteredSuppliers.map(s => {
+              return (
+                <div key={s.id} data-testid={`supplier-${s.id}`}>
+                  {editingSupplier && editingSupplier.id === s.id ? (
+                    <div style={{ background: "#F8FAFC", borderRadius: "14px", padding: "14px", border: "1px solid #E2E8F0" }}>
+                      <p style={{ fontSize: "12px", fontWeight: "700", color: "#1C1C1E", marginBottom: "8px" }}>Edit Supplier</p>
+                      <div className="flex flex-col gap-2.5">
+                        <Input value={supplierForm.name} onChange={e => setSupplierForm(p => ({ ...p, name: e.target.value }))} className="h-9 text-xs" />
+                        <Input value={supplierForm.contactPerson} onChange={e => setSupplierForm(p => ({ ...p, contactPerson: e.target.value }))} className="h-9 text-xs" placeholder="Nama kontak" />
+                        <Input value={supplierForm.phoneNumber} onChange={e => setSupplierForm(p => ({ ...p, phoneNumber: e.target.value }))} className="h-9 text-xs" placeholder="Nomor Telepon" />
+                        <div className="flex gap-2">
+                          <button onClick={handleSaveSupplier} className="px-3 py-1.5 rounded-lg text-white text-xs font-bold bg-pink-500">Simpan</button>
+                          <button onClick={() => setEditingSupplier(null)} className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold">Batal</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>{s.name}</p>
+                          {s.contactPerson && <p style={{ fontSize: "11px", color: "#64748B", marginTop: "2px" }}>Kontak: {s.contactPerson}</p>}
+                          {s.phoneNumber && <p style={{ fontSize: "11px", color: "#94A3B8" }}>No. HP: {s.phoneNumber}</p>}
+                        </div>
+                        <div className="flex items-start gap-1.5 ml-2 flex-shrink-0">
+                          <ActionBtn icon={<Pencil size={12} />} color="#E85D8C" bg="#FEF1F5" onClick={() => { setEditingSupplier(s); setSupplierForm({ name: s.name, contactPerson: s.contactPerson ?? "", phoneNumber: s.phoneNumber ?? "" }); setShowAddForm(false); setSupplierDeleteTarget(null); }} testId={`edit-supplier-${s.id}`} />
+                          <ActionBtn icon={<Trash2 size={12} />} color="#DC2626" bg="#FEE2E2" onClick={() => { setSupplierDeleteTarget({ id: s.id, name: s.name }); setEditingSupplier(null); }} testId={`delete-supplier-${s.id}`} />
+                        </div>
+                      </div>
+                      {supplierDeleteTarget?.id === s.id && (
+                        <ConfirmDelete label={s.name} onConfirm={handleDeleteSupplier} onCancel={() => setSupplierDeleteTarget(null)} loading={deletingSupplier} />
                       )}
                     </div>
                   )}
