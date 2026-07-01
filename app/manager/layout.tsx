@@ -3,18 +3,18 @@
 import { RoleGuard } from "@/components/shared/RoleGuard";
 import { useAuth } from "@/lib/auth-context";
 import {
-  LayoutDashboard, ShoppingCart, Package, MoreHorizontal,
+  LayoutDashboard, ShoppingCart, Package, User,
   ClipboardList, LogOut, Banknote,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", href: "/manager/dashboard", icon: LayoutDashboard },
+  { label: "Beranda", href: "/manager/dashboard", icon: LayoutDashboard },
   { label: "Transaksi", href: "/manager/orders", icon: ClipboardList },
   { label: "Kasir", href: "/manager/pos", icon: ShoppingCart, isPosButton: true },
   { label: "Inventori", href: "/manager/inventory", icon: Package },
-  { label: "Lainnya", href: "/manager/more", icon: MoreHorizontal },
+  { label: "Profil", href: "/manager/profile", icon: User },
 ];
 
 function DesktopSidebar() {
@@ -92,7 +92,7 @@ function MobileBottomNav() {
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
-      <div className="relative flex items-end justify-around px-1 pt-1.5 pb-2 min-h-[58px]">
+      <div className="relative flex items-end justify-around px-1 pt-1 pb-1.5 min-h-[58px]">
         {NAV_ITEMS.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;
@@ -103,20 +103,20 @@ function MobileBottomNav() {
                 key={item.href}
                 href={item.href}
                 data-testid={`manager-nav-${item.label.toLowerCase()}`}
-                className="relative flex flex-col items-center justify-center tap-target -translate-y-4"
+                className="relative flex flex-col items-center justify-center tap-target -translate-y-3.5"
                 style={{ zIndex: 35 }}
               >
                 <div
                   className="flex items-center justify-center rounded-full transition-all duration-300 active:scale-95"
                   style={{
-                    width: "56px",
-                    height: "56px",
+                    width: "54px",
+                    height: "54px",
                     background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)",
-                    boxShadow: "0 6px 20px rgba(232,93,140,0.45)",
+                    boxShadow: "0 6px 18px rgba(232,93,140,0.42)",
                     border: "4px solid #fff"
                   }}
                 >
-                  <Icon size={22} className="text-white" strokeWidth={2.5} />
+                  <Icon size={20} className="text-white" strokeWidth={2.5} />
                 </div>
                 <span className="text-[10px] font-bold mt-1" style={{ color: active ? "#E85D8C" : "#94A3B8" }}>
                   {item.label}
@@ -130,7 +130,7 @@ function MobileBottomNav() {
               key={item.href}
               href={item.href}
               data-testid={`manager-nav-${item.label.toLowerCase()}`}
-              className="flex flex-col items-center gap-0.5 min-w-[50px] min-h-[50px] justify-center tap-target"
+              className="flex flex-col items-center gap-0.5 min-w-[50px] min-h-[50px] justify-center tap-target -translate-y-1.5"
             >
               <div
                 className="flex items-center justify-center h-8 w-8 rounded-xl transition-all duration-200"
@@ -138,7 +138,7 @@ function MobileBottomNav() {
               >
                 <Icon size={18} strokeWidth={active ? 2.5 : 1.8} style={{ color: active ? "#E85D8C" : "#94A3B8" }} />
               </div>
-              <span className="text-[10px] font-semibold" style={{ color: active ? "#E85D8C" : "#94A3B8" }}>
+              <span className="text-[10px] font-bold" style={{ color: active ? "#E85D8C" : "#94A3B8" }}>
                 {item.label}
               </span>
             </Link>

@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Bell, AlertTriangle, ChevronRight } from "lucide-react";
+import { 
+  Loader2, Bell, AlertTriangle, ChevronRight, 
+  ShoppingCart, ClipboardList, Banknote, FileText, 
+  Settings, Users, Package, Database
+} from "lucide-react";
 import Link from "next/link";
 
 interface DashboardData {
@@ -17,6 +21,10 @@ interface AlertItem {
 interface OrderSummary {
   id: string; orderNumber: string; customerName: string;
   status: string; paymentStatus: string; createdAt: string;
+}
+interface PnlSummary {
+  saldoBukuCash: number;
+  saldoBukuBank: number;
 }
 
 const DAILY_TARGET = 2_000_000;
@@ -46,6 +54,7 @@ export default function ManagerDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [recentOrders, setRecentOrders] = useState<OrderSummary[]>([]);
+  const [pnlSummary, setPnlSummary] = useState<PnlSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
@@ -54,14 +63,22 @@ export default function ManagerDashboardPage() {
   }, [getToken]);
 
   useEffect(() => {
+    const currentMonth = new Date().toISOString().substring(0, 7); // e.g. "2026-07"
     Promise.all([
       fetchWithAuth("/api/dashboard/today").then((r) => r.json()),
       fetchWithAuth("/api/alerts?unread=true").then((r) => r.json()),
       fetchWithAuth("/api/orders").then((r) => r.json()),
-    ]).then(([d, a, o]) => {
+      fetchWithAuth(`/api/reports/pnl?month=${currentMonth}`).then((r) => r.ok ? r.json() : null),
+    ]).then(([d, a, o, p]) => {
       setData(d);
       setAlerts(Array.isArray(a) ? a : []);
       setRecentOrders(Array.isArray(o) ? o.slice(0, 5) : []);
+      if (p) {
+        setPnlSummary({
+          saldoBukuCash: p.saldoBukuCash ?? 0,
+          saldoBukuBank: p.saldoBukuBank ?? 0,
+        });
+      }
     }).finally(() => setLoading(false));
   }, [fetchWithAuth]);
 
@@ -90,16 +107,17 @@ export default function ManagerDashboardPage() {
   const omzetPct = data ? Math.min(100, Math.round((data.omzet / DAILY_TARGET) * 100)) : 0;
 
   return (
-    <div className="page-enter min-h-screen" style={{ background: "#FCABB4" }}>
+    <div className="page-enter min-h-screen pb-20" style={{ background: "#FCABB4" }}>
 
       {/* ── Greeting Header (white) ── */}
-      <div className="px-5 pt-4 pb-4" style={{ background: "#fff" }}>
-        <div className="flex items-start justify-between">
+      <div className="px-5 pt-5 pb-5" style={{ background: "#fff", borderBottomLeftRadius: "24px", borderBottomRightRadius: "24px", boxShadow: "0 4px 20px rgba(0,0,0,0.03)" }}>
+        <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-xs" style={{ color: "#94A3B8" }}>{greeting}</p>
-            <h1 className="text-lg font-bold mt-0.5" style={{ color: "#1C1C1E" }}>
-              {user?.displayName?.split(" ")[0] ?? "Manager"}
+            <h1 className="text-xl font-extrabold mt-0.5" style={{ color: "#1C1C1E" }}>
+              {user?.displayName ?? "Manager"}
             </h1>
+            <p className="text-[10px] text-slate-400 mt-1">{todayLabel} — Outlet Utama</p>
           </div>
           <button
             onClick={alerts.length > 0 ? markAllRead : undefined}
@@ -113,7 +131,81 @@ export default function ManagerDashboardPage() {
             )}
           </button>
         </div>
-        <p className="text-xs mt-1.5" style={{ color: "#94A3B8" }}>{todayLabel} — Outlet Utama</p>
+
+        {/* ── Balance Box (Gopay-style) ── */}
+        <div 
+          className="rounded-3xl p-4 flex justify-between items-center text-white" 
+          style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)", boxShadow: "0 8px 24px rgba(232,93,140,0.3)" }}
+        >
+          <div className="flex-1 border-r border-white/20 pr-4">
+            <span className="text-[10px] font-bold text-white/70 block uppercase tracking-wider">💵 Laci Tunai</span>
+            <span className="text-sm font-extrabold block mt-0.5 tabular-nums">{fmt(pnlSummary?.saldoBukuCash ?? 0)}</span>
+          </div>
+          <div className="flex-1 pl-4">
+            <span className="text-[10px] font-bold text-white/70 block uppercase tracking-wider">🏦 Bank Transfer</span>
+            <span className="text-sm font-extrabold block mt-0.5 tabular-nums">{fmt(pnlSummary?.saldoBukuBank ?? 0)}</span>
+          </div>
+        </div>
+
+        {/* ── Grid Fitur Utama (2x4 ala Gojek) ── */}
+        <div className="grid grid-cols-4 gap-x-2 gap-y-4 mt-6">
+          <Link href="/manager/pos" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
+              <ShoppingCart size={20} style={{ color: "#E85D8C" }} />
+            </div>
+            <span className="text-[10px] font-bold text-slate-700 text-center mt-1.5">Kasir POS</span>
+          </Link>
+
+          <Link href="/manager/orders" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#EFF6FF" }}>
+              <ClipboardList size={20} style={{ color: "#2563EB" }} />
+            </div>
+            <span className="text-[10px] font-bold text-slate-700 text-center mt-1.5">Pesanan</span>
+          </Link>
+
+          <Link href="/manager/expenses" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#FEF2F2" }}>
+              <Banknote size={20} style={{ color: "#DC2626" }} />
+            </div>
+            <span className="text-[10px] font-bold text-slate-700 text-center mt-1.5">Pengeluaran</span>
+          </Link>
+
+          <Link href="/manager/reports" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#F0FDF4" }}>
+              <FileText size={20} style={{ color: "#16A34A" }} />
+            </div>
+            <span className="text-[10px] font-bold text-slate-700 text-center mt-1.5">Laporan P&L</span>
+          </Link>
+
+          <Link href="/crew/attendance" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#FFFBEB" }}>
+              <Settings size={20} style={{ color: "#D97706" }} />
+            </div>
+            <span className="text-[10px] font-bold text-slate-700 text-center mt-1.5">IP Absensi</span>
+          </Link>
+
+          <Link href="/manager/employees" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#F5F3FF" }}>
+              <Users size={20} style={{ color: "#7C3AED" }} />
+            </div>
+            <span className="text-[10px] font-bold text-slate-700 text-center mt-1.5">Karyawan</span>
+          </Link>
+
+          <Link href="/manager/inventory" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#F0FDFA" }}>
+              <Package size={20} style={{ color: "#0D9488" }} />
+            </div>
+            <span className="text-[10px] font-bold text-slate-700 text-center mt-1.5">Inventori</span>
+          </Link>
+
+          <Link href="/manager/master-data" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#F8FAFC" }}>
+              <Database size={20} style={{ color: "#64748B" }} />
+            </div>
+            <span className="text-[10px] font-bold text-slate-700 text-center mt-1.5">Master Data</span>
+          </Link>
+        </div>
+
       </div>
 
       {/* ── Stats Section ── */}
