@@ -12,6 +12,28 @@ function getClientIp(req: NextRequest): string {
   return "unknown";
 }
 
+function isIpWhitelisted(clientIp: string, whitelist: string[]): boolean {
+  return whitelist.some((whitelisted) => {
+    const w = whitelisted.trim();
+    if (w === clientIp) return true;
+
+    // Wildcard match (e.g. 182.10.131.*)
+    if (w.includes("*")) {
+      const regexStr = "^" + w.replace(/\./g, "\\.").replace(/\*/g, ".*") + "$";
+      const regex = new RegExp(regexStr);
+      return regex.test(clientIp);
+    }
+
+    // Subnet ending with .0 (e.g. 182.10.131.0)
+    if (w.endsWith(".0")) {
+      const prefix = w.slice(0, -1); // e.g. "182.10.131."
+      return clientIp.startsWith(prefix);
+    }
+
+    return false;
+  });
+}
+
 export async function POST(req: NextRequest) {
   const auth = await requireRole(req, ["crew"]);
   if (auth instanceof NextResponse) return auth;
@@ -23,7 +45,7 @@ export async function POST(req: NextRequest) {
     const configSnap = await adminDb.doc("settings/attendanceConfig").get();
     const config = configSnap.data();
     const whitelist: string[] = config?.whitelistedIps ?? [];
-    const ipValid = whitelist.includes(ip);
+    const ipValid = isIpWhitelisted(ip, whitelist);
 
     if (!ipValid) {
       await adminDb.doc("settings/attendanceConfig").set(
