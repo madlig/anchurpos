@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { 
   Loader2, UserCheck, ChefHat, PackageOpen, ClipboardList, 
-  MapPin, Clock, Calendar, AlertTriangle, ShieldCheck
+  Clock, Calendar
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
@@ -166,25 +166,6 @@ export default function CrewDashboard() {
           </div>
         ) : (
           <div className="space-y-3.5">
-            {/* Informasi Status IP/Subnet saat ini */}
-            {ipAddress && (
-              <div className="flex items-center justify-between p-2.5 rounded-xl text-xxs font-semibold bg-slate-50 border border-slate-100">
-                <div className="flex items-center gap-1 text-slate-500">
-                  <MapPin size={11} />
-                  <span>IP: {ipAddress}</span>
-                </div>
-                {allowedSubnet ? (
-                  <span className="text-green-600 flex items-center gap-0.5">
-                    <ShieldCheck size={11} /> Wi-Fi Toko (Langsung)
-                  </span>
-                ) : (
-                  <span className="text-amber-600 flex items-center gap-0.5">
-                    <AlertTriangle size={11} /> Butuh Review Manager
-                  </span>
-                )}
-              </div>
-            )}
-
             {/* Check-In / Check-Out Timestamps */}
             <div className="grid grid-cols-2 gap-2 text-xxs font-semibold text-slate-500">
               <div className="p-3 bg-slate-50/50 border border-slate-100 rounded-2xl flex flex-col items-center">
