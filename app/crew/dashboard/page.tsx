@@ -9,21 +9,31 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
-interface AttendanceStatus {
-  hasCheckedIn: boolean;
-  hasCheckedOut: boolean;
-  checkInTime: string | null;
-  checkOutTime: string | null;
-  needsReview: boolean;
-  reviewReason: string | null;
-  ipAddress?: string;
-  allowedSubnet?: boolean;
+interface AttendanceItem {
+  time: string;
+  ipAddress: string;
+  ipValid: boolean;
+}
+
+interface DailyAttendance {
+  id: string;
+  date: string;
+  checkIn: AttendanceItem | null;
+  checkOut: AttendanceItem | null;
+  totalHours: number | null;
+  status: string;
+  flaggedReason?: string | null;
+}
+
+interface AttendanceStatusResponse {
+  today: DailyAttendance | null;
+  history: any[];
 }
 
 export default function CrewDashboard() {
   const { user, getToken } = useAuth();
   const router = useRouter();
-  const [status, setStatus] = useState<AttendanceStatus | null>(null);
+  const [status, setStatus] = useState<AttendanceStatusResponse | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [time, setTime] = useState("");
@@ -110,6 +120,15 @@ export default function CrewDashboard() {
     { label: "Stock Opname", desc: "Hitung & update stok fisik harian", href: "/crew/stock-opname", icon: ClipboardList, bg: "#FFFBF0", text: "#D97706" },
   ];
 
+  const todayData = status?.today;
+  const hasCheckedIn = !!todayData?.checkIn?.time;
+  const hasCheckedOut = !!todayData?.checkOut?.time;
+  const checkInTime = todayData?.checkIn?.time;
+  const checkOutTime = todayData?.checkOut?.time;
+  const ipAddress = todayData?.checkIn?.ipAddress;
+  const allowedSubnet = todayData?.checkIn?.ipValid;
+  const needsReview = todayData?.status === "menunggu_persetujuan" || todayData?.checkIn?.ipValid === false;
+
   return (
     <div className="px-5 pt-6 pb-24 max-w-md mx-auto space-y-5">
       {/* ── Header Welcome ── */}
@@ -148,13 +167,13 @@ export default function CrewDashboard() {
         ) : (
           <div className="space-y-3.5">
             {/* Informasi Status IP/Subnet saat ini */}
-            {status?.ipAddress && (
+            {ipAddress && (
               <div className="flex items-center justify-between p-2.5 rounded-xl text-xxs font-semibold bg-slate-50 border border-slate-100">
                 <div className="flex items-center gap-1 text-slate-500">
                   <MapPin size={11} />
-                  <span>IP: {status.ipAddress}</span>
+                  <span>IP: {ipAddress}</span>
                 </div>
-                {status.allowedSubnet ? (
+                {allowedSubnet ? (
                   <span className="text-green-600 flex items-center gap-0.5">
                     <ShieldCheck size={11} /> Wi-Fi Toko (Langsung)
                   </span>
@@ -171,19 +190,19 @@ export default function CrewDashboard() {
               <div className="p-3 bg-slate-50/50 border border-slate-100 rounded-2xl flex flex-col items-center">
                 <span className="text-[9px] uppercase tracking-wider text-slate-400">Masuk</span>
                 <span className="font-bold text-slate-700 text-xs mt-1">
-                  {status?.checkInTime ? new Date(status.checkInTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                  {checkInTime ? new Date(checkInTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "—"}
                 </span>
               </div>
               <div className="p-3 bg-slate-50/50 border border-slate-100 rounded-2xl flex flex-col items-center">
                 <span className="text-[9px] uppercase tracking-wider text-slate-400">Pulang</span>
                 <span className="font-bold text-slate-700 text-xs mt-1">
-                  {status?.checkOutTime ? new Date(status.checkOutTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                  {checkOutTime ? new Date(checkOutTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "—"}
                 </span>
               </div>
             </div>
 
             {/* Tombol Aksi */}
-            {!status?.hasCheckedIn ? (
+            {!hasCheckedIn ? (
               <button
                 onClick={handleCheckIn}
                 disabled={actionLoading}
@@ -192,7 +211,7 @@ export default function CrewDashboard() {
                 {actionLoading ? <Loader2 className="animate-spin" size={14} /> : <Clock size={14} />}
                 Mulai Kerja (Check-In)
               </button>
-            ) : !status?.hasCheckedOut ? (
+            ) : !hasCheckedOut ? (
               <button
                 onClick={handleCheckOut}
                 disabled={actionLoading}
@@ -208,7 +227,7 @@ export default function CrewDashboard() {
             )}
 
             {/* Review warning */}
-            {status?.hasCheckedIn && status.needsReview && (
+            {hasCheckedIn && needsReview && (
               <p className="text-[10px] text-amber-600 font-semibold text-center mt-1">
                 ⚠️ Absen masuk menunggu review manager (Di luar IP Toko).
               </p>
