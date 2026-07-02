@@ -51,12 +51,20 @@ export default function StockOpnameReviewPage() {
   );
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showAllFilter, setShowAllFilter] = useState<Record<string, boolean>>({});
   const [adjustments, setAdjustments] = useState<
     Map<string, Map<string, boolean>>
   >(new Map());
   const [reviewNote, setReviewNote] = useState("");
   const [submitting, setSubmitting] = useState("");
   const [error, setError] = useState("");
+
+  function toggleShowAll(opnameId: string) {
+    setShowAllFilter((prev) => ({
+      ...prev,
+      [opnameId]: !prev[opnameId],
+    }));
+  }
 
   const fetchWithAuth = useCallback(
     async (url: string, options?: RequestInit) => {
@@ -196,29 +204,37 @@ export default function StockOpnameReviewPage() {
               const discrepancyItems = opname.items.filter(
                 (i) => i.difference !== 0
               );
+              const showAll = showAllFilter[opname.id] ?? false;
+              const displayedItems = (showAll || discrepancyItems.length === 0) 
+                ? opname.items 
+                : discrepancyItems;
 
               return (
-                <Card key={opname.id} className="overflow-hidden">
+                <Card key={opname.id} className="overflow-hidden border-stone-200/80 shadow-sm rounded-2xl">
                   <button
                     onClick={() =>
                       setExpandedId(isExpanded ? null : opname.id)
                     }
-                    className="w-full p-4 flex items-center justify-between text-left"
+                    className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/50 transition-colors"
                   >
                     <div>
-                      <p className="text-sm font-medium text-stone-900">
+                      <p className="text-sm font-semibold text-stone-900">
                         {formatDate(opname.date)}
                       </p>
-                      <p className="text-xs text-stone-500">
+                      <p className="text-xxs text-stone-400 font-medium uppercase mt-0.5 tracking-wider">
                         {opname.totalIngredientsChecked}/
                         {opname.totalIngredientsAll} bahan dicek
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {opname.hasDiscrepancy && (
-                        <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full flex items-center gap-1">
-                          <AlertTriangle size={12} />
+                      {opname.hasDiscrepancy ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full flex items-center gap-1">
+                          <AlertTriangle size={10} />
                           {discrepancyItems.length} selisih
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/50 rounded-full">
+                          ✓ Semua Sesuai
                         </span>
                       )}
                       {isExpanded ? (
@@ -230,50 +246,78 @@ export default function StockOpnameReviewPage() {
                   </button>
 
                   {isExpanded && (
-                    <div className="px-4 pb-4 border-t border-stone-100 pt-3">
-                      {discrepancyItems.length === 0 ? (
-                        <p className="text-sm text-emerald-600 mb-3">
-                          Tidak ada selisih — semua cocok
-                        </p>
-                      ) : (
-                        <div className="space-y-2 mb-4">
-                          {discrepancyItems.map((item) => {
-                            const ing = ingredients.get(item.ingredientId);
-                            const unit = ing?.baseUnit ?? "";
-                            const physical =
-                              item.inputMethod === "packaged"
-                                ? item.physicalStockConverted ?? 0
-                                : item.physicalStock ?? 0;
-                            const isChecked =
-                              adjustments
-                                .get(opname.id)
-                                ?.get(item.ingredientId) ?? false;
+                    <div className="px-4 pb-4 border-t border-stone-100 pt-3.5 bg-stone-50/30">
+                      {/* Control Filter Toggle */}
+                      {discrepancyItems.length > 0 && (
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">
+                            {showAll ? "Menampilkan Semua Bahan" : "Menampilkan Hanya Selisih"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleShowAll(opname.id)}
+                            className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
+                          >
+                            {showAll ? "Tampilkan Hanya Selisih" : "Tampilkan Semua Bahan"}
+                          </button>
+                        </div>
+                      )}
 
-                            return (
-                              <div
-                                key={item.ingredientId}
-                                className="bg-stone-50 rounded-lg p-3"
-                              >
-                                <div className="flex items-start justify-between mb-1">
-                                  <p className="text-sm font-medium text-stone-900">
+                      <div className="space-y-2 mb-4">
+                        {displayedItems.map((item) => {
+                          const ing = ingredients.get(item.ingredientId);
+                          const unit = ing?.baseUnit ?? "";
+                          const physical =
+                            item.inputMethod === "packaged"
+                              ? item.physicalStockConverted ?? 0
+                              : item.physicalStock ?? 0;
+                          
+                          const hasDiff = item.difference !== 0;
+                          const isChecked =
+                            adjustments
+                              .get(opname.id)
+                              ?.get(item.ingredientId) ?? false;
+
+                          return (
+                            <div
+                              key={item.ingredientId}
+                              className={`rounded-xl p-3 border ${
+                                hasDiff 
+                                  ? "bg-amber-50/30 border-amber-100" 
+                                  : "bg-white border-stone-100"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between mb-1">
+                                <div>
+                                  <p className="text-xs font-semibold text-stone-800">
                                     {ing?.name ?? item.ingredientId}
                                   </p>
-                                  <span
-                                    className={`text-xs font-mono ${
-                                      item.difference < 0
-                                        ? "text-red-600"
-                                        : "text-emerald-600"
-                                    }`}
-                                  >
-                                    {item.difference > 0 ? "+" : ""}
-                                    {formatNumber(item.difference, unit)}
-                                  </span>
+                                  <p className="text-[10px] text-stone-400 font-medium mt-0.5">
+                                    Sistem: {formatNumber(item.systemStock, unit)} | Fisik: {formatNumber(physical, unit)}
+                                  </p>
                                 </div>
-                                <p className="text-xs text-stone-500">
-                                  Sistem: {formatNumber(item.systemStock, unit)}{" "}
-                                  | Fisik: {formatNumber(physical, unit)}
-                                </p>
-                                <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                                <div>
+                                  {hasDiff ? (
+                                    <span
+                                      className={`text-xs font-bold font-mono px-2 py-0.5 rounded-lg ${
+                                        item.difference < 0
+                                          ? "bg-red-50 text-red-600"
+                                          : "bg-emerald-50 text-emerald-600"
+                                      }`}
+                                    >
+                                      {item.difference > 0 ? "+" : ""}
+                                      {formatNumber(item.difference, unit)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50/60 border border-emerald-100 px-2 py-0.5 rounded-lg">
+                                      ✓ Sesuai
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {hasDiff && (
+                                <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
                                   <input
                                     type="checkbox"
                                     checked={isChecked}
@@ -283,34 +327,34 @@ export default function StockOpnameReviewPage() {
                                         item.ingredientId
                                       )
                                     }
-                                    className="rounded border-stone-300"
+                                    className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
                                   />
-                                  <span className="text-xs text-stone-600">
+                                  <span className="text-[10px] font-semibold text-stone-600">
                                     Sesuaikan stok sistem ke angka fisik
                                   </span>
                                 </label>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
 
                       <Input
                         placeholder="Catatan review (opsional)"
                         value={reviewNote}
                         onChange={(e) => setReviewNote(e.target.value)}
-                        className="mb-3"
+                        className="mb-3 text-xs h-9 rounded-xl border-stone-200"
                       />
 
                       <Button
                         onClick={() => handleReview(opname.id)}
                         disabled={submitting === opname.id}
-                        className="w-full gap-2"
+                        className="w-full gap-2 text-xs font-bold h-9 rounded-xl"
                       >
                         {submitting === opname.id ? (
-                          <Loader2 size={14} className="animate-spin" />
+                          <Loader2 size={13} className="animate-spin" />
                         ) : (
-                          <Check size={14} />
+                          <Check size={13} />
                         )}
                         Selesaikan Review
                       </Button>
@@ -328,32 +372,128 @@ export default function StockOpnameReviewPage() {
           <h2 className="text-sm font-semibold text-stone-700 mb-3">
             Sudah Direview
           </h2>
-          <div className="space-y-2">
-            {reviewed.map((opname) => (
-              <Card key={opname.id} className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-stone-900">
-                      {formatDate(opname.date)}
-                    </p>
-                    <p className="text-xs text-stone-500">
-                      {opname.totalIngredientsChecked} bahan dicek
-                    </p>
-                  </div>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      opname.reviewAction === "adjusted"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-stone-100 text-stone-600"
-                    }`}
+          <div className="space-y-3">
+            {reviewed.map((opname) => {
+              const isExpanded = expandedId === opname.id;
+              const discrepancyItems = opname.items.filter(
+                (i) => i.difference !== 0
+              );
+              const showAll = showAllFilter[opname.id] ?? false;
+              const displayedItems = (showAll || discrepancyItems.length === 0) 
+                ? opname.items 
+                : discrepancyItems;
+
+              return (
+                <Card key={opname.id} className="overflow-hidden border-stone-200/60 shadow-xxs rounded-2xl bg-stone-50/20">
+                  <button
+                    onClick={() =>
+                      setExpandedId(isExpanded ? null : opname.id)
+                    }
+                    className="w-full p-4 flex items-center justify-between text-left hover:bg-stone-50/50 transition-colors"
                   >
-                    {opname.reviewAction === "adjusted"
-                      ? "Disesuaikan"
-                      : "Acknowledged"}
-                  </span>
-                </div>
-              </Card>
-            ))}
+                    <div>
+                      <p className="text-sm font-semibold text-stone-700">
+                        {formatDate(opname.date)}
+                      </p>
+                      <p className="text-xxs text-stone-400 font-medium mt-0.5">
+                        {opname.totalIngredientsChecked} bahan dicek
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                          opname.reviewAction === "adjusted"
+                            ? "bg-blue-50 text-blue-700 border-blue-200/50"
+                            : "bg-stone-100 text-stone-600 border-stone-200/50"
+                        }`}
+                      >
+                        {opname.reviewAction === "adjusted"
+                          ? "Disesuaikan"
+                          : "Acknowledged"}
+                      </span>
+                      {isExpanded ? (
+                        <ChevronUp size={16} className="text-stone-400" />
+                      ) : (
+                        <ChevronDown size={16} className="text-stone-400" />
+                      )}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="px-4 pb-4 border-t border-stone-100 pt-3.5 bg-white">
+                      {/* Control Filter Toggle */}
+                      {discrepancyItems.length > 0 && (
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">
+                            {showAll ? "Menampilkan Semua Bahan" : "Menampilkan Hanya Selisih"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleShowAll(opname.id)}
+                            className="text-[10px] font-bold text-stone-500 hover:text-stone-700 hover:underline"
+                          >
+                            {showAll ? "Tampilkan Hanya Selisih" : "Tampilkan Semua Bahan"}
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        {displayedItems.map((item) => {
+                          const ing = ingredients.get(item.ingredientId);
+                          const unit = ing?.baseUnit ?? "";
+                          const physical =
+                            item.inputMethod === "packaged"
+                              ? item.physicalStockConverted ?? 0
+                              : item.physicalStock ?? 0;
+                          
+                          const hasDiff = item.difference !== 0;
+
+                          return (
+                            <div
+                              key={item.ingredientId}
+                              className={`rounded-xl p-3 border ${
+                                hasDiff 
+                                  ? "bg-stone-50/50 border-stone-200/40" 
+                                  : "bg-white border-stone-100"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="text-xs font-semibold text-stone-700">
+                                    {ing?.name ?? item.ingredientId}
+                                  </p>
+                                  <p className="text-[10px] text-stone-400 mt-0.5">
+                                    Sistem: {formatNumber(item.systemStock, unit)} | Fisik: {formatNumber(physical, unit)}
+                                  </p>
+                                </div>
+                                <div>
+                                  {hasDiff ? (
+                                    <span
+                                      className={`text-xs font-bold font-mono px-2 py-0.5 rounded-lg ${
+                                        item.difference < 0
+                                          ? "bg-red-50/50 text-red-600"
+                                          : "bg-emerald-50/50 text-emerald-600"
+                                      }`}
+                                    >
+                                      {item.difference > 0 ? "+" : ""}
+                                      {formatNumber(item.difference, unit)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold text-stone-400 bg-stone-50 border border-stone-200/50 px-2 py-0.5 rounded-lg">
+                                      Sesuai
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
           </div>
         </div>
       )}
