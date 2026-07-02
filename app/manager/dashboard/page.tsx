@@ -177,7 +177,7 @@ export default function ManagerDashboardPage() {
             <span className="text-[10px] font-bold text-slate-700 text-center mt-1.5">Laporan P&L</span>
           </Link>
 
-          <Link href="/crew/attendance" className="flex flex-col items-center tap-target">
+          <Link href="/manager/settings" className="flex flex-col items-center tap-target">
             <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#FFFBEB" }}>
               <Settings size={20} style={{ color: "#D97706" }} />
             </div>
