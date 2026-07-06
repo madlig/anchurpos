@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Search, ShoppingCart, X, Minus, Plus, ChevronDown, UserPlus, CreditCard, CheckCircle2 } from "lucide-react";
+import { Loader2, Search, ShoppingCart, X, Minus, Plus, ChevronDown, UserPlus, CreditCard, CheckCircle2, Store, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -44,6 +44,17 @@ function getPrice(product: ProductItem, qty: number): number {
 
 function startingPrice(product: ProductItem): number {
   return getPrice(product, 1);
+}
+
+function getChannelIcon(channel: string, size = 14) {
+  switch (channel) {
+    case "walkin":
+      return <Store size={size} />;
+    case "whatsapp":
+      return <MessageCircle size={size} />;
+    default:
+      return null;
+  }
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -373,17 +384,19 @@ export default function KasirPage() {
           {/* ── Sumber Pesanan (Channel Selector) ── */}
           <div className="grid grid-cols-4 gap-1.5 mt-3 mb-2">
             {([
-              { key: "walkin", label: "Walk-in", emoji: "🏪" },
-              { key: "whatsapp", label: "WhatsApp", emoji: "💬" },
-              { key: "tiktok", label: "TikTok", emoji: "🎵" },
-              { key: "shopee", label: "Shopee", emoji: "🛍️" },
+              { key: "walkin", label: "Walk-in" },
+              { key: "whatsapp", label: "WhatsApp" },
+              { key: "tiktok", label: "TikTok" },
+              { key: "shopee", label: "Shopee" },
             ] as const).map(ch => (
               <button key={ch.key} onClick={() => { setOrderChannel(ch.key); setCart([]); setSelectedCustomer(null); setCustomerSearch(""); setPlatformFeeOverride(""); }}
-                style={{ padding: "8px 4px", borderRadius: "10px", fontSize: "11px", fontWeight: "600", border: "none", cursor: "pointer", textAlign: "center",
+                className="tap-target"
+                style={{ padding: "8px 4px", borderRadius: "10px", fontSize: "11px", fontWeight: "600", border: "none", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
                   color: orderChannel === ch.key ? "#fff" : "#64748B",
                   background: orderChannel === ch.key ? "#E85D8C" : "#F1F5F9" }}>
-                <span style={{ marginRight: "4px" }}>{ch.emoji}</span>
-                {ch.label}
+                {getChannelIcon(ch.key)}
+                <span>{ch.label}</span>
               </button>
             ))}
           </div>
@@ -629,7 +642,13 @@ export default function KasirPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#1C1C1E" }}>Checkout Pesanan</h2>
-                <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>Sumber: <strong style={{ color: "#E85D8C" }}>{orderChannel === "walkin" ? "Walk-in 🏪" : orderChannel === "whatsapp" ? "WhatsApp 💬" : orderChannel === "tiktok" ? "TikTok 🎵" : "Shopee 🛍️"}</strong></p>
+                <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px", display: "flex", alignItems: "center", gap: "4px" }}>
+                  Sumber:{" "}
+                  <span className="inline-flex items-center gap-1 font-bold" style={{ color: "#E85D8C" }}>
+                    {getChannelIcon(orderChannel, 12)}
+                    {orderChannel === "walkin" ? "Walk-in" : orderChannel === "whatsapp" ? "WhatsApp" : orderChannel === "tiktok" ? "TikTok" : "Shopee"}
+                  </span>
+                </p>
               </div>
               <button onClick={() => setShowCheckout(false)}
                 style={{ width: "30px", height: "30px", borderRadius: "10px", background: "#F8FAFC", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>

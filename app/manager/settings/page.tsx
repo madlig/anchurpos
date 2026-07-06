@@ -12,6 +12,7 @@ import {
   Trash2,
   AlertCircle,
   CheckCircle2,
+  Tag,
 } from "lucide-react";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 
@@ -342,7 +343,7 @@ export default function ManagerSettingsPage() {
       <Card className="p-5 space-y-4">
         <div className="flex items-center gap-2">
           <div style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontSize: "15px" }}>🏷️</span>
+            <Tag size={16} className="text-pink-500" />
           </div>
           <div>
             <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>Fee Platform Marketplace</p>

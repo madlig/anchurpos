@@ -15,31 +15,82 @@ import {
   ArrowRight,
   TrendingDown,
   Inbox,
+  ShoppingBag,
+  Box,
+  Zap,
+  Tag,
+  Banknote,
+  Building2,
+  QrCode,
+  FileText,
 } from "lucide-react";
 import type { Expense, Ingredient } from "@/types";
+import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 }
 
-const CATEGORY_ICONS: Record<string, string> = {
-  bahan_baku: "🧈",
-  packaging: "📦",
-  operasional: "🔌",
-  lain_lain: "🏷️",
-};
+function getCategoryIcon(category: string, size = 16, active = false) {
+  const color = active ? "text-white" : {
+    bahan_baku: "text-pink-500",
+    packaging: "text-blue-500",
+    operasional: "text-amber-500",
+    lain_lain: "text-slate-500",
+  }[category] || "text-slate-500";
+
+  switch (category) {
+    case "bahan_baku":
+      return <ShoppingBag size={size} className={color} />;
+    case "packaging":
+      return <Box size={size} className={color} />;
+    case "operasional":
+      return <Zap size={size} className={color} />;
+    case "lain_lain":
+    default:
+      return <Tag size={size} className={color} />;
+  }
+}
+
+function getPaymentMethodLabel(method: string, iconSize = 14, active = false) {
+  const iconColor = active ? "text-white" : {
+    cash: "text-emerald-600",
+    transfer: "text-blue-600",
+    qris: "text-indigo-600",
+  }[method] || "text-slate-500";
+
+  switch (method) {
+    case "cash":
+      return (
+        <span className="flex items-center justify-center gap-1.5">
+          <Banknote size={iconSize} className={iconColor} />
+          <span>Tunai</span>
+        </span>
+      );
+    case "transfer":
+      return (
+        <span className="flex items-center justify-center gap-1.5">
+          <Building2 size={iconSize} className={iconColor} />
+          <span>Transfer</span>
+        </span>
+      );
+    case "qris":
+      return (
+        <span className="flex items-center justify-center gap-1.5">
+          <QrCode size={iconSize} className={iconColor} />
+          <span>QRIS</span>
+        </span>
+      );
+    default:
+      return <span>{method}</span>;
+  }
+}
 
 const CATEGORY_LABELS: Record<string, string> = {
   bahan_baku: "Bahan Baku",
   packaging: "Packaging",
   operasional: "Operasional",
   lain_lain: "Lain-lain",
-};
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  cash: "💵 Tunai",
-  transfer: "🏦 Transfer",
-  qris: "📱 QRIS",
 };
 
 // Form pencatatan pengeluaran premium
@@ -91,6 +142,7 @@ function ExpenseForm({
   onSuccess: () => void;
   onCancel: () => void;
 }) {
+  const { alert, confirm } = useAlertConfirm();
   const [category, setCategory] = useState<"bahan_baku" | "packaging" | "operasional" | "lain_lain">("bahan_baku");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer" | "qris">("cash");
   const [notes, setNotes] = useState("");
@@ -143,7 +195,7 @@ function ExpenseForm({
   const isProductCategory = category === "bahan_baku" || category === "packaging";
 
   // Tambah item aktif ke keranjang belanja
-  function handleAddItem() {
+  async function handleAddItem() {
     setError("");
 
     if (isProductCategory) {
@@ -197,8 +249,9 @@ function ExpenseForm({
         });
 
       if (highestSim >= 0.85 && closestMatch) {
-        const confirmUseExisting = window.confirm(
-          `Apakah Anda bermaksud menginput barang berikut yang sudah ada di database?\n- Nama: "${(closestMatch as Ingredient).name}"\n\nKlik "OK" untuk menggunakan "${(closestMatch as Ingredient).name}"\nKlik "Batal/Cancel" jika Anda ingin membuat bahan baru.`
+        const confirmUseExisting = await confirm(
+          `Apakah Anda bermaksud menginput barang berikut yang sudah ada di database?\n- Nama: "${(closestMatch as Ingredient).name}"\n\nKlik "Konfirmasi" untuk menggunakan "${(closestMatch as Ingredient).name}"\nKlik "Batal" jika Anda ingin membuat bahan baru.`,
+          "Gunakan Bahan Terdaftar?"
         );
 
         if (confirmUseExisting) {
@@ -385,7 +438,7 @@ function ExpenseForm({
                 background: category === cat ? "#E85D8C" : "#F1F5F9",
               }}
             >
-              <span className="mr-1">{CATEGORY_ICONS[cat]}</span>
+              <span className="mr-1.5 inline-flex items-center">{getCategoryIcon(cat, 14, category === cat)}</span>
               {CATEGORY_LABELS[cat]}
             </button>
           ))}
@@ -666,7 +719,7 @@ function ExpenseForm({
                 background: paymentMethod === method ? "#E85D8C" : "#F1F5F9",
               }}
             >
-              {PAYMENT_METHOD_LABELS[method]}
+              {getPaymentMethodLabel(method, 14, paymentMethod === method)}
             </button>
           ))}
         </div>
@@ -744,6 +797,7 @@ interface Supplier {
 
 export default function ExpensesPage() {
   const { getToken } = useAuth();
+  const { alert, confirm } = useAlertConfirm();
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showExpenseForm, setShowExpenseForm] = useState(false);
@@ -777,35 +831,34 @@ export default function ExpensesPage() {
     [getToken]
   );
 
-  const loadIngredients = useCallback(async () => {
-    const res = await fetchWithAuth("/api/ingredients");
-    if (res.ok) setIngredients(await res.json());
-  }, [fetchWithAuth]);
-
-  const loadSuppliers = useCallback(async () => {
-    const res = await fetchWithAuth("/api/suppliers");
-    if (res.ok) setSuppliers(await res.json());
-  }, [fetchWithAuth]);
-
-  // Load all expenses between date range
   const loadExpenses = useCallback(async () => {
-    setLoading(true);
     try {
-      const res = await fetchWithAuth(`/api/expenses`);
-      if (res.ok) {
-        const allData: Expense[] = await res.json();
-        // Filter di client berdasarkan start & end date kustom
-        const filtered = allData.filter((e) => {
-          const expDate = e.date.split("T")[0];
-          return expDate >= startDate && expDate <= endDate;
-        });
-        setExpenses(filtered);
-      }
-    } finally {
-      setLoading(false);
+      const res = await fetchWithAuth(`/api/expenses?startDate=${startDate}&endDate=${endDate}`);
+      if (res.ok) setExpenses(await res.json());
+    } catch (err) {
+      console.error(err);
     }
   }, [fetchWithAuth, startDate, endDate]);
 
+  const loadIngredients = useCallback(async () => {
+    try {
+      const res = await fetchWithAuth("/api/ingredients");
+      if (res.ok) setIngredients(await res.json());
+    } catch (err) {
+      console.error(err);
+    }
+  }, [fetchWithAuth]);
+
+  const loadSuppliers = useCallback(async () => {
+    try {
+      const res = await fetchWithAuth("/api/suppliers");
+      if (res.ok) setSuppliers(await res.json());
+    } catch (err) {
+      console.error(err);
+    }
+  }, [fetchWithAuth]);
+
+  // Initial load
   useEffect(() => {
     loadIngredients();
     loadSuppliers();
@@ -817,9 +870,12 @@ export default function ExpensesPage() {
 
   // Delete transaction with stock reversion
   const handleDeleteExpense = async (id: string, itemName: string) => {
-    if (!window.confirm(`Apakah Anda yakin ingin membatalkan pengeluaran "${itemName}"? Tindakan ini akan mengembalikan stok bahan baku terkait.`)) {
-      return;
-    }
+    const confirmed = await confirm(
+      `Apakah Anda yakin ingin membatalkan pengeluaran "${itemName}"? Tindakan ini akan mengembalikan stok bahan baku terkait.`,
+      "Batalkan Pengeluaran",
+      { destructive: true, confirmLabel: "Ya, Batalkan", cancelLabel: "Batal" }
+    );
+    if (!confirmed) return;
 
     try {
       const res = await fetchWithAuth(`/api/expenses/${id}`, {
@@ -830,10 +886,10 @@ export default function ExpensesPage() {
         loadIngredients();
       } else {
         const d = await res.json();
-        alert(d.error ?? "Gagal membatalkan transaksi");
+        await alert(d.error ?? "Gagal membatalkan transaksi", "Gagal", "danger");
       }
     } catch {
-      alert("Kesalahan jaringan");
+      await alert("Kesalahan jaringan", "Kesalahan", "danger");
     }
   };
 
@@ -903,7 +959,7 @@ export default function ExpensesPage() {
           <Card className="p-3 bg-white border-none rounded-2xl flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Bahan Baku</span>
-              <span className="text-[14px]">🧈</span>
+              <ShoppingBag size={14} className="text-pink-500" />
             </div>
             <p className="text-xs font-extrabold text-slate-800 mt-2">{fmt(summaryTotals.totalBahanBaku)}</p>
           </Card>
@@ -911,7 +967,7 @@ export default function ExpensesPage() {
           <Card className="p-3 bg-white border-none rounded-2xl flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Packaging</span>
-              <span className="text-[14px]">📦</span>
+              <Box size={14} className="text-blue-500" />
             </div>
             <p className="text-xs font-extrabold text-slate-800 mt-2">{fmt(summaryTotals.totalPackaging)}</p>
           </Card>
@@ -919,7 +975,7 @@ export default function ExpensesPage() {
           <Card className="p-3 bg-white border-none rounded-2xl flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Operasional</span>
-              <span className="text-[14px]">🔌</span>
+              <Zap size={14} className="text-amber-500" />
             </div>
             <p className="text-xs font-extrabold text-slate-800 mt-2">{fmt(summaryTotals.totalOperasional)}</p>
           </Card>
@@ -927,7 +983,7 @@ export default function ExpensesPage() {
           <Card className="p-3 bg-white border-none rounded-2xl flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Lain-lain</span>
-              <span className="text-[14px]">🏷️</span>
+              <Tag size={14} className="text-slate-500" />
             </div>
             <p className="text-xs font-extrabold text-slate-800 mt-2">{fmt(summaryTotals.totalLainLain)}</p>
           </Card>
@@ -1011,7 +1067,7 @@ export default function ExpensesPage() {
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs">{CATEGORY_ICONS[exp.category]}</span>
+                        <span className="inline-flex items-center">{getCategoryIcon(exp.category, 14)}</span>
                         <p className="text-xs font-bold text-slate-800">{exp.itemName}</p>
                       </div>
                       <p className="text-[10px] text-slate-400 font-semibold mt-1">
@@ -1022,20 +1078,22 @@ export default function ExpensesPage() {
                     <div className="text-right">
                       <p className="text-xs font-black text-red-500">-{fmt(exp.totalPrice)}</p>
                       <span className="text-[9px] font-bold bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded-md mt-1 inline-block">
-                        {PAYMENT_METHOD_LABELS[exp.paymentMethod] || exp.paymentMethod}
+                        {getPaymentMethodLabel(exp.paymentMethod)}
                       </span>
                     </div>
                   </div>
 
                   {exp.notes && (
-                    <div className="mt-2.5 p-2 bg-slate-50 rounded-xl text-[10px] text-slate-500 font-medium border border-slate-100">
-                      📝 {exp.notes}
+                    <div className="mt-2.5 p-2 bg-slate-50 rounded-xl text-[10px] text-slate-500 font-medium border border-slate-100 flex items-start gap-1">
+                      <FileText size={12} className="text-slate-400 mt-0.5 flex-shrink-0" />
+                      <span>{exp.notes}</span>
                     </div>
                   )}
 
                   <div className="flex justify-between items-center mt-3 pt-2.5 border-t border-slate-50">
-                    <span className="text-[9px] font-bold text-slate-400">
-                      📅 {new Date(exp.date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                    <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1">
+                      <Calendar size={10} className="text-slate-400" />
+                      <span>{new Date(exp.date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</span>
                     </span>
                     <button
                       onClick={() => handleDeleteExpense(exp.id, exp.itemName)}
