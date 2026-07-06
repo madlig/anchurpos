@@ -8,6 +8,7 @@ import {
   Clock, Calendar
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 
 interface AttendanceItem {
   time: string;
@@ -33,6 +34,7 @@ interface AttendanceStatusResponse {
 export default function CrewDashboard() {
   const { user, getToken } = useAuth();
   const router = useRouter();
+  const { alert, confirm } = useAlertConfirm();
   const [status, setStatus] = useState<AttendanceStatusResponse | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -79,35 +81,44 @@ export default function CrewDashboard() {
       const res = await fetchWithAuth("/api/attendance/check-in", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error ?? "Gagal Check-in");
+        await alert(data.error ?? "Gagal Check-in", "Absensi Gagal", "danger");
       } else {
-        alert(data.needsReview 
-          ? "Check-in berhasil diajukan! (Menunggu review manager karena berada di luar jaringan utama)"
-          : "Check-in berhasil secara instan!"
+        await alert(
+          data.needsReview 
+            ? "Check-in berhasil diajukan! (Menunggu review manager karena berada di luar jaringan utama)"
+            : "Check-in berhasil secara instan!",
+          "Absensi Berhasil",
+          "success"
         );
         loadStatus();
       }
     } catch {
-      alert("Kesalahan jaringan");
+      await alert("Kesalahan jaringan saat melakukan check-in", "Kesalahan Koneksi", "danger");
     } finally {
       setActionLoading(false);
     }
   }
 
   async function handleCheckOut() {
-    if (!window.confirm("Apakah Anda yakin ingin Check-out (pulang) sekarang?")) return;
+    const confirmed = await confirm(
+      "Apakah Anda yakin ingin Check-out (pulang) sekarang?",
+      "Konfirmasi Check-out",
+      { destructive: true, confirmLabel: "Ya, Check-out", cancelLabel: "Batal" }
+    );
+    if (!confirmed) return;
+
     setActionLoading(true);
     try {
       const res = await fetchWithAuth("/api/attendance/check-out", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error ?? "Gagal Check-out");
+        await alert(data.error ?? "Gagal Check-out", "Absensi Gagal", "danger");
       } else {
-        alert("Check-out berhasil disimpan!");
+        await alert("Check-out berhasil disimpan!", "Absensi Berhasil", "success");
         loadStatus();
       }
     } catch {
-      alert("Kesalahan jaringan");
+      await alert("Kesalahan jaringan saat melakukan check-out", "Kesalahan Koneksi", "danger");
     } finally {
       setActionLoading(false);
     }

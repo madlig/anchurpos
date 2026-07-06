@@ -13,6 +13,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
+import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 
 interface AttendanceConfig {
   whitelistedIps: string[];
@@ -23,6 +24,7 @@ interface AttendanceConfig {
 
 export default function ManagerSettingsPage() {
   const { getToken } = useAuth();
+  const { confirm } = useAlertConfirm();
   const [config, setConfig] = useState<AttendanceConfig | null>(null);
   const [dailyLoyangTarget, setDailyLoyangTarget] = useState<number>(8);
   const [loading, setLoading] = useState(true);
@@ -109,7 +111,13 @@ export default function ManagerSettingsPage() {
   }
 
   async function removeIp(ip: string) {
-    if (!window.confirm(`Hapus IP ${ip} dari whitelist?`)) return;
+    const confirmed = await confirm(
+      `Apakah Anda yakin ingin menghapus IP ${ip} dari whitelist?`,
+      "Hapus Whitelist IP",
+      { destructive: true, confirmLabel: "Ya, Hapus", cancelLabel: "Batal" }
+    );
+    if (!confirmed) return;
+
     setError("");
     setSuccess("");
     try {

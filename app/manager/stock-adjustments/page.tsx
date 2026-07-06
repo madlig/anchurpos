@@ -13,6 +13,7 @@ import {
   ChevronRight,
   X,
 } from "lucide-react";
+import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 
 interface Product {
   id: string;
@@ -28,13 +29,15 @@ interface Adjustment {
   id: string;
   date: string;
   productId: string;
+  productName: string;
   variantId: string;
+  variantName: string;
   qty: number;
   reasonCategory: string;
   reasonCustom: string | null;
   recipientName: string | null;
   totalCost: number;
-  createdAt: string;
+  createdBy: string;
 }
 
 const REASON_OPTIONS = [
@@ -47,6 +50,7 @@ const REASON_OPTIONS = [
 
 export default function StockAdjustmentsPage() {
   const { role, getToken } = useAuth();
+  const { confirm } = useAlertConfirm();
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
@@ -147,7 +151,13 @@ export default function StockAdjustmentsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Hapus pengeluaran ini?")) return;
+    const confirmed = await confirm(
+      "Apakah Anda yakin ingin menghapus data pengeluaran stok ini?",
+      "Hapus Pengeluaran Stok",
+      { destructive: true, confirmLabel: "Ya, Hapus", cancelLabel: "Batal" }
+    );
+    if (!confirmed) return;
+    
     await fetchWithAuth(`/api/stock-adjustments/${id}`, { method: "DELETE" });
     await loadData();
   }

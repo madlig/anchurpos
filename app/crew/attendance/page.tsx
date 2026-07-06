@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Loader2, Clock, CheckCircle2, AlertTriangle, Wifi } from "lucide-react";
+import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 
 interface TodayStatus {
   id: string; date: string;
@@ -22,6 +23,7 @@ interface HistoryItem {
 
 export default function CrewAttendancePage() {
   const { user, getToken } = useAuth();
+  const { confirm } = useAlertConfirm();
   const [today, setToday] = useState<TodayStatus | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +62,7 @@ export default function CrewAttendancePage() {
     setError(""); setSubmitting(true);
     try {
       const res = await fetchWithAuth(`/api/attendance/${type}`, { 
-        method: "POST"
+         method: "POST"
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Gagal absen. Pastikan terhubung ke WiFi rumah produksi."); return; }
@@ -91,9 +93,14 @@ export default function CrewAttendancePage() {
     if (!hasCheckedIn) return { label: "MASUK", action: () => handleAction("check-in"), bg: "linear-gradient(135deg,#E85D8C,#C94A73)", shadow: "0 10px 40px rgba(232,93,140,0.4)", testId: "attendance-check-in-btn", disabled: false, subLabel: "" };
     if (!hasCheckedOut) return {
       label: "PULANG",
-      action: () => {
+      action: async () => {
         if (hoursWorked < 8) {
-          if (window.confirm("Anda baru shift kurang dari 8 jam. Ingin diakhiri?")) {
+          const confirmed = await confirm(
+            "Anda baru bekerja kurang dari 8 jam. Apakah Anda yakin ingin checkout sekarang?",
+            "Checkout Awal",
+            { destructive: true, confirmLabel: "Ya, Pulang", cancelLabel: "Batal" }
+          );
+          if (confirmed) {
             handleAction("check-out");
           }
         } else {

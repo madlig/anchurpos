@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { AlertConfirmProvider } from "@/components/shared/AlertConfirmProvider";
 
 export const metadata: Metadata = {
   title: "AnchurPOS",
@@ -31,7 +32,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <AuthProvider>
-          {children}
+          <AlertConfirmProvider>
+            {children}
+          </AlertConfirmProvider>
         </AuthProvider>
       </body>
     </html>
