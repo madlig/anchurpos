@@ -109,8 +109,15 @@ export async function POST(req: NextRequest) {
 
     // Build list of anomalies
     const anomalies: string[] = [];
-    if (!ipValid) anomalies.push("IP tidak dikenal");
-    if (totalHours < 8) anomalies.push("Check-out awal (<8 jam)");
+    if (data.checkIn?.ipValid === false) {
+      anomalies.push("IP Check-in tidak dikenal");
+    }
+    if (!ipValid) {
+      anomalies.push("IP Check-out tidak dikenal");
+    }
+    if (totalHours < 8) {
+      anomalies.push("Check-out awal (<8 jam)");
+    }
 
     // Every check-out goes to status: "direview" as requested: "semua absen akan direview oleh oleh manager atau owner"
     const status = "direview";

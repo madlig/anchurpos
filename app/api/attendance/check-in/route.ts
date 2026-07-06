@@ -78,11 +78,6 @@ export async function POST(req: NextRequest) {
         { lastDetectedIp: ip, lastDetectedAt: FieldValue.serverTimestamp() },
         { merge: true }
       );
-
-      return NextResponse.json(
-        { error: "IP tidak dikenali, hubungi Manager" },
-        { status: 403 }
-      );
     }
 
     const today = new Date().toISOString().split("T")[0];
@@ -113,7 +108,7 @@ export async function POST(req: NextRequest) {
       checkIn: {
         time: new Date().toISOString(),
         ipAddress: ip,
-        ipValid: true,
+        ipValid: ipValid,
       },
       checkOut: null,
       totalHours: null,
