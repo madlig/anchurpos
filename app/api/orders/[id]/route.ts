@@ -238,29 +238,54 @@ export async function PUT(
     const dateToUse = customDate ? new Date(customDate) : (oldOrder.createdAt?.toDate?.() || new Date(oldOrder.createdAt));
 
     await adminDb.runTransaction(async (tx) => {
-      // 1. REVERT OLD GLAZE/SAUS STOCK DEDUCTIONS
+      // --- ALL READS MUST HAPPEN BEFORE ANY WRITES ---
+      
       const oldSauceDist = oldOrder.sauceDistribution;
+      const addOnSnaps: Record<string, FirebaseFirestore.DocumentSnapshot> = {};
+
+      // Collect all sauce IDs to fetch
+      const sauceIdsToFetch = new Set<string>();
+      if (oldSauceDist && typeof oldSauceDist === "object") {
+        Object.keys(oldSauceDist).forEach(id => sauceIdsToFetch.add(id));
+      }
+      if (sauceDistribution && typeof sauceDistribution === "object") {
+        Object.keys(sauceDistribution).forEach(id => sauceIdsToFetch.add(id));
+      }
+
+      // Fetch all required addOns
+      for (const sauceId of sauceIdsToFetch) {
+        addOnSnaps[sauceId] = await tx.get(adminDb.collection("addOns").doc(sauceId));
+      }
+
+      // Track the running stock for each addon in memory to handle revert+deduct correctly
+      const addonStocks: Record<string, number> = {};
+      for (const sauceId of sauceIdsToFetch) {
+        const snap = addOnSnaps[sauceId];
+        addonStocks[sauceId] = snap && snap.exists ? (snap.data()?.currentStock ?? 0) : 0;
+      }
+
+      // --- WRITES ---
+
+      // 1. REVERT OLD GLAZE/SAUS STOCK DEDUCTIONS
       if (oldSauceDist && typeof oldSauceDist === "object") {
         for (const [sauceId, cupCount] of Object.entries(oldSauceDist)) {
-          if (typeof cupCount === "number" && cupCount > 0) {
+          if (typeof cupCount === "number" && cupCount > 0 && addOnSnaps[sauceId]?.exists) {
             const addOnRef = adminDb.collection("addOns").doc(sauceId);
-            const addOnSnap = await tx.get(addOnRef);
-            if (addOnSnap.exists) {
-              const currAddonStock = addOnSnap.data()?.currentStock ?? 0;
-              const nextAddonStock = currAddonStock + cupCount; // add back
-              tx.update(addOnRef, { currentStock: nextAddonStock });
+            const nextAddonStock = addonStocks[sauceId] + cupCount;
+            addonStocks[sauceId] = nextAddonStock; // update in memory for later deductions
 
-              // Log stock reversion
-              const movementRef = adminDb.collection("stockMovements").doc();
-              tx.set(movementRef, {
-                ingredientId: `addon:${sauceId}`,
-                changeAmount: cupCount,
-                newStockAfter: nextAddonStock,
-                sourceType: "opname_adjustment",
-                notes: `Revert saos karena update order #${orderNumber}`,
-                createdAt: new Date(),
-              });
-            }
+            tx.update(addOnRef, { currentStock: nextAddonStock });
+
+            // Log stock reversion
+            const movementRef = adminDb.collection("stockMovements").doc();
+            tx.set(movementRef, {
+              ingredientId: `addon:${sauceId}`,
+              changeAmount: cupCount,
+              newStockAfter: nextAddonStock,
+              sourceType: "opname_adjustment",
+              notes: `Revert saos karena update order #${orderNumber}`,
+              createdAt: new Date(),
+            });
           }
         }
       }
@@ -315,25 +340,23 @@ export async function PUT(
       // 7. DEDUCT NEW GLAZE/SAUS STOCK DEDUCTIONS
       if (sauceDistribution && typeof sauceDistribution === "object") {
         for (const [sauceId, cupCount] of Object.entries(sauceDistribution)) {
-          if (typeof cupCount === "number" && cupCount > 0) {
+          if (typeof cupCount === "number" && cupCount > 0 && addOnSnaps[sauceId]?.exists) {
             const addOnRef = adminDb.collection("addOns").doc(sauceId);
-            const addOnSnap = await tx.get(addOnRef);
-            if (addOnSnap.exists) {
-              const currAddonStock = addOnSnap.data()?.currentStock ?? 0;
-              const nextAddonStock = currAddonStock - cupCount;
-              tx.update(addOnRef, { currentStock: nextAddonStock });
+            const nextAddonStock = addonStocks[sauceId] - cupCount;
+            addonStocks[sauceId] = nextAddonStock; // update in memory
 
-              // Log new stock movement
-              const movementRef = adminDb.collection("stockMovements").doc();
-              tx.set(movementRef, {
-                ingredientId: `addon:${sauceId}`,
-                changeAmount: -cupCount,
-                newStockAfter: nextAddonStock,
-                sourceType: "sale",
-                notes: `Penjualan saos untuk update order #${orderNumber}`,
-                createdAt: dateToUse,
-              });
-            }
+            tx.update(addOnRef, { currentStock: nextAddonStock });
+
+            // Log new stock movement
+            const movementRef = adminDb.collection("stockMovements").doc();
+            tx.set(movementRef, {
+              ingredientId: `addon:${sauceId}`,
+              changeAmount: -cupCount,
+              newStockAfter: nextAddonStock,
+              sourceType: "sale",
+              notes: `Penjualan saos untuk update order #${orderNumber}`,
+              createdAt: dateToUse,
+            });
           }
         }
       }
