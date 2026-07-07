@@ -117,6 +117,7 @@ export async function PUT(
     customDate,
     shippingCost,
     shippingBorneBy,
+    deliveryMethod,
     sauceDistribution,
   } = body as {
     customerId?: string;
@@ -135,6 +136,7 @@ export async function PUT(
     customDate?: string;
     shippingCost?: number;
     shippingBorneBy?: "seller" | "customer";
+    deliveryMethod?: "pickup" | "self_delivery" | "courier";
     sauceDistribution?: Record<string, number>;
   };
 
@@ -327,6 +329,7 @@ export async function PUT(
         orderNotes: orderNotes ?? null,
         shippingCost: shippingCost ?? null,
         shippingBorneBy: shippingBorneBy ?? null,
+        deliveryMethod: deliveryMethod ?? null,
         sauceDistribution: sauceDistribution ?? null,
         createdAt: dateToUse,
       });
