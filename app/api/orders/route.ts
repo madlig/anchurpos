@@ -16,13 +16,20 @@ export async function GET(req: NextRequest) {
     let query: FirebaseFirestore.Query = adminDb
       .collection("orders")
       .orderBy("createdAt", "desc")
-      .limit(50);
+      .limit(200);
 
-    if (status) query = query.where("status", "==", status);
+    // When explicitly requesting void tab, filter for void only
+    // Otherwise always filter IN by status (non-void)
+    if (status === "void") {
+      query = query.where("status", "==", "void");
+    } else if (status) {
+      query = query.where("status", "==", status);
+    }
+
     if (paymentStatus) query = query.where("paymentStatus", "==", paymentStatus);
 
     const snap = await query.get();
-    const orders = snap.docs.map((doc) => {
+    let orders = snap.docs.map((doc) => {
       const d = doc.data();
       return {
         id: doc.id,
@@ -44,11 +51,24 @@ export async function GET(req: NextRequest) {
         orderNotes: d.orderNotes ?? null,
         shippingCost: d.shippingCost,
         shippingCostConfirmed: d.shippingCostConfirmed ?? false,
+        shippingBorneBy: d.shippingBorneBy ?? null,
+        deliveryMethod: d.deliveryMethod ?? null,
         invoiceNumber: d.invoiceNumber,
+
+        voidReason: d.voidReason ?? null,
+        voidedAt: d.voidedAt?.toDate?.().toISOString() ?? null,
         createdAt: d.createdAt?.toDate?.().toISOString() ?? d.createdAt,
         completedAt: d.completedAt?.toDate?.().toISOString() ?? d.completedAt,
       };
     });
+
+    // When not explicitly requesting void tab, exclude void orders
+    if (status !== "void") {
+      orders = orders.filter((o) => o.status !== "void");
+    }
+
+    // Apply client-side limit after filtering
+    orders = orders.slice(0, 50);
 
     return NextResponse.json(orders);
   } catch (err) {
@@ -56,6 +76,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Gagal mengambil data order" }, { status: 500 });
   }
 }
+
 
 async function generateOrderNumber(customDate?: Date): Promise<string> {
   const today = customDate || new Date();
@@ -120,6 +141,7 @@ export async function POST(req: NextRequest) {
     customDate,
     shippingCost,
     shippingBorneBy,
+    deliveryMethod,
     sauceDistribution,
   } = body as {
     customerId?: string;
@@ -127,7 +149,7 @@ export async function POST(req: NextRequest) {
     customerType?: string;
     source: string;
     orderChannel?: string;
-    items: { productId: string; variantId: string; qty: number }[];
+    items: { productId: string; variantId: string; qty: number; sauceId?: string; sauceName?: string }[];
     paymentMethod?: string;
     paymentStatus?: string;
     shippingAddress?: string;
@@ -138,8 +160,10 @@ export async function POST(req: NextRequest) {
     customDate?: string;
     shippingCost?: number;
     shippingBorneBy?: "seller" | "customer";
+    deliveryMethod?: "pickup" | "self_delivery" | "courier";
     sauceDistribution?: Record<string, number>;
   };
+
 
   if (!items?.length) {
     return NextResponse.json({ error: "Pilih minimal 1 item" }, { status: 400 });
@@ -220,6 +244,8 @@ export async function POST(req: NextRequest) {
         margin,
         assemblyStatus: isRainbow ? "pending_approval" : null,
         rainbowSourceBreakdown: null,
+        sauceId: item.sauceId ?? null,
+        sauceName: item.sauceName ?? null,
       };
 
       if (isRainbow) hasRainbow = true;
@@ -264,12 +290,14 @@ export async function POST(req: NextRequest) {
         proofOfTransferUrl: null,
         shippingCost: shippingCost ?? null,
         shippingBorneBy: shippingBorneBy ?? null,
+        deliveryMethod: deliveryMethod ?? null,
         shippingCostConfirmed: true,
         invoiceNumber: null,
         invoiceGeneratedAt: null,
         invoiceUrl: null,
         sauceDistribution: sauceDistribution ?? null,
       });
+
 
       // Kurangi stok add-on saos/glaze secara dinamis jika terlampir
       if (sauceDistribution && typeof sauceDistribution === "object") {

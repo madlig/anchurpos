@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Loader2, Search, ShoppingCart, X, Minus, Plus, ChevronDown, UserPlus, CreditCard, CheckCircle2, Store, MessageCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface PriceTier { id: string; minQty: number; maxQty: number | null; price: number; }
@@ -21,6 +21,8 @@ interface CartItem {
   productId: string; productName: string;
   variantId: string; variantName: string;
   qty: number; price: number;
+  sauceId?: string;
+  sauceName?: string;
 }
 
 type PayMethod = "cash" | "transfer" | "qris";
@@ -73,9 +75,34 @@ export default function KasirPage() {
   // Variant selector sheet
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
   const [variantQtys, setVariantQtys] = useState<Record<string, number>>({});
+  const [variantSauces, setVariantSauces] = useState<Record<string, string>>({});
+  
+  // Dynamic Addon Sauce States
+  const [addOns, setAddOns] = useState<any[]>([]);
+  const [sauceDist, setSauceDist] = useState<Record<string, number>>({});
 
   // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
+
+  const defaultSauce = useMemo(() => {
+    if (!addOns.length) return null;
+    const tiramisu = addOns.find(a => a.name.toLowerCase().includes("tiramisu") || a.id === "saus-tiramisu");
+    if (tiramisu) return tiramisu;
+    return addOns[0];
+  }, [addOns]);
+
+  useEffect(() => {
+    if (selectedProduct && addOns.length > 0) {
+      const initialSauces: Record<string, string> = {};
+      const def = defaultSauce?.id || addOns[0].id;
+      variants.forEach(v => {
+        initialSauces[v.id] = def;
+      });
+      setVariantSauces(initialSauces);
+    } else {
+      setVariantSauces({});
+    }
+  }, [selectedProduct, addOns, defaultSauce, variants]);
 
   // Checkout sheet state
   const [showCheckout, setShowCheckout] = useState(false);
@@ -98,13 +125,11 @@ export default function KasirPage() {
   const [enableCustomDate, setEnableCustomDate] = useState(false);
   const [customOrderDate, setCustomOrderDate] = useState("");
 
-  // WhatsApp shipping cost states
+  // WhatsApp shipping states
+  const [deliveryMethod, setDeliveryMethod] = useState<"pickup" | "self_delivery" | "courier">("courier");
   const [shippingCost, setShippingCost] = useState("");
   const [shippingBorneBy, setShippingBorneBy] = useState<"seller" | "customer">("customer");
 
-  // Dynamic Addon Sauce States
-  const [addOns, setAddOns] = useState<any[]>([]);
-  const [sauceDist, setSauceDist] = useState<Record<string, number>>({});
 
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
@@ -144,51 +169,40 @@ export default function KasirPage() {
   const cartTotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart]);
   const cartCount = useMemo(() => cart.reduce((s, i) => s + i.qty, 0), [cart]);
 
-  // Kalkulasi total saos glaze yang didapat (Regular: 2 cup, Full: 3 cup, Tiktok: 2 cup)
-  const totalSaucesNeeded = useMemo(() => {
-    if (orderChannel !== "whatsapp") return 0;
-    let total = 0;
+  // Kalkulasi distribusi saos glaze otomatis (Cokelat default + Pilihan bebas)
+  const computedSauceDist = useMemo(() => {
+    const dist: Record<string, number> = {};
+    if (!addOns.length) return dist;
+
+    // Cari saos cokelat default
+    const defaultCoklat = addOns.find(a => a.id === "saus-coklat" || a.id === "saus-coklat-tiktok")?.id || "saus-coklat";
+
     cart.forEach(item => {
-      const vName = item.variantName.toLowerCase();
-      if (vName.includes("regular") || vName.includes("tiktok")) {
-        total += item.qty * 2;
-      } else if (vName.includes("full")) {
-        total += item.qty * 3;
+      const hasSauce = !item.productId.toLowerCase().includes("full") && !item.productName.toLowerCase().includes("full");
+      if (hasSauce) {
+        // 1. Setiap pack mendapat 1x Cokelat default
+        dist[defaultCoklat] = (dist[defaultCoklat] ?? 0) + item.qty;
+        
+        // 2. Setiap pack mendapat 1x Saus pilihan bebas
+        const chosenSauce = item.sauceId || defaultCoklat;
+        dist[chosenSauce] = (dist[chosenSauce] ?? 0) + item.qty;
       }
     });
-    return total;
-  }, [cart, orderChannel]);
 
-  // Auto-fill default saos saat checkout dibuka
+    return dist;
+  }, [cart, addOns]);
+
+  const totalSaucesNeeded = useMemo(() => {
+    return Object.values(computedSauceDist).reduce((s, v) => s + v, 0);
+  }, [computedSauceDist]);
+
   useEffect(() => {
-    if (showCheckout && totalSaucesNeeded > 0 && addOns.length > 0) {
-      // Cari saos cokelat
-      const cokelatAddon = addOns.find(a => a.name.toLowerCase().includes("cokelat") || a.id === "cokelat");
-      // Cari saos tiramisu sebagai default pilihan kedua
-      const tiramisuAddon = addOns.find(a => a.name.toLowerCase().includes("tiramisu") || a.id === "tiramisu") || addOns[0];
-
-      const initialDist: Record<string, number> = {};
-      // Inisialisasi semua add-ons ke 0
-      addOns.forEach(a => {
-        initialDist[a.id] = 0;
-      });
-
-      if (cokelatAddon) {
-        // Regular include 1 Cokelat & 1 Pilihan. Berarti Cokelat = totalSaucesNeeded / 2
-        const half = Math.floor(totalSaucesNeeded / 2);
-        initialDist[cokelatAddon.id] = half;
-        if (tiramisuAddon) {
-          initialDist[tiramisuAddon.id] = totalSaucesNeeded - half;
-        }
-      } else {
-        // Jika tidak ada cokelat, masukkan ke add-on pertama
-        initialDist[addOns[0].id] = totalSaucesNeeded;
-      }
-      setSauceDist(initialDist);
-    } else if (!showCheckout) {
+    if (showCheckout) {
+      setSauceDist(computedSauceDist);
+    } else {
       setSauceDist({});
     }
-  }, [showCheckout, totalSaucesNeeded, addOns]);
+  }, [showCheckout, computedSauceDist]);
 
   // ── Variant sheet helpers ──────────────────────────────────────────────────
   function openVariantSheet(product: ProductItem) {
@@ -230,6 +244,11 @@ export default function KasirPage() {
       const variant = variants.find(v => v.id === variantId);
       const totalQty = qty;
       const price = getPrice(selectedProduct, totalQty);
+      
+      const hasSauce = !selectedProduct.id.toLowerCase().includes("full") && !selectedProduct.name.toLowerCase().includes("full");
+      const sId = hasSauce ? variantSauces[variantId] : undefined;
+      const sName = sId ? (addOns.find(a => a.id === sId)?.name || sId) : undefined;
+
       newItems.push({
         productId: selectedProduct.id,
         productName: selectedProduct.name,
@@ -237,13 +256,15 @@ export default function KasirPage() {
         variantName: variant?.name ?? variantId,
         qty,
         price,
+        sauceId: sId,
+        sauceName: sName,
       });
     }
 
     setCart(prev => {
       const next = [...prev];
       for (const ni of newItems) {
-        const idx = next.findIndex(c => c.productId === ni.productId && c.variantId === ni.variantId);
+        const idx = next.findIndex(c => c.productId === ni.productId && c.variantId === ni.variantId && c.sauceId === ni.sauceId);
         if (idx >= 0) {
           next[idx] = { ...next[idx], qty: next[idx].qty + ni.qty };
         } else {
@@ -330,22 +351,30 @@ export default function KasirPage() {
           customerType: isNewCustomer ? newCustomerType : (selectedCustomer?.customerType ?? null),
           source: orderChannel === "walkin" ? "walk_in" : orderChannel === "whatsapp" ? "wa_form" : "marketplace_manual",
           orderChannel,
-          items: cart.map(c => ({ productId: c.productId, variantId: c.variantId, qty: c.qty })),
+          items: cart.map(c => ({
+            productId: c.productId,
+            variantId: c.variantId,
+            qty: c.qty,
+            sauceId: c.sauceId,
+            sauceName: c.sauceName,
+          })),
           orderNotes: orderNotes.trim() || null,
           customDate: enableCustomDate && customOrderDate ? customOrderDate : undefined,
-          shippingCost: orderChannel === "whatsapp" ? (parseInt(shippingCost) || 0) : null,
-          shippingBorneBy: orderChannel === "whatsapp" ? shippingBorneBy : null,
+          shippingCost: orderChannel === "whatsapp" && deliveryMethod !== "pickup" ? (parseInt(shippingCost) || 0) : null,
+          shippingBorneBy: orderChannel === "whatsapp" && deliveryMethod !== "pickup" ? shippingBorneBy : null,
+          deliveryMethod: orderChannel === "whatsapp" ? deliveryMethod : null,
           sauceDistribution: totalSaucesNeeded > 0 ? sauceDist : undefined,
         }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Gagal membuat pesanan"); return; }
+      if (!res.ok) { setError(data.error ?? "Gagal menyimpan pesanan"); return; }
       // Reset
       setCart([]); setShowCheckout(false); setCustomerSearch("");
       setSelectedCustomer(null); setOrderNotes(""); setIsPaid(true); setSaveNewCustomer(false);
       setPlatformFeeOverride(""); setNewCustomerType("reguler");
       setEnableCustomDate(false); setCustomOrderDate("");
-      setShippingCost(""); setShippingBorneBy("customer");
+      setShippingCost(""); setShippingBorneBy("customer"); setDeliveryMethod("courier");
+
       router.push(`/manager/orders/${data.orderId}`);
     } catch { setError("Gagal menghubungi server"); } finally { setSubmitting(false); }
   }
@@ -551,63 +580,80 @@ export default function KasirPage() {
                   <div
                     key={v.id}
                     style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      display: "flex", flexDirection: "column", gap: "8px",
                       padding: "10px 14px", borderRadius: "12px",
                       background: qty > 0 ? "#FEF1F5" : "#F8FAFC",
                       border: qty > 0 ? "1px solid #F2A0B7" : "1px solid #F1F5F9",
                     }}
                     data-testid={`variant-row-${v.id}`}
                   >
-                    <div>
-                      <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{v.name}</p>
-                      <p style={{ fontSize: "11px", color: isLowStock ? "#DC2626" : "#94A3B8", marginTop: "2px" }}>
-                        Stok: {currentStock} pcs {isLowStock ? "⚠ Rendah" : ""}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {qty > 0 ? (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div>
+                        <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{v.name}</p>
+                        <p style={{ fontSize: "11px", color: isLowStock ? "#DC2626" : "#94A3B8", marginTop: "2px" }}>
+                          Stok: {currentStock} pcs {isLowStock ? "⚠ Rendah" : ""}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {qty > 0 ? (
+                          <button
+                            onClick={() => adjustVariantQty(v.id, -1)}
+                            style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#F1F5F9", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          >
+                            <Minus size={13} style={{ color: "#64748B" }} />
+                          </button>
+                        ) : (
+                          <div style={{ width: "30px" }} />
+                        )}
+
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={qty || ""}
+                          placeholder="0"
+                          onChange={e => {
+                            const val = Math.max(0, parseInt(e.target.value) || 0);
+                            setVariantQtys(prev => ({ ...prev, [v.id]: val }));
+                          }}
+                          style={{
+                            width: "54px",
+                            height: "30px",
+                            borderRadius: "8px",
+                            border: "1px solid #E2E8F0",
+                            textAlign: "center",
+                            fontSize: "13px",
+                            fontWeight: "700",
+                            color: "#1C1C1E",
+                            background: "#fff",
+                            outline: "none",
+                          }}
+                        />
+
                         <button
-                          onClick={() => adjustVariantQty(v.id, -1)}
-                          style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#F1F5F9", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          onClick={() => adjustVariantQty(v.id, 1)}
+                          style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#E85D8C", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          data-testid={`add-variant-${v.id}`}
                         >
-                          <Minus size={13} style={{ color: "#64748B" }} />
+                          <Plus size={13} style={{ color: "#fff" }} strokeWidth={2.5} />
                         </button>
-                      ) : (
-                        <div style={{ width: "30px" }} />
-                      )}
-
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={qty || ""}
-                        placeholder="0"
-                        onChange={e => {
-                          const val = Math.max(0, parseInt(e.target.value) || 0);
-                          setVariantQtys(prev => ({ ...prev, [v.id]: val }));
-                        }}
-                        style={{
-                          width: "54px",
-                          height: "30px",
-                          borderRadius: "8px",
-                          border: "1px solid #E2E8F0",
-                          textAlign: "center",
-                          fontSize: "13px",
-                          fontWeight: "700",
-                          color: "#1C1C1E",
-                          background: "#fff",
-                          outline: "none",
-                        }}
-                      />
-
-                      <button
-                        onClick={() => adjustVariantQty(v.id, 1)}
-                        style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#E85D8C", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                        data-testid={`add-variant-${v.id}`}
-                      >
-                        <Plus size={13} style={{ color: "#fff" }} strokeWidth={2.5} />
-                      </button>
+                      </div>
                     </div>
+
+                    {qty > 0 && !selectedProduct.id.toLowerCase().includes("full") && !selectedProduct.name.toLowerCase().includes("full") && addOns.length > 0 && (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "8px", borderTop: "1px dashed #F1F5F9" }}>
+                        <span style={{ fontSize: "11px", fontWeight: "600", color: "#E85D8C" }}>Pilih Saus Bebas (Saos 2):</span>
+                        <select
+                          value={variantSauces[v.id] || ""}
+                          onChange={e => setVariantSauces(prev => ({ ...prev, [v.id]: e.target.value }))}
+                          style={{ padding: "4px 8px", borderRadius: "8px", border: "1px solid #F2A0B7", fontSize: "11px", outline: "none", color: "#1C1C1E", background: "#fff", cursor: "pointer", minWidth: "150px" }}
+                        >
+                          {addOns.map(addon => (
+                            <option key={addon.id} value={addon.id}>{addon.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -668,7 +714,10 @@ export default function KasirPage() {
                     </div>
                     <div>
                       <p style={{ fontSize: "12px", fontWeight: "600", color: "#1C1C1E" }}>{item.productName}</p>
-                      <p style={{ fontSize: "11px", color: "#94A3B8" }}>{item.variantName}</p>
+                      <p style={{ fontSize: "11px", color: "#94A3B8" }}>
+                        {item.variantName}
+                        {item.sauceName ? ` · Saus: ${item.sauceName}` : ""}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -815,51 +864,93 @@ export default function KasirPage() {
               </div>
             )}
 
-            {/* ── Biaya Ongkir — hanya untuk WhatsApp ── */}
+            {/* ── Metode Pengiriman — hanya untuk WhatsApp ── */}
             {orderChannel === "whatsapp" && (
               <div style={{ marginBottom: "12px", padding: "12px", borderRadius: "12px", background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
                 <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
-                  Biaya Ongkir (WhatsApp)
+                  Metode Pengiriman
                 </label>
-                <div className="flex items-center gap-2 mb-2">
-                  <span style={{ fontSize: "13px", color: "#64748B", fontWeight: "600" }}>Rp</span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="0"
-                    value={shippingCost}
-                    onChange={e => setShippingCost(e.target.value)}
-                    style={{ flex: 1, padding: "8px 12px", borderRadius: "10px", border: "1px solid #E2E8F0", fontSize: "13px", outline: "none", background: "#fff", color: "#1C1C1E" }}
-                  />
-                  {shippingCost !== "" && (
-                    <button onClick={() => setShippingCost("")}
-                      style={{ width: "28px", height: "28px", borderRadius: "8px", background: "#FEE2E2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <X size={12} style={{ color: "#DC2626" }} />
+
+                {/* Step 1 — Pilih tipe */}
+                <div className="flex gap-2 mb-3">
+                  {([
+                    { key: "pickup", label: "Pickup" },
+                    { key: "self_delivery", label: "Diantar Kita" },
+                    { key: "courier", label: "Kurir Online" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.key}
+                      onClick={() => {
+                        setDeliveryMethod(opt.key);
+                        if (opt.key === "pickup") { setShippingCost(""); setShippingBorneBy("customer"); }
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: "7px 4px",
+                        borderRadius: "10px",
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        border: "none",
+                        cursor: "pointer",
+                        color: deliveryMethod === opt.key ? "#fff" : "#64748B",
+                        background: deliveryMethod === opt.key ? "#E85D8C" : "#E2E8F0",
+                        transition: "all 0.15s",
+                      }}>
+                      {opt.label}
                     </button>
-                  )}
+                  ))}
                 </div>
-                {parseInt(shippingCost) > 0 && (
+
+                {/* Step 2 — Sub-fields per tipe */}
+                {deliveryMethod === "pickup" && (
+                  <p style={{ fontSize: "11px", color: "#16A34A", fontWeight: "600", padding: "8px 10px", background: "#DCFCE7", borderRadius: "8px" }}>
+                    Pembeli akan mengambil sendiri. Tidak ada biaya ongkir.
+                  </p>
+                )}
+
+                {(deliveryMethod === "self_delivery" || deliveryMethod === "courier") && (
                   <div>
+                    <p style={{ fontSize: "10px", color: "#94A3B8", marginBottom: "6px" }}>
+                      {deliveryMethod === "self_delivery" ? "Biaya antar (masukkan 0 jika gratis):" : "Biaya ongkir kurir:"}
+                    </p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span style={{ fontSize: "13px", color: "#64748B", fontWeight: "600" }}>Rp</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="0"
+                        value={shippingCost}
+                        onChange={e => setShippingCost(e.target.value)}
+                        style={{ flex: 1, padding: "8px 12px", borderRadius: "10px", border: "1px solid #E2E8F0", fontSize: "13px", outline: "none", background: "#fff", color: "#1C1C1E" }}
+                      />
+                      {shippingCost !== "" && (
+                        <button onClick={() => setShippingCost("")}
+                          style={{ width: "28px", height: "28px", borderRadius: "8px", background: "#FEE2E2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <X size={12} style={{ color: "#DC2626" }} />
+                        </button>
+                      )}
+                    </div>
                     <p style={{ fontSize: "10px", color: "#94A3B8", marginBottom: "6px" }}>Ditanggung Oleh:</p>
                     <div className="flex gap-2">
                       <button onClick={() => setShippingBorneBy("customer")}
                         style={{ flex: 1, padding: "6px", borderRadius: "8px", fontSize: "11px", fontWeight: "600", border: "none", cursor: "pointer",
                           color: shippingBorneBy === "customer" ? "#fff" : "#64748B",
                           background: shippingBorneBy === "customer" ? "#E85D8C" : "#E2E8F0" }}>
-                        Pembeli 👤
+                        Pembeli
                       </button>
                       <button onClick={() => setShippingBorneBy("seller")}
                         style={{ flex: 1, padding: "6px", borderRadius: "8px", fontSize: "11px", fontWeight: "600", border: "none", cursor: "pointer",
                           color: shippingBorneBy === "seller" ? "#fff" : "#64748B",
                           background: shippingBorneBy === "seller" ? "#E85D8C" : "#E2E8F0" }}>
-                        Kita (Penjual) 🏪
+                        Kita (Toko)
                       </button>
                     </div>
                   </div>
                 )}
               </div>
             )}
+
 
             {/* ── Metode Pembayaran (hanya tampil jika sudah bayar & bukan marketplace record only) ── */}
             {(orderChannel === "walkin" || (orderChannel === "whatsapp" && isPaid)) && (
@@ -900,59 +991,29 @@ export default function KasirPage() {
               </div>
             )}
 
-            {/* ── Distribusi Saos Glaze (Custom B2B / standard) ── */}
-            {totalSaucesNeeded > 0 && addOns.length > 0 && (() => {
-              const allocated = Object.values(sauceDist).reduce((s, v) => s + v, 0);
-              const isMatched = allocated === totalSaucesNeeded;
-              return (
-                <div style={{ marginBottom: "12px", padding: "12px", borderRadius: "12px", background: "#FFFBF0", border: isMatched ? "1px solid #FCD34D" : "1px solid #F87171" }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span style={{ fontSize: "11px", fontWeight: "700", color: "#B45309", textTransform: "uppercase" }}>Pilihan Rasa Saos Glaze</span>
-                    <span style={{ fontSize: "11px", fontWeight: "850", padding: "2px 8px", borderRadius: "6px",
-                      color: isMatched ? "#15803D" : "#B91C1C", background: isMatched ? "#DCFCE7" : "#FEE2E2" }}>
-                      {allocated} / {totalSaucesNeeded} Cup
-                    </span>
-                  </div>
-                  <p style={{ fontSize: "10px", color: "#78350F", marginBottom: "8px", lineHeight: "1.3" }}>
-                    Tentukan jumlah cup per rasa saos yang disajikan untuk pesanan ini.
-                  </p>
-
-                  <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto pr-1">
-                    {addOns.map(addon => {
-                      const qty = sauceDist[addon.id] ?? 0;
-                      return (
-                        <div key={addon.id} className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100">
-                          <span style={{ fontSize: "12px", fontWeight: "600", color: "#1C1C1E" }}>🍮 {addon.name}</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => adjustSauceQty(addon.id, -1)}
-                              style={{ width: "24px", height: "24px", borderRadius: "6px", background: "#F1F5F9", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "700", color: "#64748B" }}
-                            >
-                              -
-                            </button>
-                            <span style={{ fontSize: "12px", fontWeight: "700", color: "#1C1C1E", width: "20px", textAlign: "center" }}>{qty}</span>
-                            <button
-                              type="button"
-                              onClick={() => adjustSauceQty(addon.id, 1)}
-                              disabled={allocated >= totalSaucesNeeded}
-                              style={{ width: "24px", height: "24px", borderRadius: "6px", background: allocated >= totalSaucesNeeded ? "#F1F5F9" : "#FEF1F5", border: "none", cursor: allocated >= totalSaucesNeeded ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "700", color: allocated >= totalSaucesNeeded ? "#94A3B8" : "#E85D8C" }}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {!isMatched && (
-                    <p style={{ fontSize: "10px", color: "#DC2626", fontWeight: "750", marginTop: "6px", textAlign: "center" }}>
-                      * Jumlah saos harus pas {totalSaucesNeeded} cup sebelum Anda dapat checkout.
-                    </p>
-                  )}
+            {/* ── Distribusi Saos Glaze (Tinjauan Otomatis) ── */}
+            {totalSaucesNeeded > 0 && addOns.length > 0 && (
+              <div style={{ marginBottom: "12px", padding: "12px", borderRadius: "12px", background: "#FEF1F5", border: "1px solid #F2A0B7" }}>
+                <span style={{ fontSize: "11px", fontWeight: "750", color: "#E85D8C", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
+                  Rincian Saus Glaze (Otomatis)
+                </span>
+                <p style={{ fontSize: "10px", color: "#64748B", marginBottom: "8px", lineHeight: "1.3" }}>
+                  Setiap pack churros (non-full) otomatis mendapatkan 1x Cokelat default + 1x rasa saus pilihan bebas Anda.
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {Object.entries(sauceDist).map(([sauceId, qty]) => {
+                    if (qty <= 0) return null;
+                    const name = addOns.find(a => a.id === sauceId)?.name || sauceId;
+                    return (
+                      <div key={sauceId} className="flex justify-between items-center text-xs font-semibold text-slate-700" style={{ padding: "4px 0", borderBottom: "1px dashed #F1F5F9" }}>
+                        <span>🍮 {name}</span>
+                        <span style={{ color: "#E85D8C", fontWeight: "700" }}>{qty} cup</span>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })()}
+              </div>
+            )}
 
             {/* Notes */}
             <div style={{ marginBottom: "14px" }}>
@@ -968,7 +1029,7 @@ export default function KasirPage() {
                 <span style={{ fontSize: "14px", fontWeight: "600", color: "#64748B" }}>Total Pesanan</span>
                 <span style={{ fontSize: "18px", fontWeight: "700", color: "#E85D8C" }}>{fmt(cartTotal)}</span>
               </div>
-              {orderChannel === "whatsapp" && (parseInt(shippingCost) || 0) > 0 && (
+              {orderChannel === "whatsapp" && deliveryMethod !== "pickup" && (parseInt(shippingCost) || 0) > 0 && (
                 <div className="flex items-center justify-between" style={{ marginTop: "4px" }}>
                   <span style={{ fontSize: "12px", color: "#94A3B8" }}>
                     Ongkir ({shippingBorneBy === "customer" ? "Ditanggung Pembeli" : "Ditanggung Kita"})
@@ -978,6 +1039,7 @@ export default function KasirPage() {
                   </span>
                 </div>
               )}
+
               {feeAmount > 0 && (
                 <div className="flex items-center justify-between" style={{ marginTop: "4px" }}>
                   <span style={{ fontSize: "12px", color: "#94A3B8" }}>Fee {orderChannel} ({activeFeePercent}%)</span>
@@ -986,16 +1048,16 @@ export default function KasirPage() {
               )}
               <div className="flex items-center justify-between" style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px solid #F2A0B7" }}>
                 <span style={{ fontSize: "13px", fontWeight: "700", color: "#64748B" }}>
-                  {shippingBorneBy === "customer" && (parseInt(shippingCost) || 0) > 0 ? "Total Tagihan (inc. Ongkir)" : "Pendapatan Bersih"}
+                  {deliveryMethod !== "pickup" && shippingBorneBy === "customer" && (parseInt(shippingCost) || 0) > 0 ? "Total Tagihan (inc. Ongkir)" : "Pendapatan Bersih"}
                 </span>
                 <span style={{ fontSize: "16px", fontWeight: "700", color: "#16A34A" }}>
                   {fmt(
-                    (cartTotal - feeAmount) + 
-                    (orderChannel === "whatsapp" && shippingBorneBy === "customer" ? (parseInt(shippingCost) || 0) : 0)
+                    (cartTotal - feeAmount) +
+                    (orderChannel === "whatsapp" && deliveryMethod !== "pickup" && shippingBorneBy === "customer" ? (parseInt(shippingCost) || 0) : 0)
                   )}
                 </span>
               </div>
-              {orderChannel === "whatsapp" && (parseInt(shippingCost) || 0) > 0 && shippingBorneBy === "seller" && (
+              {orderChannel === "whatsapp" && deliveryMethod !== "pickup" && (parseInt(shippingCost) || 0) > 0 && shippingBorneBy === "seller" && (
                 <p style={{ fontSize: "10px", color: "#64748B", marginTop: "6px", textAlign: "right", fontStyle: "italic" }}>
                   * Ongkir ditanggung kita akan otomatis dicatat sebagai pengeluaran operasional.
                 </p>

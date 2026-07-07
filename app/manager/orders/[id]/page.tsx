@@ -15,9 +15,13 @@ interface OrderDetail {
   customerId: string | null; customerName: string; customerPhone: string | null;
   channel: string; status: string; paymentStatus: string; paymentMethod: string | null;
   shippingAddress: string | null; shippingCost: number | null; shippingCostConfirmed: boolean;
+  shippingBorneBy: string | null; deliveryMethod: string | null;
   requestedDeliveryDate: string | null; orderNotes: string | null;
+  voidReason: string | null; voidedAt: string | null;
   createdAt: string; completedAt: string | null; items: OrderItem[];
 }
+
+
 
 function fmt(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -36,7 +40,9 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState("");
   const [error, setError] = useState("");
-  const [showVoidConfirm, setShowVoidConfirm] = useState(false);
+  const [showVoidModal, setShowVoidModal] = useState(false);
+  const [voidReason, setVoidReason] = useState("");
+  const [voidReasonError, setVoidReasonError] = useState("");
 
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
@@ -62,11 +68,18 @@ export default function OrderDetailPage() {
   }
 
   async function voidOrder() {
+    if (!voidReason.trim()) {
+      setVoidReasonError("Alasan pembatalan wajib diisi.");
+      return;
+    }
+    setVoidReasonError("");
     setActionLoading("void"); setError("");
     try {
-      const res = await fetchWithAuth(`/api/orders/${orderId}/void`, { method: "POST" });
+      const res = await fetchWithAuth(`/api/orders/${orderId}/void`, { method: "POST", body: JSON.stringify({ voidReason: voidReason.trim() }) });
       if (!res.ok) { setError((await res.json()).error ?? "Gagal void order"); return; }
-      await loadOrder(); setShowVoidConfirm(false);
+      await loadOrder();
+      setShowVoidModal(false);
+      setVoidReason("");
     } finally { setActionLoading(""); }
   }
 
@@ -223,49 +236,87 @@ export default function OrderDetailPage() {
             )}
 
             {!isDone && (
-              <button
-                onClick={markComplete}
-                disabled={actionLoading === "status"}
-                data-testid="mark-complete-btn"
-                className="w-full flex items-center justify-center gap-2"
-                style={{ padding: "12px", borderRadius: "12px", background: "#E85D8C", color: "#fff", border: "none", cursor: actionLoading ? "default" : "pointer", fontSize: "13px", fontWeight: "700", opacity: actionLoading === "status" ? 0.7 : 1 }}>
-                {actionLoading === "status" ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                Tandai Selesai
-              </button>
+              <>
+                <button
+                  onClick={() => router.push(`/manager/orders/${order.id}/edit`)}
+                  data-testid="edit-order-btn"
+                  className="w-full flex items-center justify-center gap-2 mb-2"
+                  style={{ padding: "11px", borderRadius: "12px", background: "#FFFBEB", color: "#D97706", border: "1px solid #FDE68A", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
+                  Edit Order
+                </button>
+                <button
+                  onClick={markComplete}
+                  disabled={actionLoading === "status"}
+                  data-testid="mark-complete-btn"
+                  className="w-full flex items-center justify-center gap-2"
+                  style={{ padding: "12px", borderRadius: "12px", background: "#E85D8C", color: "#fff", border: "none", cursor: actionLoading ? "default" : "pointer", fontSize: "13px", fontWeight: "700", opacity: actionLoading === "status" ? 0.7 : 1 }}>
+                  {actionLoading === "status" ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                  Tandai Selesai
+                </button>
+              </>
             )}
 
-            {!showVoidConfirm && isDone && (
+            {!isVoid && (
               <button
-                onClick={() => setShowVoidConfirm(true)}
+                onClick={() => setShowVoidModal(true)}
                 data-testid="void-btn"
                 className="w-full flex items-center justify-center gap-2 mt-2"
                 style={{ padding: "11px", borderRadius: "12px", background: "#FEE2E2", color: "#DC2626", border: "1px solid #FECACA", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
                 <Ban size={14} />
-                Void Order
+                Batalkan Order (Void)
               </button>
-            )}
-
-            {showVoidConfirm && (
-              <div style={{ borderRadius: "10px", background: "#FEF2F2", padding: "12px", border: "1px solid #FECACA" }}>
-                <p style={{ fontSize: "12px", fontWeight: "600", color: "#DC2626", marginBottom: "10px" }}>Yakin void order ini? Stok akan dikembalikan.</p>
-                <div className="flex gap-2">
-                  <button onClick={voidOrder} disabled={actionLoading === "void"} data-testid="confirm-void-btn"
-                    style={{ flex: 1, padding: "10px", borderRadius: "10px", background: "#DC2626", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}>
-                    {actionLoading === "void" ? <Loader2 size={12} className="animate-spin mx-auto" /> : "Ya, Void"}
-                  </button>
-                  <button onClick={() => setShowVoidConfirm(false)}
-                    style={{ flex: 1, padding: "10px", borderRadius: "10px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
-                    Batal
-                  </button>
-                </div>
-              </div>
             )}
           </div>
         )}
 
+        {/* ── Void Banner ─── */}
         {isVoid && (
-          <div style={{ background: "#FEE2E2", borderRadius: "14px", padding: "14px", border: "1px solid #FECACA", textAlign: "center" }} data-testid="void-banner">
-            <p style={{ fontSize: "13px", fontWeight: "700", color: "#DC2626" }}>Order ini sudah di-void</p>
+          <div style={{ background: "#FEF2F2", borderRadius: "14px", padding: "14px", border: "1px solid #FECACA" }} data-testid="void-banner">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Ban size={14} style={{ color: "#DC2626", flexShrink: 0 }} />
+              <p style={{ fontSize: "13px", fontWeight: "700", color: "#DC2626" }}>Order Telah Dibatalkan</p>
+            </div>
+            {(order as any).voidReason && (
+              <p style={{ fontSize: "12px", color: "#6B7280", marginTop: "4px", fontStyle: "italic" }}>Alasan: {(order as any).voidReason}</p>
+            )}
+          </div>
+        )}
+
+        {/* ── Void Modal ─── */}
+        {showVoidModal && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.4)" }} onClick={(e) => { if (e.target === e.currentTarget) { setShowVoidModal(false); setVoidReason(""); setVoidReasonError(""); } }}>
+            <div style={{ background: "#fff", borderRadius: "20px 20px 0 0", padding: "20px", width: "100%", maxWidth: "480px", paddingBottom: "32px" }}>
+              <div className="flex items-center gap-2 mb-4">
+                <Ban size={16} style={{ color: "#DC2626" }} />
+                <h3 style={{ fontSize: "15px", fontWeight: "700", color: "#1C1C1E" }}>Batalkan Order</h3>
+              </div>
+              <p style={{ fontSize: "12px", color: "#64748B", marginBottom: "12px", lineHeight: "1.5" }}>
+                Pesanan akan dibatalkan dan stok akan dikembalikan ke inventaris. Tindakan ini tidak dapat diurungkan.
+              </p>
+              <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Alasan Pembatalan *</label>
+              <textarea
+                value={voidReason}
+                onChange={(e) => { setVoidReason(e.target.value); if (voidReasonError) setVoidReasonError(""); }}
+                placeholder="Contoh: Salah input pesanan, pelanggan membatalkan, dll."
+                rows={3}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${voidReasonError ? "#DC2626" : "#E2E8F0"}`, fontSize: "12px", outline: "none", resize: "none", color: "#1C1C1E", boxSizing: "border-box" }}
+              />
+              {voidReasonError && <p style={{ fontSize: "11px", color: "#DC2626", marginTop: "4px" }}>{voidReasonError}</p>}
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={voidOrder}
+                  disabled={actionLoading === "void"}
+                  data-testid="confirm-void-btn"
+                  style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "#DC2626", color: "#fff", border: "none", cursor: actionLoading === "void" ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", opacity: actionLoading === "void" ? 0.7 : 1 }}>
+                  {actionLoading === "void" ? <Loader2 size={14} className="animate-spin" /> : <><Ban size={14} /> Batalkan Order</>}
+                </button>
+                <button
+                  onClick={() => { setShowVoidModal(false); setVoidReason(""); setVoidReasonError(""); }}
+                  style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
+                  Tutup
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -283,6 +334,29 @@ export default function OrderDetailPage() {
             <span style={{ fontSize: "11px", color: "#94A3B8" }}>No. Order</span>
             <span style={{ fontSize: "12px", fontWeight: "600", color: "#1C1C1E", fontFamily: "monospace" }}>{order.orderNumber}</span>
           </div>
+          {order.deliveryMethod && (
+            <div className="flex items-center justify-between" style={{ marginTop: "6px" }}>
+              <span style={{ fontSize: "11px", color: "#94A3B8" }}>Pengiriman</span>
+              <span style={{ fontSize: "12px", fontWeight: "500", color: "#64748B" }}>
+                {order.deliveryMethod === "pickup" ? "Ambil Sendiri (Pickup)"
+                  : order.deliveryMethod === "self_delivery" ? "Diantar oleh Toko"
+                  : "Kurir Online"}
+              </span>
+            </div>
+          )}
+          {order.deliveryMethod !== "pickup" && (order.shippingCost ?? 0) > 0 && (
+            <div className="flex items-center justify-between" style={{ marginTop: "6px" }}>
+              <span style={{ fontSize: "11px", color: "#94A3B8" }}>Ongkir</span>
+              <span style={{ fontSize: "12px", fontWeight: "500", color: "#64748B" }}>
+                {fmt(order.shippingCost ?? 0)}
+                {order.shippingBorneBy && (
+                  <span style={{ fontSize: "10px", color: "#94A3B8", marginLeft: "4px" }}>
+                    ({order.shippingBorneBy === "customer" ? "Ditanggung Pembeli" : "Ditanggung Toko"})
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
           {order.completedAt && (
             <div className="flex items-center justify-between" style={{ marginTop: "6px" }}>
               <span style={{ fontSize: "11px", color: "#94A3B8" }}>Selesai</span>
@@ -290,6 +364,7 @@ export default function OrderDetailPage() {
             </div>
           )}
         </div>
+
 
       </div>
     </div>

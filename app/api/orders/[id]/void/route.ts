@@ -7,10 +7,23 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireRole(req, ["owner"]);
+  // Allow both manager and owner to void orders
+  const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await params;
+
+  let voidReason: string | undefined;
+  try {
+    const body = await req.json();
+    voidReason = body?.voidReason?.trim();
+  } catch {
+    // body optional parse error
+  }
+
+  if (!voidReason) {
+    return NextResponse.json({ error: "Alasan pembatalan (voidReason) wajib diisi" }, { status: 400 });
+  }
 
   try {
     const orderRef = adminDb.doc(`orders/${id}`);
@@ -79,10 +92,35 @@ export async function POST(
         }
       }
 
+      // ── Revert glaze/sauce stock from sauceDistribution ─────────────────────
+      const sauceDist = order.sauceDistribution as Record<string, number> | undefined;
+      if (sauceDist && Object.keys(sauceDist).length > 0) {
+        for (const [addOnId, cupCount] of Object.entries(sauceDist)) {
+          if (cupCount <= 0) continue;
+          const ingredientRef = adminDb.collection("ingredients").doc(addOnId);
+          const ingredientSnap = await tx.get(ingredientRef);
+          if (ingredientSnap.exists) {
+            tx.update(ingredientRef, {
+              currentStock: FieldValue.increment(cupCount),
+            });
+            const movRef = ingredientRef.collection("movements").doc();
+            tx.set(movRef, {
+              changeAmount: cupCount,
+              newStock: null,
+              reason: `Revert void pesanan #${order.orderNumber} — ${voidReason}`,
+              sourceType: "opname_adjustment",
+              createdAt: FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      }
+
+      // ── Mark the order as void ───────────────────────────────────────────────
       tx.update(orderRef, {
         status: "void",
         voidedBy: auth.uid,
         voidedAt: FieldValue.serverTimestamp(),
+        voidReason,
       });
     });
 
@@ -92,3 +130,4 @@ export async function POST(
     return NextResponse.json({ error: "Gagal void order" }, { status: 500 });
   }
 }
+
