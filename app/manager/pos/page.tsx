@@ -74,8 +74,7 @@ export default function KasirPage() {
 
   // Variant selector sheet
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
-  const [variantQtys, setVariantQtys] = useState<Record<string, number>>({});
-  const [variantSauces, setVariantSauces] = useState<Record<string, string>>({});
+  const [variantSelections, setVariantSelections] = useState<Record<string, { id: string; qty: number; sauceId: string }[]>>({});
   
   // Dynamic Addon Sauce States
   const [addOns, setAddOns] = useState<any[]>([]);
@@ -93,8 +92,6 @@ export default function KasirPage() {
 
   useEffect(() => {
     if (selectedProduct && addOns.length > 0) {
-      const initialSauces: Record<string, string> = {};
-      const def = defaultSauce?.id || addOns[0].id;
       variants.forEach(v => {
         initialSauces[v.id] = def;
       });
@@ -207,17 +204,43 @@ export default function KasirPage() {
   // ── Variant sheet helpers ──────────────────────────────────────────────────
   function openVariantSheet(product: ProductItem) {
     setSelectedProduct(product);
-    setVariantQtys({});
+    setVariantSelections({});
   }
 
-  function adjustVariantQty(variantId: string, delta: number) {
-    setVariantQtys(prev => {
-      const next = Math.max(0, (prev[variantId] ?? 0) + delta);
-      return { ...prev, [variantId]: next };
+  function addVariantSelectionRow(variantId: string, initialQty: number = 1) {
+    const newRowId = Math.random().toString(36).substr(2, 9);
+    const defSauce = defaultSauce?.id || (addOns[0]?.id ?? "");
+    setVariantSelections(prev => {
+      const currentRows = prev[variantId] || [];
+      return { ...prev, [variantId]: [...currentRows, { id: newRowId, qty: initialQty, sauceId: defSauce }] };
     });
   }
 
-  const totalVariantSelected = Object.values(variantQtys).reduce((s, n) => s + n, 0);
+  function updateVariantSelectionQty(variantId: string, rowId: string, delta: number) {
+    setVariantSelections(prev => {
+      const currentRows = prev[variantId] || [];
+      const newRows = currentRows.map(r => r.id === rowId ? { ...r, qty: r.qty + delta } : r).filter(r => r.qty > 0);
+      return { ...prev, [variantId]: newRows };
+    });
+  }
+
+  function setVariantSelectionQtyDirect(variantId: string, rowId: string, qty: number) {
+    setVariantSelections(prev => {
+      const currentRows = prev[variantId] || [];
+      const newRows = currentRows.map(r => r.id === rowId ? { ...r, qty: Math.max(0, qty) } : r).filter(r => r.qty > 0);
+      return { ...prev, [variantId]: newRows };
+    });
+  }
+
+  function updateVariantSelectionSauce(variantId: string, rowId: string, newSauceId: string) {
+    setVariantSelections(prev => {
+      const currentRows = prev[variantId] || [];
+      const newRows = currentRows.map(r => r.id === rowId ? { ...r, sauceId: newSauceId } : r);
+      return { ...prev, [variantId]: newRows };
+    });
+  }
+
+  const totalVariantSelected = Object.values(variantSelections).flatMap(r => r).reduce((s, r) => s + r.qty, 0);
 
   // Recalculate unit prices in cart dynamically based on accumulated quantity per product
   const recalculateCartPrices = useCallback((currentCart: CartItem[]): CartItem[] => {
@@ -239,26 +262,28 @@ export default function KasirPage() {
   function addToCart() {
     if (!selectedProduct) return;
     const newItems: CartItem[] = [];
-    for (const [variantId, qty] of Object.entries(variantQtys)) {
-      if (qty <= 0) continue;
-      const variant = variants.find(v => v.id === variantId);
-      const totalQty = qty;
-      const price = getPrice(selectedProduct, totalQty);
-      
-      const hasSauce = !selectedProduct.id.toLowerCase().includes("full") && !selectedProduct.name.toLowerCase().includes("full");
-      const sId = hasSauce ? variantSauces[variantId] : undefined;
-      const sName = sId ? (addOns.find(a => a.id === sId)?.name || sId) : undefined;
+    const hasSauce = !selectedProduct.id.toLowerCase().includes("full") && !selectedProduct.name.toLowerCase().includes("full");
 
-      newItems.push({
-        productId: selectedProduct.id,
-        productName: selectedProduct.name,
-        variantId,
-        variantName: variant?.name ?? variantId,
-        qty,
-        price,
-        sauceId: sId,
-        sauceName: sName,
-      });
+    for (const [variantId, rows] of Object.entries(variantSelections)) {
+      const variant = variants.find(v => v.id === variantId);
+      for (const row of rows) {
+        if (row.qty <= 0) continue;
+        
+        const price = 0; // will be recalculated by recalculateCartPrices
+        const sId = hasSauce ? row.sauceId : undefined;
+        const sName = sId ? (addOns.find(a => a.id === sId)?.name || sId) : undefined;
+
+        newItems.push({
+          productId: selectedProduct.id,
+          productName: selectedProduct.name,
+          variantId,
+          variantName: variant?.name ?? variantId,
+          qty: row.qty,
+          price,
+          sauceId: sId,
+          sauceName: sName,
+        });
+      }
     }
 
     setCart(prev => {
@@ -274,7 +299,7 @@ export default function KasirPage() {
       return recalculateCartPrices(next);
     });
     setSelectedProduct(null);
-    setVariantQtys({});
+    setVariantSelections({});
   }
 
   function removeFromCart(idx: number) {
@@ -570,12 +595,15 @@ export default function KasirPage() {
             {/* Variant list */}
             <div className="flex flex-col gap-2">
               {variants.map(v => {
-                const qty = variantQtys[v.id] ?? 0;
+                const rows = variantSelections[v.id] || [];
+                const qty = rows.reduce((s, r) => s + r.qty, 0);
                 const stockId = `${selectedProduct.id}_${v.id}`;
                 const stockItem = productStocks.find(s => s.id === stockId);
                 const currentStock = stockItem ? stockItem.currentStock : 0;
                 const minStock = stockItem ? stockItem.minStock : v.minStock;
                 const isLowStock = currentStock < minStock;
+                const hasSauce = !selectedProduct.id.toLowerCase().includes("full") && !selectedProduct.name.toLowerCase().includes("full");
+
                 return (
                   <div
                     key={v.id}
@@ -594,64 +622,133 @@ export default function KasirPage() {
                           Stok: {currentStock} pcs {isLowStock ? "⚠ Rendah" : ""}
                         </p>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        {qty > 0 ? (
+                      
+                      {/* Top level QTY controls — only active if NO rows exist or if product has NO sauce */}
+                      {(!hasSauce || rows.length === 0) && (
+                        <div className="flex items-center gap-1.5">
+                          {qty > 0 ? (
+                            <button
+                              onClick={() => {
+                                if (rows.length > 0) updateVariantSelectionQty(v.id, rows[0].id, -1);
+                              }}
+                              style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#F1F5F9", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                            >
+                              <Minus size={13} style={{ color: "#64748B" }} />
+                            </button>
+                          ) : (
+                            <div style={{ width: "30px" }} />
+                          )}
+
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={qty || ""}
+                            placeholder="0"
+                            onChange={e => {
+                              const val = Math.max(0, parseInt(e.target.value) || 0);
+                              if (rows.length > 0) {
+                                setVariantSelectionQtyDirect(v.id, rows[0].id, val);
+                              } else if (val > 0) {
+                                addVariantSelectionRow(v.id, val);
+                              }
+                            }}
+                            style={{
+                              width: "54px",
+                              height: "30px",
+                              borderRadius: "8px",
+                              border: "1px solid #E2E8F0",
+                              textAlign: "center",
+                              fontSize: "13px",
+                              fontWeight: "700",
+                              color: "#1C1C1E",
+                              background: "#fff",
+                              outline: "none",
+                            }}
+                          />
+
                           <button
-                            onClick={() => adjustVariantQty(v.id, -1)}
-                            style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#F1F5F9", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                            onClick={() => {
+                              if (rows.length > 0) updateVariantSelectionQty(v.id, rows[0].id, 1);
+                              else addVariantSelectionRow(v.id, 1);
+                            }}
+                            style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#E85D8C", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                            data-testid={`add-variant-${v.id}`}
                           >
-                            <Minus size={13} style={{ color: "#64748B" }} />
+                            <Plus size={13} style={{ color: "#fff" }} strokeWidth={2.5} />
                           </button>
-                        ) : (
-                          <div style={{ width: "30px" }} />
-                        )}
+                        </div>
+                      )}
 
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={qty || ""}
-                          placeholder="0"
-                          onChange={e => {
-                            const val = Math.max(0, parseInt(e.target.value) || 0);
-                            setVariantQtys(prev => ({ ...prev, [v.id]: val }));
-                          }}
-                          style={{
-                            width: "54px",
-                            height: "30px",
-                            borderRadius: "8px",
-                            border: "1px solid #E2E8F0",
-                            textAlign: "center",
-                            fontSize: "13px",
-                            fontWeight: "700",
-                            color: "#1C1C1E",
-                            background: "#fff",
-                            outline: "none",
-                          }}
-                        />
-
-                        <button
-                          onClick={() => adjustVariantQty(v.id, 1)}
-                          style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#E85D8C", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                          data-testid={`add-variant-${v.id}`}
-                        >
-                          <Plus size={13} style={{ color: "#fff" }} strokeWidth={2.5} />
-                        </button>
-                      </div>
+                      {/* Display total qty if product has sauce and has rows */}
+                      {hasSauce && rows.length > 0 && (
+                        <div style={{ fontSize: "14px", fontWeight: "700", color: "#E85D8C" }}>
+                          Total: {qty}
+                        </div>
+                      )}
                     </div>
 
-                    {qty > 0 && !selectedProduct.id.toLowerCase().includes("full") && !selectedProduct.name.toLowerCase().includes("full") && addOns.length > 0 && (
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "8px", borderTop: "1px dashed #F1F5F9" }}>
-                        <span style={{ fontSize: "11px", fontWeight: "600", color: "#E85D8C" }}>Pilih Saus Bebas (Saos 2):</span>
-                        <select
-                          value={variantSauces[v.id] || ""}
-                          onChange={e => setVariantSauces(prev => ({ ...prev, [v.id]: e.target.value }))}
-                          style={{ padding: "4px 8px", borderRadius: "8px", border: "1px solid #F2A0B7", fontSize: "11px", outline: "none", color: "#1C1C1E", background: "#fff", cursor: "pointer", minWidth: "150px" }}
+                    {/* Sauce Breakdown Rows */}
+                    {hasSauce && rows.length > 0 && (
+                      <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-pink-100 border-dashed">
+                        {rows.map((row, index) => (
+                          <div key={row.id} className="flex items-center justify-between bg-white px-2 py-1.5 rounded-lg border border-pink-50">
+                            <select
+                              value={row.sauceId}
+                              onChange={e => updateVariantSelectionSauce(v.id, row.id, e.target.value)}
+                              style={{ padding: "4px 8px", borderRadius: "8px", border: "1px solid #F2A0B7", fontSize: "11px", outline: "none", color: "#1C1C1E", background: "#fff", cursor: "pointer", flex: 1, marginRight: "8px" }}
+                            >
+                              {addOns.map(addon => (
+                                <option key={addon.id} value={addon.id}>{addon.name}</option>
+                              ))}
+                            </select>
+                            
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => updateVariantSelectionQty(v.id, row.id, -1)}
+                                style={{ width: "26px", height: "26px", borderRadius: "6px", background: "#F1F5F9", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                              >
+                                <Minus size={11} style={{ color: "#64748B" }} />
+                              </button>
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={row.qty || ""}
+                                placeholder="0"
+                                onChange={e => {
+                                  const val = Math.max(0, parseInt(e.target.value) || 0);
+                                  setVariantSelectionQtyDirect(v.id, row.id, val);
+                                }}
+                                style={{
+                                  width: "40px",
+                                  height: "26px",
+                                  borderRadius: "6px",
+                                  border: "1px solid #E2E8F0",
+                                  textAlign: "center",
+                                  fontSize: "12px",
+                                  fontWeight: "700",
+                                  color: "#1C1C1E",
+                                  background: "#fff",
+                                  outline: "none",
+                                }}
+                              />
+                              <button
+                                onClick={() => updateVariantSelectionQty(v.id, row.id, 1)}
+                                style={{ width: "26px", height: "26px", borderRadius: "6px", background: "#E85D8C", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                              >
+                                <Plus size={11} style={{ color: "#fff" }} strokeWidth={2.5} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        <button
+                          onClick={() => addVariantSelectionRow(v.id, 1)}
+                          style={{ marginTop: "4px", padding: "6px 0", fontSize: "11px", fontWeight: "600", color: "#E85D8C", background: "transparent", border: "1px dashed #F2A0B7", borderRadius: "8px", cursor: "pointer", textAlign: "center", width: "100%" }}
                         >
-                          {addOns.map(addon => (
-                            <option key={addon.id} value={addon.id}>{addon.name}</option>
-                          ))}
-                        </select>
+                          + Tambah Kombinasi Saus
+                        </button>
                       </div>
                     )}
                   </div>
@@ -667,7 +764,7 @@ export default function KasirPage() {
                 style={{ padding: "14px", borderRadius: "14px", background: "#E85D8C", color: "#fff", fontSize: "14px", fontWeight: "700", border: "none", cursor: "pointer" }}
                 data-testid="add-to-cart-btn"
               >
-                Tambah ke Cart ({totalVariantSelected} item · {fmt(cart.length === 0 ? getPrice(selectedProduct, totalVariantSelected) * totalVariantSelected : cartTotal + Object.entries(variantQtys).reduce((s, [vId, qty]) => s + getPrice(selectedProduct, qty) * qty, 0))})
+                Tambah ke Cart ({totalVariantSelected} item · {fmt(cart.length === 0 ? getPrice(selectedProduct, totalVariantSelected) * totalVariantSelected : cartTotal + Object.values(variantSelections).flatMap(r => r).reduce((s, r) => s + getPrice(selectedProduct, r.qty) * r.qty, 0))})
               </button>
             ) : (
               <p className="text-center mt-4" style={{ fontSize: "12px", color: "#94A3B8" }}>Pilih varian untuk ditambah ke cart</p>
