@@ -462,8 +462,7 @@ export default function MasterDataPage() {
 
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: "#FEF1F5" }}>
-      {/* ── Branded Pink Header ── */}
-      <div className="sticky top-0 z-30 shadow-md bg-gradient-to-r from-[#E85D8C] to-[#FCABB4]">
+      <div className="sticky top-0 z-30 shadow-md bg-[#E85D8C]">
         <div className="px-5 pt-6 pb-4 max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <div>
