@@ -90,16 +90,7 @@ export default function KasirPage() {
     return addOns[0];
   }, [addOns]);
 
-  useEffect(() => {
-    if (selectedProduct && addOns.length > 0) {
-      variants.forEach(v => {
-        initialSauces[v.id] = def;
-      });
-      setVariantSauces(initialSauces);
-    } else {
-      setVariantSauces({});
-    }
-  }, [selectedProduct, addOns, defaultSauce, variants]);
+
 
   // Checkout sheet state
   const [showCheckout, setShowCheckout] = useState(false);
