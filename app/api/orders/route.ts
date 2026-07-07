@@ -258,6 +258,34 @@ export async function POST(req: NextRequest) {
       const finalOrderChannel = orderChannel ?? "walkin";
       const isImmediate = ["walkin", "tiktok", "shopee"].includes(finalOrderChannel);
 
+      // --- ALL READS MUST HAPPEN BEFORE ANY WRITES ---
+      
+      // 1. Read Add-ons for sauce distribution
+      const addOnSnaps: Record<string, FirebaseFirestore.DocumentSnapshot> = {};
+      if (sauceDistribution && typeof sauceDistribution === "object") {
+        for (const [sauceId, cupCount] of Object.entries(sauceDistribution)) {
+          if (typeof cupCount === "number" && cupCount > 0) {
+            addOnSnaps[sauceId] = await tx.get(adminDb.collection("addOns").doc(sauceId));
+          }
+        }
+      }
+
+      // 2. Read Product Stocks
+      const stockSnaps: Record<string, FirebaseFirestore.DocumentSnapshot> = {};
+      if (isImmediate) {
+        for (const item of items) {
+          const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
+          if (!isRainbow) {
+            const stockId = `${item.productId}_${item.variantId}`;
+            if (!stockSnaps[stockId]) {
+              stockSnaps[stockId] = await tx.get(adminDb.collection("productStocks").doc(stockId));
+            }
+          }
+        }
+      }
+
+      // --- WRITES ---
+
       // Calculate platform fee & net revenue
       const totalOrderValue = processedItems.reduce((sum, item) => sum + ((item.totalPrice as number) ?? 0), 0);
       const finalFeePercent = inputFeePercent ?? 0;
@@ -304,8 +332,8 @@ export async function POST(req: NextRequest) {
         for (const [sauceId, cupCount] of Object.entries(sauceDistribution)) {
           if (typeof cupCount === "number" && cupCount > 0) {
             const addOnRef = adminDb.collection("addOns").doc(sauceId);
-            const addOnSnap = await tx.get(addOnRef);
-            if (addOnSnap.exists) {
+            const addOnSnap = addOnSnaps[sauceId];
+            if (addOnSnap && addOnSnap.exists) {
               const currAddonStock = addOnSnap.data()?.currentStock ?? 0;
               const nextAddonStock = currAddonStock - cupCount;
               tx.update(addOnRef, { currentStock: nextAddonStock });
@@ -353,34 +381,40 @@ export async function POST(req: NextRequest) {
 
       // Kurangi stok produk jadi jika orderChannel langsung (walkin, tiktok, shopee)
       if (isImmediate) {
+        // Since we might have multiple items pointing to the same stockId, we need to accumulate changes
+        const stockChanges: Record<string, number> = {};
         for (const item of items) {
           const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
           if (!isRainbow) {
             const stockId = `${item.productId}_${item.variantId}`;
-            const stockRef = adminDb.collection("productStocks").doc(stockId);
-            const stockSnap = await tx.get(stockRef);
-            const currStock = stockSnap.exists ? (stockSnap.data()?.currentStock ?? 0) : 0;
-            const nextStock = currStock - item.qty;
-
-            tx.set(stockRef, {
-              productId: item.productId,
-              variantId: item.variantId,
-              currentStock: nextStock,
-            }, { merge: true });
-
-            // Log stock movement
-            const movementRef = adminDb.collection("stockMovements").doc();
-            tx.set(movementRef, {
-              ingredientId: `product:${stockId}`,
-              changeAmount: -item.qty,
-              newStockAfter: nextStock,
-              sourceType: "sale",
-              sourceId: orderRef.id,
-              note: `Penjualan ${finalOrderChannel} #${orderNumber}`,
-              createdBy: (user as AuthUser | null)?.uid ?? null,
-              createdAt: dateToUse,
-            });
+            stockChanges[stockId] = (stockChanges[stockId] ?? 0) + item.qty;
           }
+        }
+
+        for (const [stockId, changeQty] of Object.entries(stockChanges)) {
+          const stockRef = adminDb.collection("productStocks").doc(stockId);
+          const stockSnap = stockSnaps[stockId];
+          const currStock = stockSnap && stockSnap.exists ? (stockSnap.data()?.currentStock ?? 0) : 0;
+          const nextStock = currStock - changeQty;
+
+          tx.set(stockRef, {
+            productId: stockId.split("_")[0],
+            variantId: stockId.split("_").slice(1).join("_"),
+            currentStock: nextStock,
+          }, { merge: true });
+
+          // Log stock movement
+          const movementRef = adminDb.collection("stockMovements").doc();
+          tx.set(movementRef, {
+            ingredientId: `product:${stockId}`,
+            changeAmount: -changeQty,
+            newStockAfter: nextStock,
+            sourceType: "sale",
+            sourceId: orderRef.id,
+            note: `Penjualan ${finalOrderChannel} #${orderNumber}`,
+            createdBy: (user as AuthUser | null)?.uid ?? null,
+            createdAt: dateToUse,
+          });
         }
       }
 
@@ -408,7 +442,7 @@ export async function POST(req: NextRequest) {
       needsProduction,
       hasRainbow,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("POST /api/orders error:", err);
     return NextResponse.json({ error: "Gagal membuat order" }, { status: 500 });
   }

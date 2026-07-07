@@ -618,56 +618,74 @@ export default function KasirPage() {
                       {(!hasSauce || rows.length === 0) && (
                         <div className="flex items-center gap-1.5">
                           {qty > 0 ? (
-                            <button
-                              onClick={() => {
-                                if (rows.length > 0) updateVariantSelectionQty(v.id, rows[0].id, -1);
-                              }}
-                              style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#F1F5F9", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                            >
-                              <Minus size={13} style={{ color: "#64748B" }} />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => {
+                                  if (rows.length > 0) updateVariantSelectionQty(v.id, rows[0].id, -1);
+                                }}
+                                style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#F1F5F9", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                              >
+                                <Minus size={13} style={{ color: "#64748B" }} />
+                              </button>
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={qty || ""}
+                                placeholder="0"
+                                onChange={e => {
+                                  const val = Math.max(0, parseInt(e.target.value) || 0);
+                                  if (rows.length > 0) {
+                                    setVariantSelectionQtyDirect(v.id, rows[0].id, val);
+                                  } else if (val > 0) {
+                                    addVariantSelectionRow(v.id, val);
+                                  }
+                                }}
+                                style={{
+                                  width: "54px",
+                                  height: "30px",
+                                  borderRadius: "8px",
+                                  border: "1px solid #E2E8F0",
+                                  textAlign: "center",
+                                  fontSize: "13px",
+                                  fontWeight: "700",
+                                  color: "#1C1C1E",
+                                  background: "#fff",
+                                  outline: "none",
+                                }}
+                              />
+                              <button
+                                onClick={() => {
+                                  if (rows.length > 0) updateVariantSelectionQty(v.id, rows[0].id, 1);
+                                  else addVariantSelectionRow(v.id, 1);
+                                }}
+                                style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#E85D8C", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                                data-testid={`add-variant-${v.id}`}
+                              >
+                                <Plus size={13} style={{ color: "#fff" }} strokeWidth={2.5} />
+                              </button>
+                            </>
                           ) : (
-                            <div style={{ width: "30px" }} />
+                            <button
+                              onClick={() => addVariantSelectionRow(v.id, 1)}
+                              style={{
+                                padding: "6px 14px",
+                                borderRadius: "8px",
+                                background: "#E85D8C",
+                                color: "#fff",
+                                border: "none",
+                                fontSize: "12px",
+                                fontWeight: "600",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px"
+                              }}
+                              data-testid={`add-variant-${v.id}`}
+                            >
+                              <Plus size={13} strokeWidth={2.5} /> Tambah
+                            </button>
                           )}
-
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={qty || ""}
-                            placeholder="0"
-                            onChange={e => {
-                              const val = Math.max(0, parseInt(e.target.value) || 0);
-                              if (rows.length > 0) {
-                                setVariantSelectionQtyDirect(v.id, rows[0].id, val);
-                              } else if (val > 0) {
-                                addVariantSelectionRow(v.id, val);
-                              }
-                            }}
-                            style={{
-                              width: "54px",
-                              height: "30px",
-                              borderRadius: "8px",
-                              border: "1px solid #E2E8F0",
-                              textAlign: "center",
-                              fontSize: "13px",
-                              fontWeight: "700",
-                              color: "#1C1C1E",
-                              background: "#fff",
-                              outline: "none",
-                            }}
-                          />
-
-                          <button
-                            onClick={() => {
-                              if (rows.length > 0) updateVariantSelectionQty(v.id, rows[0].id, 1);
-                              else addVariantSelectionRow(v.id, 1);
-                            }}
-                            style={{ width: "30px", height: "30px", borderRadius: "8px", background: "#E85D8C", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                            data-testid={`add-variant-${v.id}`}
-                          >
-                            <Plus size={13} style={{ color: "#fff" }} strokeWidth={2.5} />
-                          </button>
                         </div>
                       )}
 
@@ -729,6 +747,13 @@ export default function KasirPage() {
                                 style={{ width: "26px", height: "26px", borderRadius: "6px", background: "#E85D8C", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                               >
                                 <Plus size={11} style={{ color: "#fff" }} strokeWidth={2.5} />
+                              </button>
+                              <button
+                                onClick={() => setVariantSelectionQtyDirect(v.id, row.id, 0)}
+                                style={{ marginLeft: "4px", width: "26px", height: "26px", borderRadius: "6px", background: "#FEE2E2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                                title="Hapus varian"
+                              >
+                                <X size={13} style={{ color: "#DC2626" }} />
                               </button>
                             </div>
                           </div>
