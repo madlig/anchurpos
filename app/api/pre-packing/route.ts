@@ -237,3 +237,47 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Gagal menyimpan pre-packing" }, { status: 500 });
   }
 }
+
+export async function GET(req: NextRequest) {
+  const auth = await requireRole(req, ["owner", "manager", "crew"]);
+  if (auth instanceof NextResponse) return auth;
+
+  const { searchParams } = new URL(req.url);
+  const dateStr = searchParams.get("date");
+
+  try {
+    let query = adminDb.collection("prePacking").orderBy("date", "desc") as FirebaseFirestore.Query;
+
+    if (dateStr) {
+      const d = new Date(dateStr);
+      d.setHours(0, 0, 0, 0);
+      const next = new Date(d);
+      next.setDate(next.getDate() + 1);
+      query = query.where("date", ">=", d).where("date", "<", next);
+    }
+
+    const snap = await query.limit(100).get();
+
+    const results = snap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        date: data.date?.toDate?.().toISOString() ?? "",
+        variantId: data.variantId,
+        type: data.type ?? "standard",
+        totalLoyangUsed: data.totalLoyangUsed,
+        resultRegularPacks: data.resultRegularPacks ?? 0,
+        resultFullPacks: data.resultFullPacks ?? 0,
+        resultTikTokPacks: data.resultTikTokPacks ?? 0,
+        leftoverPcs: data.leftoverPcs ?? 0,
+        crewId: data.crewId,
+        createdAt: data.createdAt?.toDate?.().toISOString() ?? "",
+      };
+    });
+
+    return NextResponse.json(results);
+  } catch (err) {
+    console.error("GET /api/pre-packing error:", err);
+    return NextResponse.json({ error: "Gagal mengambil data pre-packing" }, { status: 500 });
+  }
+}

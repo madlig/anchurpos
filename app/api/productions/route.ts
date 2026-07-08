@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
         variantId: data.variantId,
         batches: data.batches,
         loyangCount: data.loyangCount,
+        pcsCount: data.pcsCount || 0,
         loyangRemaining: data.loyangRemaining,
         type: data.type ?? "standard",
         notes: data.notes ?? "",
