@@ -17,7 +17,10 @@ export default function CrewPrePackingPage() {
   const [bufferPcs, setBufferPcs] = useState(0);
   const [showDetail, setShowDetail] = useState(false);
   const [loyangUsed, setLoyangUsed] = useState("");
-  const [totalPcs, setTotalPcs] = useState("");
+  const [resultRegularPacks, setResultRegularPacks] = useState("");
+  const [resultFullPacks, setResultFullPacks] = useState("");
+  const [resultTikTokPacks, setResultTikTokPacks] = useState("");
+  const [leftoverPcs, setLeftoverPcs] = useState("");
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [poolLoading, setPoolLoading] = useState(false);
@@ -58,21 +61,26 @@ export default function CrewPrePackingPage() {
   // Draft load
   useEffect(() => {
     if (typeof window !== "undefined" && selectedVariant) {
-      const savedLoyang = localStorage.getItem(`prepack_draft_loyang_${activeTab}_${selectedVariant}`);
-      const savedPcs = localStorage.getItem(`prepack_draft_pcs_${activeTab}_${selectedVariant}`);
-      setLoyangUsed(savedLoyang || "");
-      setTotalPcs(savedPcs || "");
+      try {
+        const saved = JSON.parse(localStorage.getItem(`prepack_draft_${activeTab}_${selectedVariant}`) || "{}");
+        if (saved.loyangUsed) setLoyangUsed(saved.loyangUsed);
+        if (saved.resultRegularPacks) setResultRegularPacks(saved.resultRegularPacks);
+        if (saved.resultFullPacks) setResultFullPacks(saved.resultFullPacks);
+        if (saved.resultTikTokPacks) setResultTikTokPacks(saved.resultTikTokPacks);
+        if (saved.leftoverPcs) setLeftoverPcs(saved.leftoverPcs);
+      } catch(e) {}
       setDraftLoaded(true);
     }
   }, [selectedVariant, activeTab]);
 
   // Draft save
   useEffect(() => {
-    if (draftLoaded && typeof window !== "undefined" && selectedVariant) {
-      localStorage.setItem(`prepack_draft_loyang_${activeTab}_${selectedVariant}`, loyangUsed);
-      localStorage.setItem(`prepack_draft_pcs_${activeTab}_${selectedVariant}`, totalPcs);
+    if (draftLoaded && selectedVariant && typeof window !== "undefined") {
+      localStorage.setItem(`prepack_draft_${activeTab}_${selectedVariant}`, JSON.stringify({ 
+        loyangUsed, resultRegularPacks, resultFullPacks, resultTikTokPacks, leftoverPcs 
+      }));
     }
-  }, [loyangUsed, totalPcs, draftLoaded, activeTab, selectedVariant]);
+  }, [loyangUsed, resultRegularPacks, resultFullPacks, resultTikTokPacks, leftoverPcs, draftLoaded, activeTab, selectedVariant]);
 
   useEffect(() => {
     setSuccess("");
@@ -85,6 +93,7 @@ export default function CrewPrePackingPage() {
 
   function selectVariant(id: string) {
     setSelectedVariant(id);
+    setLoyangUsed(""); setResultRegularPacks(""); setResultFullPacks(""); setResultTikTokPacks(""); setLeftoverPcs("");
     setSuccess(""); setError(""); setShowDetail(false); loadPool(id);
   }
 
@@ -97,30 +106,37 @@ export default function CrewPrePackingPage() {
   async function handleSubmit() {
     setError(""); setSuccess("");
     const loyang = parseFloat(loyangUsed) || 0;
-    const pcs = parseInt(totalPcs) || 0;
+    const regPacks = parseInt(resultRegularPacks) || 0;
+    const fullPacks = parseInt(resultFullPacks) || 0;
+    const tiktokPacks = parseInt(resultTikTokPacks) || 0;
+    const leftover = parseInt(leftoverPcs) || 0;
+    
     if (loyang <= 0) { setError("Jumlah loyang harus lebih dari 0"); return; }
-    if (pcs <= 0) { setError("Jumlah pcs churros harus lebih dari 0"); return; }
+    
+    if (activeTab === "standard" && regPacks === 0 && fullPacks === 0 && leftover === 0) {
+      setError("Isi jumlah hasil pack atau sisa pcs"); return;
+    }
+    if (activeTab === "tiktok" && tiktokPacks === 0 && leftover === 0) {
+      setError("Isi jumlah hasil pack atau sisa pcs"); return;
+    }
+    
     if (loyang > totalAvailable) { setError(`Loyang tidak cukup, tersedia hanya ${totalAvailable}`); return; }
     setSubmitting(true);
-    
-    // Auto calculate
-    const packSize = 12; // Regular and TikTok are both 12 pcs
-    const calculatedPacks = Math.floor(pcs / packSize);
-    const calculatedLeftover = pcs % packSize;
 
     try {
       const payload: any = {
         variantId: selectedVariant,
         totalLoyangUsed: loyang,
         type: activeTab,
-        leftoverPcs: calculatedLeftover,
+        leftoverPcs: leftover,
         customDate: enableCustomDate && customDate ? customDate : undefined
       };
+      
       if (activeTab === "standard") {
-        payload.resultRegularPacks = calculatedPacks;
-        payload.resultFullPacks = 0; // Defaulting to regular packs for now
+        payload.resultRegularPacks = regPacks;
+        payload.resultFullPacks = fullPacks;
       } else {
-        payload.resultTikTokPacks = calculatedPacks;
+        payload.resultTikTokPacks = tiktokPacks;
       }
 
       const res = await fetchWithAuth("/api/pre-packing", {
@@ -129,11 +145,10 @@ export default function CrewPrePackingPage() {
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || "Gagal menyimpan"); return; }
-      setSuccess("Tersimpan!");
-      setLoyangUsed(""); setTotalPcs("");
+      setSuccess("Data pre-packing berhasil disimpan!");
+      setLoyangUsed(""); setResultRegularPacks(""); setResultFullPacks(""); setResultTikTokPacks(""); setLeftoverPcs("");
       if (typeof window !== "undefined" && selectedVariant) {
-        localStorage.removeItem(`prepack_draft_loyang_${activeTab}_${selectedVariant}`);
-        localStorage.removeItem(`prepack_draft_pcs_${activeTab}_${selectedVariant}`);
+        localStorage.removeItem(`prepack_draft_${activeTab}_${selectedVariant}`);
       }
       if (selectedVariant) loadPool(selectedVariant);
     } catch { setError("Gagal menyimpan pre-packing"); } finally { setSubmitting(false); }
@@ -262,37 +277,75 @@ export default function CrewPrePackingPage() {
 
               {totalAvailable > 0 && (
                 <div className="space-y-5 bg-white p-6 rounded-3xl" style={{ boxShadow: "0 10px 40px rgba(232,93,140,0.15)" }}>
-                  {[
-                    { label: "Loyang dipakai sekarang (bisa desimal)", val: loyangUsed, set: setLoyangUsed, max: totalAvailable, step: 0.5 },
-                    { label: "Total Pcs Churros Dihasilkan", val: totalPcs, set: setTotalPcs, max: undefined, step: 1 },
-                  ].map(({ label, val, set, max, step }) => (
-                    <div key={label}>
-                      <label className="text-xs font-bold uppercase tracking-widest mb-3 block" style={{ color: "#94A3B8" }}>{label}</label>
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest mb-3 block" style={{ color: "#94A3B8" }}>Loyang Diambil (bisa desimal)</label>
+                    <div className="flex items-center rounded-2xl p-1.5 gap-1.5" style={{ background: "#F8FAFC", border: "2px solid #F1F5F9" }}>
+                      <button type="button" onClick={() => stepVal(setLoyangUsed, loyangUsed, -0.5, totalAvailable)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target hover:bg-white transition-all active:scale-95 text-slate-700 bg-white shadow-sm">
+                        <Minus size={18} strokeWidth={3} />
+                      </button>
+                      <Input type="number" min="0" step="0.5" value={loyangUsed} onChange={(e) => setLoyangUsed(e.target.value)} className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0 text-pink-900" />
+                      <button type="button" onClick={() => stepVal(setLoyangUsed, loyangUsed, 0.5, totalAvailable)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-pink-500 shadow-sm">
+                        <Plus size={18} strokeWidth={3} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {activeTab === "standard" ? (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold uppercase tracking-widest mb-3 block" style={{ color: "#94A3B8" }}>Hasil Pack Regular (Isi 12)</label>
+                        <div className="flex items-center rounded-2xl p-1.5 gap-1.5" style={{ background: "#F8FAFC", border: "2px solid #F1F5F9" }}>
+                          <button type="button" onClick={() => stepVal(setResultRegularPacks, resultRegularPacks, -1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target hover:bg-white transition-all active:scale-95 text-slate-700 bg-white shadow-sm">
+                            <Minus size={18} strokeWidth={3} />
+                          </button>
+                          <Input type="number" min="0" step="1" value={resultRegularPacks} onChange={(e) => setResultRegularPacks(e.target.value)} className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0 text-pink-900" />
+                          <button type="button" onClick={() => stepVal(setResultRegularPacks, resultRegularPacks, 1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-pink-500 shadow-sm">
+                            <Plus size={18} strokeWidth={3} />
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold uppercase tracking-widest mb-3 block" style={{ color: "#94A3B8" }}>Hasil Pack Full (Isi 16)</label>
+                        <div className="flex items-center rounded-2xl p-1.5 gap-1.5" style={{ background: "#F8FAFC", border: "2px solid #F1F5F9" }}>
+                          <button type="button" onClick={() => stepVal(setResultFullPacks, resultFullPacks, -1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target hover:bg-white transition-all active:scale-95 text-slate-700 bg-white shadow-sm">
+                            <Minus size={18} strokeWidth={3} />
+                          </button>
+                          <Input type="number" min="0" step="1" value={resultFullPacks} onChange={(e) => setResultFullPacks(e.target.value)} className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0 text-pink-900" />
+                          <button type="button" onClick={() => stepVal(setResultFullPacks, resultFullPacks, 1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-pink-500 shadow-sm">
+                            <Plus size={18} strokeWidth={3} />
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-widest mb-3 block" style={{ color: "#94A3B8" }}>Hasil Pack TikTok (Isi 12)</label>
                       <div className="flex items-center rounded-2xl p-1.5 gap-1.5" style={{ background: "#F8FAFC", border: "2px solid #F1F5F9" }}>
-                        <button type="button" onClick={() => stepVal(set, val, -step, max)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target transition-all active:scale-95 hover:bg-white" style={{ background: "#fff", boxShadow: "0 2px 5px rgba(0,0,0,0.05)", color: "#334155" }}>
+                        <button type="button" onClick={() => stepVal(setResultTikTokPacks, resultTikTokPacks, -1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target hover:bg-white transition-all active:scale-95 text-slate-700 bg-white shadow-sm">
                           <Minus size={18} strokeWidth={3} />
                         </button>
-                        <Input type="number" min="0" step={step} value={val} onChange={(e) => set(e.target.value)} className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0" style={{ color: "#831843" }} />
-                        <button type="button" onClick={() => stepVal(set, val, step, max)} className="h-12 w-12 rounded-xl text-white flex items-center justify-center tap-target transition-all active:scale-95" style={{ background: "#E85D8C", boxShadow: "0 4px 10px rgba(232,93,140,0.3)" }}>
+                        <Input type="number" min="0" step="1" value={resultTikTokPacks} onChange={(e) => setResultTikTokPacks(e.target.value)} className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0 text-pink-900" />
+                        <button type="button" onClick={() => stepVal(setResultTikTokPacks, resultTikTokPacks, 1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-pink-500 shadow-sm">
                           <Plus size={18} strokeWidth={3} />
                         </button>
                       </div>
                     </div>
-                  ))}
-
-                  {/* Auto Calculated Summary */}
-                  {parseInt(totalPcs) > 0 && (
-                    <div className="mt-6 p-5 rounded-2xl bg-pink-50 border border-pink-100 flex justify-between items-center">
-                      <div>
-                        <p className="text-[10px] font-black text-pink-500 uppercase tracking-widest mb-1.5">Hasil Perhitungan Pack</p>
-                        <p className="text-lg font-black text-pink-900">
-                          {Math.floor(parseInt(totalPcs) / 12)} Pack {activeTab === "standard" ? "Regular" : "TikTok"} <span className="text-pink-300 font-normal mx-1">|</span> Sisa {parseInt(totalPcs) % 12} pcs
-                        </p>
-                      </div>
-                    </div>
                   )}
 
-                  <button onClick={handleSubmit} disabled={submitting || !(parseFloat(loyangUsed) > 0) || !(parseInt(totalPcs) > 0)} className="w-full mt-2 min-h-[60px] rounded-2xl text-white font-extrabold text-base flex items-center justify-center gap-3 tap-target disabled:opacity-60 transition-all hover:shadow-xl active:scale-[0.98]"
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest mb-3 block" style={{ color: "#94A3B8" }}>Sisa / Reject (Pcs)</label>
+                    <div className="flex items-center rounded-2xl p-1.5 gap-1.5" style={{ background: "#F8FAFC", border: "2px solid #F1F5F9" }}>
+                      <button type="button" onClick={() => stepVal(setLeftoverPcs, leftoverPcs, -1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target hover:bg-white transition-all active:scale-95 text-slate-700 bg-white shadow-sm">
+                        <Minus size={18} strokeWidth={3} />
+                      </button>
+                      <Input type="number" min="0" step="1" value={leftoverPcs} onChange={(e) => setLeftoverPcs(e.target.value)} className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0 text-pink-900" />
+                      <button type="button" onClick={() => stepVal(setLeftoverPcs, leftoverPcs, 1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-pink-500 shadow-sm">
+                        <Plus size={18} strokeWidth={3} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <button onClick={handleSubmit} disabled={submitting || !(parseFloat(loyangUsed) > 0)} className="w-full mt-2 min-h-[60px] rounded-2xl text-white font-extrabold text-base flex items-center justify-center gap-3 tap-target disabled:opacity-60 transition-all hover:shadow-xl active:scale-[0.98]"
                     style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)", boxShadow: "0 10px 25px rgba(232,93,140,0.4)" }} data-testid="submit-prepacking-button">
                     {submitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} strokeWidth={3} />}
                     Simpan Pre-Packing
