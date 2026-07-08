@@ -468,10 +468,9 @@ export default function KasirPage() {
   return (
     <div className="min-h-screen" style={{ background: "#FEF1F5" }}>
 
-      {/* ── Header (solid pink) ── */}
-      <div className="sticky top-0 z-30 bg-[#FCABB4] shadow-md" style={{ borderBottom: "none" }}>
-        <div className="px-5 pt-4 pb-2">
-          <div className="flex items-center justify-between">
+      {/* ── Header (Glassmorphism) ── */}
+      <div className="sticky top-0 z-30 pt-4 px-4 pb-4 bg-white/90 backdrop-blur-xl border-b border-pink-200 shadow-sm">
+        <div className="flex items-center justify-between">
             <h1 style={{ fontSize: "18px", fontWeight: "800", color: "#1C1C1E" }}>Input Pesanan</h1>
           </div>
 

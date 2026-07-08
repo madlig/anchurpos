@@ -555,12 +555,12 @@ export default function MasterDataPage() {
 
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: "#FEF1F5" }}>
-      <div className="sticky top-0 z-30 shadow-md bg-[#E85D8C]">
-        <div className="px-5 pt-6 pb-4 max-w-7xl mx-auto">
+      <div className="sticky top-0 z-30 pt-4 pb-4 bg-white/90 backdrop-blur-xl border-b border-pink-200 shadow-sm">
+        <div className="px-5 max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-2xl font-black text-white tracking-tight drop-shadow-sm">Master Data</h1>
-              <p className="text-pink-100 text-[13px] font-medium mt-1">Kelola inventori dan pelanggan Anchur.us</p>
+              <h1 className="text-2xl font-black text-slate-800 tracking-tight drop-shadow-sm">Master Data</h1>
+              <p className="text-slate-500 text-[13px] font-medium mt-1">Kelola inventori dan pelanggan Anchur.us</p>
             </div>
             <button
               onClick={() => {
@@ -570,7 +570,7 @@ export default function MasterDataPage() {
                 else { setEditItem(null); }
                 setShowAddForm(true);
               }}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-white text-[#E85D8C] rounded-xl text-sm font-bold shadow-sm hover:shadow-md hover:bg-pink-50 transition-all active:scale-95"
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-pink-500 text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md hover:bg-pink-600 transition-all active:scale-95"
             >
               <Plus size={18} strokeWidth={2.5} /> Tambah Data
             </button>
@@ -585,13 +585,13 @@ export default function MasterDataPage() {
                 <button
                   key={t.key}
                   onClick={() => switchTab(t.key)}
-                  className={`flex items-center gap-2 px-5 py-3 rounded-full whitespace-nowrap text-[14px] font-bold transition-all duration-300 shadow-sm ${
+                  className={`flex items-center gap-2 px-5 py-3 rounded-full whitespace-nowrap text-[14px] font-bold transition-all duration-300 shadow-sm border ${
                     isActive 
-                      ? "bg-white text-[#E85D8C] scale-100" 
-                      : "bg-white/20 text-white border border-white/30 hover:bg-white/30 scale-95 hover:scale-100"
+                      ? "bg-pink-500 text-white border-pink-500 scale-100" 
+                      : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50 scale-95 hover:scale-100 hover:border-slate-300"
                   }`}
                 >
-                  <Icon size={16} strokeWidth={isActive ? 2.5 : 2} className={isActive ? "text-[#E85D8C]" : "text-white"} />
+                  <Icon size={16} strokeWidth={isActive ? 2.5 : 2} className={isActive ? "text-white" : "text-slate-500"} />
                   {t.label}
                 </button>
               );

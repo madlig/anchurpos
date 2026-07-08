@@ -109,8 +109,8 @@ export default function ManagerDashboardPage() {
   return (
     <div className="page-enter min-h-screen pb-20" style={{ background: "#FCABB4" }}>
 
-      {/* ── Greeting Header (white) ── */}
-      <div className="px-5 pt-5 pb-5" style={{ background: "#fff", borderBottomLeftRadius: "24px", borderBottomRightRadius: "24px", boxShadow: "0 4px 20px rgba(0,0,0,0.03)" }}>
+      {/* ── Greeting Header (Glassmorphism) ── */}
+      <div className="px-5 pt-5 pb-5 sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200 rounded-b-[24px]">
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-xs" style={{ color: "#94A3B8" }}>{greeting}</p>

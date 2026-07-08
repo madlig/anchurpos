@@ -83,20 +83,20 @@ export default function CrewStockOpnamePage() {
 
   return (
     <div className="page-enter min-h-screen pb-10" style={{ background: "#FCABB4" }}>
-      {/* Header */}
-      <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30" style={{ background: "#E85D8C", boxShadow: "0 10px 30px rgba(232,93,140,0.2)" }}>
+      {/* Header (Glassmorphism) */}
+      <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-white">Stock Opname</h1>
-            <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.9)" }}>{filledCount}/{ingredients.length} bahan diisi</p>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-800">Stock Opname</h1>
+            <p className="text-sm mt-1 text-slate-500">{filledCount}/{ingredients.length} bahan diisi</p>
           </div>
-          <div className="rounded-2xl px-3 py-1.5 bg-white/20 backdrop-blur-md" style={{ border: "1px solid rgba(255,255,255,0.3)" }}>
-            <span className="text-sm font-bold tabular-nums text-white">{filledCount}/{ingredients.length}</span>
+          <div className="rounded-2xl px-3 py-1.5 bg-pink-50 border border-pink-100">
+            <span className="text-sm font-bold tabular-nums text-pink-600">{filledCount}/{ingredients.length}</span>
           </div>
         </div>
         {/* Progress bar */}
-        <div className="h-1.5 rounded-full mt-4 overflow-hidden bg-white/20">
-          <div className="h-full rounded-full transition-all bg-white" style={{ width: `${ingredients.length > 0 ? (filledCount / ingredients.length) * 100 : 0}%` }} />
+        <div className="h-1.5 rounded-full mt-4 overflow-hidden bg-slate-100">
+          <div className="h-full rounded-full transition-all bg-pink-500" style={{ width: `${ingredients.length > 0 ? (filledCount / ingredients.length) * 100 : 0}%` }} />
         </div>
       </div>
 

@@ -53,11 +53,11 @@ export default function ManagerProductionsPage() {
   }, [loadData]);
 
   return (
-    <div className="page-enter min-h-screen pb-24" style={{ background: "#F8FAFC" }}>
-      {/* Header */}
-      <div className="px-5 pt-6 pb-6 bg-white shadow-sm sticky top-0 z-20">
+    <div className="page-enter min-h-screen pb-24" style={{ background: "#FCABB4" }}>
+      {/* Header (Glassmorphism) */}
+      <div className="px-5 pt-6 pb-6 bg-white/90 backdrop-blur-xl border-b border-pink-200 shadow-sm sticky top-0 z-20">
         <h1 className="text-2xl font-black mb-1" style={{ color: "#1E293B" }}>Laporan Produksi</h1>
-        <p className="text-sm font-semibold" style={{ color: "#94A3B8" }}>
+        <p className="text-sm font-semibold text-slate-500">
           Pantau hasil produksi dan pre-packing crew
         </p>
         

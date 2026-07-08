@@ -699,15 +699,15 @@ export default function CrewPackingPage() {
 
   return (
     <div className="min-h-screen pb-24" style={{ background: "#FCABB4" }}>
-      {/* Header */}
-      <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30" style={{ background: "#E85D8C", boxShadow: "0 10px 30px rgba(232,93,140,0.2)" }}>
+      {/* Header (Glassmorphism) */}
+      <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200">
         <div className="flex items-center gap-2 mb-1">
-          <div className="h-10 w-10 rounded-2xl flex items-center justify-center bg-white/20 backdrop-blur-md" style={{ border: "1px solid rgba(255,255,255,0.3)" }}>
-            <ClipboardList size={20} style={{ color: "#fff" }} />
+          <div className="h-10 w-10 rounded-2xl flex items-center justify-center bg-pink-50 border border-pink-100">
+            <ClipboardList size={20} className="text-pink-500" />
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-white">Modul Packing</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-800">Modul Packing</h1>
         </div>
-        <p className="text-xs ml-[48px]" style={{ color: "rgba(255,255,255,0.9)" }}>
+        <p className="text-xs ml-[48px] text-slate-500">
           Kelola packing pesanan, repack glaze bulk, blender gula cinnamon, bongkar regular ke full, dan pemakaian bahan.
         </p>
       </div>

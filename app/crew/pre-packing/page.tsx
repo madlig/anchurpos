@@ -158,20 +158,20 @@ export default function CrewPrePackingPage() {
 
   return (
     <div className="page-enter min-h-screen pb-10" style={{ background: "#FCABB4" }}>
-      {/* Header */}
-      <div className="px-5 pt-6 pb-6 mb-2 rounded-b-3xl sticky top-0 z-30" style={{ background: "#E85D8C", boxShadow: "0 10px 30px rgba(232,93,140,0.2)" }}>
+      {/* Header (Glassmorphism) */}
+      <div className="px-5 pt-6 pb-6 mb-2 rounded-b-3xl sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl flex items-center justify-center bg-white/20 backdrop-blur-md" style={{ border: "1px solid rgba(255,255,255,0.3)" }}>
-              <PackageOpen size={20} style={{ color: "#fff" }} />
+            <div className="h-10 w-10 rounded-2xl flex items-center justify-center bg-pink-50 border border-pink-100">
+              <PackageOpen size={20} className="text-pink-500" />
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#fff", letterSpacing: "-0.02em" }}>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-800" style={{ letterSpacing: "-0.02em" }}>
               {enableCustomDate && customDate ? `Pre-Packing: ${customDate}` : "Pre-Packing"}
             </h1>
           </div>
           
           <div className="flex items-center gap-2">
-            <label className="text-xxs font-bold text-white flex items-center gap-1.5 cursor-pointer">
+            <label className="text-xxs font-bold text-slate-600 flex items-center gap-1.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={enableCustomDate}
