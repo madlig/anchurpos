@@ -11,10 +11,10 @@ interface RoleGuardProps {
   children: React.ReactNode;
 }
 
-const ROLE_HOME: Record<Role, string> = {
+const ROLE_HOME: Record<string, string> = {
   owner: "/owner/dashboard",
   manager: "/manager/dashboard",
-  crew: "/crew/attendance",
+  crew: "/crew/dashboard",
 };
 
 export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
