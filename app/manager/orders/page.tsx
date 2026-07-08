@@ -66,10 +66,10 @@ export default function OrdersListPage() {
   const isVoidTab = tab === "void";
 
   return (
-    <div className="page-enter min-h-screen pb-24" style={{ background: "#F8FAFC" }}>
+    <div className="page-enter min-h-screen pb-24" style={{ background: "#FCABB4" }}>
       
       {/* Floating Header */}
-      <div className="sticky top-0 z-30 pt-4 px-4 pb-2 bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/50">
+      <div className="sticky top-0 z-30 pt-4 px-4 pb-2 bg-white/90 backdrop-blur-xl border-b border-pink-200 shadow-sm">
         <div className="flex items-center justify-between mb-4 mt-2">
           <div>
             <h1 className="text-3xl font-black text-slate-800 tracking-tight">Pesanan</h1>

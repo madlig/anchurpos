@@ -84,13 +84,13 @@ export default function OrderDetailPage() {
   }
 
   if (loading) return (
-    <div className="flex h-screen items-center justify-center bg-slate-50">
+    <div className="flex h-screen items-center justify-center" style={{ background: "#FCABB4" }}>
       <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
     </div>
   );
 
   if (!order) return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50">
+    <div className="flex flex-col items-center justify-center min-h-screen" style={{ background: "#FCABB4" }}>
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center">
         <Package size={48} className="text-slate-300 mb-4" />
         <p className="text-base font-bold text-slate-500">Order tidak ditemukan</p>
@@ -111,10 +111,10 @@ export default function OrderDetailPage() {
   const isVoid = order.status === "void";
 
   return (
-    <div className="min-h-screen pb-24 bg-slate-50">
+    <div className="min-h-screen pb-24" style={{ background: "#FCABB4" }}>
 
       {/* ── Sticky Header (Glassmorphism) ── */}
-      <div className="sticky top-0 z-30 pt-4 px-4 pb-4 bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/50 flex items-center justify-between">
+      <div className="sticky top-0 z-30 pt-4 px-4 pb-4 bg-white/90 backdrop-blur-xl border-b border-pink-200 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button 
             onClick={() => router.back()} 
