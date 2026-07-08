@@ -22,6 +22,7 @@ export interface Product {
   description: string;
   packPerBatch: number;
   isActive: boolean;
+  channels?: OrderChannel[];
   createdAt: string;
   updatedAt: string;
 }
@@ -79,6 +80,7 @@ export interface Ingredient {
   unitAlternatives: UnitAlternative[];
   opnameMethod: OpnameMethod;
   packagedConfig: PackagedConfig | null;
+  channels?: OrderChannel[];
 }
 
 // --- 4b. stockMovements/{movementId} ---

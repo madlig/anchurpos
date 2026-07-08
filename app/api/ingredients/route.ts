@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
         unitAlternatives: data.unitAlternatives ?? [],
         opnameMethod: data.opnameMethod ?? "direct",
         packagedConfig: data.packagedConfig ?? null,
+        channels: data.channels ?? [],
       };
     });
 
@@ -41,8 +42,8 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const { name, category = "bahan_baku", baseUnit, minStock = 0 } = body as {
-    name: string; category?: string; baseUnit: string; minStock?: number;
+  const { name, category = "bahan_baku", baseUnit, minStock = 0, channels = [] } = body as {
+    name: string; category?: string; baseUnit: string; minStock?: number; channels?: string[];
   };
   if (!name?.trim() || !baseUnit?.trim()) {
     return NextResponse.json({ error: "Nama dan satuan wajib diisi" }, { status: 400 });
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
       currentStock: 0, minStock,
       unitAlternatives: [], opnameMethod: "direct",
       packagedConfig: null,
+      channels,
       createdAt: FieldValue.serverTimestamp(),
     });
     return NextResponse.json({ id: ref.id, name: name.trim() }, { status: 201 });

@@ -13,9 +13,10 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
-  const { name, code, description, packPerBatch, priceTiers } = body as {
+  const { name, code, description, packPerBatch, priceTiers, channels } = body as {
     name?: string; code?: string; description?: string; packPerBatch?: number;
     priceTiers?: { minQty: number; maxQty: number | null; price: number }[];
+    channels?: string[];
   };
 
   if (!name?.trim() || !code?.trim()) {
@@ -32,6 +33,7 @@ export async function PATCH(
       code: code.trim().toUpperCase(),
       description: description ?? "",
       packPerBatch: packPerBatch ?? 1,
+      channels: channels ?? [],
       updatedAt: FieldValue.serverTimestamp(),
     });
 

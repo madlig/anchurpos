@@ -38,6 +38,7 @@ export async function GET() {
         isActive: data.isActive,
         createdAt: data.createdAt?.toDate?.().toISOString() ?? "",
         updatedAt: data.updatedAt?.toDate?.().toISOString() ?? "",
+        channels: data.channels ?? [],
         priceTiers,
       });
     }
@@ -57,9 +58,10 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const { name, code, description = "", packPerBatch = 1, priceTiers = [] } = body as {
+  const { name, code, description = "", packPerBatch = 1, priceTiers = [], channels = [] } = body as {
     name: string; code: string; description?: string;
     packPerBatch?: number; priceTiers?: { minQty: number; maxQty: number | null; price: number }[];
+    channels?: string[];
   };
 
   if (!name?.trim() || !code?.trim()) {
@@ -71,6 +73,7 @@ export async function POST(req: NextRequest) {
     await ref.set({
       name: name.trim(), code: code.trim().toUpperCase(),
       description, packPerBatch, isActive: true,
+      channels,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });

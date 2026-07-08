@@ -13,7 +13,7 @@ export async function PATCH(
 
   try {
     const body = await req.json();
-    const { name, price, minStock } = body;
+    const { name, price, minStock, channels } = body;
 
     const addOnRef = adminDb.collection("addOns").doc(id);
     const snap = await addOnRef.get();
@@ -25,6 +25,7 @@ export async function PATCH(
     if (name !== undefined) updates.name = name.trim();
     if (price !== undefined) updates.price = Number(price);
     if (minStock !== undefined) updates.minStock = Number(minStock);
+    if (channels !== undefined) updates.channels = channels;
 
     await addOnRef.update(updates);
     return NextResponse.json({ success: true });

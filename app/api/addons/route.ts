@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
         price: d.price ?? 0,
         currentStock: d.currentStock ?? 0,
         minStock: d.minStock ?? 10,
+        channels: d.channels ?? [],
         createdAt: d.createdAt?.toDate?.().toISOString() ?? "",
       };
     });
@@ -35,10 +36,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name, price, minStock } = body as {
+    const { name, price, minStock, channels = [] } = body as {
       name: string;
       price: number;
       minStock?: number;
+      channels?: string[];
     };
 
     if (!name || !name.trim() || price === undefined) {
@@ -52,6 +54,7 @@ export async function POST(req: NextRequest) {
       price: Number(price),
       currentStock: 0,
       minStock: Number(minStock || 10),
+      channels,
       createdBy: user.uid,
       createdAt: FieldValue.serverTimestamp(),
     });

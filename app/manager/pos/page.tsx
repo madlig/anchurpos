@@ -2,14 +2,14 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Search, ShoppingCart, X, Minus, Plus, ChevronDown, UserPlus, CreditCard, CheckCircle2, Store, MessageCircle } from "lucide-react";
+import { Loader2, Search, ShoppingCart, X, Minus, Plus, ChevronDown, UserPlus, CreditCard, CheckCircle2, Store, MessageCircle, Trash2, Smartphone, ShoppingBag, ArrowLeft } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface PriceTier { id: string; minQty: number; maxQty: number | null; price: number; }
 interface ProductItem {
   id: string; code: string; name: string; description: string;
-  packPerBatch: number; isActive: boolean; priceTiers: PriceTier[];
+  packPerBatch: number; isActive: boolean; priceTiers: PriceTier[]; channels?: string[];
 }
 interface Variant {
   id: string; name: string; currentStock: number; minStock: number; sortOrder: number;
@@ -24,6 +24,7 @@ interface CartItem {
   sauceId?: string;
   sauceName?: string;
 }
+interface AddonItem { id: string; name: string; price: number; currentStock: number; minStock: number; channels?: string[]; }
 
 type PayMethod = "cash" | "transfer" | "qris";
 
@@ -50,12 +51,11 @@ function startingPrice(product: ProductItem): number {
 
 function getChannelIcon(channel: string, size = 14) {
   switch (channel) {
-    case "walkin":
-      return <Store size={size} />;
-    case "whatsapp":
-      return <MessageCircle size={size} />;
-    default:
-      return null;
+    case "walkin": return <Store size={size} />;
+    case "whatsapp": return <MessageCircle size={size} />;
+    case "tiktok": return <Smartphone size={size} />;
+    case "shopee": return <ShoppingBag size={size} />;
+    default: return null;
   }
 }
 
@@ -74,7 +74,7 @@ export default function KasirPage() {
 
   // Variant selector sheet
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
-  const [variantSelections, setVariantSelections] = useState<Record<string, { id: string; qty: number; sauceId: string }[]>>({});
+  const [variantSelections, setVariantSelections] = useState<Record<string, { id: string; qty: number | ""; sauceId: string }[]>>({});
   
   // Dynamic Addon Sauce States
   const [addOns, setAddOns] = useState<any[]>([]);
@@ -83,21 +83,27 @@ export default function KasirPage() {
   // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  const defaultSauce = useMemo(() => {
-    if (!addOns.length) return null;
-    const tiramisu = addOns.find(a => a.name.toLowerCase().includes("tiramisu") || a.id === "saus-tiramisu");
-    if (tiramisu) return tiramisu;
-    return addOns[0];
-  }, [addOns]);
+
 
 
 
   // Checkout sheet state
   const [showCheckout, setShowCheckout] = useState(false);
-  const [orderChannel, setOrderChannel] = useState<"walkin" | "whatsapp" | "tiktok" | "shopee">("walkin");
+  const [orderChannel, setOrderChannel] = useState<"walkin" | "whatsapp" | "tiktok" | "shopee" | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+
+  const filteredAddOns = useMemo(() => {
+    return addOns.filter(a => !a.channels?.length || (orderChannel && a.channels.includes(orderChannel)));
+  }, [addOns, orderChannel]);
+
+  const defaultSauce = useMemo(() => {
+    if (!filteredAddOns.length) return null;
+    const tiramisu = filteredAddOns.find(a => a.name.toLowerCase().includes("tiramisu") || a.id === "saus-tiramisu");
+    if (tiramisu) return tiramisu;
+    return filteredAddOns[0];
+  }, [filteredAddOns]);
   const [saveNewCustomer, setSaveNewCustomer] = useState(false);
   const [newCustomerType, setNewCustomerType] = useState<"reguler" | "b2b" | "reseller">("reguler");
   const [payMethod, setPayMethod] = useState<PayMethod>("cash");
@@ -142,15 +148,13 @@ export default function KasirPage() {
     }).finally(() => setLoading(false));
   }, [fetchWithAuth]);
 
-  // ── Filtered products ──────────────────────────────────────────────────────
   const filteredProducts = useMemo(() => {
-    // TikTok: hanya tampilkan produk TikTok (nama mengandung "tiktok" atau "TikTok")
-    const isTicktokChannel = orderChannel === "tiktok";
-    return products.filter(p =>
-      (isTicktokChannel ? p.name.toLowerCase().includes("tiktok") : !p.name.toLowerCase().includes("tiktok")) &&
-      (activeCategory === "Semua" || p.name === activeCategory) &&
-      (!search || p.name.toLowerCase().includes(search.toLowerCase()))
-    );
+    return products.filter(p => {
+      const isChannelMatch = !p.channels?.length || (orderChannel && p.channels.includes(orderChannel));
+      const isCategoryMatch = activeCategory === "Semua" || p.name === activeCategory;
+      const isSearchMatch = !search || p.name.toLowerCase().includes(search.toLowerCase());
+      return isChannelMatch && isCategoryMatch && isSearchMatch;
+    });
   }, [products, activeCategory, search, orderChannel]);
 
   // ── Cart calculations ──────────────────────────────────────────────────────
@@ -210,15 +214,30 @@ export default function KasirPage() {
   function updateVariantSelectionQty(variantId: string, rowId: string, delta: number) {
     setVariantSelections(prev => {
       const currentRows = prev[variantId] || [];
-      const newRows = currentRows.map(r => r.id === rowId ? { ...r, qty: r.qty + delta } : r).filter(r => r.qty > 0);
+      const newRows = currentRows.map(r => {
+        const currentQty = typeof r.qty === "number" ? r.qty : 1;
+        return { ...r, qty: Math.max(1, currentQty + delta) };
+      });
       return { ...prev, [variantId]: newRows };
     });
   }
 
-  function setVariantSelectionQtyDirect(variantId: string, rowId: string, qty: number) {
+  function setVariantSelectionQtyDirect(variantId: string, rowId: string, val: string) {
     setVariantSelections(prev => {
       const currentRows = prev[variantId] || [];
-      const newRows = currentRows.map(r => r.id === rowId ? { ...r, qty: Math.max(0, qty) } : r).filter(r => r.qty > 0);
+      const newRows: { id: string; qty: number | ""; sauceId: string }[] = currentRows.map(r => {
+        if (r.id !== rowId) return r;
+        if (val === "") return { ...r, qty: "" };
+        return { ...r, qty: Math.max(1, parseInt(val) || 1) };
+      });
+      return { ...prev, [variantId]: newRows };
+    });
+  }
+
+  function removeVariantSelectionRow(variantId: string, rowId: string) {
+    setVariantSelections(prev => {
+      const currentRows = prev[variantId] || [];
+      const newRows = currentRows.filter(r => r.id !== rowId);
       return { ...prev, [variantId]: newRows };
     });
   }
@@ -231,7 +250,7 @@ export default function KasirPage() {
     });
   }
 
-  const totalVariantSelected = Object.values(variantSelections).flatMap(r => r).reduce((s, r) => s + r.qty, 0);
+  const totalVariantSelected = Object.values(variantSelections).flatMap(r => r).reduce((s, r) => s + (typeof r.qty === "number" ? r.qty : 0), 0);
 
   // Recalculate unit prices in cart dynamically based on accumulated quantity per product
   const recalculateCartPrices = useCallback((currentCart: CartItem[]): CartItem[] => {
@@ -258,7 +277,7 @@ export default function KasirPage() {
     for (const [variantId, rows] of Object.entries(variantSelections)) {
       const variant = variants.find(v => v.id === variantId);
       for (const row of rows) {
-        if (row.qty <= 0) continue;
+        if (typeof row.qty !== "number" || row.qty <= 0) continue;
         
         const price = 0; // will be recalculated by recalculateCartPrices
         const sId = hasSauce ? row.sauceId : undefined;
@@ -411,58 +430,85 @@ export default function KasirPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="flex h-screen items-center justify-center" style={{ background: "#FCABB4" }}>
-      <Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} />
+    <div className="flex h-screen items-center justify-center" style={{ background: "#FEF1F5" }}>
+      <Loader2 className="h-7 w-7 animate-spin" style={{ color: "#FCABB4" }} />
     </div>
   );
 
-  return (
-    <div className="min-h-screen" style={{ background: "#FCABB4" }}>
+  if (!orderChannel) {
+    return (
+      <div className="min-h-screen flex flex-col justify-center items-center px-6" style={{ background: "#FEF1F5" }}>
+        <div className="mb-10 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <h1 className="text-3xl font-black text-[#1C1C1E] mb-2">Pilih Channel</h1>
+          <p className="text-[#64748B] text-sm font-medium">Dari mana pesanan ini berasal?</p>
+        </div>
+        <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
+          {([
+            { key: "walkin", label: "Walk-in" },
+            { key: "whatsapp", label: "WhatsApp" },
+            { key: "tiktok", label: "TikTok" },
+            { key: "shopee", label: "Shopee" },
+          ] as const).map(ch => (
+            <button
+              key={ch.key}
+              onClick={() => { setOrderChannel(ch.key); setCart([]); setSelectedCustomer(null); setCustomerSearch(""); setPlatformFeeOverride(""); }}
+              className="flex flex-col items-center justify-center p-6 bg-white rounded-3xl shadow-[0_8px_30px_rgba(252,171,180,0.2)] border-2 border-transparent hover:border-[#FCABB4] hover:shadow-[0_8px_30px_rgba(252,171,180,0.4)] transition-all animate-in fade-in zoom-in-95 duration-300"
+            >
+              <div className="mb-3 p-4 bg-[#FEF1F5] rounded-full text-[#E85D8C]">
+                {getChannelIcon(ch.key, 28)}
+              </div>
+              <span className="font-bold text-[#1C1C1E]">{ch.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
-      {/* ── Header (white, sticky) ── */}
-      <div className="sticky top-0 z-30" style={{ background: "#fff", borderBottom: "1px solid #F1F5F9" }}>
+  return (
+    <div className="min-h-screen" style={{ background: "#FEF1F5" }}>
+
+      {/* ── Header (solid pink) ── */}
+      <div className="sticky top-0 z-30 bg-[#FCABB4] shadow-md" style={{ borderBottom: "none" }}>
         <div className="px-5 pt-4 pb-2">
           <div className="flex items-center justify-between">
-            <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Input Pesanan</h1>
+            <h1 style={{ fontSize: "18px", fontWeight: "800", color: "#1C1C1E" }}>Input Pesanan</h1>
           </div>
 
-          {/* ── Sumber Pesanan (Channel Selector) ── */}
-          <div className="grid grid-cols-4 gap-1.5 mt-3 mb-2">
-            {([
-              { key: "walkin", label: "Walk-in" },
-              { key: "whatsapp", label: "WhatsApp" },
-              { key: "tiktok", label: "TikTok" },
-              { key: "shopee", label: "Shopee" },
-            ] as const).map(ch => (
-              <button key={ch.key} onClick={() => { setOrderChannel(ch.key); setCart([]); setSelectedCustomer(null); setCustomerSearch(""); setPlatformFeeOverride(""); }}
-                className="tap-target"
-                style={{ padding: "8px 4px", borderRadius: "10px", fontSize: "11px", fontWeight: "600", border: "none", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
-                  color: orderChannel === ch.key ? "#fff" : "#64748B",
-                  background: orderChannel === ch.key ? "#E85D8C" : "#F1F5F9" }}>
-                {getChannelIcon(ch.key)}
-                <span>{ch.label}</span>
-              </button>
-            ))}
+          {/* ── Sumber Pesanan (Channel Info) ── */}
+          <div className="flex items-center justify-between mt-3 mb-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/40 rounded-xl">
+              <span className="text-pink-900 font-semibold text-xs flex items-center gap-1.5">
+                {getChannelIcon(orderChannel)}
+                {orderChannel === "walkin" ? "Walk-in" : orderChannel === "whatsapp" ? "WhatsApp" : orderChannel === "tiktok" ? "TikTok" : "Shopee"}
+              </span>
+            </div>
+            <button 
+              onClick={() => { setOrderChannel(null); setCart([]); setSelectedCustomer(null); setCustomerSearch(""); setPlatformFeeOverride(""); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-xl shadow-sm text-xs font-bold text-[#1C1C1E] hover:bg-slate-50 transition-colors"
+            >
+              <ArrowLeft size={14} /> Ganti Channel
+            </button>
           </div>
 
           {/* Search bar */}
           <div
             className="flex items-center gap-2 mt-2"
-            style={{ padding: "9px 12px", background: "#F8FAFC", borderRadius: "12px", border: "1px solid #F1F5F9" }}
+            style={{ padding: "9px 12px", background: "rgba(255,255,255,0.5)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.6)" }}
           >
-            <Search size={15} style={{ color: "#94A3B8", flexShrink: 0 }} />
+            <Search size={15} style={{ color: "#64748B", flexShrink: 0 }} />
             <input
               type="text"
               placeholder="Cari produk..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ flex: 1, background: "transparent", fontSize: "13px", color: "#1C1C1E", outline: "none" }}
+              className="placeholder:text-slate-500"
               data-testid="pos-search"
             />
             {search && (
               <button onClick={() => setSearch("")}>
-                <X size={14} style={{ color: "#94A3B8" }} />
+                <X size={14} style={{ color: "#64748B" }} />
               </button>
             )}
           </div>
@@ -479,9 +525,9 @@ export default function KasirPage() {
                 padding: "5px 14px",
                 borderRadius: "100px",
                 fontSize: "12px",
-                fontWeight: activeCategory === cat ? "600" : "500",
-                color: activeCategory === cat ? "#fff" : "#64748B",
-                background: activeCategory === cat ? "#E85D8C" : "#F1F5F9",
+                fontWeight: activeCategory === cat ? "700" : "600",
+                color: activeCategory === cat ? "#1C1C1E" : "#475569",
+                background: activeCategory === cat ? "#fff" : "rgba(255,255,255,0.4)",
                 border: "none",
                 cursor: "pointer",
                 whiteSpace: "nowrap",
@@ -511,7 +557,7 @@ export default function KasirPage() {
             <p style={{ fontSize: "14px", color: "#94A3B8" }}>Produk tidak ditemukan</p>
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {filteredProducts.map(product => (
               <ProductCard
                 key={product.id}
@@ -528,16 +574,16 @@ export default function KasirPage() {
       {cart.length > 0 && (
         <div
           className="fixed left-0 right-0 z-50"
-          style={{ bottom: "66px", padding: "10px 16px", background: "linear-gradient(to top, #FCABB4 60%, transparent)" }}
+          style={{ bottom: "66px", padding: "10px 16px", background: "linear-gradient(to top, #FEF1F5 60%, transparent)" }}
         >
           <button
             onClick={() => setShowCheckout(true)}
             className="w-full flex items-center justify-between"
             style={{
-              background: "linear-gradient(135deg,#E85D8C,#C94A73)",
+              background: "linear-gradient(135deg, #FCABB4, #F9A8D4)",
               borderRadius: "100px",
               padding: "14px 20px",
-              boxShadow: "0 8px 30px rgba(232,93,140,0.4)",
+              boxShadow: "0 8px 30px rgba(252,171,180,0.6)",
               border: "none",
               cursor: "pointer",
             }}
@@ -545,13 +591,13 @@ export default function KasirPage() {
           >
             <div className="flex items-center gap-2.5">
               <span
-                style={{ background: "rgba(255,255,255,0.2)", borderRadius: "100px", padding: "3px 10px", fontSize: "12px", fontWeight: "700", color: "#fff" }}
+                style={{ background: "rgba(131,24,67,0.15)", borderRadius: "100px", padding: "3px 10px", fontSize: "12px", fontWeight: "800", color: "#831843" }}
               >
                 {cartCount} item
               </span>
-              <span style={{ fontSize: "15px", fontWeight: "700", color: "#fff" }}>{fmt(cartTotal)}</span>
+              <span style={{ fontSize: "15px", fontWeight: "800", color: "#831843" }}>{fmt(cartTotal)}</span>
             </div>
-            <span style={{ fontSize: "13px", fontWeight: "700", color: "#fff" }}>Bayar →</span>
+            <span style={{ fontSize: "14px", fontWeight: "800", color: "#831843" }}>Bayar →</span>
           </button>
         </div>
       )}
@@ -561,7 +607,7 @@ export default function KasirPage() {
         <div
           className="fixed inset-0 z-50 flex flex-col justify-end"
           style={{ background: "rgba(0,0,0,0.45)" }}
-          onClick={e => { if (e.target === e.currentTarget) { setSelectedProduct(null); setVariantQtys({}); } }}
+          onClick={e => { if (e.target === e.currentTarget) { setSelectedProduct(null); setVariantSelections({}); } }}
         >
           <div
             className="overflow-y-auto"
@@ -576,7 +622,7 @@ export default function KasirPage() {
                 </p>
               </div>
               <button
-                onClick={() => { setSelectedProduct(null); setVariantQtys({}); }}
+                onClick={() => { setSelectedProduct(null); setVariantSelections({}); }}
                 style={{ width: "30px", height: "30px", borderRadius: "10px", background: "#F8FAFC", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
               >
                 <X size={16} style={{ color: "#64748B" }} />
@@ -584,10 +630,10 @@ export default function KasirPage() {
             </div>
 
             {/* Variant list */}
-            <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {variants.map(v => {
                 const rows = variantSelections[v.id] || [];
-                const qty = rows.reduce((s, r) => s + r.qty, 0);
+                const qty = rows.reduce((s, r) => s + (typeof r.qty === "number" ? r.qty : 0), 0);
                 const stockId = `${selectedProduct.id}_${v.id}`;
                 const stockItem = productStocks.find(s => s.id === stockId);
                 const currentStock = stockItem ? stockItem.currentStock : 0;
@@ -631,14 +677,13 @@ export default function KasirPage() {
                                 type="number"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                value={qty || ""}
+                                value={qty}
                                 placeholder="0"
                                 onChange={e => {
-                                  const val = Math.max(0, parseInt(e.target.value) || 0);
                                   if (rows.length > 0) {
-                                    setVariantSelectionQtyDirect(v.id, rows[0].id, val);
-                                  } else if (val > 0) {
-                                    addVariantSelectionRow(v.id, val);
+                                    setVariantSelectionQtyDirect(v.id, rows[0].id, e.target.value);
+                                  } else if (parseInt(e.target.value) > 0) {
+                                    addVariantSelectionRow(v.id, parseInt(e.target.value));
                                   }
                                 }}
                                 style={{
@@ -663,6 +708,15 @@ export default function KasirPage() {
                                 data-testid={`add-variant-${v.id}`}
                               >
                                 <Plus size={13} style={{ color: "#fff" }} strokeWidth={2.5} />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (rows.length > 0) removeVariantSelectionRow(v.id, rows[0].id);
+                                }}
+                                style={{ marginLeft: "4px", width: "30px", height: "30px", borderRadius: "8px", background: "#FEE2E2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                                title="Batal"
+                              >
+                                <Trash2 size={13} style={{ color: "#DC2626" }} />
                               </button>
                             </>
                           ) : (
@@ -723,11 +777,10 @@ export default function KasirPage() {
                                 type="number"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                value={row.qty || ""}
+                                value={row.qty}
                                 placeholder="0"
                                 onChange={e => {
-                                  const val = Math.max(0, parseInt(e.target.value) || 0);
-                                  setVariantSelectionQtyDirect(v.id, row.id, val);
+                                  setVariantSelectionQtyDirect(v.id, row.id, e.target.value);
                                 }}
                                 style={{
                                   width: "40px",
@@ -749,11 +802,11 @@ export default function KasirPage() {
                                 <Plus size={11} style={{ color: "#fff" }} strokeWidth={2.5} />
                               </button>
                               <button
-                                onClick={() => setVariantSelectionQtyDirect(v.id, row.id, 0)}
+                                onClick={() => removeVariantSelectionRow(v.id, row.id)}
                                 style={{ marginLeft: "4px", width: "26px", height: "26px", borderRadius: "6px", background: "#FEE2E2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                                title="Hapus varian"
+                                title="Hapus kombinasi saus"
                               >
-                                <X size={13} style={{ color: "#DC2626" }} />
+                                <Trash2 size={13} style={{ color: "#DC2626" }} />
                               </button>
                             </div>
                           </div>
@@ -780,7 +833,7 @@ export default function KasirPage() {
                 style={{ padding: "14px", borderRadius: "14px", background: "#E85D8C", color: "#fff", fontSize: "14px", fontWeight: "700", border: "none", cursor: "pointer" }}
                 data-testid="add-to-cart-btn"
               >
-                Tambah ke Cart ({totalVariantSelected} item · {fmt(cart.length === 0 ? getPrice(selectedProduct, totalVariantSelected) * totalVariantSelected : cartTotal + Object.values(variantSelections).flatMap(r => r).reduce((s, r) => s + getPrice(selectedProduct, r.qty) * r.qty, 0))})
+                Tambah ke Cart ({totalVariantSelected} item · {fmt(cart.length === 0 ? getPrice(selectedProduct, totalVariantSelected) * totalVariantSelected : cartTotal + Object.values(variantSelections).flatMap(r => r).reduce((s, r) => s + getPrice(selectedProduct, typeof r.qty === "number" ? r.qty : 0) * (typeof r.qty === "number" ? r.qty : 0), 0))})
               </button>
             ) : (
               <p className="text-center mt-4" style={{ fontSize: "12px", color: "#94A3B8" }}>Pilih varian untuk ditambah ke cart</p>
@@ -1191,8 +1244,8 @@ export default function KasirPage() {
               const isMatched = totalSaucesNeeded === 0 || allocated === totalSaucesNeeded;
               return (
                 <button onClick={handleCheckout} disabled={submitting || !cart.length || !isMatched} className="w-full"
-                  style={{ padding: "15px", borderRadius: "14px", fontSize: "14px", fontWeight: "700", color: "#fff",
-                    background: !isMatched ? "#94A3B8" : isPaid ? "#E85D8C" : "#F59E0B", border: "none", cursor: submitting || !isMatched ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1 }}
+                  style={{ padding: "15px", borderRadius: "14px", fontSize: "14px", fontWeight: "800", color: !isMatched ? "#fff" : isPaid ? "#831843" : "#fff",
+                    background: !isMatched ? "#94A3B8" : isPaid ? "#FCABB4" : "#F59E0B", border: "none", cursor: submitting || !isMatched ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1 }}
                   data-testid="confirm-order-btn">
                   {submitting ? "Memproses..." : !isMatched ? `Saos Kurang (${allocated}/${totalSaucesNeeded})` : isPaid ? "Konfirmasi & Catat Pesanan" : "Catat Pesanan (Belum Bayar)"}
                 </button>
@@ -1205,39 +1258,41 @@ export default function KasirPage() {
   );
 }
 
-// ─── Product Card ─────────────────────────────────────────────────────────────
 function ProductCard({ product, variantCount, onAdd }: {
   product: ProductItem; variantCount: number; onAdd: () => void;
 }) {
   const sp = startingPrice(product);
   return (
     <div
-      style={{ background: "#fff", borderRadius: "14px", overflow: "hidden", border: "1px solid #F1F5F9" }}
+      onClick={onAdd}
+      className="bg-white rounded-[16px] overflow-hidden border border-white/40 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer flex flex-col group relative"
       data-testid={`product-card-${product.id}`}
     >
-      {/* Image placeholder */}
-      <div style={{ height: "80px", background: "linear-gradient(135deg, rgba(232,93,140,0.12), rgba(252,171,180,0.3))", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: "rgba(232,93,140,0.18)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ fontSize: "20px" }}>🍰</span>
+      {/* Decorative gradient top bar */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FCABB4] to-[#F9A8D4]" />
+      
+      {/* Icon Area */}
+      <div className="h-[70px] bg-slate-50 flex items-center justify-center group-hover:bg-pink-50/50 transition-colors">
+        <div className="w-[38px] h-[38px] rounded-[12px] bg-white shadow-sm border border-slate-100 flex items-center justify-center group-hover:scale-110 group-hover:border-pink-200 transition-transform duration-300">
+          <span className="text-[20px]">🍰</span>
         </div>
       </div>
 
       {/* Info */}
-      <div style={{ padding: "8px 10px 10px" }}>
-        <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E", lineHeight: "1.3" }}>{product.name}</p>
-        <p style={{ fontSize: "11px", fontWeight: "500", color: "#94A3B8", marginTop: "2px" }}>
+      <div className="p-3 flex-1 flex flex-col">
+        <p className="text-[13px] font-extrabold text-slate-800 leading-[1.3] line-clamp-2">{product.name}</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1.5">
           {variantCount} varian
         </p>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px" }}>
-          <span style={{ fontSize: "13px", fontWeight: "700", color: "#E85D8C" }}>
+        <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100/60">
+          <span className="text-[14px] font-black text-[#831843]">
             {sp > 0 ? fmt(sp) : "—"}
           </span>
           <button
-            onClick={onAdd}
-            style={{ width: "28px", height: "28px", borderRadius: "8px", background: "#E85D8C", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            className="w-7 h-7 rounded-[8px] bg-slate-100 text-[#831843] group-hover:bg-[#FCABB4] group-hover:text-[#831843] transition-colors flex items-center justify-center"
             data-testid={`product-add-btn-${product.id}`}
           >
-            <Plus size={14} style={{ color: "#fff" }} strokeWidth={2.5} />
+            <Plus size={16} strokeWidth={3} />
           </button>
         </div>
       </div>

@@ -12,10 +12,10 @@ function fmt(n: number) {
 }
 
 interface PriceTier { minQty: number; maxQty: number | null; price: number; }
-interface ProductItem { id: string; name: string; code: string; description: string; packPerBatch: number; priceTiers: PriceTier[]; }
+interface ProductItem { id: string; name: string; code: string; description: string; packPerBatch: number; priceTiers: PriceTier[]; channels?: string[]; }
 interface VariantItem { id: string; name: string; sortOrder: number; currentStock: number; minStock: number; }
-interface IngredientItem { id: string; name: string; category: string; baseUnit: string; currentStock: number; minStock: number; }
-interface AddonItem { id: string; name: string; price: number; currentStock: number; minStock: number; }
+interface IngredientItem { id: string; name: string; category: string; baseUnit: string; currentStock: number; minStock: number; channels?: string[]; }
+interface AddonItem { id: string; name: string; price: number; currentStock: number; minStock: number; channels?: string[]; }
 interface SupplierItem { id: string; name: string; contactPerson?: string; phoneNumber?: string; }
 interface CustomerItem { id: string; name: string; customerType: string; channel: string; phoneNumber: string | null; address: string | null; notes: string; discountPerUnit: number; }
 
@@ -46,28 +46,43 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   onSuccess: () => void; onCancel: () => void;
 }) {
   const isEdit = !!initial;
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    name: string; code: string; description: string; packPerBatch: string; channels: string[];
+  }>({
     name: initial?.name ?? "", code: initial?.code ?? "",
     description: initial?.description ?? "", packPerBatch: String(initial?.packPerBatch ?? "1"),
+    channels: initial?.channels ?? [],
   });
+  const hasMultipleTiers = initial?.priceTiers && (initial.priceTiers.length > 1 || initial.priceTiers.some(t => t.minQty > 1 || t.maxQty !== null));
+  const [hasTiering, setHasTiering] = useState<boolean>(hasMultipleTiers || false);
+  const [singlePrice, setSinglePrice] = useState<string>(
+    initial?.priceTiers?.length ? String(initial.priceTiers[0].price) : ""
+  );
   const [tiers, setTiers] = useState<{ minQty: string; maxQty: string; price: string }[]>(
-    initial?.priceTiers?.length
+    initial?.priceTiers?.length && hasMultipleTiers
       ? initial.priceTiers.map(t => ({ minQty: String(t.minQty), maxQty: t.maxQty ? String(t.maxQty) : "", price: String(t.price) }))
-      : [{ minQty: "1", maxQty: "", price: "" }]
+      : [{ minQty: "1", maxQty: "", price: "" }, { minQty: "", maxQty: "", price: "" }]
   );
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
   async function handleSave() {
     if (!form.name.trim() || !form.code.trim()) { setErr("Nama dan kode wajib diisi"); return; }
-    const priceTiers = tiers.filter(t => t.price && t.minQty).map(t => ({
-      minQty: parseInt(t.minQty), maxQty: t.maxQty ? parseInt(t.maxQty) : null, price: parseInt(t.price),
-    }));
+    let priceTiers: any[] = [];
+    if (!hasTiering) {
+      if (!singlePrice) { setErr("Harga wajib diisi"); return; }
+      priceTiers = [{ minQty: 1, maxQty: null, price: parseInt(singlePrice) }];
+    } else {
+      priceTiers = tiers.filter(t => t.price && t.minQty).map(t => ({
+        minQty: parseInt(t.minQty), maxQty: t.maxQty ? parseInt(t.maxQty) : null, price: parseInt(t.price),
+      }));
+      if (priceTiers.length === 0) { setErr("Minimal 1 tier harga harus diisi"); return; }
+    }
     setSaving(true); setErr("");
     try {
       const url = isEdit ? `/api/products/${initial!.id}` : "/api/products";
       const method = isEdit ? "PATCH" : "POST";
-      const res = await fetchWithAuth(url, { method, body: JSON.stringify({ ...form, packPerBatch: parseInt(form.packPerBatch) || 1, priceTiers }) });
+      const res = await fetchWithAuth(url, { method, body: JSON.stringify({ ...form, packPerBatch: parseInt(form.packPerBatch) || 1, priceTiers, channels: form.channels }) });
       if (!res.ok) { setErr((await res.json()).error ?? "Gagal"); return; }
       onSuccess();
     } finally { setSaving(false); }
@@ -91,30 +106,76 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
         </div>
         
         <div className="mt-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-          <p style={{ fontSize: "12px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "12px" }}>Tingkatan Harga</p>
-          <div className="flex flex-col gap-3">
-            {tiers.map((tier, i) => (
-              <div key={i} className="flex gap-2 items-center">
-                <Input type="number" placeholder="Min qty" value={tier.minQty} onChange={e => setTiers(p => p.map((t, j) => j === i ? { ...t, minQty: e.target.value } : t))}
-                  className="w-24 h-10 rounded-lg border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
-                <span style={{ fontSize: "12px", color: "#94A3B8" }}>–</span>
-                <Input type="number" placeholder="Max (∞)" value={tier.maxQty} onChange={e => setTiers(p => p.map((t, j) => j === i ? { ...t, maxQty: e.target.value } : t))}
-                  className="w-24 h-10 rounded-lg border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
-                <Input type="number" placeholder="Harga" value={tier.price} onChange={e => setTiers(p => p.map((t, j) => j === i ? { ...t, price: e.target.value } : t))}
-                  className="flex-1 h-10 rounded-lg border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
-                {tiers.length > 1 && (
-                  <button onClick={() => setTiers(p => p.filter((_, j) => j !== i))}
-                    style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#FEF2F2", border: "1px solid #FECACA", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s" }}>
-                    <X size={14} style={{ color: "#DC2626" }} />
-                  </button>
-                )}
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p style={{ fontSize: "12px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>Harga Produk</p>
+              <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>Aktifkan tiering jika harga berubah berdasarkan jumlah beli.</p>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <span style={{ fontSize: "12px", fontWeight: "600", color: "#64748B" }}>Ada Tiering?</span>
+              <input type="checkbox" checked={hasTiering} onChange={e => setHasTiering(e.target.checked)} className="accent-[#E85D8C] w-4 h-4" />
+            </label>
           </div>
-          <button onClick={() => setTiers(p => [...p, { minQty: "", maxQty: "", price: "" }])}
-            style={{ fontSize: "13px", color: "#E85D8C", background: "none", border: "none", cursor: "pointer", textAlign: "left", fontWeight: "700", marginTop: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-            <Plus size={16} /> Tambah Tier Harga
-          </button>
+
+          {!hasTiering ? (
+            <div className="flex items-center gap-2">
+              <Input type="number" placeholder="Harga Produk" value={singlePrice} onChange={e => setSinglePrice(e.target.value)}
+                className="w-full h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-3">
+                {tiers.map((tier, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <Input type="number" placeholder="Min qty" value={tier.minQty} onChange={e => setTiers(p => p.map((t, j) => j === i ? { ...t, minQty: e.target.value } : t))}
+                      className="w-24 h-10 rounded-lg border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
+                    <span style={{ fontSize: "12px", color: "#94A3B8" }}>–</span>
+                    <Input type="number" placeholder="Max (∞)" value={tier.maxQty} onChange={e => setTiers(p => p.map((t, j) => j === i ? { ...t, maxQty: e.target.value } : t))}
+                      className="w-24 h-10 rounded-lg border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
+                    <Input type="number" placeholder="Harga" value={tier.price} onChange={e => setTiers(p => p.map((t, j) => j === i ? { ...t, price: e.target.value } : t))}
+                      className="flex-1 h-10 rounded-lg border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
+                    {tiers.length > 1 && (
+                      <button onClick={() => setTiers(p => p.filter((_, j) => j !== i))}
+                        style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#FEF2F2", border: "1px solid #FECACA", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s" }}>
+                        <X size={14} style={{ color: "#DC2626" }} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setTiers(p => [...p, { minQty: "", maxQty: "", price: "" }])}
+                style={{ fontSize: "13px", color: "#E85D8C", background: "none", border: "none", cursor: "pointer", textAlign: "left", fontWeight: "700", marginTop: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <Plus size={16} /> Tambah Tier Harga
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="mt-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+          <p style={{ fontSize: "12px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "12px" }}>Afiliasi Channel</p>
+          <p style={{ fontSize: "11px", color: "#94A3B8", marginBottom: "12px" }}>Biarkan kosong jika produk ini tersedia di semua channel.</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: "walkin", label: "Walk-in" },
+              { id: "whatsapp", label: "WhatsApp" },
+              { id: "tiktok", label: "TikTok" },
+              { id: "shopee", label: "Shopee" }
+            ].map(ch => {
+              const checked = form.channels.includes(ch.id);
+              return (
+                <label key={ch.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${checked ? 'border-[#E85D8C] bg-pink-50' : 'border-slate-200 bg-white'} cursor-pointer transition-colors`}>
+                  <input type="checkbox" checked={checked} className="accent-[#E85D8C]"
+                    onChange={(e) => {
+                      setForm(p => ({
+                        ...p,
+                        channels: e.target.checked ? [...p.channels, ch.id] : p.channels.filter(c => c !== ch.id)
+                      }));
+                    }} />
+                  <span style={{ fontSize: "12px", fontWeight: checked ? "600" : "500", color: checked ? "#831843" : "#64748B" }}>{ch.label}</span>
+                </label>
+              );
+            })}
+          </div>
         </div>
         
         {err && <p style={{ fontSize: "13px", color: "#DC2626", fontWeight: "500" }}>{err}</p>}
@@ -187,9 +248,12 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   onSuccess: () => void; onCancel: () => void;
 }) {
   const isEdit = !!initial;
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    name: string; baseUnit: string; minStock: string; category: string; channels: string[];
+  }>({
     name: initial?.name ?? "", baseUnit: initial?.baseUnit ?? "",
     minStock: String(initial?.minStock ?? "0"), category: initial?.category ?? "bahan_baku",
+    channels: initial?.channels ?? [],
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -200,7 +264,7 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
     try {
       const url = isEdit ? `/api/ingredients/${initial!.id}` : "/api/ingredients";
       const method = isEdit ? "PATCH" : "POST";
-      const res = await fetchWithAuth(url, { method, body: JSON.stringify({ name: form.name.trim(), baseUnit: form.baseUnit.trim(), category: form.category, minStock: parseFloat(form.minStock) || 0 }) });
+      const res = await fetchWithAuth(url, { method, body: JSON.stringify({ name: form.name.trim(), baseUnit: form.baseUnit.trim(), category: form.category, minStock: parseFloat(form.minStock) || 0, channels: form.channels }) });
       if (!res.ok) { setErr((await res.json()).error ?? "Gagal"); return; }
       onSuccess();
     } finally { setSaving(false); }
@@ -226,6 +290,34 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
           <Input type="number" placeholder="Stok min" value={form.minStock} onChange={e => setForm(p => ({ ...p, minStock: e.target.value }))}
             className="w-32 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
         </div>
+
+        <div className="mt-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+          <p style={{ fontSize: "12px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "12px" }}>Afiliasi Channel</p>
+          <p style={{ fontSize: "11px", color: "#94A3B8", marginBottom: "12px" }}>Biarkan kosong jika bahan ini tersedia di semua channel.</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: "walkin", label: "Walk-in" },
+              { id: "whatsapp", label: "WhatsApp" },
+              { id: "tiktok", label: "TikTok" },
+              { id: "shopee", label: "Shopee" }
+            ].map(ch => {
+              const checked = form.channels.includes(ch.id);
+              return (
+                <label key={ch.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${checked ? 'border-[#E85D8C] bg-pink-50' : 'border-slate-200 bg-white'} cursor-pointer transition-colors`}>
+                  <input type="checkbox" checked={checked} className="accent-[#E85D8C]"
+                    onChange={(e) => {
+                      setForm(p => ({
+                        ...p,
+                        channels: e.target.checked ? [...p.channels, ch.id] : p.channels.filter(c => c !== ch.id)
+                      }));
+                    }} />
+                  <span style={{ fontSize: "12px", fontWeight: checked ? "600" : "500", color: checked ? "#831843" : "#64748B" }}>{ch.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
         {err && <p style={{ fontSize: "13px", color: "#DC2626", fontWeight: "500" }}>{err}</p>}
         <div className="flex gap-3 mt-2 pt-4 border-t border-slate-100">
           <button onClick={handleSave} disabled={saving} data-testid="save-ingredient-btn"
@@ -267,7 +359,7 @@ export default function MasterDataPage() {
   // ── Add-on & Supplier states ──
   const [addOns, setAddOns] = useState<AddonItem[]>([]);
   const [editingAddon, setEditingAddon] = useState<AddonItem | null>(null);
-  const [addonForm, setAddonForm] = useState({ name: "", price: "", minStock: "10" });
+  const [addonForm, setAddonForm] = useState<{ name: string; price: string; minStock: string; channels: string[] }>({ name: "", price: "", minStock: "10", channels: [] });
   const [savingAddon, setSavingAddon] = useState(false);
   const [addonDeleteTarget, setAddonDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deletingAddon, setDeletingAddon] = useState(false);
@@ -380,13 +472,14 @@ export default function MasterDataPage() {
         body: JSON.stringify({
           name: addonForm.name,
           price: Number(addonForm.price),
-          minStock: Number(addonForm.minStock || 10)
+          minStock: Number(addonForm.minStock || 10),
+          channels: addonForm.channels
         })
       });
       if (res.ok) {
         setShowAddForm(false);
         setEditingAddon(null);
-        setAddonForm({ name: "", price: "", minStock: "10" });
+        setAddonForm({ name: "", price: "", minStock: "10", channels: [] });
         await loadAll();
       }
     } finally { setSavingAddon(false); }
@@ -472,7 +565,7 @@ export default function MasterDataPage() {
             <button
               onClick={() => {
                 if (tab === "pelanggan") { setEditingCustomer(null); setCustomerForm({ name: "", customerType: "reguler", channel: "walk_in", phoneNumber: "", address: "", notes: "", discountPerUnit: "0" }); }
-                else if (tab === "addons") { setEditingAddon(null); setAddonForm({ name: "", price: "", minStock: "10" }); }
+                else if (tab === "addons") { setEditingAddon(null); setAddonForm({ name: "", price: "", minStock: "10", channels: [] }); }
                 else if (tab === "suppliers") { setEditingSupplier(null); setSupplierForm({ name: "", contactPerson: "", phoneNumber: "" }); }
                 else { setEditItem(null); }
                 setShowAddForm(true);
@@ -679,6 +772,33 @@ export default function MasterDataPage() {
                           <Input type="number" placeholder="Harga Jual (Rp)" value={addonForm.price} onChange={e => setAddonForm(p => ({ ...p, price: e.target.value }))} className="h-12 flex-1 rounded-xl text-sm focus-visible:ring-[#E85D8C]" />
                           <Input type="number" placeholder="Min Stok" value={addonForm.minStock} onChange={e => setAddonForm(p => ({ ...p, minStock: e.target.value }))} className="h-12 w-32 rounded-xl text-sm focus-visible:ring-[#E85D8C]" />
                         </div>
+                        
+                        <div className="mt-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                          <p style={{ fontSize: "12px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "12px" }}>Afiliasi Channel</p>
+                          <p style={{ fontSize: "11px", color: "#94A3B8", marginBottom: "12px" }}>Biarkan kosong jika Add-on ini tersedia di semua channel.</p>
+                          <div className="flex flex-wrap gap-2">
+                            {[
+                              { id: "walkin", label: "Walk-in" },
+                              { id: "whatsapp", label: "WhatsApp" },
+                              { id: "tiktok", label: "TikTok" },
+                              { id: "shopee", label: "Shopee" }
+                            ].map(ch => {
+                              const checked = addonForm.channels.includes(ch.id);
+                              return (
+                                <label key={ch.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${checked ? 'border-[#E85D8C] bg-pink-50' : 'border-slate-200 bg-white'} cursor-pointer transition-colors`}>
+                                  <input type="checkbox" checked={checked} className="accent-[#E85D8C]"
+                                    onChange={(e) => {
+                                      setAddonForm(p => ({
+                                        ...p,
+                                        channels: e.target.checked ? [...p.channels, ch.id] : p.channels.filter(c => c !== ch.id)
+                                      }));
+                                    }} />
+                                  <span style={{ fontSize: "12px", fontWeight: checked ? "600" : "500", color: checked ? "#831843" : "#64748B" }}>{ch.label}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
                         <div className="flex gap-3 mt-2 pt-4 border-t border-slate-100">
                           <button onClick={handleSaveAddon} disabled={savingAddon} className="flex-1 flex justify-center items-center h-12 rounded-xl bg-[#E85D8C] text-white text-sm font-bold shadow-[0_4px_12px_rgba(232,93,140,0.2)] hover:bg-[#D94E7A] transition-colors">
                             {savingAddon ? <Loader2 size={16} className="animate-spin" /> : "Simpan Add-on"}
@@ -700,7 +820,7 @@ export default function MasterDataPage() {
                             <div className="flex justify-between items-start mb-2">
                               <h3 className="text-[17px] font-black text-slate-800">{a.name}</h3>
                               <div className="flex gap-1">
-                                <ActionBtn icon={<Pencil size={12} />} color="#E85D8C" bg="#FEF1F5" hoverBg="#FCE7F3" onClick={() => { setEditingAddon(a); setAddonForm({ name: a.name, price: String(a.price), minStock: String(a.minStock) }); setShowAddForm(false); setAddonDeleteTarget(null); }} />
+                                <ActionBtn icon={<Pencil size={12} />} color="#E85D8C" bg="#FEF1F5" hoverBg="#FCE7F3" onClick={() => { setEditingAddon(a); setAddonForm({ name: a.name, price: String(a.price), minStock: String(a.minStock), channels: a.channels ?? [] }); setShowAddForm(false); setAddonDeleteTarget(null); }} />
                                 <ActionBtn icon={<Trash2 size={12} />} color="#DC2626" bg="#FEF2F2" hoverBg="#FEE2E2" onClick={() => { setAddonDeleteTarget({ id: a.id, name: a.name }); setEditingAddon(null); }} />
                               </div>
                             </div>
