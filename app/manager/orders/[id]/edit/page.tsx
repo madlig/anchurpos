@@ -77,6 +77,9 @@ export default function EditOrderPage() {
   const [enableCustomDate, setEnableCustomDate] = useState(false);
   const [customOrderDate, setCustomOrderDate] = useState("");
 
+  const [poNumber, setPoNumber] = useState("");
+  const [showPoNumber, setShowPoNumber] = useState(false);
+
   const [shippingCost, setShippingCost] = useState("");
   const [shippingBorneBy, setShippingBorneBy] = useState<"seller" | "customer">("customer");
   const [deliveryMethod, setDeliveryMethod] = useState<"pickup" | "self_delivery" | "courier">("courier");
@@ -135,6 +138,11 @@ export default function EditOrderPage() {
         setOrderNumber(o.orderNumber);
         setOrderChannel(o.orderChannel || "walkin");
         setOriginalCreatedAt(o.createdAt);
+        
+        if (o.poNumber) {
+          setPoNumber(o.poNumber);
+          setShowPoNumber(true);
+        }
         
         // Map items to cart structure
         const mappedCart: EditCartItem[] = o.items.map((item: any) => ({
@@ -397,6 +405,7 @@ export default function EditOrderPage() {
         orderNotes: orderNotes.trim() || null,
         platformFeePercent: (orderChannel === "tiktok" || orderChannel === "shopee") ? (parseFloat(platformFeeOverride) || 0) : undefined,
         customDate: enableCustomDate && customOrderDate ? customOrderDate : undefined,
+        poNumber: showPoNumber && poNumber.trim() ? poNumber.trim() : null,
         sauceDistribution: Object.keys(computedSauceDist).length > 0 ? computedSauceDist : undefined,
       };
 
@@ -658,6 +667,25 @@ export default function EditOrderPage() {
                 </div>
               )}
             </div>
+            {/* Input Nomor PO / Referensi (Khusus B2B & Reseller) */}
+            {(selectedCustomer?.customerType === "b2b" || selectedCustomer?.customerType === "reseller") && (
+              <div className="mb-4">
+                <label className="flex items-center gap-2 cursor-pointer mb-2">
+                  <input type="checkbox" checked={showPoNumber} onChange={e => { setShowPoNumber(e.target.checked); if (!e.target.checked) setPoNumber(""); }}
+                    className="rounded text-pink-600 focus:ring-pink-500" />
+                  <span className="text-xs font-semibold text-slate-700">Tambahkan Nomor PO / Referensi</span>
+                </label>
+                {showPoNumber && (
+                  <input
+                    type="text"
+                    placeholder="Contoh: PO/2607..."
+                    value={poNumber}
+                    onChange={e => setPoNumber(e.target.value)}
+                    className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white outline-none"
+                  />
+                )}
+              </div>
+            )}
 
             {/* Custom Back-Dated Date */}
             <div className="mb-4 p-3 rounded-xl bg-slate-50 border border-slate-100">

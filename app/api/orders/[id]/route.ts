@@ -120,6 +120,7 @@ export async function PUT(
     shippingBorneBy,
     deliveryMethod,
     sauceDistribution,
+    poNumber,
   } = body as {
     customerId?: string;
     customerName?: string;
@@ -139,6 +140,7 @@ export async function PUT(
     shippingBorneBy?: "seller" | "customer";
     deliveryMethod?: "pickup" | "self_delivery" | "courier";
     sauceDistribution?: Record<string, number>;
+    poNumber?: string | null;
   };
 
   if (!items?.length) {
@@ -331,7 +333,8 @@ export async function PUT(
         shippingCost: shippingCost ?? null,
         shippingBorneBy: shippingBorneBy ?? null,
         deliveryMethod: deliveryMethod ?? null,
-        sauceDistribution: sauceDistribution ?? null,
+        poNumber: poNumber !== undefined ? poNumber : (oldOrder.poNumber ?? null),
+        sauceDistribution: sauceDistribution !== undefined ? sauceDistribution : (oldOrder.sauceDistribution ?? null),
         createdAt: dateToUse,
       });
 
