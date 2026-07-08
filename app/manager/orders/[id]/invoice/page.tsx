@@ -181,10 +181,33 @@ export default function InvoicePage() {
       </div>
 
       <style>{`
+        /* Override manager layout for invoice page */
+        html, body {
+          background-color: #ffffff !important;
+          background: #ffffff !important;
+        }
+        
+        /* Hide sidebar and bottom nav */
+        aside, nav {
+          display: none !important;
+        }
+        
+        /* Remove margin from layout container */
+        div[class*="md:ml-60"] {
+          margin-left: 0 !important;
+          padding-bottom: 0 !important;
+        }
+        
+        /* Ensure pink layout wrapper is white */
+        div[style*="#FCABB4"], div[style*="rgb(252, 171, 180)"] {
+          background: #ffffff !important;
+        }
+
         @media print {
           .no-print { display: none !important; }
-          body { margin: 0; }
-          #invoice { max-width: 100%; padding: 20px; }
+          body { background: #fff !important; margin: 0; padding: 0; }
+          @page { margin: 0; }
+          #invoice { padding: 20px !important; width: 100% !important; max-width: none !important; }
         }
       `}</style>
     </>
