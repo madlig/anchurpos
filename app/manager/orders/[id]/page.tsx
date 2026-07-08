@@ -12,7 +12,7 @@ interface OrderItem {
 }
 interface OrderDetail {
   id: string; orderNumber: string; source: string;
-  customerId: string | null; customerName: string; customerPhone: string | null;
+  customerId: string | null; customerName: string; customerType: string | null; customerPhone: string | null;
   channel: string; status: string; paymentStatus: string; paymentMethod: string | null;
   shippingAddress: string | null; shippingCost: number | null; shippingCostConfirmed: boolean;
   shippingBorneBy: string | null; deliveryMethod: string | null;
@@ -281,14 +281,14 @@ export default function OrderDetailPage() {
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Tindakan</span>
 
             <div className="flex flex-col gap-3">
-              {/* Print Invoice — B2B Only */}
-              {order.channel === "b2b" && (
+              {/* Print Invoice — B2B and Reseller */}
+              {(order.customerType === "b2b" || order.customerType === "reseller" || order.channel === "b2b") && (
                 <button
                   onClick={() => window.open(`/manager/orders/${order.id}/invoice`, "_blank")}
                   className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-blue-50 text-blue-600 font-black hover:bg-blue-100 transition-colors tap-target shadow-sm"
                 >
                   <Printer size={18} />
-                  Cetak Invoice B2B
+                  Cetak Invoice
                 </button>
               )}
 
