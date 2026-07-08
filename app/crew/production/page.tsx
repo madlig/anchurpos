@@ -19,6 +19,7 @@ export default function CrewProductionPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [entries, setEntries] = useState<Map<string, EntryInput>>(new Map());
   const [notes, setNotes] = useState("");
+  const [draftLoaded, setDraftLoaded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
@@ -68,14 +69,37 @@ export default function CrewProductionPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Reset inputs when changing tabs
+  // Draft loading and saving
   useEffect(() => {
-    setSelected(new Set());
-    setEntries(new Map());
-    setNotes("");
-    setSuccess("");
-    setError("");
+    if (typeof window !== "undefined") {
+      try {
+        const savedEntries = localStorage.getItem("prod_draft_entries_" + activeTab);
+        const savedNotes = localStorage.getItem("prod_draft_notes_" + activeTab);
+        if (savedEntries) {
+          const parsed = JSON.parse(savedEntries);
+          const map = new Map<string, EntryInput>(parsed);
+          setEntries(map);
+          setSelected(new Set(map.keys()));
+        } else {
+          setEntries(new Map());
+          setSelected(new Set());
+        }
+        setNotes(savedNotes || "");
+      } catch (e) {
+        console.error("Gagal meload draft", e);
+      }
+      setDraftLoaded(true);
+      setSuccess("");
+      setError("");
+    }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (draftLoaded && typeof window !== "undefined") {
+      localStorage.setItem("prod_draft_entries_" + activeTab, JSON.stringify(Array.from(entries.entries())));
+      localStorage.setItem("prod_draft_notes_" + activeTab, notes);
+    }
+  }, [entries, notes, draftLoaded, activeTab]);
 
   function toggleVariant(id: string) {
     const next = new Set(selected);
@@ -154,6 +178,10 @@ export default function CrewProductionPage() {
       setSelected(new Set());
       setEntries(new Map());
       setNotes("");
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("prod_draft_entries_" + activeTab);
+        localStorage.removeItem("prod_draft_notes_" + activeTab);
+      }
       await loadData();
     } catch {
       setError("Gagal menyimpan produksi");
@@ -182,32 +210,30 @@ export default function CrewProductionPage() {
           <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>
             {enableCustomDate && customDate ? `Produksi: ${customDate}` : "Produksi Hari Ini"}
           </h1>
-          {role && (role === "owner" || role === "manager") && (
-            <div className="flex items-center gap-2">
-              <label className="text-xxs font-bold text-slate-500 flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={enableCustomDate}
-                  onChange={(e) => {
-                    setEnableCustomDate(e.target.checked);
-                    if (e.target.checked && !customDate) {
-                      setCustomDate(new Date().toISOString().split("T")[0]);
-                    }
-                  }}
-                  className="accent-pink-600"
-                />
-                Tanggal Mundur
-              </label>
-              {enableCustomDate && (
-                <input
-                  type="date"
-                  value={customDate}
-                  onChange={(e) => setCustomDate(e.target.value)}
-                  className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-700 bg-white"
-                />
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <label className="text-xxs font-bold text-slate-500 flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enableCustomDate}
+                onChange={(e) => {
+                  setEnableCustomDate(e.target.checked);
+                  if (e.target.checked && !customDate) {
+                    setCustomDate(new Date().toISOString().split("T")[0]);
+                  }
+                }}
+                className="accent-pink-600"
+              />
+              Pilih Tanggal
+            </label>
+            {enableCustomDate && (
+              <input
+                type="date"
+                value={customDate}
+                onChange={(e) => setCustomDate(e.target.value)}
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-700 bg-white"
+              />
+            )}
+          </div>
         </div>
         <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "2px" }}>
           {todayProductions.length} item produksi tercatat

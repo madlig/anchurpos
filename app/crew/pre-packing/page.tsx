@@ -17,10 +17,8 @@ export default function CrewPrePackingPage() {
   const [bufferPcs, setBufferPcs] = useState(0);
   const [showDetail, setShowDetail] = useState(false);
   const [loyangUsed, setLoyangUsed] = useState("");
-  const [regularPacks, setRegularPacks] = useState("");
-  const [fullPacks, setFullPacks] = useState("");
-  const [tiktokPacks, setTikTokPacks] = useState("");
-  const [leftoverPcs, setLeftoverPcs] = useState("");
+  const [totalPcs, setTotalPcs] = useState("");
+  const [draftLoaded, setDraftLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [poolLoading, setPoolLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -57,47 +55,72 @@ export default function CrewPrePackingPage() {
     } finally { setPoolLoading(false); }
   }, [fetchWithAuth, activeTab]);
 
+  // Draft load
   useEffect(() => {
-    setLoyangUsed("");
-    setRegularPacks("");
-    setFullPacks("");
-    setTikTokPacks("");
-    setLeftoverPcs("");
+    if (typeof window !== "undefined" && selectedVariant) {
+      const savedLoyang = localStorage.getItem(`prepack_draft_loyang_${activeTab}_${selectedVariant}`);
+      const savedPcs = localStorage.getItem(`prepack_draft_pcs_${activeTab}_${selectedVariant}`);
+      setLoyangUsed(savedLoyang || "");
+      setTotalPcs(savedPcs || "");
+      setDraftLoaded(true);
+    }
+  }, [selectedVariant, activeTab]);
+
+  // Draft save
+  useEffect(() => {
+    if (draftLoaded && typeof window !== "undefined" && selectedVariant) {
+      localStorage.setItem(`prepack_draft_loyang_${activeTab}_${selectedVariant}`, loyangUsed);
+      localStorage.setItem(`prepack_draft_pcs_${activeTab}_${selectedVariant}`, totalPcs);
+    }
+  }, [loyangUsed, totalPcs, draftLoaded, activeTab, selectedVariant]);
+
+  useEffect(() => {
     setSuccess("");
     setError("");
-    if (selectedVariant) loadPool(selectedVariant);
+    if (selectedVariant) {
+      setDraftLoaded(false);
+      loadPool(selectedVariant);
+    }
   }, [activeTab, selectedVariant, loadPool]);
 
   function selectVariant(id: string) {
-    setSelectedVariant(id); setLoyangUsed(""); setRegularPacks(""); setFullPacks(""); setTikTokPacks(""); setLeftoverPcs("");
+    setSelectedVariant(id);
     setSuccess(""); setError(""); setShowDetail(false); loadPool(id);
   }
 
   function stepVal(setter: (v: string) => void, current: string, delta: number, max?: number) {
-    const val = Math.max(0, (parseInt(current) || 0) + delta);
+    const val = Math.max(0, (parseFloat(current) || 0) + delta);
     if (max !== undefined && val > max) return;
     setter(String(val));
   }
 
   async function handleSubmit() {
     setError(""); setSuccess("");
-    const loyang = parseInt(loyangUsed) || 0;
+    const loyang = parseFloat(loyangUsed) || 0;
+    const pcs = parseInt(totalPcs) || 0;
     if (loyang <= 0) { setError("Jumlah loyang harus lebih dari 0"); return; }
+    if (pcs <= 0) { setError("Jumlah pcs churros harus lebih dari 0"); return; }
     if (loyang > totalAvailable) { setError(`Loyang tidak cukup, tersedia hanya ${totalAvailable}`); return; }
     setSubmitting(true);
+    
+    // Auto calculate
+    const packSize = 12; // Regular and TikTok are both 12 pcs
+    const calculatedPacks = Math.floor(pcs / packSize);
+    const calculatedLeftover = pcs % packSize;
+
     try {
       const payload: any = {
         variantId: selectedVariant,
         totalLoyangUsed: loyang,
         type: activeTab,
-        leftoverPcs: parseInt(leftoverPcs) || 0,
+        leftoverPcs: calculatedLeftover,
         customDate: enableCustomDate && customDate ? customDate : undefined
       };
       if (activeTab === "standard") {
-        payload.resultRegularPacks = parseInt(regularPacks) || 0;
-        payload.resultFullPacks = parseInt(fullPacks) || 0;
+        payload.resultRegularPacks = calculatedPacks;
+        payload.resultFullPacks = 0; // Defaulting to regular packs for now
       } else {
-        payload.resultTikTokPacks = parseInt(tiktokPacks) || 0;
+        payload.resultTikTokPacks = calculatedPacks;
       }
 
       const res = await fetchWithAuth("/api/pre-packing", {
@@ -106,7 +129,12 @@ export default function CrewPrePackingPage() {
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || "Gagal menyimpan"); return; }
-      setSuccess("Tersimpan!"); setLoyangUsed(""); setRegularPacks(""); setFullPacks(""); setTikTokPacks(""); setLeftoverPcs("");
+      setSuccess("Tersimpan!");
+      setLoyangUsed(""); setTotalPcs("");
+      if (typeof window !== "undefined" && selectedVariant) {
+        localStorage.removeItem(`prepack_draft_loyang_${activeTab}_${selectedVariant}`);
+        localStorage.removeItem(`prepack_draft_pcs_${activeTab}_${selectedVariant}`);
+      }
       if (selectedVariant) loadPool(selectedVariant);
     } catch { setError("Gagal menyimpan pre-packing"); } finally { setSubmitting(false); }
   }
@@ -125,32 +153,30 @@ export default function CrewPrePackingPage() {
           </h1>
         </div>
 
-        {role && (role === "owner" || role === "manager") && (
-          <div className="flex items-center gap-2">
-            <label className="text-xxs font-bold text-slate-500 flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={enableCustomDate}
-                onChange={(e) => {
-                  setEnableCustomDate(e.target.checked);
-                  if (e.target.checked && !customDate) {
-                    setCustomDate(new Date().toISOString().split("T")[0]);
-                  }
-                }}
-                className="accent-pink-600"
-              />
-              Tanggal Mundur
-            </label>
-            {enableCustomDate && (
-              <input
-                type="date"
-                value={customDate}
-                onChange={(e) => setCustomDate(e.target.value)}
-                className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-700 bg-white"
-              />
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <label className="text-xxs font-bold text-slate-500 flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={enableCustomDate}
+              onChange={(e) => {
+                setEnableCustomDate(e.target.checked);
+                if (e.target.checked && !customDate) {
+                  setCustomDate(new Date().toISOString().split("T")[0]);
+                }
+              }}
+              className="accent-pink-600"
+            />
+            Pilih Tanggal
+          </label>
+          {enableCustomDate && (
+            <input
+              type="date"
+              value={customDate}
+              onChange={(e) => setCustomDate(e.target.value)}
+              className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-700 bg-white"
+            />
+          )}
+        </div>
       </div>
       <p className="text-sm mb-5 ml-10" style={{ color: "#64748B" }}>Loyang → Pack Regular & Full</p>
 
@@ -231,37 +257,40 @@ export default function CrewPrePackingPage() {
 
               {totalAvailable > 0 && (
                 <div className="space-y-4">
-                  {(activeTab === "standard" 
-                    ? [
-                        { label: "Loyang dipakai sekarang", val: loyangUsed, set: setLoyangUsed, max: totalAvailable },
-                        { label: "Jadi pack Regular berapa", val: regularPacks, set: setRegularPacks, max: undefined },
-                        { label: "Jadi pack Full berapa", val: fullPacks, set: setFullPacks, max: undefined },
-                        { label: "Sisa pcs churros tidak masuk pack (buffer baru)", val: leftoverPcs, set: setLeftoverPcs, max: undefined },
-                      ]
-                    : [
-                        { label: "Loyang dipakai sekarang", val: loyangUsed, set: setLoyangUsed, max: totalAvailable },
-                        { label: "Jadi pack TikTok berapa", val: tiktokPacks, set: setTikTokPacks, max: undefined },
-                        { label: "Sisa pcs churros tidak masuk pack (buffer baru)", val: leftoverPcs, set: setLeftoverPcs, max: undefined },
-                      ]
-                  ).map(({ label, val, set, max }) => (
+                  {[
+                    { label: "Loyang dipakai sekarang (bisa desimal)", val: loyangUsed, set: setLoyangUsed, max: totalAvailable, step: 0.5 },
+                    { label: "Total Pcs Churros Dihasilkan", val: totalPcs, set: setTotalPcs, max: undefined, step: 1 },
+                  ].map(({ label, val, set, max, step }) => (
                     <div key={label}>
                       <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>{label}</label>
                       <div className="flex items-center rounded-full p-1 gap-1" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
-                        <button type="button" onClick={() => stepVal(set, val, -1, max)} className="h-12 w-12 rounded-full flex items-center justify-center tap-target" style={{ background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", color: "#334155" }}>
+                        <button type="button" onClick={() => stepVal(set, val, -step, max)} className="h-12 w-12 rounded-full flex items-center justify-center tap-target" style={{ background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", color: "#334155" }}>
                           <Minus size={18} strokeWidth={2.5} />
                         </button>
-                        <Input type="number" min="0" value={val} onChange={(e) => set(e.target.value)} className="flex-1 text-center font-extrabold text-xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0" style={{ color: "#1C1C1E" }} />
-                        <button type="button" onClick={() => stepVal(set, val, 1, max)} className="h-12 w-12 rounded-full text-white flex items-center justify-center tap-target" style={{ background: "#E85D8C" }}>
+                        <Input type="number" min="0" step={step} value={val} onChange={(e) => set(e.target.value)} className="flex-1 text-center font-extrabold text-xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0" style={{ color: "#1C1C1E" }} />
+                        <button type="button" onClick={() => stepVal(set, val, step, max)} className="h-12 w-12 rounded-full text-white flex items-center justify-center tap-target" style={{ background: "#E85D8C" }}>
                           <Plus size={18} strokeWidth={2.5} />
                         </button>
                       </div>
                     </div>
                   ))}
 
-                  <button onClick={handleSubmit} disabled={submitting || !(parseInt(loyangUsed) > 0)} className="w-full min-h-[56px] rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 tap-target disabled:opacity-60"
+                  {/* Auto Calculated Summary */}
+                  {parseInt(totalPcs) > 0 && (
+                    <div className="mt-4 p-4 rounded-2xl bg-pink-50 border border-pink-100 flex justify-between items-center">
+                      <div>
+                        <p className="text-xs font-bold text-pink-500 uppercase tracking-widest mb-1">Hasil Perhitungan Pack</p>
+                        <p className="text-sm font-semibold text-pink-900">
+                          {Math.floor(parseInt(totalPcs) / 12)} Pack {activeTab === "standard" ? "Regular" : "TikTok"} <span className="text-pink-400 font-normal mx-1">/</span> Sisa {parseInt(totalPcs) % 12} pcs
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <button onClick={handleSubmit} disabled={submitting || !(parseFloat(loyangUsed) > 0) || !(parseInt(totalPcs) > 0)} className="w-full min-h-[56px] rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 tap-target disabled:opacity-60"
                     style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)", boxShadow: "0 8px 20px rgba(232,93,140,0.3)" }} data-testid="submit-prepacking-button">
                     {submitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
-                    Simpan
+                    Simpan Pre-Packing
                   </button>
                 </div>
               )}
