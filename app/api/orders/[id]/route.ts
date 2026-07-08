@@ -33,6 +33,7 @@ export async function GET(
       customerId: d.customerId ?? null,
       customerName: d.customerName,
       customerType: d.customerType ?? null,
+      poNumber: d.poNumber ?? null,
       customerPhone: d.customerPhone,
       channel: d.channel,
       status: d.status,

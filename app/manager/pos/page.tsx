@@ -109,6 +109,8 @@ export default function KasirPage() {
   const [payMethod, setPayMethod] = useState<PayMethod>("cash");
   const [isPaid, setIsPaid] = useState(true);
   const [orderNotes, setOrderNotes] = useState("");
+  const [poNumber, setPoNumber] = useState("");
+  const [showPoNumber, setShowPoNumber] = useState(false);
   const [platformFeeOverride, setPlatformFeeOverride] = useState(""); // manual override if needed
   const [marketplaceFees, setMarketplaceFees] = useState({ tiktok: 0, shopee: 0 });
   const [submitting, setSubmitting] = useState(false);
@@ -367,6 +369,7 @@ export default function KasirPage() {
           body: JSON.stringify({
             name: customerSearch.trim(),
             customerType: newCustomerType,
+            poNumber: showPoNumber && poNumber.trim() ? poNumber.trim() : null,
             channel: orderChannel === "whatsapp" ? "whatsapp" : "walk_in",
             createdVia: "pos"
           }),
@@ -483,7 +486,7 @@ export default function KasirPage() {
               </span>
             </div>
             <button 
-              onClick={() => { setOrderChannel(null); setCart([]); setSelectedCustomer(null); setCustomerSearch(""); setPlatformFeeOverride(""); }}
+              onClick={() => { setOrderChannel(null); setCart([]); setSelectedCustomer(null); setCustomerSearch(""); setPlatformFeeOverride(""); setPoNumber(""); setShowPoNumber(false); }}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-xl shadow-sm text-xs font-bold text-[#1C1C1E] hover:bg-slate-50 transition-colors"
             >
               <ArrowLeft size={14} /> Ganti Channel

@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 interface OrderItem { productName: string; variantName: string; qty: number; basePrice: number; totalPrice: number; }
 interface OrderDetail {
   id: string; orderNumber: string; customerName: string; customerPhone: string | null;
-  channel: string; orderChannel: string; customerType: string | null;
+  channel: string; orderChannel: string; customerType: string | null; poNumber: string | null;
   createdAt: string; completedAt: string | null;
   paymentStatus: string; paymentMethod: string | null; shippingCost: number | null;
   platformFee: number; netRevenue: number | null;
@@ -92,6 +92,7 @@ export default function InvoicePage() {
           <div style={{ textAlign: "right" }}>
             <h2 style={{ fontSize: "28px", fontWeight: "800", color: "#1C1C1E", margin: "0 0 6px" }}>{docTitle}</h2>
             <p style={{ fontSize: "13px", fontFamily: "monospace", color: "#64748B", margin: "0 0 4px" }}>{order.orderNumber}</p>
+            {order.poNumber && <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 4px" }}>Referensi: <strong>{order.poNumber}</strong></p>}
             <p style={{ fontSize: "12px", color: "#94A3B8", margin: 0 }}>Tanggal: {fmtDate(order.createdAt)}</p>
             <div style={{ marginTop: "8px", display: "inline-block", padding: "4px 12px", borderRadius: "100px",
               background: isPaid ? "#DCFCE7" : "#FEE2E2",

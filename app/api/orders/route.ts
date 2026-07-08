@@ -143,6 +143,7 @@ export async function POST(req: NextRequest) {
     shippingBorneBy,
     deliveryMethod,
     sauceDistribution,
+    poNumber,
   } = body as {
     customerId?: string;
     customerName?: string;
@@ -162,6 +163,7 @@ export async function POST(req: NextRequest) {
     shippingBorneBy?: "seller" | "customer";
     deliveryMethod?: "pickup" | "self_delivery" | "courier";
     sauceDistribution?: Record<string, number>;
+    poNumber?: string | null;
   };
 
 
@@ -324,6 +326,9 @@ export async function POST(req: NextRequest) {
         invoiceGeneratedAt: null,
         invoiceUrl: null,
         sauceDistribution: sauceDistribution ?? null,
+        poNumber: poNumber ?? null,
+        voidReason: null,
+        voidedAt: null,
       });
 
 
