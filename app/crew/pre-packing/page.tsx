@@ -142,46 +142,51 @@ export default function CrewPrePackingPage() {
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} /></div>;
 
   return (
-    <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-3">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
-            <PackageOpen size={16} style={{ color: "#E85D8C" }} />
+    <div className="page-enter min-h-screen pb-10" style={{ background: "#FCABB4" }}>
+      {/* Header */}
+      <div className="px-5 pt-6 pb-6 mb-2 rounded-b-3xl" style={{ background: "#fff", boxShadow: "0 10px 30px rgba(232,93,140,0.15)" }}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
+              <PackageOpen size={20} style={{ color: "#E85D8C" }} />
+            </div>
+            <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E", letterSpacing: "-0.02em" }}>
+              {enableCustomDate && customDate ? `Pre-Packing: ${customDate}` : "Pre-Packing"}
+            </h1>
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>
-            {enableCustomDate && customDate ? `Pre-Packing: ${customDate}` : "Pre-Packing"}
-          </h1>
+          
+          <div className="flex items-center gap-2">
+            <label className="text-xxs font-bold text-slate-500 flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enableCustomDate}
+                onChange={(e) => {
+                  setEnableCustomDate(e.target.checked);
+                  if (e.target.checked && !customDate) {
+                    setCustomDate(new Date().toISOString().split("T")[0]);
+                  }
+                }}
+                className="accent-pink-600"
+              />
+              Pilih Tanggal
+            </label>
+            {enableCustomDate && (
+              <input
+                type="date"
+                value={customDate}
+                onChange={(e) => setCustomDate(e.target.value)}
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-700 bg-white"
+              />
+            )}
+          </div>
         </div>
-
-        <div className="flex items-center gap-2">
-          <label className="text-xxs font-bold text-slate-500 flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={enableCustomDate}
-              onChange={(e) => {
-                setEnableCustomDate(e.target.checked);
-                if (e.target.checked && !customDate) {
-                  setCustomDate(new Date().toISOString().split("T")[0]);
-                }
-              }}
-              className="accent-pink-600"
-            />
-            Pilih Tanggal
-          </label>
-          {enableCustomDate && (
-            <input
-              type="date"
-              value={customDate}
-              onChange={(e) => setCustomDate(e.target.value)}
-              className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-700 bg-white"
-            />
-          )}
-        </div>
+        <p className="text-xs mt-3 ml-12 font-medium" style={{ color: "#94A3B8" }}>Loyang → Pack Regular & Full</p>
       </div>
-      <p className="text-sm mb-5 ml-10" style={{ color: "#64748B" }}>Loyang → Pack Regular & Full</p>
+
+      <div className="px-4 mt-6 md:px-8 md:max-w-3xl">
 
       {/* Sub-tabs Selector */}
-      <div className="flex bg-slate-100 rounded-2xl p-1 gap-1 mb-5" style={{ border: "1px solid #E2E8F0" }}>
+      <div className="flex bg-white/20 backdrop-blur-md rounded-2xl p-1.5 gap-1 mb-6" style={{ border: "1px solid rgba(255,255,255,0.3)", boxShadow: "0 4px 12px rgba(232,93,140,0.1)" }}>
         {[
           { key: "standard", label: "Churros Standar (Mentah)" },
           { key: "tiktok", label: "Churros TikTok (Setengah Matang)" },
@@ -195,7 +200,7 @@ export default function CrewPrePackingPage() {
               style={
                 active
                   ? { background: "#fff", color: "#E85D8C", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }
-                  : { color: "#64748B" }
+                  : { color: "#fff" }
               }
             >
               {t.label}
@@ -205,12 +210,12 @@ export default function CrewPrePackingPage() {
       </div>
 
       {/* Variant chips */}
-      <div className="flex flex-wrap gap-2 mb-5">
+      <div className="flex flex-wrap gap-2 mb-6">
         {variants.map((v) => (
           <button key={v.id} onClick={() => selectVariant(v.id)} className="min-h-[48px] px-5 py-2.5 rounded-full text-sm font-bold transition-all tap-target"
             style={selectedVariant === v.id
-              ? { background: "#E85D8C", color: "#fff", boxShadow: "0 4px 12px rgba(232,93,140,0.3)" }
-              : { background: "#fff", color: "#334155", border: "1px solid #E2E8F0" }}
+              ? { background: "#E85D8C", color: "#fff", boxShadow: "0 4px 12px rgba(232,93,140,0.3)", border: "1px solid #E85D8C" }
+              : { background: "#fff", color: "#334155", border: "1px solid rgba(255,255,255,0.5)" }}
             data-testid={`variant-chip-${v.id}`}>
             {v.name}
           </button>
@@ -224,31 +229,31 @@ export default function CrewPrePackingPage() {
           ) : (
             <>
               {/* Pool card */}
-              <div className="rounded-3xl p-5 mb-5" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+              <div className="rounded-3xl p-6 mb-6" style={{ background: "rgba(255,255,255,0.95)", border: "1px solid rgba(255,255,255,0.5)", boxShadow: "0 10px 30px rgba(232,93,140,0.2)" }}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-3xl font-extrabold tabular-nums" style={{ color: "#1C1C1E" }}>{totalAvailable}</p>
-                    <p className="text-sm" style={{ color: "#64748B" }}>loyang siap di-pack</p>
+                    <p className="text-4xl font-black tabular-nums" style={{ color: "#831843" }}>{totalAvailable}</p>
+                    <p className="text-xs font-bold uppercase tracking-widest mt-1" style={{ color: "#64748B" }}>loyang siap di-pack</p>
                     {bufferPcs > 0 && (
-                      <div className="mt-2 text-xs font-semibold px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5" style={{ background: "#FEF1F5", color: "#E85D8C" }}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse"></span>
-                        Stok buffer: {bufferPcs} pcs (akan otomatis dipakai)
+                      <div className="mt-3 text-xs font-bold px-3 py-1.5 rounded-xl inline-flex items-center gap-2" style={{ background: "#FEF1F5", color: "#E85D8C", border: "1px solid rgba(232,93,140,0.2)" }}>
+                        <span className="w-2 h-2 rounded-full bg-pink-500 animate-pulse"></span>
+                        Stok buffer: {bufferPcs} pcs (akan dipakai)
                       </div>
                     )}
                   </div>
                   {pool.length > 0 && (
-                    <button onClick={() => setShowDetail(!showDetail)} className="flex items-center gap-1 text-xs font-semibold tap-target" style={{ color: "#E85D8C" }}>
-                      {showDetail ? "Sembunyikan" : "Rincian"}
-                      {showDetail ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    <button onClick={() => setShowDetail(!showDetail)} className="flex flex-col items-center gap-1 text-[10px] uppercase tracking-widest font-bold tap-target px-3 py-2 rounded-xl" style={{ color: "#E85D8C", background: "#FEF1F5" }}>
+                      {showDetail ? "Tutup" : "Rincian"}
+                      {showDetail ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
                   )}
                 </div>
                 {showDetail && pool.length > 0 && (
-                  <div className="mt-3 space-y-1 pt-3" style={{ borderTop: "1px solid #F1F5F9" }}>
+                  <div className="mt-4 space-y-2 pt-4" style={{ borderTop: "1px dashed rgba(232,93,140,0.2)" }}>
                     {pool.map((p) => (
-                      <div key={p.productionId} className="flex justify-between text-xs" style={{ color: "#64748B" }}>
-                        <span>{new Date(p.date).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</span>
-                        <span className="font-mono font-bold">{p.loyangRemaining} loyang</span>
+                      <div key={p.productionId} className="flex justify-between text-sm items-center">
+                        <span className="font-semibold text-slate-500">{new Date(p.date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</span>
+                        <span className="font-black text-pink-700 bg-pink-50 px-3 py-1 rounded-lg">{p.loyangRemaining} loyang</span>
                       </div>
                     ))}
                   </div>
@@ -256,20 +261,20 @@ export default function CrewPrePackingPage() {
               </div>
 
               {totalAvailable > 0 && (
-                <div className="space-y-4">
+                <div className="space-y-5 bg-white p-6 rounded-3xl" style={{ boxShadow: "0 10px 40px rgba(232,93,140,0.15)" }}>
                   {[
                     { label: "Loyang dipakai sekarang (bisa desimal)", val: loyangUsed, set: setLoyangUsed, max: totalAvailable, step: 0.5 },
                     { label: "Total Pcs Churros Dihasilkan", val: totalPcs, set: setTotalPcs, max: undefined, step: 1 },
                   ].map(({ label, val, set, max, step }) => (
                     <div key={label}>
-                      <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>{label}</label>
-                      <div className="flex items-center rounded-full p-1 gap-1" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
-                        <button type="button" onClick={() => stepVal(set, val, -step, max)} className="h-12 w-12 rounded-full flex items-center justify-center tap-target" style={{ background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", color: "#334155" }}>
-                          <Minus size={18} strokeWidth={2.5} />
+                      <label className="text-xs font-bold uppercase tracking-widest mb-3 block" style={{ color: "#94A3B8" }}>{label}</label>
+                      <div className="flex items-center rounded-2xl p-1.5 gap-1.5" style={{ background: "#F8FAFC", border: "2px solid #F1F5F9" }}>
+                        <button type="button" onClick={() => stepVal(set, val, -step, max)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target transition-all active:scale-95 hover:bg-white" style={{ background: "#fff", boxShadow: "0 2px 5px rgba(0,0,0,0.05)", color: "#334155" }}>
+                          <Minus size={18} strokeWidth={3} />
                         </button>
-                        <Input type="number" min="0" step={step} value={val} onChange={(e) => set(e.target.value)} className="flex-1 text-center font-extrabold text-xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0" style={{ color: "#1C1C1E" }} />
-                        <button type="button" onClick={() => stepVal(set, val, step, max)} className="h-12 w-12 rounded-full text-white flex items-center justify-center tap-target" style={{ background: "#E85D8C" }}>
-                          <Plus size={18} strokeWidth={2.5} />
+                        <Input type="number" min="0" step={step} value={val} onChange={(e) => set(e.target.value)} className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0" style={{ color: "#831843" }} />
+                        <button type="button" onClick={() => stepVal(set, val, step, max)} className="h-12 w-12 rounded-xl text-white flex items-center justify-center tap-target transition-all active:scale-95" style={{ background: "#E85D8C", boxShadow: "0 4px 10px rgba(232,93,140,0.3)" }}>
+                          <Plus size={18} strokeWidth={3} />
                         </button>
                       </div>
                     </div>
@@ -277,34 +282,35 @@ export default function CrewPrePackingPage() {
 
                   {/* Auto Calculated Summary */}
                   {parseInt(totalPcs) > 0 && (
-                    <div className="mt-4 p-4 rounded-2xl bg-pink-50 border border-pink-100 flex justify-between items-center">
+                    <div className="mt-6 p-5 rounded-2xl bg-pink-50 border border-pink-100 flex justify-between items-center">
                       <div>
-                        <p className="text-xs font-bold text-pink-500 uppercase tracking-widest mb-1">Hasil Perhitungan Pack</p>
-                        <p className="text-sm font-semibold text-pink-900">
-                          {Math.floor(parseInt(totalPcs) / 12)} Pack {activeTab === "standard" ? "Regular" : "TikTok"} <span className="text-pink-400 font-normal mx-1">/</span> Sisa {parseInt(totalPcs) % 12} pcs
+                        <p className="text-[10px] font-black text-pink-500 uppercase tracking-widest mb-1.5">Hasil Perhitungan Pack</p>
+                        <p className="text-lg font-black text-pink-900">
+                          {Math.floor(parseInt(totalPcs) / 12)} Pack {activeTab === "standard" ? "Regular" : "TikTok"} <span className="text-pink-300 font-normal mx-1">|</span> Sisa {parseInt(totalPcs) % 12} pcs
                         </p>
                       </div>
                     </div>
                   )}
 
-                  <button onClick={handleSubmit} disabled={submitting || !(parseFloat(loyangUsed) > 0) || !(parseInt(totalPcs) > 0)} className="w-full min-h-[56px] rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 tap-target disabled:opacity-60"
-                    style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)", boxShadow: "0 8px 20px rgba(232,93,140,0.3)" }} data-testid="submit-prepacking-button">
-                    {submitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
+                  <button onClick={handleSubmit} disabled={submitting || !(parseFloat(loyangUsed) > 0) || !(parseInt(totalPcs) > 0)} className="w-full mt-2 min-h-[60px] rounded-2xl text-white font-extrabold text-base flex items-center justify-center gap-3 tap-target disabled:opacity-60 transition-all hover:shadow-xl active:scale-[0.98]"
+                    style={{ background: "linear-gradient(135deg,#E85D8C,#C94A73)", boxShadow: "0 10px 25px rgba(232,93,140,0.4)" }} data-testid="submit-prepacking-button">
+                    {submitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} strokeWidth={3} />}
                     Simpan Pre-Packing
                   </button>
                 </div>
               )}
 
               {totalAvailable === 0 && (
-                <div className="rounded-2xl border-2 border-dashed p-8 text-center" style={{ borderColor: "#E2E8F0" }}>
-                  <p className="text-sm font-medium" style={{ color: "#94A3B8" }}>Belum ada loyang tersedia untuk varian ini</p>
+                <div className="rounded-3xl border-2 border-dashed p-10 text-center bg-white/50 backdrop-blur-sm" style={{ borderColor: "rgba(255,255,255,0.6)" }}>
+                  <PackageOpen size={32} className="mx-auto mb-3 text-white opacity-80" />
+                  <p className="text-sm font-bold text-white">Belum ada loyang tersedia untuk varian ini</p>
                 </div>
               )}
             </>
           )}
           {error && <div className="rounded-2xl px-4 py-3 mt-4" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }}><p className="text-sm font-medium" style={{ color: "#DC2626" }}>{error}</p></div>}
           {success && <div className="rounded-2xl px-4 py-3 mt-4" style={{ background: "#F0FDF4", border: "1px solid #BBF7D0" }}><p className="text-sm font-medium" style={{ color: "#16A34A" }}>{success}</p></div>}
-        </>
+        </div>
       )}
     </div>
   );

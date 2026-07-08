@@ -202,14 +202,18 @@ export default function CrewProductionPage() {
   const progressPct = Math.round((totalLoyang / loyangTarget) * 100);
 
   return (
-    <div className="page-enter min-h-screen" style={{ background: "#FCABB4" }}>
-
-      {/* Header (white) */}
-      <div className="px-5 pt-4 pb-4 mb-4" style={{ background: "#fff" }}>
+    <div className="page-enter min-h-screen pb-10" style={{ background: "#FCABB4" }}>
+      {/* Header */}
+      <div className="px-5 pt-6 pb-6 mb-2 rounded-b-3xl" style={{ background: "#fff", boxShadow: "0 10px 30px rgba(232,93,140,0.15)" }}>
         <div className="flex items-center justify-between">
-          <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>
-            {enableCustomDate && customDate ? `Produksi: ${customDate}` : "Produksi Hari Ini"}
-          </h1>
+          <div>
+            <h1 style={{ fontSize: "22px", fontWeight: "800", color: "#1C1C1E", letterSpacing: "-0.02em" }}>
+              {enableCustomDate && customDate ? `Produksi: ${customDate}` : "Produksi Hari Ini"}
+            </h1>
+            <p style={{ fontSize: "13px", color: "#64748B", marginTop: "4px", fontWeight: "500" }}>
+              {todayProductions.length} item produksi tercatat
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <label className="text-xxs font-bold text-slate-500 flex items-center gap-1.5 cursor-pointer">
               <input
@@ -235,14 +239,11 @@ export default function CrewProductionPage() {
             )}
           </div>
         </div>
-        <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "2px" }}>
-          {todayProductions.length} item produksi tercatat
-        </p>
       </div>
 
       {/* Sub-tabs Selector */}
-      <div className="px-4 mb-4 md:px-8 md:max-w-3xl">
-        <div className="flex bg-white/20 backdrop-blur rounded-2xl p-1 gap-1" style={{ border: "1px solid rgba(255,255,255,0.2)" }}>
+      <div className="px-4 mb-6 mt-4 md:px-8 md:max-w-3xl">
+        <div className="flex bg-white/20 backdrop-blur-md rounded-2xl p-1.5 gap-1" style={{ border: "1px solid rgba(255,255,255,0.3)", boxShadow: "0 4px 12px rgba(232,93,140,0.1)" }}>
           {[
             { key: "standard", label: "Churros Standar (Mentah)" },
             { key: "tiktok", label: "Churros TikTok (Setengah Matang)" },
@@ -266,15 +267,16 @@ export default function CrewProductionPage() {
         </div>
       </div>
 
-      <div className="px-4 pb-4 md:px-8 md:max-w-3xl">
+      <div className="px-4 pb-4 md:px-8 md:max-w-3xl space-y-6">
 
       {/* Summary stats card */}
       {todayProductions.length > 0 && (
         <div
           data-testid="production-summary-card"
-          style={{ background: "#fff", borderRadius: "14px", border: "1px solid #F1F5F9", marginBottom: "16px", overflow: "hidden" }}
+          className="rounded-3xl transition-all"
+          style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.5)", overflow: "hidden", boxShadow: "0 10px 30px rgba(232,93,140,0.2)" }}
         >
-          <div className="flex" style={{ borderBottom: "1px solid #F8FAFC" }}>
+          <div className="flex" style={{ borderBottom: "1px solid rgba(241,245,249,0.5)" }}>
             {[
               { label: "Selesai", value: String(totalLoyang), color: "#E85D8C" },
               { label: "Target", value: String(loyangTarget), color: "#64748B" },
@@ -282,11 +284,11 @@ export default function CrewProductionPage() {
             ].map((s, i) => (
               <div
                 key={s.label}
-                className="flex-1 text-center py-3"
-                style={{ borderRight: i < 2 ? "1px solid #F8FAFC" : "none" }}
+                className="flex-1 text-center py-4"
+                style={{ borderRight: i < 2 ? "1px solid rgba(241,245,249,0.5)" : "none" }}
               >
-                <p style={{ fontSize: "20px", fontWeight: "700", color: s.color }}>{s.value}</p>
-                <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>{s.label}</p>
+                <p style={{ fontSize: "24px", fontWeight: "800", color: s.color, letterSpacing: "-0.02em" }}>{s.value}</p>
+                <p style={{ fontSize: "12px", color: "#64748B", marginTop: "2px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</p>
               </div>
             ))}
           </div>
@@ -295,27 +297,27 @@ export default function CrewProductionPage() {
 
       {/* Today's productions */}
       {todayProductions.length > 0 && (
-        <div style={{ marginBottom: "16px" }}>
-          <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "10px" }}>Sudah Dicatat</p>
-          <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden", border: "1px solid #F1F5F9" }}>
+        <div>
+          <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E", marginBottom: "12px" }}>Sudah Dicatat</p>
+          <div className="rounded-3xl" style={{ background: "rgba(255,255,255,0.95)", overflow: "hidden", border: "1px solid rgba(255,255,255,0.5)", boxShadow: "0 10px 30px rgba(232,93,140,0.15)" }}>
             {todayProductions.map((p, i) => {
               const barPct = Math.min(100, (p.loyangCount / loyangTarget) * 100);
               return (
                 <div
                   key={p.id}
-                  style={{ padding: "12px 14px", borderBottom: i < todayProductions.length - 1 ? "1px solid #F8FAFC" : "none" }}
+                  style={{ padding: "16px 20px", borderBottom: i < todayProductions.length - 1 ? "1px solid rgba(241,245,249,0.6)" : "none" }}
                   data-testid={`today-production-${i}`}
                 >
-                  <div className="flex items-center justify-between" style={{ marginBottom: "6px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{p.variantId}</span>
-                    <span style={{ fontSize: "11px", fontWeight: "600", color: "#E85D8C", padding: "2px 8px", borderRadius: "100px", background: "#FEF1F5" }}>
+                  <div className="flex items-center justify-between" style={{ marginBottom: "10px" }}>
+                    <span style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>{p.variantId}</span>
+                    <span style={{ fontSize: "12px", fontWeight: "700", color: "#E85D8C", padding: "4px 10px", borderRadius: "100px", background: "#FEF1F5" }}>
                       {p.loyangCount} loyang
                     </span>
                   </div>
-                  <div style={{ height: "4px", borderRadius: "2px", background: "#F1F5F9" }}>
-                    <div style={{ height: "4px", borderRadius: "2px", background: "#E85D8C", width: `${barPct}%`, transition: "width 0.4s" }} />
+                  <div style={{ height: "6px", borderRadius: "3px", background: "#F1F5F9", overflow: "hidden" }}>
+                    <div style={{ height: "6px", borderRadius: "3px", background: "linear-gradient(90deg, #E85D8C 0%, #F472B6 100%)", width: `${barPct}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
                   </div>
-                  <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "4px" }}>{p.batches} adonan</p>
+                  <p style={{ fontSize: "12px", color: "#64748B", marginTop: "8px", fontWeight: "500" }}>{p.batches} adonan</p>
                 </div>
               );
             })}
@@ -324,10 +326,15 @@ export default function CrewProductionPage() {
       )}
 
       {/* Add Production Form */}
-      <div style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9", marginBottom: "12px" }}>
-        <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "12px" }}>
-          Tambah Produksi ({activeTab === "standard" ? "Standar" : "TikTok"})
-        </p>
+      <div className="rounded-3xl p-6" style={{ background: "#fff", border: "1px solid rgba(255,255,255,0.8)", boxShadow: "0 10px 40px rgba(232,93,140,0.2)" }}>
+        <div className="flex items-center gap-2 mb-6">
+          <div className="h-10 w-10 rounded-2xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
+            <ChefHat size={20} style={{ color: "#E85D8C" }} />
+          </div>
+          <p style={{ fontSize: "16px", fontWeight: "800", color: "#1C1C1E" }}>
+            Tambah Produksi ({activeTab === "standard" ? "Standar" : "TikTok"})
+          </p>
+        </div>
 
       {/* Variant chips */}
       <div className="mb-5">
@@ -362,11 +369,11 @@ export default function CrewProductionPage() {
           return (
             <div
               key={vid}
-              className="rounded-3xl p-5 page-enter"
-              style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
+              className="rounded-3xl p-6 page-enter"
+              style={{ background: "#FEF1F5", border: "1px solid rgba(232,93,140,0.1)", boxShadow: "0 4px 15px rgba(232,93,140,0.05)" }}
               data-testid={`entry-card-${vid}`}
             >
-              <p className="font-bold text-base mb-4" style={{ color: "#1C1C1E" }}>{variant.name}</p>
+              <p className="font-extrabold text-lg mb-5" style={{ color: "#831843" }}>{variant.name}</p>
               <div className="space-y-4">
                 <div>
                   <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>
@@ -401,17 +408,16 @@ export default function CrewProductionPage() {
 
       {selected.size > 0 && (
         <>
-          <div className="mb-4">
-            <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>
+          <div className="mb-6">
+            <label className="text-xs font-bold uppercase tracking-widest mb-3 block" style={{ color: "#94A3B8" }}>
               Catatan (Opsional)
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-2xl px-4 py-3 text-sm resize-none focus:outline-none transition-colors"
-              style={{ border: "1px solid #E2E8F0", background: "#fff" }}
-              rows={2}
-              placeholder="Catatan umum produksi hari ini..."
+              className="w-full rounded-2xl px-5 py-4 text-sm resize-none focus:outline-none transition-all"
+              style={{ border: "2px solid #F1F5F9", background: "#F8FAFC", color: "#1C1C1E", minHeight: "100px" }}
+              placeholder="Tambahkan catatan khusus hari ini..."
               data-testid="production-notes"
             />
           </div>
@@ -419,8 +425,8 @@ export default function CrewProductionPage() {
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full min-h-[56px] rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 active:scale-[0.98] transition-all disabled:opacity-70 tap-target"
-            style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)", boxShadow: "0 8px 20px rgba(232,93,140,0.3)" }}
+            className="w-full min-h-[60px] rounded-2xl text-white font-extrabold text-base flex items-center justify-center gap-3 active:scale-[0.98] transition-all disabled:opacity-70 tap-target hover:shadow-lg"
+            style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)", boxShadow: "0 10px 25px rgba(232,93,140,0.4)" }}
             data-testid="save-production-button"
           >
             {submitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
@@ -477,8 +483,8 @@ function Stepper({
         min="0"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 text-center font-extrabold text-xl tabular-nums border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 h-12 p-0"
-        style={{ color: "#1C1C1E" }}
+        className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 h-14 p-0"
+        style={{ color: "#831843" }}
         data-testid={testId ? `${testId}-input` : undefined}
       />
       <button
