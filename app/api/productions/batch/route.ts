@@ -8,6 +8,7 @@ interface BatchEntry {
   variantId: string;
   batches: number;
   loyangCount: number;
+  pcsCount: number;
 }
 
 export async function POST(req: NextRequest) {
@@ -82,6 +83,7 @@ export async function POST(req: NextRequest) {
           variantId: entry.variantId,
           batches: entry.batches,
           loyangCount: entry.loyangCount,
+          pcsCount: entry.pcsCount || 0,
           loyangRemaining: entry.loyangCount,
           type: type || "standard",
           notes: notes ?? "",

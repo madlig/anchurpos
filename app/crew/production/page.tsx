@@ -10,6 +10,7 @@ interface EntryInput {
   variantId: string;
   batches: string;
   loyangCount: string;
+  pcsCount: string;
 }
 
 export default function CrewProductionPage() {
@@ -111,13 +112,13 @@ export default function CrewProductionPage() {
     } else {
       next.add(id);
       const nextEntries = new Map(entries);
-      nextEntries.set(id, { variantId: id, batches: "", loyangCount: "" });
+      nextEntries.set(id, { variantId: id, batches: "", loyangCount: "", pcsCount: "" });
       setEntries(nextEntries);
     }
     setSelected(next);
   }
 
-  function updateEntry(variantId: string, field: "batches" | "loyangCount", value: string) {
+  function updateEntry(variantId: string, field: "batches" | "loyangCount" | "pcsCount", value: string) {
     const nextEntries = new Map(entries);
     const entry = nextEntries.get(variantId);
     if (entry) {
@@ -126,11 +127,11 @@ export default function CrewProductionPage() {
     }
   }
 
-  function stepValue(variantId: string, field: "batches" | "loyangCount", delta: number) {
+  function stepValue(variantId: string, field: "batches" | "loyangCount" | "pcsCount", delta: number) {
     const entry = entries.get(variantId);
     if (!entry) return;
     const current = parseFloat(entry[field]) || 0;
-    const step = field === "batches" ? 0.5 : 1;
+    const step = field === "batches" ? 0.5 : field === "pcsCount" ? 12 : 1;
     const next = Math.max(0, current + delta * step);
     updateEntry(variantId, field, String(next));
   }
@@ -146,6 +147,7 @@ export default function CrewProductionPage() {
         variantId: e.variantId,
         batches: parseFloat(e.batches) || 0,
         loyangCount: parseInt(e.loyangCount) || 0,
+        pcsCount: parseInt(e.pcsCount) || 0,
       }));
 
     if (batchEntries.length === 0) {
@@ -398,7 +400,19 @@ export default function CrewProductionPage() {
                     step="1"
                     testId={`stepper-loyang-${vid}`}
                   />
-                  <p className="text-xs text-stone-400 mt-1.5">Sesuai loyang yang sudah dicetak</p>
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>
+                    Total Pcs Churros
+                  </label>
+                  <Stepper
+                    value={entry.pcsCount}
+                    onChange={(v) => updateEntry(vid, "pcsCount", v)}
+                    onStep={(d) => stepValue(vid, "pcsCount", d)}
+                    step="12"
+                    testId={`stepper-pcs-${vid}`}
+                  />
+                  <p className="text-xs text-stone-400 mt-1.5">Sesuai pcs yang dihasilkan</p>
                 </div>
               </div>
             </div>

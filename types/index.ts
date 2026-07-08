@@ -167,6 +167,7 @@ export interface Production {
   variantId: string;
   batches: number;
   loyangCount: number;
+  pcsCount: number;
   loyangRemaining: number;
   notes: string;
   shiftCrewId: string;
