@@ -397,6 +397,9 @@ export default function KasirPage() {
             sauceName: c.sauceName,
           })),
           orderNotes: orderNotes.trim() || null,
+          paymentMethod: payMethod,
+          paymentStatus: isPaid ? "sudah_bayar" : "belum_bayar",
+          poNumber: showPoNumber && poNumber.trim() ? poNumber.trim() : null,
           customDate: enableCustomDate && customOrderDate ? customOrderDate : undefined,
           shippingCost: orderChannel === "whatsapp" && deliveryMethod !== "pickup" ? (parseInt(shippingCost) || 0) : null,
           shippingBorneBy: orderChannel === "whatsapp" && deliveryMethod !== "pickup" ? shippingBorneBy : null,
@@ -1008,8 +1011,8 @@ export default function KasirPage() {
             )}
 
 
-            {/* ── Status Bayar — hanya untuk WhatsApp ── */}
-            {orderChannel === "whatsapp" && (
+            {/* ── Status Bayar — ── */}
+            {(orderChannel === "whatsapp" || orderChannel === "walkin") && (
               <div style={{ marginBottom: "12px" }}>
                 <label style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
                   Status Pembayaran

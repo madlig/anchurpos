@@ -667,8 +667,8 @@ export default function EditOrderPage() {
                 </div>
               )}
             </div>
-            {/* Input Nomor PO / Referensi (Khusus B2B & Reseller) */}
-            {(selectedCustomer?.customerType === "b2b" || selectedCustomer?.customerType === "reseller") && (
+            {/* Input Nomor PO / Referensi (Khusus B2B & Reseller atau jika sudah ada PO) */}
+            {(showPoNumber || selectedCustomer?.customerType === "b2b" || selectedCustomer?.customerType === "reseller") && (
               <div className="mb-4">
                 <label className="flex items-center gap-2 cursor-pointer mb-2">
                   <input type="checkbox" checked={showPoNumber} onChange={e => { setShowPoNumber(e.target.checked); if (!e.target.checked) setPoNumber(""); }}
