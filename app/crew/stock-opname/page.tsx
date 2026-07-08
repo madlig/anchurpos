@@ -82,23 +82,25 @@ export default function CrewStockOpnamePage() {
   }
 
   return (
-    <div className="px-5 pt-6 pb-4 md:px-8 md:pt-8 page-enter">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E" }}>Stock Opname</h1>
-          <p className="text-sm capitalize" style={{ color: "#64748B" }}>{filledCount}/{ingredients.length} diisi</p>
+    <div className="page-enter min-h-screen pb-10" style={{ background: "#FCABB4" }}>
+      {/* Header */}
+      <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30" style={{ background: "#E85D8C", boxShadow: "0 10px 30px rgba(232,93,140,0.2)" }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-white">Stock Opname</h1>
+            <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.9)" }}>{filledCount}/{ingredients.length} bahan diisi</p>
+          </div>
+          <div className="rounded-2xl px-3 py-1.5 bg-white/20 backdrop-blur-md" style={{ border: "1px solid rgba(255,255,255,0.3)" }}>
+            <span className="text-sm font-bold tabular-nums text-white">{filledCount}/{ingredients.length}</span>
+          </div>
         </div>
-        <div className="rounded-2xl px-3 py-1.5" style={{ background: "#FEF1F5" }}>
-          <span className="text-sm font-bold tabular-nums" style={{ color: "#E85D8C" }}>{filledCount}/{ingredients.length}</span>
+        {/* Progress bar */}
+        <div className="h-1.5 rounded-full mt-4 overflow-hidden bg-white/20">
+          <div className="h-full rounded-full transition-all bg-white" style={{ width: `${ingredients.length > 0 ? (filledCount / ingredients.length) * 100 : 0}%` }} />
         </div>
       </div>
 
-      {/* Progress bar */}
-      <div className="h-2 rounded-full mb-5 overflow-hidden" style={{ background: "#F1F5F9" }}>
-        <div className="h-full rounded-full transition-all" style={{ width: `${ingredients.length > 0 ? (filledCount / ingredients.length) * 100 : 0}%`, background: "linear-gradient(90deg,#E85D8C,#C94A73)" }} />
-      </div>
-
-      <div className="space-y-3 mb-6">
+      <div className="px-4 mt-6 md:px-8 max-w-4xl mx-auto space-y-3 mb-6">
         {ingredients.map((ing) => {
           const entry = entries.get(ing.id);
           const isPackaged = ing.opnameMethod === "packaged" && ing.packagedConfig;

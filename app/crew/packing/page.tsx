@@ -700,21 +700,21 @@ export default function CrewPackingPage() {
   return (
     <div className="min-h-screen pb-24" style={{ background: "#FCABB4" }}>
       {/* Header */}
-      <div className="px-5 pt-5 pb-5 bg-white shadow-sm rounded-b-[24px]">
+      <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30" style={{ background: "#E85D8C", boxShadow: "0 10px 30px rgba(232,93,140,0.2)" }}>
         <div className="flex items-center gap-2 mb-1">
-          <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
-            <ClipboardList size={16} style={{ color: "#E85D8C" }} />
+          <div className="h-10 w-10 rounded-2xl flex items-center justify-center bg-white/20 backdrop-blur-md" style={{ border: "1px solid rgba(255,255,255,0.3)" }}>
+            <ClipboardList size={20} style={{ color: "#fff" }} />
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-800">Modul Packing</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight text-white">Modul Packing</h1>
         </div>
-        <p className="text-xs text-slate-400 ml-10">
+        <p className="text-xs ml-[48px]" style={{ color: "rgba(255,255,255,0.9)" }}>
           Kelola packing pesanan, repack glaze bulk, blender gula cinnamon, bongkar regular ke full, dan pemakaian bahan.
         </p>
       </div>
 
       <div className="px-4 pt-4 md:px-8 max-w-4xl mx-auto">
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap bg-slate-100 bg-opacity-70 backdrop-blur rounded-2xl p-1 gap-1 mb-5" style={{ border: "1px solid rgba(255,255,255,0.3)" }}>
+        <div className="flex flex-wrap bg-white/20 backdrop-blur-md rounded-2xl p-1.5 gap-1 mb-6" style={{ border: "1px solid rgba(255,255,255,0.3)", boxShadow: "0 4px 12px rgba(232,93,140,0.1)" }}>
           {[
             { key: "pack_order", label: "Pack Pesanan" },
             { key: "repack_glaze", label: "Repack Saos" },
@@ -725,11 +725,11 @@ export default function CrewPackingPage() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as any)}
-              className="flex-1 py-2.5 px-1.5 rounded-xl text-xs font-bold transition-all tap-target min-w-[75px] md:min-w-0"
+              className="flex-1 min-w-[120px] py-2.5 rounded-xl text-xs font-bold transition-all tap-target"
               style={
                 activeTab === tab.key
                   ? { background: "#fff", color: "#E85D8C", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }
-                  : { color: "#475569" }
+                  : { color: "#fff" }
               }
             >
               {tab.label}

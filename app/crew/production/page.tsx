@@ -204,18 +204,18 @@ export default function CrewProductionPage() {
   return (
     <div className="page-enter min-h-screen pb-10" style={{ background: "#FCABB4" }}>
       {/* Header */}
-      <div className="px-5 pt-6 pb-6 mb-2 rounded-b-3xl" style={{ background: "#fff", boxShadow: "0 10px 30px rgba(232,93,140,0.15)" }}>
+      <div className="px-5 pt-6 pb-6 mb-2 rounded-b-3xl sticky top-0 z-30" style={{ background: "#E85D8C", boxShadow: "0 10px 30px rgba(232,93,140,0.2)" }}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 style={{ fontSize: "22px", fontWeight: "800", color: "#1C1C1E", letterSpacing: "-0.02em" }}>
+            <h1 style={{ fontSize: "22px", fontWeight: "800", color: "#fff", letterSpacing: "-0.02em" }}>
               {enableCustomDate && customDate ? `Produksi: ${customDate}` : "Produksi Hari Ini"}
             </h1>
-            <p style={{ fontSize: "13px", color: "#64748B", marginTop: "4px", fontWeight: "500" }}>
+            <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.9)", marginTop: "4px", fontWeight: "500" }}>
               {todayProductions.length} item produksi tercatat
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xxs font-bold text-slate-500 flex items-center gap-1.5 cursor-pointer">
+            <label className="text-xxs font-bold text-white flex items-center gap-1.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={enableCustomDate}
@@ -225,7 +225,7 @@ export default function CrewProductionPage() {
                     setCustomDate(new Date().toISOString().split("T")[0]);
                   }
                 }}
-                className="accent-pink-600"
+                className="accent-pink-200"
               />
               Pilih Tanggal
             </label>
@@ -234,7 +234,7 @@ export default function CrewProductionPage() {
                 type="date"
                 value={customDate}
                 onChange={(e) => setCustomDate(e.target.value)}
-                className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-700 bg-white"
+                className="text-xs border border-white/30 bg-white/20 text-white rounded-lg px-2 py-1 outline-none"
               />
             )}
           </div>

@@ -144,19 +144,19 @@ export default function CrewPrePackingPage() {
   return (
     <div className="page-enter min-h-screen pb-10" style={{ background: "#FCABB4" }}>
       {/* Header */}
-      <div className="px-5 pt-6 pb-6 mb-2 rounded-b-3xl" style={{ background: "#fff", boxShadow: "0 10px 30px rgba(232,93,140,0.15)" }}>
+      <div className="px-5 pt-6 pb-6 mb-2 rounded-b-3xl sticky top-0 z-30" style={{ background: "#E85D8C", boxShadow: "0 10px 30px rgba(232,93,140,0.2)" }}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
-              <PackageOpen size={20} style={{ color: "#E85D8C" }} />
+            <div className="h-10 w-10 rounded-2xl flex items-center justify-center bg-white/20 backdrop-blur-md" style={{ border: "1px solid rgba(255,255,255,0.3)" }}>
+              <PackageOpen size={20} style={{ color: "#fff" }} />
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#1C1C1E", letterSpacing: "-0.02em" }}>
+            <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#fff", letterSpacing: "-0.02em" }}>
               {enableCustomDate && customDate ? `Pre-Packing: ${customDate}` : "Pre-Packing"}
             </h1>
           </div>
           
           <div className="flex items-center gap-2">
-            <label className="text-xxs font-bold text-slate-500 flex items-center gap-1.5 cursor-pointer">
+            <label className="text-xxs font-bold text-white flex items-center gap-1.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={enableCustomDate}
@@ -166,7 +166,7 @@ export default function CrewPrePackingPage() {
                     setCustomDate(new Date().toISOString().split("T")[0]);
                   }
                 }}
-                className="accent-pink-600"
+                className="accent-pink-200"
               />
               Pilih Tanggal
             </label>
@@ -175,12 +175,12 @@ export default function CrewPrePackingPage() {
                 type="date"
                 value={customDate}
                 onChange={(e) => setCustomDate(e.target.value)}
-                className="text-xs border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-700 bg-white"
+                className="text-xs border border-white/30 bg-white/20 text-white rounded-lg px-2 py-1 outline-none"
               />
             )}
           </div>
         </div>
-        <p className="text-xs mt-3 ml-12 font-medium" style={{ color: "#94A3B8" }}>Loyang → Pack Regular & Full</p>
+        <p className="text-xs mt-3 ml-13 font-medium" style={{ color: "rgba(255,255,255,0.9)", marginLeft: "52px" }}>Loyang → Pack Regular & Full</p>
       </div>
 
       <div className="px-4 mt-6 md:px-8 md:max-w-3xl">

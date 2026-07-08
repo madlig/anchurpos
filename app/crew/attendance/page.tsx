@@ -125,10 +125,10 @@ export default function CrewAttendancePage() {
   return (
     <div className="page-enter min-h-screen" style={{ background: "#FCABB4" }}>
 
-      {/* Header (white) */}
-      <div className="px-5 pt-4 pb-4" style={{ background: "#fff" }}>
-        <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Absensi</h1>
-        <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "2px" }}>
+      {/* Header (pink) */}
+      <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30" style={{ background: "#E85D8C", boxShadow: "0 10px 30px rgba(232,93,140,0.2)" }}>
+        <h1 className="text-xl font-extrabold text-white tracking-tight">Absensi</h1>
+        <p className="text-[12px] font-medium mt-1" style={{ color: "rgba(255,255,255,0.9)" }}>
           {user?.displayName?.split(" ")[0] ?? "Crew"} — {todayLabel}
         </p>
       </div>
