@@ -511,7 +511,6 @@ export default function KasirPage() {
               </button>
             )}
           </div>
-        </div>
 
         {/* Category chips */}
         <div className="flex gap-2 overflow-x-auto px-5 pb-3" style={{ scrollbarWidth: "none" }}>
