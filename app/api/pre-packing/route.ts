@@ -26,13 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Data pre-packing tidak lengkap" }, { status: 400 });
   }
 
-  // Security: Only owner/manager can back-date packing
-  if (customDate) {
-    const isPrivileged = user.role === "owner" || user.role === "manager";
-    if (!isPrivileged) {
-      return NextResponse.json({ error: "Akses ditolak: Hanya Manager/Owner yang dapat mencatat pengemasan mundur" }, { status: 403 });
-    }
-  }
+  // Custom date logic allows any role to submit back-dated pre-packing as requested by user
 
   const effectiveCrewId = crewId || user.uid;
   const activeType = type || "standard";

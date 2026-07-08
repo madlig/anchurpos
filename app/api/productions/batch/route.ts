@@ -28,13 +28,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Minimal 1 varian harus diisi" }, { status: 400 });
   }
 
-  // Security: Only owner/manager can back-date production
-  if (customDate) {
-    const isPrivileged = user.role === "owner" || user.role === "manager";
-    if (!isPrivileged) {
-      return NextResponse.json({ error: "Akses ditolak: Hanya Manager/Owner yang dapat mencatat produksi mundur" }, { status: 403 });
-    }
-  }
+  // Custom date logic allows any role to submit back-dated production as requested by user
 
   const effectiveCrewId = crewId || user.uid;
 
