@@ -832,11 +832,14 @@ export default function ExpensesPage() {
   );
 
   const loadExpenses = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await fetchWithAuth(`/api/expenses?startDate=${startDate}&endDate=${endDate}`);
       if (res.ok) setExpenses(await res.json());
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   }, [fetchWithAuth, startDate, endDate]);
 
