@@ -601,14 +601,36 @@ function ExpenseForm({
                     onChange={(e) => setQty(e.target.value)}
                     className="h-10 rounded-xl text-xs border-slate-200 bg-white flex-1"
                   />
-                  <Input
-                    type="text"
-                    placeholder="kg/gram"
-                    value={purchaseUnit}
-                    onChange={(e) => setPurchaseUnit(e.target.value)}
-                    disabled={!!ingredientId}
-                    className={`h-10 rounded-xl text-xs border-slate-200 w-20 ${!!ingredientId ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
-                  />
+                  {(() => {
+                    const selectedIng = ingredientId ? ingredients.find(i => i.id === ingredientId) : null;
+                    const hasAlts = selectedIng && selectedIng.unitAlternatives && selectedIng.unitAlternatives.length > 0;
+                    
+                    if (hasAlts) {
+                      return (
+                        <select
+                          value={purchaseUnit}
+                          onChange={(e) => setPurchaseUnit(e.target.value)}
+                          className="h-10 rounded-xl text-xs border border-slate-200 w-28 bg-white outline-none focus:border-pink-300 px-2"
+                        >
+                          <option value={selectedIng.baseUnit}>{selectedIng.baseUnit}</option>
+                          {selectedIng.unitAlternatives!.map(alt => (
+                            <option key={alt.unit} value={alt.unit}>{alt.unit}</option>
+                          ))}
+                        </select>
+                      );
+                    }
+                    
+                    return (
+                      <Input
+                        type="text"
+                        placeholder="kg/gram"
+                        value={purchaseUnit}
+                        onChange={(e) => setPurchaseUnit(e.target.value)}
+                        disabled={!!ingredientId}
+                        className={`h-10 rounded-xl text-xs border-slate-200 w-20 ${!!ingredientId ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
+                      />
+                    );
+                  })()}
                 </div>
               </div>
               <div>
