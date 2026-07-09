@@ -702,7 +702,7 @@ export default function MasterDataPage() {
               {tab === "produk" && (filteredProducts.length === 0 && !showAddForm ? (
                 <div className="col-span-full"><EmptyState label={search ? "Tidak ada hasil pencarian" : "Belum ada produk"} sub={search ? "Coba kata kunci lain" : "Klik tombol Tambah Data di atas"} /></div>
               ) : filteredProducts.map(p => (
-                <div key={p.id} className="animate-in fade-in zoom-in-95 duration-300">
+                <div key={p.id} className={`animate-in fade-in zoom-in-95 duration-300 ${editItem && (editItem as ProductItem).id === p.id ? "col-span-full" : ""}`}>
                   {editItem && (editItem as ProductItem).id === p.id ? (
                     <ProductForm initial={p} fetchWithAuth={fetchWithAuth} onSuccess={onSuccess} onCancel={() => setEditItem(null)} />
                   ) : (
@@ -739,7 +739,7 @@ export default function MasterDataPage() {
               ) : filteredVariants.map(v => {
                 const isLow = v.currentStock < v.minStock;
                 return (
-                  <div key={v.id} className="animate-in fade-in zoom-in-95 duration-300">
+                  <div key={v.id} className={`animate-in fade-in zoom-in-95 duration-300 ${editItem && (editItem as VariantItem).id === v.id ? "col-span-full" : ""}`}>
                     {editItem && (editItem as VariantItem).id === v.id ? (
                       <VariantForm initial={v} fetchWithAuth={fetchWithAuth} onSuccess={onSuccess} onCancel={() => setEditItem(null)} />
                     ) : (
@@ -788,7 +788,7 @@ export default function MasterDataPage() {
                 const barPct = Math.min(100, (ing.currentStock / Math.max(ing.minStock * 2, 1)) * 100);
                 const CAT_LABEL: Record<string, string> = { bahan_baku: "Bahan Baku", packaging: "Packaging", operasional: "Operasional" };
                 return (
-                  <div key={ing.id} className="animate-in fade-in zoom-in-95 duration-300">
+                  <div key={ing.id} className={`animate-in fade-in zoom-in-95 duration-300 ${editItem && (editItem as IngredientItem).id === ing.id ? "col-span-full" : ""}`}>
                     {editItem && (editItem as IngredientItem).id === ing.id ? (
                       <IngredientForm initial={ing} fetchWithAuth={fetchWithAuth} onSuccess={onSuccess} onCancel={() => setEditItem(null)} />
                     ) : (
