@@ -208,7 +208,6 @@ function ExpenseForm({
     setError("");
 
     if (isProductCategory) {
-    if (isProductCategory) {
       if (!itemName.trim()) {
         setError("Nama bahan baku/kemasan wajib diisi");
         return;
@@ -607,8 +606,8 @@ function ExpenseForm({
                     placeholder="kg/gram"
                     value={purchaseUnit}
                     onChange={(e) => setPurchaseUnit(e.target.value)}
-                    disabled={!isManualInput && !!ingredientId}
-                    className={`h-10 rounded-xl text-xs border-slate-200 w-20 ${(!isManualInput && !!ingredientId) ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
+                    disabled={!!ingredientId}
+                    className={`h-10 rounded-xl text-xs border-slate-200 w-20 ${!!ingredientId ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-white"}`}
                   />
                 </div>
               </div>
