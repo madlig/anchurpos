@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
           adminDb.collection("ingredients").where("category", "==", category)
         );
 
-        ingredientsSnap.docs.forEach((doc) => {
+        for (const doc of ingredientsSnap.docs) {
           const data = doc.data();
           const sim = getSimilarity(itemName, data.name || "");
           if (sim > highestSim) {
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
               currentStock: data.currentStock || 0,
             };
           }
-        });
+        }
       }
 
       // 1B. Jika ada ID terlampir, ambil data bahan
