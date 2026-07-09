@@ -42,8 +42,9 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const { name, category = "bahan_baku", baseUnit, minStock = 0, channels = [] } = body as {
+  const { name, category = "bahan_baku", baseUnit, minStock = 0, channels = [], unitAlternatives = [] } = body as {
     name: string; category?: string; baseUnit: string; minStock?: number; channels?: string[];
+    unitAlternatives?: { unit: string; conversionToBase: number }[];
   };
   if (!name?.trim() || !baseUnit?.trim()) {
     return NextResponse.json({ error: "Nama dan satuan wajib diisi" }, { status: 400 });
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     await ref.set({
       name: name.trim(), category, baseUnit: baseUnit.trim(),
       currentStock: 0, minStock,
-      unitAlternatives: [], opnameMethod: "direct",
+      unitAlternatives, opnameMethod: "direct",
       packagedConfig: null,
       channels,
       createdAt: FieldValue.serverTimestamp(),

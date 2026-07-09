@@ -14,7 +14,7 @@ function fmt(n: number) {
 interface PriceTier { minQty: number; maxQty: number | null; price: number; }
 interface ProductItem { id: string; name: string; code: string; description: string; packPerBatch: number; priceTiers: PriceTier[]; channels?: string[]; }
 interface VariantItem { id: string; name: string; sortOrder: number; currentStock: number; minStock: number; }
-interface IngredientItem { id: string; name: string; category: string; baseUnit: string; currentStock: number; minStock: number; channels?: string[]; }
+interface IngredientItem { id: string; name: string; category: string; baseUnit: string; currentStock: number; minStock: number; channels?: string[]; unitAlternatives?: { unit: string; conversionToBase: number }[]; }
 interface AddonItem { id: string; name: string; price: number; currentStock: number; minStock: number; channels?: string[]; }
 interface SupplierItem { id: string; name: string; contactPerson?: string; phoneNumber?: string; }
 interface CustomerItem { id: string; name: string; customerType: string; channel: string; phoneNumber: string | null; address: string | null; notes: string; discountPerUnit: number; }
@@ -250,10 +250,12 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   const isEdit = !!initial;
   const [form, setForm] = useState<{
     name: string; baseUnit: string; minStock: string; category: string; channels: string[];
+    unitAlternatives: { unit: string; conversionToBase: string }[];
   }>({
     name: initial?.name ?? "", baseUnit: initial?.baseUnit ?? "",
     minStock: String(initial?.minStock ?? "0"), category: initial?.category ?? "bahan_baku",
     channels: initial?.channels ?? [],
+    unitAlternatives: initial?.unitAlternatives?.map(u => ({ unit: u.unit, conversionToBase: String(u.conversionToBase) })) ?? [],
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -264,7 +266,21 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
     try {
       const url = isEdit ? `/api/ingredients/${initial!.id}` : "/api/ingredients";
       const method = isEdit ? "PATCH" : "POST";
-      const res = await fetchWithAuth(url, { method, body: JSON.stringify({ name: form.name.trim(), baseUnit: form.baseUnit.trim(), category: form.category, minStock: parseFloat(form.minStock) || 0, channels: form.channels }) });
+      const parsedAlternatives = form.unitAlternatives
+        .filter(u => u.unit.trim() && parseFloat(u.conversionToBase) > 0)
+        .map(u => ({ unit: u.unit.trim(), conversionToBase: parseFloat(u.conversionToBase) }));
+      
+      const res = await fetchWithAuth(url, { 
+        method, 
+        body: JSON.stringify({ 
+          name: form.name.trim(), 
+          baseUnit: form.baseUnit.trim(), 
+          category: form.category, 
+          minStock: parseFloat(form.minStock) || 0, 
+          channels: form.channels,
+          unitAlternatives: parsedAlternatives
+        }) 
+      });
       if (!res.ok) { setErr((await res.json()).error ?? "Gagal"); return; }
       onSuccess();
     } finally { setSaving(false); }
@@ -291,7 +307,59 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
             className="w-32 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
         </div>
 
-        <div className="mt-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+        <div className="mt-2 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+          <div>
+            <p style={{ fontSize: "12px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Satuan Alternatif (Opsional)</p>
+            <p style={{ fontSize: "11px", color: "#94A3B8", marginBottom: "8px" }}>Tambahkan satuan pembelian lain beserta rasio konversinya ke satuan dasar ({form.baseUnit || "..."}). Contoh: 1 botol = 55 ml</p>
+          </div>
+          
+          {form.unitAlternatives.map((alt, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500 whitespace-nowrap">1</span>
+              <Input 
+                placeholder="mis. botol" 
+                value={alt.unit} 
+                onChange={e => {
+                  const newAlts = [...form.unitAlternatives];
+                  newAlts[idx].unit = e.target.value;
+                  setForm(p => ({ ...p, unitAlternatives: newAlts }));
+                }}
+                className="w-24 h-9 rounded-lg border-slate-200 text-xs focus-visible:ring-[#E85D8C]" 
+              />
+              <span className="text-xs font-bold text-slate-500 whitespace-nowrap">=</span>
+              <Input 
+                type="number"
+                placeholder="mis. 55" 
+                value={alt.conversionToBase} 
+                onChange={e => {
+                  const newAlts = [...form.unitAlternatives];
+                  newAlts[idx].conversionToBase = e.target.value;
+                  setForm(p => ({ ...p, unitAlternatives: newAlts }));
+                }}
+                className="w-20 h-9 rounded-lg border-slate-200 text-xs focus-visible:ring-[#E85D8C]" 
+              />
+              <span className="text-xs font-bold text-slate-500">{form.baseUnit || "dasar"}</span>
+              <button 
+                type="button" 
+                onClick={() => setForm(p => ({ ...p, unitAlternatives: p.unitAlternatives.filter((_, i) => i !== idx) }))}
+                className="ml-auto w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => setForm(p => ({ ...p, unitAlternatives: [...p.unitAlternatives, { unit: "", conversionToBase: "" }] }))}
+            className="flex items-center gap-1.5 text-xs font-bold text-[#E85D8C] hover:text-pink-600 active:scale-95 transition-transform"
+          >
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-pink-100">+</span>
+            Tambah Satuan Alternatif
+          </button>
+        </div>
+
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
           <p style={{ fontSize: "12px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "12px" }}>Afiliasi Channel</p>
           <p style={{ fontSize: "11px", color: "#94A3B8", marginBottom: "12px" }}>Biarkan kosong jika bahan ini tersedia di semua channel.</p>
           <div className="flex flex-wrap gap-2">

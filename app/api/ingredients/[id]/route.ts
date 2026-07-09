@@ -13,8 +13,9 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
-  const { name, baseUnit, category, minStock, channels } = body as {
+  const { name, baseUnit, category, minStock, channels, unitAlternatives } = body as {
     name?: string; baseUnit?: string; category?: string; minStock?: number; channels?: string[];
+    unitAlternatives?: { unit: string; conversionToBase: number }[];
   };
 
   if (!name?.trim() || !baseUnit?.trim()) {
@@ -32,6 +33,7 @@ export async function PATCH(
       category: category ?? "bahan_baku",
       minStock: minStock ?? 0,
       channels: channels ?? [],
+      ...(unitAlternatives ? { unitAlternatives } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     });
 
