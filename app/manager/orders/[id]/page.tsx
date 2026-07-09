@@ -67,6 +67,15 @@ export default function OrderDetailPage() {
     } finally { setActionLoading(""); }
   }
 
+  async function markAsPaid() {
+    setActionLoading("payment"); setError("");
+    try {
+      const res = await fetchWithAuth(`/api/orders/${orderId}/payment`, { method: "PATCH", body: JSON.stringify({ paymentStatus: "sudah_bayar" }) });
+      if (!res.ok) { setError((await res.json()).error ?? "Gagal update pembayaran"); return; }
+      await loadOrder();
+    } finally { setActionLoading(""); }
+  }
+
   async function voidOrder() {
     if (!voidReason.trim()) {
       setVoidReasonError("Alasan pembatalan wajib diisi.");
@@ -203,11 +212,23 @@ export default function OrderDetailPage() {
             </div>
             
             <div className="flex items-center justify-between mb-5">
-              <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm ${
-                isPaid ? "bg-green-100 text-green-700 border border-green-200/50" : "bg-red-50 text-red-600 border border-red-200/50 animate-pulse"
-              }`}>
-                {isPaid ? "Lunas" : "Belum Bayar"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm ${
+                  isPaid ? "bg-green-100 text-green-700 border border-green-200/50" : "bg-red-50 text-red-600 border border-red-200/50 animate-pulse"
+                }`}>
+                  {isPaid ? "Lunas" : "Belum Bayar"}
+                </span>
+                {!isPaid && !isVoid && (
+                  <button
+                    onClick={markAsPaid}
+                    disabled={actionLoading === "payment"}
+                    className="px-3 py-1.5 rounded-xl bg-green-500 text-white text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-green-600 disabled:opacity-50 transition-colors flex items-center gap-1"
+                  >
+                    {actionLoading === "payment" ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                    Tandai Lunas
+                  </button>
+                )}
+              </div>
               
               {order.paymentMethod && (
                 <div className="flex items-center gap-1.5 text-slate-500">
