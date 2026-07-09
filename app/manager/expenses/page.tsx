@@ -289,7 +289,7 @@ function ExpenseForm({
     setIngredientId("");
     setItemName("");
     setQty("");
-    if (!isManualInput) setPurchaseUnit("");
+    setPurchaseUnit("");
     setTotalCost("");
   }
 
