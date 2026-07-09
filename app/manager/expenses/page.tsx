@@ -156,7 +156,7 @@ function ExpenseForm({
   const [qty, setQty] = useState("");
   const [purchaseUnit, setPurchaseUnit] = useState("");
   const [totalCost, setTotalCost] = useState("");
-  const [isManualInput, setIsManualInput] = useState(false);
+  const [showIngredientDropdown, setShowIngredientDropdown] = useState(false);
 
   // Keranjang belanja item untuk pengeluaran bulk
   const [itemsList, setItemsList] = useState<ExpenseItem[]>([]);
@@ -179,6 +179,14 @@ function ExpenseForm({
     return q && !selectedSupplier && !suppliers.some((s) => s.name.toLowerCase() === q);
   }, [suppliers, supplierSearch, selectedSupplier]);
 
+  // Filter bahan baku untuk dropdown pencarian
+  const filteredIngredients = useMemo(() => {
+    const q = itemName.toLowerCase().trim();
+    const catFiltered = ingredients.filter((i) => i.category === category && (i as any).isActive !== false);
+    if (!q) return catFiltered.slice(0, 8);
+    return catFiltered.filter((i) => i.name.toLowerCase().includes(q)).slice(0, 8);
+  }, [ingredients, itemName, category]);
+
   // Auto-fill nama barang jika memilih bahan baku
   const handleIngredientChange = (id: string) => {
     setIngredientId(id);
@@ -190,6 +198,7 @@ function ExpenseForm({
       setItemName("");
       setPurchaseUnit("");
     }
+    setShowIngredientDropdown(false);
   };
 
   const isProductCategory = category === "bahan_baku" || category === "packaging";
@@ -199,19 +208,16 @@ function ExpenseForm({
     setError("");
 
     if (isProductCategory) {
-      if (!isManualInput && !ingredientId) {
-        setError("Pilih bahan baku/kemasan terlebih dahulu");
-        return;
-      }
-      if (isManualInput && !itemName.trim()) {
-        setError("Nama bahan baru wajib diisi");
+    if (isProductCategory) {
+      if (!itemName.trim()) {
+        setError("Nama bahan baku/kemasan wajib diisi");
         return;
       }
       if (!qty || parseFloat(qty) <= 0) {
         setError("Jumlah pembelian (Qty) harus lebih dari 0");
         return;
       }
-      if (isManualInput && !purchaseUnit.trim()) {
+      if (!purchaseUnit.trim()) {
         setError("Satuan wajib diisi (misal: kg, gram, pcs)");
         return;
       }
@@ -228,13 +234,14 @@ function ExpenseForm({
     }
 
     // Resolving fuzzy matches interactively if manually entered
-    let postIngredientId: string | null = (!isManualInput) ? ingredientId : null;
-    let postItemName = (!isManualInput)
+    // Resolving fuzzy matches interactively if manually entered
+    let postIngredientId: string | null = ingredientId || null;
+    let postItemName = ingredientId
       ? (ingredients.find((i) => i.id === ingredientId)?.name ?? itemName)
       : itemName.trim();
     let forceCreateNew = false;
 
-    if (isProductCategory && isManualInput) {
+    if (isProductCategory && !ingredientId) {
       let highestSim = 0;
       let closestMatch: Ingredient | null = null;
 
@@ -422,7 +429,9 @@ function ExpenseForm({
                 setQty("");
                 setPurchaseUnit("");
                 setTotalCost("");
-                setIsManualInput(false);
+                setPurchaseUnit("");
+                setTotalCost("");
+                setShowIngredientDropdown(false);
                 setItemsList([]);
               }}
               style={{
@@ -540,53 +549,43 @@ function ExpenseForm({
 
         {isProductCategory ? (
           <>
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  {isManualInput ? "Nama Bahan Baru (Manual)" : "Pilih Bahan / Kemasan"}
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsManualInput(!isManualInput);
-                    setIngredientId("");
-                    setItemName("");
-                    setPurchaseUnit("");
-                  }}
-                  className="text-[10px] font-bold text-pink-600 hover:text-pink-700 underline"
+            <div style={{ position: "relative" }}>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+                Cari atau Ketik Bahan Baku / Kemasan
+              </label>
+              <Input
+                type="text"
+                placeholder="Contoh: Gula Halus Super"
+                value={itemName}
+                onChange={(e) => {
+                  setItemName(e.target.value);
+                  setIngredientId(""); // Reset ID jika user mengubah manual
+                  setShowIngredientDropdown(true);
+                }}
+                onFocus={() => setShowIngredientDropdown(true)}
+                className="h-10 rounded-xl text-xs border-slate-200 bg-white"
+              />
+              
+              {showIngredientDropdown && itemName.trim() && (
+                <div 
+                  className="absolute left-0 right-0 mt-1 z-40 max-h-48 overflow-y-auto bg-white border border-slate-100 rounded-xl shadow-xl"
+                  onMouseLeave={() => setShowIngredientDropdown(false)}
                 >
-                  {isManualInput ? "Pilih dari database" : "✍ Tulis manual bahan baru"}
-                </button>
-              </div>
-
-              {isManualInput ? (
-                <div>
-                  <Input
-                    type="text"
-                    placeholder="Contoh: Gula Halus Super"
-                    value={itemName}
-                    onChange={(e) => setItemName(e.target.value)}
-                    className="h-10 rounded-xl text-xs border-slate-200 bg-white"
-                  />
-                  <p className="text-[9px] text-slate-400 mt-1">
-                    * Sistem akan mencocokkan kemiripan secara otomatis. Jika tidak ada yang mirip, akan dibuatkan master data bahan baku baru di database.
-                  </p>
+                  {filteredIngredients.map((ing) => (
+                    <div
+                      key={ing.id}
+                      onClick={() => handleIngredientChange(ing.id)}
+                      className="px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
+                      📦 {ing.name} <span className="text-[9px] text-slate-400 font-normal">({ing.baseUnit})</span>
+                    </div>
+                  ))}
+                  {filteredIngredients.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-slate-400 italic">
+                      Bahan tidak ditemukan. Sistem akan membuatkan master data baru saat disimpan.
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <select
-                  value={ingredientId}
-                  onChange={(e) => handleIngredientChange(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs bg-white outline-none focus:border-pink-300"
-                >
-                  <option value="">-- Pilih dari database --</option>
-                  {ingredients
-                    .filter((i) => i.category === category && (i as any).isActive !== false)
-                    .map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.name} ({i.baseUnit})
-                      </option>
-                    ))}
-                </select>
               )}
             </div>
 
