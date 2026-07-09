@@ -807,14 +807,14 @@ export default function MasterDataPage() {
                           
                           <div className="mt-auto">
                             <div className="flex items-baseline gap-1 mb-2">
-                              <p className={`text-2xl font-black tracking-tight ${isLow ? "text-red-600" : "text-slate-800"}`}>{ing.currentStock.toLocaleString("id-ID")}</p>
+                              <p className={`text-2xl font-black tracking-tight ${isLow ? "text-red-600" : "text-slate-800"}`}>{(ing.currentStock ?? 0).toLocaleString("id-ID")}</p>
                               <p className="text-[12px] font-bold text-slate-500 uppercase">{ing.baseUnit}</p>
                             </div>
                             <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mb-2">
                               <div className={`h-full transition-all duration-500 ease-out ${isLow ? "bg-red-500" : "bg-[#E85D8C]"}`} style={{ width: `${barPct}%` }} />
                             </div>
                             <div className="flex justify-between items-center">
-                              <p className="text-[11px] font-bold text-slate-400">Min: {ing.minStock.toLocaleString("id-ID")} {ing.baseUnit}</p>
+                              <p className="text-[11px] font-bold text-slate-400">Min: {(ing.minStock ?? 0).toLocaleString("id-ID")} {ing.baseUnit}</p>
                               {isLow && <span className="text-[10px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded">LOW</span>}
                             </div>
                           </div>
