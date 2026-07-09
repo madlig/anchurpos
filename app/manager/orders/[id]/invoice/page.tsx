@@ -45,6 +45,9 @@ export default function InvoicePage() {
   useEffect(() => {
     if (!loading && order) {
       setTimeout(() => {
+        const orderDate = order.createdAt.split("T")[0];
+        const safeCustomerName = (order.customerName || "Tanpa Nama").replace(/[^a-zA-Z0-9 -]/g, "").trim();
+        document.title = `${orderDate}_${safeCustomerName}`;
         window.print();
       }, 500);
     }
