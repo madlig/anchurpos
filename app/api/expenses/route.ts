@@ -115,88 +115,111 @@ export async function POST(req: NextRequest) {
 
     // Run transaction to resolve ingredient, create if new, and record expense
     await adminDb.runTransaction(async (tx) => {
-      // 1. Jika ini adalah bahan baku / packaging dan belum ada ID terlampir, cari secara fuzzy (kecuali dipaksa buat baru)
-      if ((category === "bahan_baku" || category === "packaging") && !finalIngredientId) {
-        let shouldSearchFuzzy = !forceCreateNew;
-        let closestMatch: { id: string; name: string; baseUnit: string; unitAlternatives: any[] } | null = null;
-        let highestSim = 0;
+      // === FASE 1: READS ===
+      let closestMatch: { id: string; name: string; baseUnit: string; unitAlternatives: any[]; currentStock: number } | null = null;
+      let highestSim = 0;
+      let existingIngredientData: any = null;
 
-        if (shouldSearchFuzzy) {
-          const ingredientsSnap = await tx.get(
-            adminDb.collection("ingredients").where("category", "==", category)
-          );
+      // 1A. Jika ini bahan baku/packaging dan belum ada ID, lakukan pencarian fuzzy
+      if ((category === "bahan_baku" || category === "packaging") && !finalIngredientId && !forceCreateNew) {
+        const ingredientsSnap = await tx.get(
+          adminDb.collection("ingredients").where("category", "==", category)
+        );
 
-          ingredientsSnap.docs.forEach((doc) => {
-            const data = doc.data();
-            const sim = getSimilarity(itemName, data.name || "");
-            if (sim > highestSim) {
-              highestSim = sim;
-              closestMatch = {
-                id: doc.id,
-                name: data.name,
-                baseUnit: data.baseUnit,
-                unitAlternatives: data.unitAlternatives || [],
-              };
-            }
-          });
-        }
-
-        // Threshold kecocokan fuzzy: 85% mirip
-        if (highestSim >= 0.85 && closestMatch) {
-          finalIngredientId = (closestMatch as any).id;
-          matchedIngredientName = (closestMatch as any).name;
-        } else {
-          // Buat data bahan baku baru di database
-          const cleanSlug = itemName
-            .toLowerCase()
-            .trim()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-|-$)/g, "");
-          
-          const newId = `${category}-${cleanSlug}-${Date.now().toString().slice(-4)}`;
-          const newIngRef = adminDb.collection("ingredients").doc(newId);
-
-          tx.set(newIngRef, {
-            name: itemName.trim(),
-            category,
-            baseUnit: purchaseUnit || "pcs",
-            currentStock: 0,
-            unitAlternatives: [],
-            isActive: true,
-            createdAt: FieldValue.serverTimestamp(),
-          });
-
-          finalIngredientId = newId;
-          isNewCreated = true;
-        }
+        ingredientsSnap.docs.forEach((doc) => {
+          const data = doc.data();
+          const sim = getSimilarity(itemName, data.name || "");
+          if (sim > highestSim) {
+            highestSim = sim;
+            closestMatch = {
+              id: doc.id,
+              name: data.name,
+              baseUnit: data.baseUnit,
+              unitAlternatives: data.unitAlternatives || [],
+              currentStock: data.currentStock || 0,
+            };
+          }
+        });
       }
 
-      // 2. Kalkulasi konversi unit berdasarkan bahan terpilih / baru dibuat
-      if (finalIngredientId && qtyPurchased && purchaseUnit) {
+      // 1B. Jika ada ID terlampir, ambil data bahan
+      if (finalIngredientId) {
         const ingRef = adminDb.collection("ingredients").doc(finalIngredientId);
         const ingSnap = await tx.get(ingRef);
-        const ingData = ingSnap.data();
-
-        if (ingData) {
-          const result = convertToBaseUnit(
-            qtyPurchased,
-            purchaseUnit,
-            ingData.baseUnit,
-            ingData.unitAlternatives ?? []
-          );
-
-          if (result) {
-            qtyInBaseUnit = result.qtyInBaseUnit;
-            pricePerBaseUnit = qtyInBaseUnit > 0 ? totalPrice / qtyInBaseUnit : 0;
-          } else {
-            // Jika konversi gagal (satuan tidak dikenal), anggap 1:1 jika baru saja dibuat
-            qtyInBaseUnit = qtyPurchased;
-            pricePerBaseUnit = totalPrice / qtyPurchased;
-          }
+        if (ingSnap.exists) {
+          existingIngredientData = { id: ingSnap.id, ...ingSnap.data() };
         }
       }
 
-      // 3. Tulis Dokumen Pengeluaran
+      // === FASE 2: KALKULASI LOKAL (Tanpa operasi database) ===
+      let ingredientDataToUse = existingIngredientData;
+      
+      if (!finalIngredientId && highestSim >= 0.85 && closestMatch) {
+        finalIngredientId = closestMatch.id;
+        matchedIngredientName = closestMatch.name;
+        ingredientDataToUse = closestMatch;
+      } 
+      
+      let newIngId = "";
+      if ((category === "bahan_baku" || category === "packaging") && !finalIngredientId) {
+        // Harus membuat baru
+        const cleanSlug = itemName.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        newIngId = `${category}-${cleanSlug}-${Date.now().toString().slice(-4)}`;
+        finalIngredientId = newIngId;
+        isNewCreated = true;
+        ingredientDataToUse = {
+          id: newIngId,
+          name: itemName.trim(),
+          category,
+          baseUnit: purchaseUnit || "pcs",
+          currentStock: 0,
+          unitAlternatives: [],
+          isActive: true
+        };
+      }
+
+      // Hitung konversi unit
+      if (finalIngredientId && qtyPurchased && purchaseUnit && ingredientDataToUse) {
+        const result = convertToBaseUnit(
+          qtyPurchased,
+          purchaseUnit,
+          ingredientDataToUse.baseUnit,
+          ingredientDataToUse.unitAlternatives ?? []
+        );
+
+        if (result) {
+          qtyInBaseUnit = result.qtyInBaseUnit;
+          pricePerBaseUnit = qtyInBaseUnit > 0 ? totalPrice / qtyInBaseUnit : 0;
+        } else {
+          qtyInBaseUnit = qtyPurchased;
+          pricePerBaseUnit = totalPrice / qtyPurchased;
+        }
+      }
+
+      // === FASE 3: WRITES ===
+      
+      // 3A. Buat bahan baru jika diperlukan
+      if (isNewCreated && newIngId) {
+        const newIngRef = adminDb.collection("ingredients").doc(newIngId);
+        tx.set(newIngRef, {
+          name: itemName.trim(),
+          category,
+          baseUnit: purchaseUnit || "pcs",
+          currentStock: qtyInBaseUnit > 0 ? qtyInBaseUnit : 0, // Set stok awal langsung di sini
+          unitAlternatives: [],
+          isActive: true,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
+
+      // 3B. Update stok bahan yang sudah ada
+      if (!isNewCreated && finalIngredientId && qtyInBaseUnit > 0) {
+        const ingRef = adminDb.collection("ingredients").doc(finalIngredientId);
+        const currentStock = ingredientDataToUse?.currentStock ?? 0;
+        tx.update(ingRef, { currentStock: currentStock + qtyInBaseUnit });
+      }
+
+      // 3C. Buat dokumen pengeluaran
       tx.set(expenseRef, {
         date: dateToUse,
         category,
@@ -214,16 +237,12 @@ export async function POST(req: NextRequest) {
         createdAt: FieldValue.serverTimestamp(),
       });
 
-      // 4. Update stok & log movement
+      // 3D. Catat riwayat pergerakan stok
       if (finalIngredientId && qtyInBaseUnit > 0) {
-        const ingRef = adminDb.collection("ingredients").doc(finalIngredientId);
-        const ingSnap = await tx.get(ingRef);
-        const currentStock = ingSnap.data()?.currentStock ?? 0;
-        const newStock = currentStock + qtyInBaseUnit;
-
-        tx.update(ingRef, { currentStock: newStock });
-
         const movementRef = adminDb.collection("stockMovements").doc();
+        const currentStock = ingredientDataToUse?.currentStock ?? 0;
+        const newStock = isNewCreated ? qtyInBaseUnit : currentStock + qtyInBaseUnit;
+
         tx.set(movementRef, {
           ingredientId: finalIngredientId,
           changeAmount: qtyInBaseUnit,
