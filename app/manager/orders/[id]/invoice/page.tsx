@@ -158,11 +158,7 @@ export default function InvoicePage() {
               <span style={{ fontSize: "16px", fontWeight: "700", color: "#1C1C1E" }}>Total</span>
               <span style={{ fontSize: "18px", fontWeight: "800", color: "#E85D8C" }}>{fmt(total)}</span>
             </div>
-            {!isPaid && (
-              <div style={{ marginTop: "12px", padding: "10px 12px", borderRadius: "8px", background: "#FEE2E2", border: "1px solid #FECACA" }}>
-                <p style={{ fontSize: "12px", fontWeight: "600", color: "#DC2626", margin: 0 }}>⚠ Mohon segera melakukan pembayaran.</p>
-              </div>
-            )}
+
           </div>
         </div>
 
