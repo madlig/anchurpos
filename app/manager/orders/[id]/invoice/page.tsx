@@ -55,15 +55,14 @@ export default function InvoicePage() {
       <Loader2 className="animate-spin" size={28} />
     </div>
   );
-
-  if (!order) return <div style={{ textAlign: "center", padding: "40px" }}>Invoice tidak ditemukan</div>;
+  if (!order) return <div style={{ textAlign: "center", padding: "40px" }}>Dokumen tidak ditemukan</div>;
 
   const subtotal = order.items.reduce((s, i) => s + i.totalPrice, 0);
   const shipping = order.shippingCost ?? 0;
   const total = subtotal + shipping;
   const isPaid = order.paymentStatus === "sudah_bayar";
   const isB2B = order.customerType === "b2b" || order.customerType === "reseller";
-  const docTitle = isB2B ? "INVOICE" : "NOTA";
+  const docTitle = isPaid ? "KWITANSI" : (isB2B ? "INVOICE" : "NOTA");
 
   return (
     <>
@@ -71,7 +70,7 @@ export default function InvoicePage() {
       <div className="no-print" style={{ padding: "16px", display: "flex", justifyContent: "flex-end", gap: "8px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
         <button onClick={() => window.print()}
           style={{ padding: "8px 20px", borderRadius: "10px", background: "#E85D8C", color: "#fff", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "700" }}>
-          Cetak Invoice
+          Cetak {docTitle}
         </button>
         <button onClick={() => window.close()}
           style={{ padding: "8px 20px", borderRadius: "10px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "13px" }}>
