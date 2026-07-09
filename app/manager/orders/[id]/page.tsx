@@ -104,7 +104,7 @@ export default function OrderDetailPage() {
         <Package size={48} className="text-slate-300 mb-4" />
         <p className="text-base font-bold text-slate-500">Order tidak ditemukan</p>
         <button 
-          onClick={() => router.back()} 
+          onClick={() => router.push('/manager/orders')} 
           className="mt-6 px-6 py-2.5 rounded-xl bg-pink-500 text-white font-bold hover:bg-pink-600 transition-colors tap-target shadow-md shadow-pink-500/20"
         >
           Kembali
@@ -126,7 +126,7 @@ export default function OrderDetailPage() {
       <div className="sticky top-0 z-30 pt-4 px-4 pb-4 bg-white/90 backdrop-blur-xl border-b border-pink-200 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => router.back()} 
+            onClick={() => router.push('/manager/orders')} 
             data-testid="back-button"
             className="w-10 h-10 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center tap-target hover:bg-slate-50 transition-colors"
           >
