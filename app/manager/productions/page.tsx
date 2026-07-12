@@ -176,7 +176,7 @@ export default function ManagerProductionsPage() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                      {pack.type === "standard" ? (
+                      {!pack.variantId.toLowerCase().includes("tiktok") ? (
                         <>
                           <div className="border border-slate-100 rounded-2xl p-3 text-center">
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pack Reg (12)</p>
@@ -190,7 +190,7 @@ export default function ManagerProductionsPage() {
                       ) : (
                         <div className="col-span-2 border border-slate-100 rounded-2xl p-3 text-center">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pack TikTok (12)</p>
-                          <p className="text-xl font-black text-slate-700">{pack.resultTikTokPacks || 0}</p>
+                          <p className="text-xl font-black text-slate-700">{pack.resultRegularPacks || 0}</p>
                         </div>
                       )}
                     </div>
