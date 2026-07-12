@@ -118,7 +118,7 @@ export default function ManagerProductionsPage() {
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="text-xs font-bold text-slate-400 mb-0.5 uppercase tracking-wider">
-                          {p.type === "tiktok" ? "Churros TikTok" : "Churros Standar"}
+                          {p.variantId.toLowerCase().includes("tiktok") ? "Churros TikTok" : "Churros Standar"}
                         </p>
                         <p className="text-lg font-black text-slate-800">{variant?.name || p.variantId}</p>
                       </div>
