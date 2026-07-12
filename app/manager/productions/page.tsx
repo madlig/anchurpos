@@ -159,7 +159,7 @@ export default function ManagerProductionsPage() {
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="text-xs font-bold text-slate-400 mb-0.5 uppercase tracking-wider">
-                          {pack.type === "tiktok" ? "Pre-pack TikTok" : "Pre-pack Standar"}
+                          {pack.variantId.toLowerCase().includes("tiktok") ? "Pre-pack TikTok" : "Pre-pack Standar"}
                         </p>
                         <p className="text-lg font-black text-slate-800">{variant?.name || pack.variantId}</p>
                       </div>
