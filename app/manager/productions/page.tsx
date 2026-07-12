@@ -195,9 +195,9 @@ export default function ManagerProductionsPage() {
                       )}
                     </div>
                     
-                    {pack.leftoverPcs > 0 && (
+                    {(pack.leftoverPcs || 0) > 0 && (
                       <div className="bg-orange-50 rounded-xl p-2.5 text-center mt-1 border border-orange-100">
-                        <p className="text-xs font-bold text-orange-700">Sisa / Reject: {pack.leftoverPcs} pcs</p>
+                        <p className="text-xs font-bold text-orange-700">Sisa / Reject: {pack.leftoverPcs || 0} pcs</p>
                       </div>
                     )}
                   </div>
