@@ -120,8 +120,8 @@ export async function POST(req: NextRequest) {
       let highestSim = 0;
       let existingIngredientData: any = null;
 
-      // 1A. Jika ini bahan baku/packaging dan belum ada ID, lakukan pencarian fuzzy
-      if ((category === "bahan_baku" || category === "packaging") && !finalIngredientId && !forceCreateNew) {
+      // 1A. Jika ini bahan baku/packaging/operasional dan belum ada ID, lakukan pencarian fuzzy
+      if ((category === "bahan_baku" || category === "packaging" || category === "operasional") && !finalIngredientId && !forceCreateNew) {
         const ingredientsSnap = await tx.get(
           adminDb.collection("ingredients").where("category", "==", category)
         );
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
       } 
       
       let newIngId = "";
-      if ((category === "bahan_baku" || category === "packaging") && !finalIngredientId) {
+      if ((category === "bahan_baku" || category === "packaging" || category === "operasional") && !finalIngredientId) {
         // Harus membuat baru
         const cleanSlug = itemName.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
         newIngId = `${category}-${cleanSlug}-${Date.now().toString().slice(-4)}`;

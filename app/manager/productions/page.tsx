@@ -7,13 +7,16 @@ import type { Production, PrePacking, Variant } from "@/types";
 
 export default function ManagerProductionsPage() {
   const { getToken } = useAuth();
-  const [activeTab, setActiveTab] = useState<"produksi" | "prepacking">("produksi");
+  const [activeTab, setActiveTab] = useState<"produksi" | "prepacking" | "histori">("produksi");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   
   const [productions, setProductions] = useState<Production[]>([]);
   const [prePackings, setPrePackings] = useState<PrePacking[]>([]);
+  const [historyItems, setHistoryItems] = useState<Production[]>([]);
+  const [selectedHistoryVariantId, setSelectedHistoryVariantId] = useState("");
   const [variants, setVariants] = useState<Record<string, Variant>>({});
   const [loading, setLoading] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const fetchWithAuth = useCallback(
     async (url: string) => {
@@ -52,6 +55,28 @@ export default function ManagerProductionsPage() {
     loadData();
   }, [loadData]);
 
+  const loadHistory = useCallback(async () => {
+    if (!selectedHistoryVariantId) {
+      setHistoryItems([]);
+      return;
+    }
+    setLoadingHistory(true);
+    try {
+      const res = await fetchWithAuth(`/api/productions?variantId=${selectedHistoryVariantId}`);
+      if (res.ok) setHistoryItems(await res.json());
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [selectedHistoryVariantId, fetchWithAuth]);
+
+  useEffect(() => {
+    if (activeTab === "histori") {
+      loadHistory();
+    }
+  }, [activeTab, loadHistory]);
+
   return (
     <div className="page-enter min-h-screen pb-24" style={{ background: "#FCABB4" }}>
       {/* Header (Glassmorphism) */}
@@ -66,6 +91,13 @@ export default function ManagerProductionsPage() {
           <input
             type="date"
             value={date}
+            onClick={(e) => {
+              try {
+                if ('showPicker' in HTMLInputElement.prototype) {
+                  e.currentTarget.showPicker();
+                }
+              } catch (e) {}
+            }}
             onChange={(e) => setDate(e.target.value)}
             className="w-full pl-12 pr-4 py-3 rounded-xl text-sm font-bold bg-slate-50 border-0 focus:ring-2 focus:ring-pink-500 transition-all text-slate-700"
           />
@@ -74,10 +106,10 @@ export default function ManagerProductionsPage() {
 
       <div className="px-5 mt-6">
         {/* Tabs */}
-        <div className="flex bg-slate-200/60 p-1.5 rounded-2xl mb-6">
+        <div className="flex bg-slate-200/60 p-1.5 rounded-2xl mb-6 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab("produksi")}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 tap-target ${
+            className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 tap-target ${
               activeTab === "produksi"
                 ? "bg-white text-pink-600 shadow-sm"
                 : "text-slate-500 hover:text-slate-700"
@@ -88,7 +120,7 @@ export default function ManagerProductionsPage() {
           </button>
           <button
             onClick={() => setActiveTab("prepacking")}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 tap-target ${
+            className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 tap-target ${
               activeTab === "prepacking"
                 ? "bg-white text-pink-600 shadow-sm"
                 : "text-slate-500 hover:text-slate-700"
@@ -97,11 +129,85 @@ export default function ManagerProductionsPage() {
             <Package size={16} />
             Pre-Packing
           </button>
+          <button
+            onClick={() => setActiveTab("histori")}
+            className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 tap-target ${
+              activeTab === "histori"
+                ? "bg-white text-pink-600 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            <Calendar size={16} />
+            Pencarian Histori
+          </button>
         </div>
 
-        {loading ? (
+        {loading && activeTab !== "histori" ? (
           <div className="flex justify-center py-10">
             <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
+          </div>
+        ) : activeTab === "histori" ? (
+          <div className="space-y-4">
+            <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Pilih Produk</label>
+              <select
+                value={selectedHistoryVariantId}
+                onChange={(e) => setSelectedHistoryVariantId(e.target.value)}
+                className="w-full bg-slate-50 border-0 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-pink-500 outline-none"
+              >
+                <option value="">-- Pilih --</option>
+                {Object.values(variants).map(v => (
+                  <option key={v.id} value={v.id}>{v.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {loadingHistory ? (
+              <div className="flex justify-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
+              </div>
+            ) : historyItems.length === 0 ? (
+              <div className="text-center py-10 bg-white rounded-3xl border border-dashed border-slate-200">
+                <Calendar className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                <p className="text-sm font-bold text-slate-500">
+                  {selectedHistoryVariantId ? "Belum ada riwayat produksi" : "Silakan pilih produk untuk melihat riwayat"}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {historyItems.map((p) => {
+                  const variant = variants[p.variantId];
+                  return (
+                    <div key={p.id} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 flex flex-col gap-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5 uppercase tracking-wider">
+                            {new Date(p.date).toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </p>
+                          <p className="text-lg font-black text-slate-800">{variant?.name || p.variantId}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] font-bold text-pink-600 bg-pink-50 px-2 py-1 rounded-lg uppercase tracking-wider">
+                            {new Date(p.createdAt).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="bg-slate-50 rounded-2xl p-4 flex gap-4 border border-slate-100/50">
+                        <div className="flex-1">
+                          <p className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">Jml Batch</p>
+                          <p className="text-xl font-black text-slate-700 tracking-tight">{p.batches}</p>
+                        </div>
+                        <div className="w-px bg-slate-200"></div>
+                        <div className="flex-1">
+                          <p className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">Total Loyang</p>
+                          <p className="text-xl font-black text-slate-700 tracking-tight">{p.loyangCount}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : activeTab === "produksi" ? (
           <div className="space-y-4">

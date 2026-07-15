@@ -201,7 +201,7 @@ function ExpenseForm({
     setShowIngredientDropdown(false);
   };
 
-  const isProductCategory = category === "bahan_baku" || category === "packaging";
+  const isProductCategory = category === "bahan_baku" || category === "packaging" || category === "operasional";
 
   // Tambah item aktif ke keranjang belanja
   async function handleAddItem() {

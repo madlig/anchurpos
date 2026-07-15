@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     const usersSnap = await adminDb
       .collection("users")
-      .where("active", "==", true)
+      .where("isActive", "==", true)
       .where("role", "==", "crew")
       .get();
 

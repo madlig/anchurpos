@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatRupiah } from "@/lib/utils";
-import { Loader2, Plus, X, Check, AlertTriangle, Search, ChevronDown, ChevronUp, ClipboardList } from "lucide-react";
+import { Loader2, Plus, X, Check, AlertTriangle, Search, ChevronDown, ChevronUp, ClipboardList, MoreHorizontal } from "lucide-react";
 import type { Ingredient } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -297,44 +297,38 @@ export default function InventoryPage() {
   return (
     <div className="min-h-screen" style={{ background: "#FCABB4" }}>
 
-      {/* ── Header (white, sticky) ── */}
-      <div className="sticky top-0 z-20" style={{ background: "#fff", borderBottom: "1px solid #F1F5F9" }}>
-        <div className="px-5 pt-4 pb-2">
-          <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Inventori</h1>
+      {/* ── Header (Glassmorphism, sticky) ── */}
+      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-xl border-b border-pink-100 shadow-sm">
+        <div className="px-5 pt-6 pb-4">
+          <h1 className="text-2xl font-black mb-1" style={{ color: "#1E293B" }}>Inventori</h1>
+          <p className="text-sm font-semibold text-slate-500">Kelola stok dan bahan baku</p>
 
           {/* Search bar */}
-          <div
-            className="flex items-center gap-2 mt-2"
-            style={{ padding: "9px 12px", background: "#F8FAFC", borderRadius: "12px", border: "1px solid #F1F5F9" }}
-          >
-            <Search size={15} style={{ color: "#94A3B8", flexShrink: 0 }} />
+          <div className="flex items-center gap-2 mt-4 px-4 py-3 bg-slate-50/80 rounded-xl border border-slate-100 focus-within:ring-2 focus-within:ring-pink-500 focus-within:border-pink-200 transition-all">
+            <Search size={18} className="text-slate-400 flex-shrink-0" />
             <input
               type="text"
               placeholder={tab === "produk" ? "Cari varian..." : tab === "bahan" ? "Cari bahan baku..." : "Cari pengeluaran..."}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              style={{ flex: 1, background: "transparent", fontSize: "13px", color: "#1C1C1E", outline: "none" }}
+              className="flex-1 bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:font-medium placeholder:text-slate-400"
               data-testid="inventory-search"
             />
           </div>
         </div>
 
-        {/* Tabs — underline style */}
-        <div className="flex">
+        {/* Tabs — Scrollable */}
+        <div className="flex overflow-x-auto no-scrollbar px-2 pb-0">
           {TABS.map(t => (
             <button
               key={t.key}
               onClick={() => handleTabChange(t.key)}
               data-testid={`tab-${t.key}`}
-              className="flex-1"
-              style={{
-                paddingTop: "8px", paddingBottom: "10px",
-                border: "none",
-                borderBottom: tab === t.key ? "2px solid #E85D8C" : "2px solid transparent",
-                fontSize: "12px", fontWeight: tab === t.key ? "600" : "500",
-                color: tab === t.key ? "#E85D8C" : "#94A3B8",
-                background: "transparent", cursor: "pointer",
-              }}
+              className={`whitespace-nowrap px-4 py-3 text-sm transition-all border-b-2 font-bold ${
+                tab === t.key 
+                  ? "border-pink-500 text-pink-600" 
+                  : "border-transparent text-slate-400 hover:text-slate-600"
+              }`}
             >
               {t.label}
             </button>
@@ -358,113 +352,122 @@ export default function InventoryPage() {
               </div>
             )}
 
-            <div className="flex flex-col gap-2.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {variants
-                .filter(v => !searchQuery || v.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                .filter(v => !searchQuery || (v.name && v.name.toLowerCase().includes(searchQuery.toLowerCase())))
                 .length === 0 ? (
-                  <div className="py-16 text-center">
-                    <p style={{ fontSize: "14px", color: "#94A3B8" }}>
+                  <div className="py-16 text-center col-span-full bg-white rounded-3xl border border-dashed border-slate-200">
+                    <p className="text-sm font-bold text-slate-400">
                       {searchQuery ? "Tidak ditemukan" : "Belum ada data varian"}
                     </p>
                   </div>
                 ) : (
                   variants
-                    .filter(v => !searchQuery || v.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .filter(v => !searchQuery || (v.name && v.name.toLowerCase().includes(searchQuery.toLowerCase())))
                     .map(v => {
                       const isLow = v.currentStock < v.minStock;
                       const barPct = Math.min(100, (v.currentStock / Math.max(v.minStock * 2, 1)) * 100);
-                      const barColor = isLow ? "#DC2626" : v.currentStock < v.minStock * 1.5 ? "#D97706" : "#16A34A";
+                      const barColor = isLow ? "#DC2626" : v.currentStock < v.minStock * 1.5 ? "#D97706" : "#10B981";
                       const isEditing = editingVariantId === v.id;
+                      
                       return (
                         <div
                           key={v.id}
-                          style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: `1px solid ${isLow ? "#FECACA" : "#F1F5F9"}` }}
+                          className={`bg-white rounded-3xl p-5 shadow-sm border flex flex-col transition-all ${
+                            isLow ? "border-red-200 ring-2 ring-red-500/10" : "border-slate-100 hover:border-pink-200"
+                          }`}
                           data-testid={`variant-stock-${v.id}`}
                         >
-                          <div className="flex items-center justify-between" style={{ marginBottom: "8px" }}>
-                            <div className="flex items-center gap-2">
-                              <div style={{ width: "32px", height: "32px", borderRadius: "10px", background: isLow ? "#FEE2E2" : "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                <span style={{ fontSize: "14px", fontWeight: "700", color: isLow ? "#DC2626" : "#E85D8C" }}>
-                                  {v.name[0].toUpperCase()}
-                                </span>
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                                isLow ? "bg-red-50 text-red-600 animate-pulse" : "bg-pink-50 text-pink-600"
+                              }`}>
+                                <span className="text-lg font-black">{v.name?.[0]?.toUpperCase() || "?"}</span>
                               </div>
                               <div>
-                                <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{v.name}</p>
-                                <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "1px" }}>Min: {v.minStock} pcs</p>
+                                <p className="text-sm font-black text-slate-800 line-clamp-1">{v.name}</p>
+                                <p className="text-xs font-bold text-slate-400 mt-0.5">Min: {v.minStock}</p>
                               </div>
                             </div>
-                            <span style={{ fontSize: "16px", fontWeight: "700", color: isLow ? "#DC2626" : "#1C1C1E" }}>
-                              {v.currentStock} <span style={{ fontSize: "11px", fontWeight: "500", color: "#94A3B8" }}>pcs</span>
-                            </span>
-                          </div>
-
-                          {!isEditing && (
-                            <>
-                              <div style={{ height: "6px", borderRadius: "3px", background: "#F1F5F9", marginBottom: "6px" }}>
-                                <div style={{ height: "6px", borderRadius: "3px", background: barColor, width: `${barPct}%`, transition: "width 0.4s" }} />
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span style={{ fontSize: "11px", color: "#94A3B8" }}>
-                                  {isLow ? "⚠ Stok di bawah minimum" : "Stok aman"}
-                                </span>
-                                <div className="flex gap-3">
+                            
+                            {!isEditing && (
+                              <div className="relative group">
+                                <button className="p-2 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors">
+                                  <MoreHorizontal size={16} />
+                                </button>
+                                <div className="absolute right-0 mt-2 w-40 bg-white rounded-2xl shadow-xl border border-slate-100 p-1 hidden group-hover:block z-10">
                                   <button
                                     onClick={() => openMutasiModal(v.id, v.name, "pcs", "variant")}
-                                    style={{ fontSize: "11px", color: "#64748B", fontWeight: "600", background: "none", border: "none", cursor: "pointer" }}
+                                    className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 rounded-xl transition-colors"
                                   >
-                                    Riwayat
+                                    Kartu Stok
                                   </button>
                                   <button
                                     onClick={() => { setEditingVariantId(v.id); setOpnameValue(String(v.currentStock)); }}
-                                    style={{ fontSize: "11px", color: "#E85D8C", fontWeight: "600", background: "none", border: "none", cursor: "pointer" }}
+                                    className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-pink-600 rounded-xl transition-colors"
                                   >
                                     Stock Opname
                                   </button>
                                 </div>
                               </div>
-                            </>
-                          )}
+                            )}
+                          </div>
 
-                          {isEditing && (
-                            <div className="flex flex-col gap-2 mt-2">
-                              <div className="flex gap-2 items-center">
-                                <Input
-                                  type="number"
-                                  value={opnameValue}
-                                  onChange={e => setOpnameValue(e.target.value)}
-                                  placeholder="Jumlah aktual (pcs)"
-                                  className="flex-1 h-10 rounded-xl border-slate-200 text-sm"
-                                  data-testid={`opname-input-${v.id}`}
-                                />
-                                <span style={{ fontSize: "12px", color: "#64748B" }}>pcs</span>
-                              </div>
-                              <Input
-                                value={opnameNote}
-                                onChange={e => setOpnameNote(e.target.value)}
-                                placeholder="Catatan opname (opsional)"
-                                className="h-10 rounded-xl border-slate-200 text-sm"
-                              />
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => handleVariantOpname(v.id)}
-                                  disabled={submitting}
-                                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white"
-                                  style={{ background: "#E85D8C" }}
-                                  data-testid={`save-opname-${v.id}`}
-                                >
-                                  {submitting ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                                  Simpan
-                                </button>
-                                <button
-                                  onClick={() => { setEditingVariantId(null); setOpnameValue(""); setOpnameNote(""); }}
-                                  className="px-4 py-2 rounded-xl text-sm font-semibold"
-                                  style={{ background: "#F1F5F9", color: "#64748B" }}
-                                >
-                                  Batal
-                                </button>
-                              </div>
+                          <div className="mt-auto">
+                            <div className="flex justify-between items-end mb-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sisa Stok</span>
+                              <span className={`text-2xl font-black ${isLow ? "text-red-600" : "text-slate-800"}`}>
+                                {v.currentStock} <span className="text-xs font-bold text-slate-400">pcs</span>
+                              </span>
                             </div>
-                          )}
+
+                            {!isEditing ? (
+                              <div className="w-full bg-slate-100 rounded-full h-1.5 mb-1 overflow-hidden">
+                                <div 
+                                  className="h-1.5 rounded-full transition-all duration-500 ease-out" 
+                                  style={{ width: `${barPct}%`, backgroundColor: barColor }} 
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-2 mt-2 pt-3 border-t border-slate-100">
+                                <div className="flex gap-2 items-center">
+                                  <Input
+                                    type="number"
+                                    value={opnameValue}
+                                    onChange={e => setOpnameValue(e.target.value)}
+                                    placeholder="Jumlah aktual"
+                                    className="flex-1 h-10 rounded-xl border-slate-200 text-sm font-bold"
+                                    data-testid={`opname-input-${v.id}`}
+                                  />
+                                  <span className="text-xs font-bold text-slate-400">pcs</span>
+                                </div>
+                                <Input
+                                  value={opnameNote}
+                                  onChange={e => setOpnameNote(e.target.value)}
+                                  placeholder="Catatan opname (opsional)"
+                                  className="h-10 rounded-xl border-slate-200 text-sm"
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleVariantOpname(v.id)}
+                                    disabled={submitting}
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-black text-white bg-pink-500 hover:bg-pink-600 transition-colors"
+                                    data-testid={`save-opname-${v.id}`}
+                                  >
+                                    {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}
+                                    Simpan
+                                  </button>
+                                  <button
+                                    onClick={() => { setEditingVariantId(null); setOpnameValue(""); setOpnameNote(""); }}
+                                    className="px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+                                  >
+                                    Batal
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })
@@ -494,99 +497,120 @@ export default function InventoryPage() {
                   </div>
                 )}
 
-                <div className="flex flex-col gap-2.5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {filteredIngredients
-                    .filter(i => !searchQuery || i.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .filter(i => !searchQuery || (i.name && i.name.toLowerCase().includes(searchQuery.toLowerCase())))
                     .length === 0 ? (
-                      <div className="py-16 text-center">
-                        <p style={{ fontSize: "14px", color: "#94A3B8" }}>
+                      <div className="py-16 text-center col-span-full bg-white rounded-3xl border border-dashed border-slate-200">
+                        <p className="text-sm font-bold text-slate-400">
                           {searchQuery ? "Tidak ditemukan" : "Belum ada data"}
                         </p>
                       </div>
                     ) : (
                       filteredIngredients
-                        .filter(i => !searchQuery || i.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .filter(i => !searchQuery || (i.name && i.name.toLowerCase().includes(searchQuery.toLowerCase())))
                         .map(ing => {
                           const isLow = ing.currentStock < ing.minStock;
                           const barPct = Math.min(100, (ing.currentStock / Math.max(ing.minStock * 2, 1)) * 100);
-                          const barColor = isLow ? "#DC2626" : ing.currentStock < ing.minStock * 1.5 ? "#D97706" : "#16A34A";
+                          const barColor = isLow ? "#DC2626" : ing.currentStock < ing.minStock * 1.5 ? "#D97706" : "#10B981";
                           const isEditing = editingStock === ing.id;
+                          
                           return (
                             <div
                               key={ing.id}
-                              style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: `1px solid ${isLow ? "#FECACA" : "#F1F5F9"}` }}
+                              className={`bg-white rounded-3xl p-5 shadow-sm border flex flex-col transition-all ${
+                                isLow ? "border-red-200 ring-2 ring-red-500/10" : "border-slate-100 hover:border-pink-200"
+                              }`}
                               data-testid={`ingredient-${ing.id}`}
                             >
-                              <div className="flex items-center justify-between" style={{ marginBottom: "8px" }}>
-                                <span style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{ing.name}</span>
-                                <span style={{ fontSize: "16px", fontWeight: "700", color: isLow ? "#DC2626" : "#1C1C1E" }}>
-                                  {ing.currentStock.toLocaleString("id-ID")} <span style={{ fontSize: "11px", fontWeight: "500", color: "#94A3B8" }}>{ing.baseUnit}</span>
-                                </span>
-                              </div>
-
-                              {!isEditing && (
-                                <>
-                                  <div style={{ height: "6px", borderRadius: "3px", background: "#F1F5F9", marginBottom: "6px" }}>
-                                    <div style={{ height: "6px", borderRadius: "3px", background: barColor, width: `${barPct}%`, transition: "width 0.4s" }} />
+                              <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                                    isLow ? "bg-red-50 text-red-600 animate-pulse" : "bg-indigo-50 text-indigo-600"
+                                  }`}>
+                                    <span className="text-lg font-black">{ing.name?.[0]?.toUpperCase() || "?"}</span>
                                   </div>
-                                  <div className="flex items-center justify-between">
-                                    <span style={{ fontSize: "11px", color: "#94A3B8" }}>Min: {ing.minStock.toLocaleString("id-ID")} {ing.baseUnit}</span>
-                                    <div className="flex gap-3">
+                                  <div>
+                                    <p className="text-sm font-black text-slate-800 line-clamp-1">{ing.name}</p>
+                                    <p className="text-xs font-bold text-slate-400 mt-0.5">Min: {ing.minStock} {ing.baseUnit}</p>
+                                  </div>
+                                </div>
+                                
+                                {!isEditing && (
+                                  <div className="relative group">
+                                    <button className="p-2 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors">
+                                      <MoreHorizontal size={16} />
+                                    </button>
+                                    <div className="absolute right-0 mt-2 w-32 bg-white rounded-2xl shadow-xl border border-slate-100 p-1 hidden group-hover:block z-10">
                                       <button
                                         onClick={() => openMutasiModal(ing.id, ing.name, ing.baseUnit, "ingredient")}
-                                        style={{ fontSize: "11px", color: "#64748B", fontWeight: "600", background: "none", border: "none", cursor: "pointer" }}
+                                        className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 rounded-xl transition-colors"
                                       >
-                                        Riwayat
+                                        Kartu Stok
                                       </button>
                                       <button
                                         onClick={() => { setEditingStock(ing.id); setNewStockValue(String(ing.currentStock)); }}
-                                        style={{ fontSize: "11px", color: "#E85D8C", fontWeight: "600", background: "none", border: "none", cursor: "pointer" }}
+                                        className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-pink-600 rounded-xl transition-colors"
                                       >
-                                        Edit stok
+                                        Edit Stok
                                       </button>
                                     </div>
                                   </div>
-                                </>
-                              )}
+                                )}
+                              </div>
 
-                              {isEditing && (
-                                <div className="flex flex-col gap-2 mt-2">
-                                  <div className="flex gap-2 items-center">
-                                    <Input
-                                      type="number"
-                                      value={newStockValue}
-                                      onChange={e => setNewStockValue(e.target.value)}
-                                      placeholder={`Stok baru (${ing.baseUnit})`}
-                                      className="flex-1 h-10 rounded-xl border-slate-200 text-sm"
-                                    />
-                                    <span style={{ fontSize: "12px", color: "#64748B" }}>{ing.baseUnit}</span>
-                                  </div>
-                                  <Input
-                                    value={stockNote}
-                                    onChange={e => setStockNote(e.target.value)}
-                                    placeholder="Catatan (opsional)"
-                                    className="h-10 rounded-xl border-slate-200 text-sm"
-                                  />
-                                  <div className="flex gap-2">
-                                    <button
-                                      onClick={() => handleStockEdit(ing.id)}
-                                      disabled={submitting}
-                                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white"
-                                      style={{ background: "#E85D8C" }}
-                                    >
-                                      {submitting ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                                      Simpan
-                                    </button>
-                                    <button
-                                      onClick={() => { setEditingStock(null); setNewStockValue(""); setStockNote(""); }}
-                                      className="px-4 py-2 rounded-xl text-sm font-semibold"
-                                      style={{ background: "#F1F5F9", color: "#64748B" }}
-                                    >
-                                      Batal
-                                    </button>
-                                  </div>
+                              <div className="mt-auto">
+                                <div className="flex justify-between items-end mb-2">
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sisa Stok</span>
+                                  <span className={`text-2xl font-black ${isLow ? "text-red-600" : "text-slate-800"}`}>
+                                    {ing.currentStock.toLocaleString("id-ID")} <span className="text-xs font-bold text-slate-400">{ing.baseUnit}</span>
+                                  </span>
                                 </div>
-                              )}
+
+                                {!isEditing ? (
+                                  <div className="w-full bg-slate-100 rounded-full h-1.5 mb-1 overflow-hidden">
+                                    <div 
+                                      className="h-1.5 rounded-full transition-all duration-500 ease-out" 
+                                      style={{ width: `${barPct}%`, backgroundColor: barColor }} 
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col gap-2 mt-2 pt-3 border-t border-slate-100">
+                                    <div className="flex gap-2 items-center">
+                                      <Input
+                                        type="number"
+                                        value={newStockValue}
+                                        onChange={e => setNewStockValue(e.target.value)}
+                                        placeholder={`Stok baru (${ing.baseUnit})`}
+                                        className="flex-1 h-10 rounded-xl border-slate-200 text-sm font-bold"
+                                      />
+                                      <span className="text-xs font-bold text-slate-400">{ing.baseUnit}</span>
+                                    </div>
+                                    <Input
+                                      value={stockNote}
+                                      onChange={e => setStockNote(e.target.value)}
+                                      placeholder="Catatan (opsional)"
+                                      className="h-10 rounded-xl border-slate-200 text-sm"
+                                    />
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => handleStockEdit(ing.id)}
+                                        disabled={submitting}
+                                        className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-black text-white bg-pink-500 hover:bg-pink-600 transition-colors"
+                                      >
+                                        {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}
+                                        Simpan
+                                      </button>
+                                      <button
+                                        onClick={() => { setEditingStock(null); setNewStockValue(""); setStockNote(""); }}
+                                        className="px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+                                      >
+                                        Batal
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })

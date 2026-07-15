@@ -254,7 +254,7 @@ export default function EditOrderPage() {
   useEffect(() => {
     if (newProdId) {
       setNewVarId(allowedVariants[0]?.id || "");
-      const hasSauce = !newProdId.toLowerCase().includes("full");
+      const hasSauce = newProdId.toLowerCase().includes("churros");
       if (hasSauce && addOns.length > 0) {
         const tiramisu = addOns.find(a => a.name.toLowerCase().includes("tiramisu") || a.id === "saus-tiramisu") || addOns[0];
         setNewSauceId(tiramisu.id);
@@ -273,7 +273,7 @@ export default function EditOrderPage() {
     const variant = variants.find(v => v.id === newVarId);
     if (!product || !variant) return;
 
-    const hasSauce = !product.id.toLowerCase().includes("full") && !product.name.toLowerCase().includes("full");
+    const hasSauce = product.id.toLowerCase().includes("churros");
     const sId = hasSauce ? newSauceId : undefined;
     const sName = sId ? (addOns.find(a => a.id === sId)?.name || sId) : undefined;
 
@@ -325,7 +325,7 @@ export default function EditOrderPage() {
     const defaultCoklat = addOns.find(a => a.id === "saus-coklat" || a.id === "saus-coklat-tiktok")?.id || "saus-coklat";
 
     cart.forEach(item => {
-      const hasSauce = !item.productId.toLowerCase().includes("full") && !item.productName.toLowerCase().includes("full");
+      const hasSauce = item.productId.toLowerCase().includes("churros");
       if (hasSauce) {
         // 1x default chocolate
         dist[defaultCoklat] = (dist[defaultCoklat] ?? 0) + item.qty;
@@ -477,7 +477,7 @@ export default function EditOrderPage() {
 
             <div className="flex flex-col gap-3">
               {cart.map((item, idx) => {
-                const isFull = item.productId.toLowerCase().includes("full") || item.productName.toLowerCase().includes("full");
+                const hasSauce = item.productId.toLowerCase().includes("churros");
                 return (
                   <div key={idx} className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-2.5">
                     <div className="flex justify-between items-start">
@@ -491,7 +491,7 @@ export default function EditOrderPage() {
                     </div>
 
                     {/* Sauce Dropdown (only for non-full items) */}
-                    {!isFull && addOns.length > 0 && (
+                    {hasSauce && addOns.length > 0 && (
                       <div className="flex items-center justify-between pt-2 border-t border-dashed border-slate-200">
                         <span className="text-[10px] font-bold text-slate-500 uppercase">Saus Bebas (Pilihan):</span>
                         <select
@@ -558,7 +558,7 @@ export default function EditOrderPage() {
                 </div>
               </div>
 
-              {newProdId && !newProdId.toLowerCase().includes("full") && addOns.length > 0 && (
+              {newProdId && newProdId.toLowerCase().includes("churros") && addOns.length > 0 && (
                 <div className="mb-3">
                   <label className="text-[10px] font-semibold text-slate-500 block mb-1">Saus Bebas (Pilihan)</label>
                   <select

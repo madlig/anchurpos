@@ -172,7 +172,7 @@ export default function KasirPage() {
     const defaultCoklat = addOns.find(a => a.id === "saus-coklat" || a.id === "saus-coklat-tiktok")?.id || "saus-coklat";
 
     cart.forEach(item => {
-      const hasSauce = !item.productId.toLowerCase().includes("full") && !item.productName.toLowerCase().includes("full");
+      const hasSauce = item.productId.toLowerCase().includes("churros");
       if (hasSauce) {
         // 1. Setiap pack mendapat 1x Cokelat default
         dist[defaultCoklat] = (dist[defaultCoklat] ?? 0) + item.qty;
@@ -274,7 +274,7 @@ export default function KasirPage() {
   function addToCart() {
     if (!selectedProduct) return;
     const newItems: CartItem[] = [];
-    const hasSauce = !selectedProduct.id.toLowerCase().includes("full") && !selectedProduct.name.toLowerCase().includes("full");
+    const hasSauce = selectedProduct.id.toLowerCase().includes("churros");
 
     for (const [variantId, rows] of Object.entries(variantSelections)) {
       const variant = variants.find(v => v.id === variantId);
@@ -643,7 +643,7 @@ export default function KasirPage() {
                 const currentStock = stockItem ? stockItem.currentStock : 0;
                 const minStock = stockItem ? stockItem.minStock : v.minStock;
                 const isLowStock = currentStock < minStock;
-                const hasSauce = !selectedProduct.id.toLowerCase().includes("full") && !selectedProduct.name.toLowerCase().includes("full");
+                const hasSauce = selectedProduct.id.toLowerCase().includes("churros");
 
                 return (
                   <div

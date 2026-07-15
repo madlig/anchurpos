@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const dateStr = searchParams.get("date");
   const type = searchParams.get("type");
+  const variantId = searchParams.get("variantId");
 
   try {
     let query = adminDb.collection("productions").orderBy("date", "desc") as FirebaseFirestore.Query;
@@ -19,6 +20,9 @@ export async function GET(req: NextRequest) {
       const next = new Date(d);
       next.setDate(next.getDate() + 1);
       query = query.where("date", ">=", d).where("date", "<", next);
+    } else if (variantId) {
+      // If no date is specified but variantId is, we filter by variantId.
+      query = query.where("variantId", "==", variantId);
     }
 
     const snap = await query.limit(100).get();

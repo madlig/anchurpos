@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   Loader2, Plus, Pencil, Trash2, X, Check, KeyRound,
   Users, CalendarDays, UserCheck, ChevronDown, ChevronUp,
-  Wallet, Banknote, AlertTriangle
+  Wallet, Banknote, AlertTriangle, MoreHorizontal, Clock, TrendingUp
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -218,6 +218,193 @@ function ChangePasswordForm({ emp, fetchWithAuth, onSuccess, onCancel }: {
   );
 }
 
+// ─── Attendance Review Card ───────────────────────────────────────────────────
+function AttendanceReviewCard({ a, onReview, reviewingId, isCorrectionMode = false, editData, onEditChange }: { 
+  a: AttendanceRecord; 
+  onReview?: (id: string, a: AttendanceRecord, actionType: "approve" | "adjust" | "reject", data?: any) => void;
+  reviewingId?: string | null;
+  isCorrectionMode?: boolean;
+  editData?: { tot: string, ovt: string, bonus: string };
+  onEditChange?: (field: "tot" | "ovt" | "bonus", val: string) => void;
+}) {
+  const [totLocal, setTotLocal] = useState(String(a.totalHours ?? 8));
+  const [ovtLocal, setOvtLocal] = useState(String(a.overtimeHours ?? 0));
+  const [bonusLocal, setBonusLocal] = useState(String(a.overtimeBonus ?? 0));
+
+  const tot = isCorrectionMode && editData ? editData.tot : totLocal;
+  const ovt = isCorrectionMode && editData ? editData.ovt : ovtLocal;
+  const bonus = isCorrectionMode && editData ? editData.bonus : bonusLocal;
+
+  const handleTot = (v: string) => { if (isCorrectionMode && onEditChange) onEditChange("tot", v); else setTotLocal(v); };
+  const handleOvt = (v: string) => { if (isCorrectionMode && onEditChange) onEditChange("ovt", v); else setOvtLocal(v); };
+  const handleBonus = (v: string) => { if (isCorrectionMode && onEditChange) onEditChange("bonus", v); else setBonusLocal(v); };
+
+  const isDirty = (field: "tot" | "ovt" | "bonus") => {
+    if (!isCorrectionMode || !editData) return false;
+    if (field === "tot") return Number(tot) !== (a.totalHours ?? 8);
+    if (field === "ovt") return Number(ovt) !== (a.overtimeHours ?? 0);
+    if (field === "bonus") return Number(bonus) !== (a.overtimeBonus ?? 0);
+    return false;
+  };
+
+  return (
+    <div style={{ background: "#fff", borderRadius: "16px", padding: "16px", border: "1px solid #F1F5F9", boxShadow: "0 2px 10px rgba(0,0,0,0.015)" }}>
+      <div className="flex items-start justify-between border-b border-slate-50 pb-3 mb-3">
+        <div>
+          <p style={{ fontSize: "14px", fontWeight: "800", color: "#1C1C1E" }}>{a.employeeName}</p>
+          <div className="flex items-center gap-1.5 mt-1 text-slate-400">
+            <CalendarDays size={12} />
+            <span style={{ fontSize: "11px", fontWeight: "600" }}>
+              {fmtDateFull(a.date)} {a.flaggedReason ? `· ${a.flaggedReason}` : ""}
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1 text-right">
+          {a.checkIn && (
+            <p style={{ fontSize: "11px", color: "#64748B", background: "#F1F5F9", padding: "2px 8px", borderRadius: "100px", fontWeight: "600" }}>
+              Masuk: <span className="text-slate-700">{fmtTime(a.checkIn.time)}</span>
+            </p>
+          )}
+          {a.checkOut?.time && (
+            <p style={{ fontSize: "11px", color: "#64748B", background: "#F1F5F9", padding: "2px 8px", borderRadius: "100px", fontWeight: "600" }}>
+              Pulang: <span className="text-slate-700">{fmtTime(a.checkOut.time)}</span>
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 block mb-1">TOTAL JAM</label>
+            <div className="relative">
+              <input type="number" step="0.1" value={tot} onChange={(e) => handleTot(e.target.value)} style={{ background: isDirty("tot") ? "#FEF9C3" : "" }} className={`w-full h-9 rounded-lg border ${isDirty("tot") ? "border-yellow-400 text-yellow-900" : "border-slate-200 text-slate-700"} pl-3 pr-8 font-bold focus:outline-none focus:border-pink-300 focus:ring-1 focus:ring-pink-300 text-xs transition-all`} />
+              <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold ${isDirty("tot") ? "text-yellow-700" : "text-slate-400"}`}>Jam</span>
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 block mb-1">LEMBUR</label>
+            <div className="relative">
+              <input type="number" step="0.1" value={ovt} onChange={(e) => handleOvt(e.target.value)} style={{ background: isDirty("ovt") ? "#FEF9C3" : "" }} className={`w-full h-9 rounded-lg border ${isDirty("ovt") ? "border-yellow-400 text-yellow-900" : "border-slate-200 text-slate-700"} pl-3 pr-8 font-bold focus:outline-none focus:border-pink-300 focus:ring-1 focus:ring-pink-300 text-xs transition-all`} />
+              <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold ${isDirty("ovt") ? "text-yellow-700" : "text-slate-400"}`}>Jam</span>
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 block mb-1">BONUS (Rp)</label>
+            <input type="number" step="1000" value={bonus} onChange={(e) => handleBonus(e.target.value)} style={{ background: isDirty("bonus") ? "#FEF9C3" : "" }} className={`w-full h-9 rounded-lg border ${isDirty("bonus") ? "border-yellow-400 text-yellow-900" : "border-slate-200 text-slate-700"} px-3 font-bold focus:outline-none focus:border-pink-300 focus:ring-1 focus:ring-pink-300 text-xs transition-all`} />
+          </div>
+        </div>
+
+        {!isCorrectionMode && onReview && (
+          <div className="flex items-center gap-2 pt-2 border-t border-slate-50">
+            <button disabled={reviewingId === a.id} onClick={() => onReview(a.id, a, "reject")} className="tap-target flex items-center justify-center" style={{ background: "#FEF2F2", color: "#EF4444", padding: "8px 16px", borderRadius: "10px", fontWeight: "700", fontSize: "12px", border: "1px solid #FECACA", cursor: "pointer", opacity: reviewingId === a.id ? 0.6 : 1 }}>
+              Tolak
+            </button>
+            <button disabled={reviewingId === a.id} onClick={() => onReview(a.id, a, "adjust", { tot, ovt, bonus })} className="tap-target ml-auto flex items-center justify-center gap-1.5" style={{ background: "#10B981", color: "white", padding: "8px 20px", borderRadius: "10px", fontWeight: "700", fontSize: "12px", border: "none", cursor: "pointer", opacity: reviewingId === a.id ? 0.6 : 1, boxShadow: "0 4px 10px -2px rgba(16,185,129,0.3)" }}>
+              {reviewingId === a.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Setujui & Simpan
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Manual Attendance Form ───────────────────────────────────────────────────
+function ManualAttendanceForm({ employees, onSuccess, onCancel, fetchWithAuth, initialData }: {
+  employees: Employee[];
+  onSuccess: () => void;
+  onCancel: () => void;
+  fetchWithAuth: (url: string, opts?: RequestInit) => Promise<Response>;
+  initialData?: { empId: string; date: string; checkInTime: string } | null;
+}) {
+  const [empId, setEmpId] = useState(initialData?.empId || "");
+  const [date, setDate] = useState(initialData?.date || "");
+  const [checkInTime, setCheckInTime] = useState(initialData?.checkInTime || "");
+  const [checkOutTime, setCheckOutTime] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!empId || !date || !checkInTime || !checkOutTime) {
+      setError("Semua field wajib diisi");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetchWithAuth("/api/attendance/manual", {
+        method: "POST",
+        body: JSON.stringify({ employeeId: empId, date, checkInTime, checkOutTime })
+      });
+      if (res.ok) {
+        onSuccess();
+      } else {
+        const d = await res.json();
+        setError(d.error || "Gagal menyimpan data absensi manual");
+      }
+    } catch (err) {
+      setError("Terjadi kesalahan jaringan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ background: "#fff", borderRadius: "16px", padding: "16px", border: "1px solid #F1F5F9", marginBottom: "16px", boxShadow: "0 4px 15px rgba(0,0,0,0.03)" }} className="animate-in fade-in slide-in-from-top-4">
+      <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-50">
+        <div>
+          <h3 style={{ fontSize: "15px", fontWeight: "800", color: "#1C1C1E" }}>Tambah Absensi Manual</h3>
+          <p style={{ fontSize: "11px", color: "#64748B", marginTop: "2px" }}>Input data shift yang terlewat (otomatis berstatus lengkap)</p>
+        </div>
+        <button onClick={onCancel} style={{ background: "#F1F5F9", border: "none", width: "28px", height: "28px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#64748B" }}>
+          <X size={14} />
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ padding: "10px", background: "#FEF2F2", color: "#DC2626", borderRadius: "10px", fontSize: "12px", marginBottom: "12px", border: "1px solid #FECACA" }}>
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <div>
+          <label style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", display: "block", marginBottom: "4px" }}>KARYAWAN</label>
+          <select value={empId} onChange={e => setEmpId(e.target.value)} style={{ width: "100%", height: "38px", borderRadius: "10px", border: "1px solid #E2E8F0", padding: "0 12px", fontSize: "13px", color: "#334155", outline: "none", background: "#F8FAFC" }}>
+            <option value="">-- Pilih Karyawan --</option>
+            {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({ROLE_LABEL[e.role]})</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", display: "block", marginBottom: "4px" }}>TANGGAL ABSENSI</label>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ width: "100%", height: "38px", borderRadius: "10px", border: "1px solid #E2E8F0", padding: "0 12px", fontSize: "13px", color: "#334155", outline: "none", background: "#F8FAFC" }} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", display: "block", marginBottom: "4px" }}>JAM MASUK</label>
+            <input type="time" value={checkInTime} onChange={e => setCheckInTime(e.target.value)} style={{ width: "100%", height: "38px", borderRadius: "10px", border: "1px solid #E2E8F0", padding: "0 12px", fontSize: "13px", color: "#334155", outline: "none", background: "#F8FAFC" }} />
+          </div>
+          <div>
+            <label style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", display: "block", marginBottom: "4px" }}>JAM KELUAR</label>
+            <input type="time" value={checkOutTime} onChange={e => setCheckOutTime(e.target.value)} style={{ width: "100%", height: "38px", borderRadius: "10px", border: "1px solid #E2E8F0", padding: "0 12px", fontSize: "13px", color: "#334155", outline: "none", background: "#F8FAFC" }} />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-slate-50">
+          <button type="button" onClick={onCancel} style={{ padding: "10px 16px", borderRadius: "10px", background: "transparent", color: "#64748B", border: "1px solid #E2E8F0", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}>Batal</button>
+          <button type="submit" disabled={loading} style={{ padding: "10px 16px", borderRadius: "10px", background: "#10B981", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Simpan Data
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function ManagerEmployeesPage() {
   const { role, getToken } = useAuth();
@@ -237,7 +424,7 @@ export default function ManagerEmployeesPage() {
 
   // Absensi state
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
-  const [attendanceMonth, setAttendanceMonth] = useState(() => {
+  const [selectedMonth, setSelectedMonth] = useState(() => {
     const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
   const [expandedAttId, setExpandedAttId] = useState<string | null>(null);
@@ -246,18 +433,19 @@ export default function ManagerEmployeesPage() {
   const [editOvertimeBonus, setEditOvertimeBonus] = useState("");
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [attendanceSubTab, setAttendanceSubTab] = useState<"review" | "riwayat">("review");
+  const [showManualAttForm, setShowManualAttForm] = useState(false);
+  const [manualAttInitialData, setManualAttInitialData] = useState<{empId: string; date: string; checkInTime: string;} | null>(null);
 
   // Payroll state
   const [payrolls, setPayrolls] = useState<PayrollRecord[]>([]);
-  const [payrollMonth, setPayrollMonth] = useState(() => {
-    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
   const [generateStartDate, setGenerateStartDate] = useState("");
   const [generateEndDate, setGenerateEndDate] = useState("");
   const [loadingPayroll, setLoadingPayroll] = useState(false);
   const [generatingPayroll, setGeneratingPayroll] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [editingPayrollId, setEditingPayrollId] = useState<string | null>(null);
+  const [expandedPayrollId, setExpandedPayrollId] = useState<string | null>(null);
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null);
   const [editWorkPeriod, setEditWorkPeriod] = useState("");
   const [editWorkDays, setEditWorkDays] = useState("");
   const [editDailyWage, setEditDailyWage] = useState("");
@@ -265,10 +453,14 @@ export default function ManagerEmployeesPage() {
   const [editPerformanceBonusNote, setEditPerformanceBonusNote] = useState("");
   const [savingBonusId, setSavingBonusId] = useState<string | null>(null);
   const [payrollWarnings, setPayrollWarnings] = useState<string[]>([]);
+  
+  // Bulk Save State for Correction Mode
+  const [shiftEdits, setShiftEdits] = useState<Record<string, { tot: string, ovt: string, bonus: string }>>({});
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
 
   useEffect(() => {
-    if (!payrollMonth) return;
-    const [yStr, mStr] = payrollMonth.split("-");
+    if (!selectedMonth) return;
+    const [yStr, mStr] = selectedMonth.split("-");
     const year = parseInt(yStr);
     const month = parseInt(mStr);
 
@@ -284,7 +476,7 @@ export default function ManagerEmployeesPage() {
 
     setGenerateStartDate(startStr);
     setGenerateEndDate(endStr);
-  }, [payrollMonth]);
+  }, [selectedMonth]);
 
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
@@ -303,11 +495,12 @@ export default function ManagerEmployeesPage() {
   };
 
   const loadAttendance = useCallback(async () => {
-    const res = await fetchWithAuth(`/api/attendance?month=${attendanceMonth}`);
+    if (!generateStartDate || !generateEndDate) return;
+    const res = await fetchWithAuth(`/api/attendance?month=${selectedMonth}&startDate=${generateStartDate}&endDate=${generateEndDate}`);
     if (res.ok) setAttendance(await res.json());
-  }, [fetchWithAuth, attendanceMonth]);
+  }, [fetchWithAuth, selectedMonth, generateStartDate, generateEndDate]);
 
-  async function handleReviewAttendance(id: string, a: AttendanceRecord, actionType: "approve" | "adjust" | "reject") {
+  async function handleReviewAttendance(id: string, a: AttendanceRecord, actionType: "approve" | "adjust" | "reject", data?: any) {
     setReviewingId(id);
     try {
       const token = await getToken();
@@ -316,9 +509,9 @@ export default function ManagerEmployeesPage() {
       if (actionType === "approve") {
         body = { status: "lengkap" };
       } else if (actionType === "adjust") {
-        const tot = Number(editTotalHours) || 0;
-        const ovt = Number(editOvertimeHours) || 0;
-        const bonus = Number(editOvertimeBonus) || 0;
+        const tot = Number(data?.tot) || 0;
+        const ovt = Number(data?.ovt) || 0;
+        const bonus = Number(data?.bonus) || 0;
         const reg = Math.min(tot, 8);
         const blocks = Math.floor(ovt);
 
@@ -356,6 +549,9 @@ export default function ManagerEmployeesPage() {
         setExpandedAttId(null);
         showSuccess("Review absensi berhasil disimpan!");
         await loadAttendance();
+        if (tab === "payroll") {
+          await handleGeneratePayroll();
+        }
       } else {
         const errData = await res.json();
         alert(errData.error || "Gagal menyimpan review");
@@ -367,18 +563,113 @@ export default function ManagerEmployeesPage() {
     }
   }
 
+  async function handleBulkApprove() {
+    const toReview = attendance.filter(a => a.status === "direview");
+    if (toReview.length === 0) return;
+    
+    if (!confirm(`Anda yakin ingin menyetujui semua (${toReview.length}) absensi sesuai data sistem?`)) return;
+    
+    setReviewingId("bulk");
+    try {
+      const token = await getToken();
+      let count = 0;
+      
+      for (const a of toReview) {
+        const res = await fetch(`/api/attendance/${a.id}`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ status: "lengkap" })
+        });
+        if (res.ok) count++;
+      }
+      
+      showSuccess(`Berhasil menyetujui ${count} absensi!`);
+      await loadAttendance();
+    } catch (err) {
+      alert("Gagal menyetujui absensi secara massal");
+    } finally {
+      setReviewingId(null);
+    }
+  }
+
+  const handleEditChange = (id: string, field: "tot" | "ovt" | "bonus", val: string) => {
+    setShiftEdits(prev => {
+      const existing = prev[id] || { 
+        tot: String(attendance.find(a => a.id === id)?.totalHours ?? 8), 
+        ovt: String(attendance.find(a => a.id === id)?.overtimeHours ?? 0), 
+        bonus: String(attendance.find(a => a.id === id)?.overtimeBonus ?? 0) 
+      };
+      return { ...prev, [id]: { ...existing, [field]: val } };
+    });
+  };
+
+  async function handleBulkSaveCorrections(employeeId: string) {
+    const editKeys = Object.keys(shiftEdits);
+    // filter to only those belonging to this employee
+    const myEdits = editKeys.filter(id => attendance.find(a => a.id === id)?.employeeId === employeeId);
+    if (myEdits.length === 0) return;
+
+    setIsBulkSaving(true);
+    try {
+      const token = await getToken();
+      let count = 0;
+      for (const id of myEdits) {
+        const data = shiftEdits[id];
+        const tot = Number(data.tot) || 0;
+        const ovt = Number(data.ovt) || 0;
+        const bonus = Number(data.bonus) || 0;
+        const reg = Math.min(tot, 8);
+        const blocks = Math.floor(ovt);
+
+        const res = await fetch(`/api/attendance/${id}`, {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: "lengkap",
+            totalHours: tot,
+            regularHours: reg,
+            overtimeHours: ovt,
+            overtimeBlocks: blocks,
+            overtimeBonus: bonus,
+            flaggedReason: "Dikoreksi masal oleh Manager/Owner"
+          })
+        });
+        if (res.ok) count++;
+      }
+      
+      showSuccess(`${count} perubahan berhasil disimpan! Menghitung ulang gaji...`);
+      
+      // Clear edits for this employee
+      setShiftEdits(prev => {
+        const next = { ...prev };
+        myEdits.forEach(id => delete next[id]);
+        return next;
+      });
+
+      await loadAttendance();
+      await handleGeneratePayroll();
+    } catch (err) {
+      alert("Gagal menyimpan koreksi massal");
+    } finally {
+      setIsBulkSaving(false);
+    }
+  }
+
   const loadPayroll = useCallback(async () => {
     setLoadingPayroll(true);
     setPayrollWarnings([]);
     try {
-      const res = await fetchWithAuth(`/api/payroll?month=${payrollMonth}`);
+      const res = await fetchWithAuth(`/api/payroll?month=${selectedMonth}`);
       if (res.ok) setPayrolls(await res.json());
     } catch (err) {
       console.error(err);
     } finally {
       setLoadingPayroll(false);
     }
-  }, [fetchWithAuth, payrollMonth]);
+  }, [fetchWithAuth, selectedMonth]);
 
   useEffect(() => {
     if (tab === "payroll") loadPayroll();
@@ -392,7 +683,7 @@ export default function ManagerEmployeesPage() {
       const res = await fetchWithAuth("/api/payroll/generate", {
         method: "POST",
         body: JSON.stringify({
-          month: payrollMonth,
+          month: selectedMonth,
           startDate: generateStartDate || undefined,
           endDate: generateEndDate || undefined
         })
@@ -602,7 +893,9 @@ export default function ManagerEmployeesPage() {
   }, [loadEmployees]);
 
   useEffect(() => {
-    if (tab === "absensi") loadAttendance();
+    if (tab === "absensi" || tab === "payroll") {
+      loadAttendance();
+    }
   }, [tab, loadAttendance]);
 
   function showSuccess(msg: string) {
@@ -625,24 +918,27 @@ export default function ManagerEmployeesPage() {
     <div className="min-h-screen" style={{ background: "#FCABB4" }}>
 
       {/* ── Header ── */}
-      <div className="sticky top-0 z-20" style={{ background: "#fff", borderBottom: "1px solid #F1F5F9" }}>
-        <div className="px-5 pt-4 pb-2">
-          <h1 style={{ fontSize: "18px", fontWeight: "700", color: "#1C1C1E" }}>Karyawan</h1>
+      <div className="sticky top-0 z-30" style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(16px)", borderBottom: "1px solid rgba(226, 232, 240, 0.6)", boxShadow: "0 4px 20px -10px rgba(0,0,0,0.05)" }}>
+        <div className="px-5 pt-5 pb-3">
+          <h1 style={{ fontSize: "20px", fontWeight: "800", color: "#0F172A", letterSpacing: "-0.5px" }}>Tim & Karyawan</h1>
         </div>
-        <div className="flex">
+        <div className="flex px-2">
           {(["karyawan", "absensi", "payroll"] as Tab[]).map(t => {
             const active = tab === t;
             const Icon = t === "karyawan" ? Users : t === "absensi" ? CalendarDays : Wallet;
             return (
               <button key={t} onClick={() => { setTab(t); setShowAddForm(false); setEditEmp(null); }}
                 data-testid={`tab-${t}`}
-                className="flex-1 flex items-center justify-center gap-1.5"
+                className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200"
                 style={{
-                  paddingTop: "8px", paddingBottom: "10px", border: "none", background: "transparent", cursor: "pointer",
-                  borderBottom: active ? "2px solid #E85D8C" : "2px solid transparent",
-                  fontSize: "12px", fontWeight: active ? "600" : "500", color: active ? "#E85D8C" : "#94A3B8"
+                  padding: "10px 4px", border: "none", background: "transparent", cursor: "pointer",
+                  borderBottom: active ? "3px solid #E85D8C" : "3px solid transparent",
+                  color: active ? "#E85D8C" : "#94A3B8"
                 }}>
-                <Icon size={13} /> {t === "karyawan" ? "Data Karyawan" : t === "absensi" ? "Absensi" : "Gaji & Payroll"}
+                <Icon size={16} strokeWidth={active ? 2.5 : 2} /> 
+                <span style={{ fontSize: "12px", fontWeight: active ? "700" : "600", marginTop: "2px" }}>
+                  {t === "karyawan" ? "Data Karyawan" : t === "absensi" ? "Absensi" : "Gaji & Payroll"}
+                </span>
               </button>
             );
           })}
@@ -653,9 +949,20 @@ export default function ManagerEmployeesPage() {
 
         {/* Success toast */}
         {successMsg && (
-          <div className="flex items-center gap-2" style={{ padding: "10px 14px", borderRadius: "12px", background: "#DCFCE7", border: "1px solid #86EFAC", marginBottom: "12px" }}>
-            <UserCheck size={14} style={{ color: "#16A34A" }} />
-            <span style={{ fontSize: "13px", color: "#16A34A", fontWeight: "600" }}>{successMsg}</span>
+          <div className="flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4" style={{ 
+            position: "fixed",
+            bottom: "32px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            padding: "12px 20px", 
+            borderRadius: "100px", 
+            background: "#DCFCE7", 
+            border: "1px solid #86EFAC", 
+            boxShadow: "0 10px 25px -5px rgba(22, 163, 74, 0.3)",
+            zIndex: 9999
+          }}>
+            <UserCheck size={16} style={{ color: "#16A34A" }} />
+            <span style={{ fontSize: "14px", color: "#16A34A", fontWeight: "700" }}>{successMsg}</span>
           </div>
         )}
 
@@ -821,15 +1128,80 @@ export default function ManagerEmployeesPage() {
 
           return (
             <>
-              {/* Month picker */}
-              <div className="flex items-center gap-2 mb-3">
-                <button onClick={() => { const d = new Date(attendanceMonth + "-01"); d.setMonth(d.getMonth() - 1); setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
-                  style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>‹</button>
-                <p style={{ flex: 1, textAlign: "center", fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>
-                  {new Date(attendanceMonth + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
-                </p>
-                <button onClick={() => { const d = new Date(attendanceMonth + "-01"); d.setMonth(d.getMonth() + 1); setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
-                  style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>›</button>
+              {/* Period Date Filter for Attendance */}
+              <div style={{ background: "#fff", borderRadius: "16px", padding: "12px 16px", border: "1px solid #F1F5F9" }} className="mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <button onClick={() => { const d = new Date(selectedMonth + "-01"); d.setMonth(d.getMonth() - 1); setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+                    style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#F8FAFC", border: "1px solid #E2E8F0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>‹</button>
+                  <p style={{ flex: 1, textAlign: "center", fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>
+                    {new Date(selectedMonth + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
+                  </p>
+                  <button onClick={() => { const d = new Date(selectedMonth + "-01"); d.setMonth(d.getMonth() + 1); setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+                    style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#F8FAFC", border: "1px solid #E2E8F0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>›</button>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex-1">
+                    <label style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", display: "block", marginBottom: "4px" }}>TANGGAL MULAI PERIODE</label>
+                    <input type="date" value={generateStartDate} onChange={(e) => setGenerateStartDate(e.target.value)}
+                      style={{ width: "100%", height: "36px", borderRadius: "10px", border: "1px solid #E2E8F0", padding: "0 12px", fontSize: "12px", fontWeight: "600", outline: "none", background: "#F8FAFC", color: "#334155" }} />
+                  </div>
+                  <div className="flex-1">
+                    <label style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", display: "block", marginBottom: "4px" }}>TANGGAL SELESAI PERIODE</label>
+                    <input type="date" value={generateEndDate} onChange={(e) => setGenerateEndDate(e.target.value)}
+                      style={{ width: "100%", height: "36px", borderRadius: "10px", border: "1px solid #E2E8F0", padding: "0 12px", fontSize: "12px", fontWeight: "600", outline: "none", background: "#F8FAFC", color: "#334155" }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Tambah Absensi Manual Button */}
+              {!showManualAttForm && (
+                <button onClick={() => setShowManualAttForm(true)} data-testid="add-manual-att-btn"
+                  className="flex items-center gap-2 mb-4 tap-target"
+                  style={{ padding: "10px 16px", borderRadius: "12px", background: "#E85D8C", color: "#fff", fontSize: "13px", fontWeight: "600", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(232, 93, 140, 0.2)" }}>
+                  <Plus size={15} /> Tambah Absensi Karyawan
+                </button>
+              )}
+
+              {/* Manual Attendance Form */}
+              {showManualAttForm && (
+                <ManualAttendanceForm 
+                  employees={activeEmps} 
+                  fetchWithAuth={fetchWithAuth}
+                  initialData={manualAttInitialData}
+                  onSuccess={() => { 
+                    setShowManualAttForm(false); 
+                    setManualAttInitialData(null);
+                    loadAttendance(); 
+                    showSuccess("Absensi manual berhasil ditambahkan"); 
+                  }}
+                  onCancel={() => {
+                    setShowManualAttForm(false);
+                    setManualAttInitialData(null);
+                  }} 
+                />
+              )}
+
+              {/* Summary Dashboard Absensi */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div style={{ background: "#fff", padding: "16px", borderRadius: "16px", border: "1px solid #F1F5F9", boxShadow: "0 2px 10px rgba(0,0,0,0.02)" }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div style={{ padding: "6px", background: "#FEE2E2", borderRadius: "8px" }}><AlertTriangle size={14} color="#EF4444" /></div>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "#64748B" }}>MENUNGGU REVIEW</p>
+                  </div>
+                  <p style={{ fontSize: "18px", fontWeight: "800", color: "#EF4444", letterSpacing: "-0.5px" }}>
+                    {reviewCount} <span style={{ fontSize: "12px", fontWeight: "600", color: "#94A3B8" }}>Shift</span>
+                  </p>
+                </div>
+                <div style={{ background: "#fff", padding: "16px", borderRadius: "16px", border: "1px solid #F1F5F9", boxShadow: "0 2px 10px rgba(0,0,0,0.02)" }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div style={{ padding: "6px", background: "#EFF6FF", borderRadius: "8px" }}><CalendarDays size={14} color="#3B82F6" /></div>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "#64748B" }}>TOTAL SHIFT</p>
+                  </div>
+                  <p style={{ fontSize: "18px", fontWeight: "800", color: "#0F172A", letterSpacing: "-0.5px" }}>
+                    {attendance.length} <span style={{ fontSize: "12px", fontWeight: "600", color: "#94A3B8" }}>Shift</span>
+                  </p>
+                </div>
               </div>
 
               {/* Sub-tabs */}
@@ -877,132 +1249,34 @@ export default function ManagerEmployeesPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    {reviewItems.map(a => {
-                      const expanded = expandedAttId === a.id;
-                      return (
-                        <div
-                          key={a.id}
-                          style={{ background: "#fff", borderRadius: "12px", padding: "12px 14px", border: "1px solid #F1F5F9" }}
-                        >
-                          <div
-                            className="flex items-start justify-between cursor-pointer select-none"
-                            onClick={() => handleExpandAtt(a)}
-                          >
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>{a.employeeName}</p>
-                                <span style={{ fontSize: "10px", color: "#64748B", fontWeight: "normal" }}>
-                                  (klik untuk review)
-                                </span>
-                              </div>
-                              <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>
-                                {fmtDateFull(a.date)} {a.flaggedReason ? `· ${a.flaggedReason}` : ""}
-                              </p>
-                            </div>
-                            <span style={{
-                              padding: "3px 9px", borderRadius: "100px", fontSize: "11px", fontWeight: "600",
-                              background: "#FEF3C7", color: "#D97706"
-                            }}>
-                              Review
-                            </span>
-                          </div>
-
-                          <div className="flex gap-4 mt-2 cursor-pointer" onClick={() => handleExpandAtt(a)}>
-                            {a.checkIn && (
-                              <p style={{ fontSize: "11px", color: "#64748B" }}>
-                                Masuk: <strong>{fmtTime(a.checkIn.time)}</strong> {a.checkIn.ipAddress && `(${a.checkIn.ipAddress})`}
-                              </p>
-                            )}
-                            {a.checkOut?.time && (
-                              <p style={{ fontSize: "11px", color: "#64748B" }}>
-                                Pulang: <strong>{fmtTime(a.checkOut.time)}</strong> {a.checkOut.ipAddress && `(${a.checkOut.ipAddress})`}
-                              </p>
-                            )}
-                            {a.totalHours !== null && (
-                              <p style={{ fontSize: "11px", color: "#64748B" }}>
-                                {a.totalHours.toFixed(1)} jam
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Expanded Review Panel */}
-                          {expanded && (
-                            <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 text-xs">
-                              {/* Adjustment fields */}
-                              <div className="space-y-3">
-                                <p className="font-bold text-slate-800 uppercase tracking-wider text-[10px]">
-                                  Koreksi Absensi & Lembur
-                                </p>
-
-                                <div className="grid grid-cols-3 gap-2">
-                                  <div>
-                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Total Jam</label>
-                                    <input
-                                      type="number"
-                                      step="0.1"
-                                      value={editTotalHours}
-                                      onChange={(e) => setEditTotalHours(e.target.value)}
-                                      style={{ background: "#F8FAFC" }}
-                                      className="w-full h-9 rounded-lg border border-slate-200 px-2 font-semibold text-slate-700 focus:outline-none"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Lembur (Jam)</label>
-                                    <input
-                                      type="number"
-                                      step="0.1"
-                                      value={editOvertimeHours}
-                                      onChange={(e) => setEditOvertimeHours(e.target.value)}
-                                      style={{ background: "#F8FAFC" }}
-                                      className="w-full h-9 rounded-lg border border-slate-200 px-2 font-semibold text-slate-700 focus:outline-none"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Bonus Lembur (Rp)</label>
-                                    <input
-                                      type="number"
-                                      step="1000"
-                                      value={editOvertimeBonus}
-                                      onChange={(e) => setEditOvertimeBonus(e.target.value)}
-                                      style={{ background: "#F8FAFC" }}
-                                      className="w-full h-9 rounded-lg border border-slate-200 px-2 font-semibold text-slate-700 focus:outline-none"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Action buttons */}
-                              <div className="flex flex-wrap gap-2 pt-2">
-                                <button
-                                  disabled={reviewingId === a.id}
-                                  onClick={() => handleReviewAttendance(a.id, a, "approve")}
-                                  style={{ background: "#10B981" }}
-                                  className="flex-1 min-h-[36px] px-3 py-1.5 text-white rounded-xl font-bold text-xs disabled:opacity-50 transition-all active:scale-95"
-                                >
-                                  Setujui Sesuai Data
-                                </button>
-                                <button
-                                  disabled={reviewingId === a.id}
-                                  onClick={() => handleReviewAttendance(a.id, a, "adjust")}
-                                  style={{ background: "#0284C7" }}
-                                  className="flex-1 min-h-[36px] px-3 py-1.5 text-white rounded-xl font-bold text-xs disabled:opacity-50 transition-all active:scale-95"
-                                >
-                                  Simpan Koreksi & Setujui
-                                </button>
-                                <button
-                                  disabled={reviewingId === a.id}
-                                  onClick={() => handleReviewAttendance(a.id, a, "reject")}
-                                  style={{ background: "#EF4444" }}
-                                  className="flex-shrink-0 min-h-[36px] px-3 py-1.5 text-white rounded-xl font-bold text-xs disabled:opacity-50 transition-all active:scale-95"
-                                >
-                                  Tolak Absen
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    <div className="mb-2">
+                      <button 
+                        onClick={handleBulkApprove} 
+                        disabled={reviewingId === "bulk"}
+                        className="w-full tap-target"
+                        style={{
+                          background: "#10B981", 
+                          color: "#fff", 
+                          padding: "12px", 
+                          borderRadius: "12px", 
+                          fontSize: "13px", 
+                          fontWeight: "700",
+                          border: "none",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "8px",
+                          boxShadow: "0 4px 6px -1px rgba(16, 185, 129, 0.2)"
+                        }}
+                      >
+                        {reviewingId === "bulk" ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                        Setujui Semua ({reviewCount})
+                      </button>
+                    </div>
+                    {reviewItems.map(a => (
+                      <AttendanceReviewCard key={a.id} a={a} onReview={handleReviewAttendance} reviewingId={reviewingId} />
+                    ))}
                   </div>
                 )
               ) : (
@@ -1050,6 +1324,25 @@ export default function ManagerEmployeesPage() {
                             </p>
                           )}
                         </div>
+
+                        {a.status === "belum_lengkap" && (
+                          <div className="mt-3 pt-3 border-t border-slate-100 flex justify-end">
+                            <button
+                              onClick={() => {
+                                setManualAttInitialData({
+                                  empId: a.employeeId,
+                                  date: a.date,
+                                  checkInTime: a.checkIn ? new Date(a.checkIn.time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""
+                                });
+                                setShowManualAttForm(true);
+                              }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-bold text-white tap-target"
+                              style={{ background: "#3B82F6", border: "none", cursor: "pointer" }}
+                            >
+                              + Lengkapi Absen (Manual)
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1062,85 +1355,106 @@ export default function ManagerEmployeesPage() {
         {/* ── Tab: PAYROLL ── */}
         {tab === "payroll" && (
           <>
-            {/* Month picker & Generate button */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2">
-                <button onClick={() => { const d = new Date(payrollMonth + "-01"); d.setMonth(d.getMonth() - 1); setPayrollMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
-                  className="tap-target"
-                  style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>‹</button>
-                <p style={{ minWidth: "120px", textAlign: "center", fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>
-                  {new Date(payrollMonth + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
+            {/* Period Date Filter for Payroll */}
+            <div style={{ background: "#fff", borderRadius: "16px", padding: "12px 16px", border: "1px solid #F1F5F9" }} className="mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <button onClick={() => { const d = new Date(selectedMonth + "-01"); d.setMonth(d.getMonth() - 1); setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+                  style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#F8FAFC", border: "1px solid #E2E8F0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>‹</button>
+                <p style={{ flex: 1, textAlign: "center", fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>
+                  {new Date(selectedMonth + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
                 </p>
-                <button onClick={() => { const d = new Date(payrollMonth + "-01"); d.setMonth(d.getMonth() + 1); setPayrollMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
-                  className="tap-target"
-                  style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>›</button>
+                <button onClick={() => { const d = new Date(selectedMonth + "-01"); d.setMonth(d.getMonth() + 1); setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }}
+                  style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#F8FAFC", border: "1px solid #E2E8F0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}>›</button>
               </div>
+              
+              <div className="flex flex-col sm:flex-row gap-3 mb-3">
+                <div className="flex-1">
+                  <label style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", display: "block", marginBottom: "4px" }}>TANGGAL MULAI PERIODE</label>
+                  <input type="date" value={generateStartDate} onChange={(e) => setGenerateStartDate(e.target.value)}
+                    style={{ width: "100%", height: "36px", borderRadius: "10px", border: "1px solid #E2E8F0", padding: "0 12px", fontSize: "12px", fontWeight: "600", outline: "none", background: "#F8FAFC", color: "#334155" }} />
+                </div>
+                <div className="flex-1">
+                  <label style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", display: "block", marginBottom: "4px" }}>TANGGAL SELESAI PERIODE</label>
+                  <input type="date" value={generateEndDate} onChange={(e) => setGenerateEndDate(e.target.value)}
+                    style={{ width: "100%", height: "36px", borderRadius: "10px", border: "1px solid #E2E8F0", padding: "0 12px", fontSize: "12px", fontWeight: "600", outline: "none", background: "#F8FAFC", color: "#334155" }} />
+                </div>
+              </div>
+
+              {/* Summary Dashboard */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div style={{ background: "#fff", padding: "16px", borderRadius: "16px", border: "1px solid #F1F5F9", boxShadow: "0 2px 10px rgba(0,0,0,0.02)" }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div style={{ padding: "6px", background: "#FEF2F2", borderRadius: "8px" }}><Banknote size={14} color="#EF4444" /></div>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "#64748B" }}>TOTAL BEBAN GAJI</p>
+                  </div>
+                  <p style={{ fontSize: "18px", fontWeight: "800", color: "#0F172A", letterSpacing: "-0.5px" }}>
+                    {fmtRupiah(payrolls.reduce((sum, p) => sum + p.totalPaid, 0))}
+                  </p>
+                </div>
+                <div style={{ background: "#fff", padding: "16px", borderRadius: "16px", border: "1px solid #F1F5F9", boxShadow: "0 2px 10px rgba(0,0,0,0.02)" }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div style={{ padding: "6px", background: "#EFF6FF", borderRadius: "8px" }}><Users size={14} color="#3B82F6" /></div>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "#64748B" }}>KARYAWAN</p>
+                  </div>
+                  <p style={{ fontSize: "18px", fontWeight: "800", color: "#0F172A", letterSpacing: "-0.5px" }}>
+                    {payrolls.length} <span style={{ fontSize: "12px", fontWeight: "600", color: "#94A3B8" }}>Orang</span>
+                  </p>
+                </div>
+                <div style={{ background: "#fff", padding: "16px", borderRadius: "16px", border: "1px solid #F1F5F9", boxShadow: "0 2px 10px rgba(0,0,0,0.02)" }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div style={{ padding: "6px", background: "#F0FDF4", borderRadius: "8px" }}><Check size={14} color="#22C55E" /></div>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "#64748B" }}>SUDAH DIBAYAR</p>
+                  </div>
+                  <p style={{ fontSize: "18px", fontWeight: "800", color: "#22C55E", letterSpacing: "-0.5px" }}>
+                    {payrolls.filter(p => p.status === "sudah_dibayar").length}
+                  </p>
+                </div>
+                <div style={{ background: "#fff", padding: "16px", borderRadius: "16px", border: "1px solid #F1F5F9", boxShadow: "0 2px 10px rgba(0,0,0,0.02)" }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div style={{ padding: "6px", background: "#FEF3C7", borderRadius: "8px" }}><AlertTriangle size={14} color="#D97706" /></div>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "#64748B" }}>BELUM DIBAYAR</p>
+                  </div>
+                  <p style={{ fontSize: "18px", fontWeight: "800", color: "#D97706", letterSpacing: "-0.5px" }}>
+                    {payrolls.filter(p => p.status === "belum_dibayar").length}
+                  </p>
+                </div>
+              </div>
+
+              {attendance.filter(a => a.status === "direview").length > 0 && (
+                <div className="mb-4 p-4 rounded-xl flex items-start gap-3" style={{ background: "#FEE2E2", border: "1px solid #FECACA" }}>
+                  <AlertTriangle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p style={{ fontSize: "13px", fontWeight: "700", color: "#991B1B" }}>Ada {attendance.filter(a => a.status === "direview").length} Absensi Belum Direview!</p>
+                    <p style={{ fontSize: "12px", color: "#B91C1C", marginTop: "2px", lineHeight: "1.5" }}>
+                      Anda tidak dapat menghitung gaji sebelum semua absensi pada periode ini selesai direview. Silakan kembali ke tab Karyawan dan selesaikan review.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <button
                 onClick={handleGeneratePayroll}
-                disabled={generatingPayroll}
-                className="tap-target"
+                disabled={generatingPayroll || (attendance.filter(a => a.status === "direview").length > 0)}
+                className="tap-target w-full transition-all active:scale-[0.98]"
                 style={{
-                  padding: "8px 16px",
-                  borderRadius: "12px",
-                  background: "#E85D8C",
+                  padding: "12px 16px",
+                  borderRadius: "14px",
+                  background: (attendance.filter(a => a.status === "direview").length > 0) ? "#94A3B8" : "#E85D8C",
                   color: "#fff",
-                  fontSize: "12px",
+                  fontSize: "14px",
                   fontWeight: "700",
                   border: "none",
-                  cursor: "pointer",
+                  cursor: (attendance.filter(a => a.status === "direview").length > 0) ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
-                  gap: "6px",
+                  justifyContent: "center",
+                  gap: "8px",
+                  boxShadow: (attendance.filter(a => a.status === "direview").length > 0) ? "none" : "0 4px 12px rgba(232, 93, 140, 0.3)"
                 }}
               >
-                {generatingPayroll ? <Loader2 size={13} className="animate-spin" /> : <Banknote size={13} />}
+                {generatingPayroll ? <Loader2 size={16} className="animate-spin" /> : <TrendingUp size={16} />}
                 Hitung Ulang & Generate Gaji
               </button>
-            </div>
-
-            {/* Custom Date Range picker */}
-            <div style={{ background: "#fff", borderRadius: "16px", padding: "16px", border: "1px solid #F1F5F9" }} className="flex flex-col sm:flex-row gap-3 mb-4">
-              <div className="flex-1">
-                <label style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", display: "block", marginBottom: "4px" }}>TANGGAL MULAI PERIODE</label>
-                <input
-                  type="date"
-                  value={generateStartDate}
-                  onChange={(e) => setGenerateStartDate(e.target.value)}
-                  style={{
-                    width: "100%",
-                    height: "36px",
-                    borderRadius: "10px",
-                    border: "1px solid #E2E8F0",
-                    padding: "0 12px",
-                    fontSize: "12px",
-                    fontWeight: "600",
-                    outline: "none",
-                    background: "#F8FAFC",
-                    color: "#334155"
-                  }}
-                />
-              </div>
-              <div className="flex-1">
-                <label style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", display: "block", marginBottom: "4px" }}>TANGGAL SELESAI PERIODE</label>
-                <input
-                  type="date"
-                  value={generateEndDate}
-                  onChange={(e) => setGenerateEndDate(e.target.value)}
-                  style={{
-                    width: "100%",
-                    height: "36px",
-                    borderRadius: "10px",
-                    border: "1px solid #E2E8F0",
-                    padding: "0 12px",
-                    fontSize: "12px",
-                    fontWeight: "600",
-                    outline: "none",
-                    background: "#F8FAFC",
-                    color: "#334155"
-                  }}
-                />
-              </div>
             </div>
 
             {/* Warnings from generation */}
@@ -1241,173 +1555,179 @@ export default function ManagerEmployeesPage() {
                         </p>
                       )}
 
-                      {/* Aksi Gaji */}
-                      <div className="flex items-center gap-2 mt-4 pt-3" style={{ borderTop: "1px solid #F8FAFC" }}>
+                      {/* Aksi Gaji (Redesigned) */}
+                      <div className="flex items-center gap-2 mt-4 pt-4 relative" style={{ borderTop: "1px dashed #E2E8F0" }}>
                         {!isEditing ? (
                           <>
-                            {!p.isLocked && (
-                              <button
-                                onClick={() => {
-                                  setEditingPayrollId(p.id);
-                                  setEditWorkPeriod(p.workPeriod || "");
-                                  setEditWorkDays(String(p.workDays));
-                                  setEditDailyWage(String(p.dailyWage));
-                                  setEditPerformanceBonus(String(p.performanceBonus));
-                                  setEditPerformanceBonusNote(p.performanceBonusNote || "");
-                                }}
-                                className="tap-target"
-                                style={{
-                                  padding: "6px 12px",
-                                  borderRadius: "10px",
-                                  background: "#FEF1F5",
-                                  color: "#E85D8C",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  fontSize: "11px",
-                                  fontWeight: "700"
-                                }}
-                                data-testid={`edit-bonus-btn-${p.employeeId}`}
-                              >
-                                Edit Gaji
-                              </button>
-                            )}
                             <button
-                              onClick={() => printPayrollSlip(p)}
+                              onClick={() => setExpandedPayrollId(expandedPayrollId === p.id ? null : p.id)}
                               className="tap-target"
                               style={{
-                                padding: "6px 12px",
+                                padding: "8px 12px",
                                 borderRadius: "10px",
-                                background: "#F1F5F9",
-                                color: "#64748B",
-                                border: "none",
+                                background: expandedPayrollId === p.id ? "#F8FAFC" : "#fff",
+                                color: "#475569",
+                                border: "1px solid #E2E8F0",
                                 cursor: "pointer",
                                 fontSize: "11px",
-                                fontWeight: "700"
+                                fontWeight: "700",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px"
                               }}
                             >
-                              Cetak Slip
+                              <Clock size={13} />
+                              {expandedPayrollId === p.id ? "Tutup Rincian" : "Rincian Shift"}
                             </button>
-                            {canPay && (
+
+                            <div className="ml-auto relative">
                               <button
-                                onClick={() => handlePayPayroll(p)}
-                                disabled={payingId === p.id}
-                                className="ml-auto tap-target"
+                                onClick={() => setActionMenuId(actionMenuId === p.id ? null : p.id)}
+                                className="tap-target"
                                 style={{
-                                  padding: "6px 12px",
+                                  padding: "8px",
                                   borderRadius: "10px",
-                                  background: "linear-gradient(135deg, #16A34A, #15803D)",
-                                  color: "#fff",
+                                  background: actionMenuId === p.id ? "#F1F5F9" : "transparent",
+                                  color: "#64748B",
                                   border: "none",
                                   cursor: "pointer",
-                                  fontSize: "11px",
-                                  fontWeight: "700",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "4px"
                                 }}
-                                data-testid={`pay-salary-btn-${p.employeeId}`}
                               >
-                                {payingId === p.id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-                                Bayar Gaji
+                                <MoreHorizontal size={18} />
                               </button>
-                            )}
+
+                              {/* Kebab Menu Dropdown */}
+                              {actionMenuId === p.id && (
+                                <>
+                                  <div className="fixed inset-0 z-40" onClick={() => setActionMenuId(null)}></div>
+                                  <div className="absolute right-0 bottom-full mb-2 w-40 bg-white rounded-xl shadow-lg border border-slate-100 z-50 overflow-hidden" style={{ transformOrigin: "bottom right" }}>
+                                    {canPay && (
+                                      <button
+                                        onClick={() => { handlePayPayroll(p); setActionMenuId(null); }}
+                                        disabled={payingId === p.id}
+                                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-green-600 hover:bg-green-50 disabled:opacity-50 transition-colors flex items-center justify-between border-b border-slate-50"
+                                      >
+                                        Bayar Gaji
+                                        {payingId === p.id ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => { printPayrollSlip(p); setActionMenuId(null); }}
+                                      className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-50"
+                                    >
+                                      Cetak Slip
+                                    </button>
+                                    {!p.isLocked && (
+                                      <button
+                                        onClick={() => {
+                                          setEditingPayrollId(p.id);
+                                          setEditWorkPeriod(p.workPeriod || "");
+                                          setEditWorkDays(String(p.workDays));
+                                          setEditDailyWage(String(p.dailyWage));
+                                          setEditPerformanceBonus(String(p.performanceBonus));
+                                          setEditPerformanceBonusNote(p.performanceBonusNote || "");
+                                          setActionMenuId(null);
+                                        }}
+                                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-pink-600 hover:bg-pink-50 transition-colors"
+                                      >
+                                        Koreksi Gaji (Manual)
+                                      </button>
+                                    )}
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           </>
                         ) : (
-                          <div className="flex flex-col gap-3 w-full bg-slate-50 p-4 rounded-xl border border-slate-200">
-                            <p className="text-xs font-bold text-slate-700">Edit Rincian Slip Gaji</p>
+                          <div className="flex flex-col gap-3 w-full bg-white p-4 rounded-xl border border-pink-100 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-pink-500"></div>
+                            <p className="text-xs font-bold text-slate-700">Koreksi Gaji Manual (Override)</p>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div>
                                 <label className="text-[10px] font-bold text-slate-400 block mb-1">PERIODE KERJA</label>
-                                <Input
-                                  type="text"
-                                  placeholder="Contoh: Juni 2026"
-                                  value={editWorkPeriod}
-                                  onChange={(e) => setEditWorkPeriod(e.target.value)}
-                                  className="h-9 rounded-lg text-xs"
-                                />
+                                <Input type="text" placeholder="Contoh: Juni 2026" value={editWorkPeriod} onChange={(e) => setEditWorkPeriod(e.target.value)} className="h-9 rounded-lg text-xs" />
                               </div>
                               <div>
                                 <label className="text-[10px] font-bold text-slate-400 block mb-1">JUMLAH KEHADIRAN (SHIFT)</label>
-                                <Input
-                                  type="number"
-                                  placeholder="Total kehadiran..."
-                                  value={editWorkDays}
-                                  onChange={(e) => setEditWorkDays(e.target.value)}
-                                  className="h-9 rounded-lg text-xs"
-                                />
+                                <Input type="number" placeholder="Total kehadiran..." value={editWorkDays} onChange={(e) => setEditWorkDays(e.target.value)} className="h-9 rounded-lg text-xs" />
                               </div>
                               <div>
                                 <label className="text-[10px] font-bold text-slate-400 block mb-1">RATE PER SHIFT</label>
-                                <Input
-                                  type="number"
-                                  placeholder="Rate per shift..."
-                                  value={editDailyWage}
-                                  onChange={(e) => setEditDailyWage(e.target.value)}
-                                  className="h-9 rounded-lg text-xs"
-                                />
+                                <Input type="number" placeholder="Rate per shift..." value={editDailyWage} onChange={(e) => setEditDailyWage(e.target.value)} className="h-9 rounded-lg text-xs" />
                               </div>
                               <div>
                                 <label className="text-[10px] font-bold text-slate-400 block mb-1">BONUS / INSENTIF</label>
-                                <Input
-                                  type="number"
-                                  placeholder="Bonus..."
-                                  value={editPerformanceBonus}
-                                  onChange={(e) => setEditPerformanceBonus(e.target.value)}
-                                  className="h-9 rounded-lg text-xs"
-                                />
+                                <Input type="number" placeholder="Bonus..." value={editPerformanceBonus} onChange={(e) => setEditPerformanceBonus(e.target.value)} className="h-9 rounded-lg text-xs" />
                               </div>
                             </div>
 
                             <div>
                               <label className="text-[10px] font-bold text-slate-400 block mb-1">DETAIL/KETERANGAN BONUS</label>
-                              <Input
-                                type="text"
-                                placeholder="Contoh: Bonus rajin packing & target tercapai..."
-                                value={editPerformanceBonusNote}
-                                onChange={(e) => setEditPerformanceBonusNote(e.target.value)}
-                                className="h-9 rounded-lg text-xs"
-                              />
+                              <Input type="text" placeholder="Contoh: Bonus rajin packing & target tercapai..." value={editPerformanceBonusNote} onChange={(e) => setEditPerformanceBonusNote(e.target.value)} className="h-9 rounded-lg text-xs" />
                             </div>
 
-                            <div className="flex items-center gap-2 mt-1">
-                              <button
-                                onClick={() => handleSavePayroll(p.id)}
-                                disabled={savingBonusId === p.id}
-                                className="tap-target"
-                                style={{
-                                  padding: "8px 16px",
-                                  borderRadius: "8px",
-                                  background: "#E85D8C",
-                                  color: "#fff",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  fontSize: "11px",
-                                  fontWeight: "700"
-                                }}
-                                data-testid={`save-bonus-btn-${p.employeeId}`}
-                              >
-                                {savingBonusId === p.id ? <Loader2 size={11} className="animate-spin" /> : "Simpan Perubahan"}
-                              </button>
-                              <button
-                                onClick={() => setEditingPayrollId(null)}
-                                style={{
-                                  padding: "8px 16px",
-                                  borderRadius: "8px",
-                                  background: "#F1F5F9",
-                                  color: "#64748B",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  fontSize: "11px",
-                                  fontWeight: "600"
-                                }}
-                              >
-                                Batal
+                            <div className="flex items-center justify-end gap-2 mt-2 pt-2 border-t border-slate-50">
+                              <button onClick={() => setEditingPayrollId(null)} className="tap-target" style={{ padding: "8px 16px", borderRadius: "10px", background: "transparent", color: "#64748B", border: "1px solid #E2E8F0", cursor: "pointer", fontSize: "11px", fontWeight: "700" }}>Batal</button>
+                              <button onClick={() => handleSavePayroll(p.id)} disabled={savingBonusId === p.id} className="tap-target" style={{ padding: "8px 16px", borderRadius: "10px", background: "#E85D8C", color: "#fff", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: "700" }} data-testid={`save-bonus-btn-${p.employeeId}`}>
+                                {savingBonusId === p.id ? <Loader2 size={11} className="animate-spin" /> : "Simpan Koreksi"}
                               </button>
                             </div>
                           </div>
                         )}
                       </div>
+
+                      {expandedPayrollId === p.id && (
+                        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-2 relative">
+                          <p className="text-xs font-bold text-slate-700 mb-1">Rincian Shift Karyawan</p>
+                          {attendance.filter(a => a.employeeId === p.employeeId && a.status === "lengkap").length === 0 ? (
+                            <p className="text-xs text-slate-500 italic">Tidak ada shift tercatat pada periode ini.</p>
+                          ) : (
+                            <>
+                              {attendance
+                                .filter(a => a.employeeId === p.employeeId && a.status === "lengkap")
+                                .map(a => (
+                                  <AttendanceReviewCard 
+                                    key={a.id} 
+                                    a={a} 
+                                    isCorrectionMode={true}
+                                    editData={shiftEdits[a.id]}
+                                    onEditChange={(field, val) => handleEditChange(a.id, field, val)}
+                                  />
+                                ))}
+
+                              {/* Bulk Save Button Overlay */}
+                              {Object.keys(shiftEdits).filter(id => attendance.find(a => a.id === id)?.employeeId === p.employeeId).length > 0 && (
+                                <div className="sticky bottom-4 mt-2 p-3 bg-white/90 backdrop-blur-sm border border-slate-200 shadow-xl rounded-xl flex items-center justify-between z-10 animate-in slide-in-from-bottom-4">
+                                  <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-slate-700">Perubahan Terdeteksi</span>
+                                    <span className="text-[10px] text-slate-500">{Object.keys(shiftEdits).filter(id => attendance.find(a => a.id === id)?.employeeId === p.employeeId).length} shift diedit belum disimpan</span>
+                                  </div>
+                                  <button
+                                    onClick={() => handleBulkSaveCorrections(p.employeeId)}
+                                    disabled={isBulkSaving}
+                                    className="flex items-center gap-2 tap-target"
+                                    style={{
+                                      background: "#E85D8C",
+                                      color: "#fff",
+                                      padding: "10px 16px",
+                                      borderRadius: "10px",
+                                      fontSize: "12px",
+                                      fontWeight: "700",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      boxShadow: "0 4px 10px rgba(232, 93, 140, 0.3)"
+                                    }}
+                                  >
+                                    {isBulkSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                                    Simpan {Object.keys(shiftEdits).filter(id => attendance.find(a => a.id === id)?.employeeId === p.employeeId).length} Perubahan
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

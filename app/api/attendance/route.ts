@@ -8,11 +8,13 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const month = searchParams.get("month");
+  const reqStartDate = searchParams.get("startDate");
+  const reqEndDate = searchParams.get("endDate");
   const employeeId = searchParams.get("employeeId");
   const flagged = searchParams.get("flagged") === "true";
 
-  if (!month && !flagged) {
-    return NextResponse.json({ error: "month atau flagged wajib diisi" }, { status: 400 });
+  if (!month && !flagged && (!reqStartDate || !reqEndDate)) {
+    return NextResponse.json({ error: "month atau startDate/endDate wajib diisi" }, { status: 400 });
   }
 
   try {
@@ -23,15 +25,27 @@ export async function GET(req: NextRequest) {
       // Query all records requiring review (status == "direview")
       snap = await query.where("status", "==", "direview").get();
     } else {
-      const [year, mon] = month!.split("-").map(Number);
-      const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
-      const endMonth = mon === 12 ? 1 : mon + 1;
-      const endYear = mon === 12 ? year + 1 : year;
-      const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
+      let qStartDate = "";
+      let qEndDate = "";
 
-      let q = query
-        .where("date", ">=", startDate)
-        .where("date", "<", endDate);
+      if (reqStartDate && reqEndDate) {
+        qStartDate = reqStartDate;
+        qEndDate = reqEndDate; // inclusive if we use <=, but the original logic uses < endDate. If it's a specific date range (like 29 to 28), it should be <=.
+        // Wait, the payroll route uses <= finalEndDate. So let's use <= here too for consistency if reqStartDate is provided.
+      } else {
+        const [year, mon] = month!.split("-").map(Number);
+        qStartDate = `${year}-${String(mon).padStart(2, "0")}-01`;
+        const endMonth = mon === 12 ? 1 : mon + 1;
+        const endYear = mon === 12 ? year + 1 : year;
+        qEndDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
+      }
+
+      let q = query.where("date", ">=", qStartDate);
+      if (reqStartDate && reqEndDate) {
+        q = q.where("date", "<=", qEndDate);
+      } else {
+        q = q.where("date", "<", qEndDate);
+      }
 
       if (employeeId) {
         q = q.where("employeeId", "==", employeeId);
