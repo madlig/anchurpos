@@ -7,6 +7,15 @@ import {
   ChevronDown, MapPin, Phone, User, Calendar, MessageSquare,
 } from "lucide-react";
 
+interface StockItem {
+  id: string;
+  productId: string;
+  productName: string;
+  variantId: string;
+  variantName: string;
+  name: string;
+  currentStock: number;
+}
 interface SimpleProduct { id: string; name: string; }
 interface SimpleVariant { id: string; name: string; }
 interface CartItem {
@@ -19,7 +28,7 @@ const SELECT_CLS = "w-full h-11 rounded-2xl border px-4 pr-9 text-sm font-medium
 export default function PublicOrderPage() {
   const [products, setProducts] = useState<SimpleProduct[]>([]);
   const [variants, setVariants] = useState<SimpleVariant[]>([]);
-  const [productStocks, setProductStocks] = useState<any[]>([]);
+  const [productStocks, setProductStocks] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [name, setName] = useState("");
@@ -40,9 +49,9 @@ export default function PublicOrderPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/products").then((r) => r.json()),
-      fetch("/api/variants").then((r) => r.json()),
-      fetch("/api/products/stocks").then((r) => r.json()),
+      fetch("/api/public/products").then((r) => r.json()),
+      fetch("/api/public/variants").then((r) => r.json()),
+      fetch("/api/public/products/stocks").then((r) => r.json()),
     ])
       .then(([p, v, s]) => {
         setProducts(p);
@@ -55,8 +64,11 @@ export default function PublicOrderPage() {
   const availableVariants = useMemo(() => {
     if (!addProductId) return [];
 
+    const product = products.find(p => p.id === addProductId);
+    const productName = product?.name || "";
+
     // 1. If it's a frozen product
-    if (addProductId.startsWith("churros-frozen")) {
+    if (addProductId.startsWith("churros-frozen") || productName.toLowerCase().includes("frozen")) {
       const stocks = productStocks.filter(s => s.productId === addProductId);
       return stocks.map(s => ({
         id: s.variantId,

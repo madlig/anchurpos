@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
+import { BUSINESS } from "@/lib/constants";
 
 function getClientIp(req: NextRequest): string {
   const forwarded = req.headers.get("x-forwarded-for");
@@ -102,10 +103,10 @@ export async function POST(req: NextRequest) {
     const checkInTime = new Date(data.checkIn.time).getTime();
     const now = new Date();
     const totalHours = (now.getTime() - checkInTime) / (1000 * 60 * 60);
-    const regularHours = Math.min(totalHours, 8);
-    const overtimeHours = Math.max(0, totalHours - 8);
-    const overtimeBlocks = Math.floor(overtimeHours);
-    const overtimeBonus = overtimeBlocks * 10000;
+    const regularHours = Math.min(totalHours, BUSINESS.REGULAR_HOURS_PER_SHIFT);
+    const overtimeHours = Math.max(0, totalHours - BUSINESS.REGULAR_HOURS_PER_SHIFT);
+    const overtimeBlocks = Math.floor(overtimeHours / 2);
+    const overtimeBonus = overtimeBlocks * BUSINESS.OVERTIME_BONUS_PER_BLOCK;
 
     // Build list of anomalies
     const anomalies: string[] = [];

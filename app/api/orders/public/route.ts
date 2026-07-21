@@ -1,25 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { publicOrderSchema } from "@/lib/validations";
 
-async function generateOrderNumber(): Promise<string> {
-  const today = new Date();
-  const dateStr = today.toISOString().split("T")[0].replace(/-/g, "");
-  const prefix = `ORD-${dateStr}-`;
 
-  const snap = await adminDb
-    .collection("orders")
-    .where("orderNumber", ">=", prefix)
-    .where("orderNumber", "<=", prefix + "")
-    .orderBy("orderNumber", "desc")
-    .limit(1)
-    .get();
-
-  if (snap.empty) return `${prefix}0001`;
-  const last = snap.docs[0].data().orderNumber as string;
-  const seq = parseInt(last.split("-").pop()!) + 1;
-  return `${prefix}${String(seq).padStart(4, "0")}`;
-}
 
 async function getApplicableTier(productId: string, qty: number): Promise<number> {
   const tiersSnap = await adminDb
@@ -40,6 +24,12 @@ async function getApplicableTier(productId: string, qty: number): Promise<number
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
+  const parseResult = publicOrderSchema.safeParse(body);
+  
+  if (!parseResult.success) {
+    return NextResponse.json({ error: "Data pesanan tidak valid", details: parseResult.error.format() }, { status: 400 });
+  }
+
   const {
     phoneNumber,
     name,
@@ -47,24 +37,7 @@ export async function POST(req: NextRequest) {
     items,
     requestedDeliveryDate,
     orderNotes,
-  } = body as {
-    phoneNumber: string;
-    name: string;
-    address: string;
-    items: { productId: string; variantId: string; qty: number }[];
-    requestedDeliveryDate?: string;
-    orderNotes?: string;
-  };
-
-  if (!phoneNumber || !name || !items?.length) {
-    return NextResponse.json({ error: "Data pesanan tidak lengkap" }, { status: 400 });
-  }
-
-  for (const item of items) {
-    if (!item.productId || !item.variantId || !item.qty || item.qty <= 0) {
-      return NextResponse.json({ error: "Item pesanan tidak valid" }, { status: 400 });
-    }
-  }
+  } = parseResult.data;
 
   try {
     let customerId = "";
@@ -98,7 +71,7 @@ export async function POST(req: NextRequest) {
       customerId = newCustRef.id;
     }
 
-    const orderNumber = await generateOrderNumber();
+    let orderNumber = "";
     const orderRef = adminDb.collection("orders").doc();
     let hasRainbow = false;
 
@@ -135,6 +108,27 @@ export async function POST(req: NextRequest) {
     }
 
     await adminDb.runTransaction(async (tx) => {
+      // 1. Generate Order Number inside transaction to avoid race conditions
+      const today = new Date();
+      const dateStr = today.toISOString().split("T")[0].replace(/-/g, "");
+      const prefix = `ORD-${dateStr}-`;
+
+      const snap = await tx.get(
+        adminDb.collection("orders")
+          .where("orderNumber", ">=", prefix)
+          .where("orderNumber", "<=", prefix + "\uffff")
+          .orderBy("orderNumber", "desc")
+          .limit(1)
+      );
+
+      if (snap.empty) {
+        orderNumber = `${prefix}0001`;
+      } else {
+        const last = snap.docs[0].data().orderNumber as string;
+        const seq = parseInt(last.split("-").pop()!) + 1;
+        orderNumber = `${prefix}${String(seq).padStart(4, "0")}`;
+      }
+
       tx.set(orderRef, {
         orderNumber,
         source: "wa_form",

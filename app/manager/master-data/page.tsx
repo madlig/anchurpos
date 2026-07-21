@@ -4,11 +4,13 @@ import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Loader2, Plus, X, Check, Package, Layers, Beaker, Pencil, Trash2, Users, Search, Store } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { formatNumber } from "@/lib/formatters";
 
 type Tab = "produk" | "varian" | "bahan" | "pelanggan" | "addons" | "suppliers";
 
 function fmt(n: number) {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+  return formatNumber(n);
 }
 
 interface PriceTier { minQty: number; maxQty: number | null; price: number; }
@@ -105,7 +107,7 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
             className="w-32 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
         </div>
         
-        <div className="mt-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+        <div className="mt-2 p-4 bg-brand-50 border border-slate-200 rounded-xl">
           <div className="flex items-center justify-between mb-4">
             <div>
               <p style={{ fontSize: "12px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>Harga Produk</p>
@@ -151,7 +153,7 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
           )}
         </div>
 
-        <div className="mt-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+        <div className="mt-2 p-4 bg-brand-50 border border-slate-200 rounded-xl">
           <p style={{ fontSize: "12px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "12px" }}>Afiliasi Channel</p>
           <p style={{ fontSize: "11px", color: "#94A3B8", marginBottom: "12px" }}>Biarkan kosong jika produk ini tersedia di semua channel.</p>
           <div className="flex flex-wrap gap-2">
@@ -163,7 +165,7 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
             ].map(ch => {
               const checked = form.channels.includes(ch.id);
               return (
-                <label key={ch.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${checked ? 'border-[#E85D8C] bg-pink-50' : 'border-slate-200 bg-white'} cursor-pointer transition-colors`}>
+                <label key={ch.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${checked ? 'border-[#E85D8C] bg-primary/10' : 'border-slate-200 bg-white'} cursor-pointer transition-colors`}>
                   <input type="checkbox" checked={checked} className="accent-[#E85D8C]"
                     onChange={(e) => {
                       setForm(p => ({
@@ -307,7 +309,7 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
             className="w-32 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
         </div>
 
-        <div className="mt-2 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+        <div className="mt-2 p-4 bg-brand-50 border border-slate-200 rounded-xl space-y-3">
           <div>
             <p style={{ fontSize: "12px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Satuan Alternatif (Opsional)</p>
             <p style={{ fontSize: "11px", color: "#94A3B8", marginBottom: "8px" }}>Tambahkan satuan pembelian lain beserta rasio konversinya ke satuan dasar ({form.baseUnit || "..."}). Contoh: 1 botol = 55 ml</p>
@@ -352,14 +354,14 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
           <button
             type="button"
             onClick={() => setForm(p => ({ ...p, unitAlternatives: [...p.unitAlternatives, { unit: "", conversionToBase: "" }] }))}
-            className="flex items-center gap-1.5 text-xs font-bold text-[#E85D8C] hover:text-pink-600 active:scale-95 transition-transform"
+            className="flex items-center gap-1.5 text-xs font-bold text-[#E85D8C] hover:text-primary active:scale-95 transition-transform"
           >
-            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-pink-100">+</span>
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/20">+</span>
             Tambah Satuan Alternatif
           </button>
         </div>
 
-        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+        <div className="p-4 bg-brand-50 border border-slate-200 rounded-xl">
           <p style={{ fontSize: "12px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "12px" }}>Afiliasi Channel</p>
           <p style={{ fontSize: "11px", color: "#94A3B8", marginBottom: "12px" }}>Biarkan kosong jika bahan ini tersedia di semua channel.</p>
           <div className="flex flex-wrap gap-2">
@@ -371,7 +373,7 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
             ].map(ch => {
               const checked = form.channels.includes(ch.id);
               return (
-                <label key={ch.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${checked ? 'border-[#E85D8C] bg-pink-50' : 'border-slate-200 bg-white'} cursor-pointer transition-colors`}>
+                <label key={ch.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${checked ? 'border-[#E85D8C] bg-primary/10' : 'border-slate-200 bg-white'} cursor-pointer transition-colors`}>
                   <input type="checkbox" checked={checked} className="accent-[#E85D8C]"
                     onChange={(e) => {
                       setForm(p => ({
@@ -628,7 +630,7 @@ export default function MasterDataPage() {
           <div className="flex justify-between items-center mb-6">
             <div>
               <h1 className="text-2xl font-black text-slate-800 tracking-tight drop-shadow-sm">Master Data</h1>
-              <p className="text-slate-500 text-[13px] font-medium mt-1">Kelola inventori dan pelanggan Anchur.us</p>
+              <p className="text-slate-500 text-sm font-medium mt-1">Kelola inventori dan pelanggan Anchur.us</p>
             </div>
             <button
               onClick={() => {
@@ -638,7 +640,7 @@ export default function MasterDataPage() {
                 else { setEditItem(null); }
                 setShowAddForm(true);
               }}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-pink-500 text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md hover:bg-pink-600 transition-all active:scale-95"
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-bold shadow-sm hover:shadow-md hover:bg-primary transition-all active:scale-95"
             >
               <Plus size={18} strokeWidth={2.5} /> Tambah Data
             </button>
@@ -655,8 +657,8 @@ export default function MasterDataPage() {
                   onClick={() => switchTab(t.key)}
                   className={`flex items-center gap-2 px-5 py-3 rounded-full whitespace-nowrap text-[14px] font-bold transition-all duration-300 shadow-sm border ${
                     isActive 
-                      ? "bg-pink-500 text-white border-pink-500 scale-100" 
-                      : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50 scale-95 hover:scale-100 hover:border-slate-300"
+                      ? "bg-primary text-white border-primary scale-100" 
+                      : "bg-white text-slate-500 border-slate-200 hover:bg-brand-50 scale-95 hover:scale-100 hover:border-slate-300"
                   }`}
                 >
                   <Icon size={16} strokeWidth={isActive ? 2.5 : 2} className={isActive ? "text-white" : "text-slate-500"} />
@@ -716,9 +718,9 @@ export default function MasterDataPage() {
                           </div>
                         </div>
                         <div className="mb-4">
-                          <span className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[10px] font-black text-slate-600 tracking-wider">SKU: {p.code}</span>
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-xs font-black text-slate-600 tracking-wider">SKU: {p.code}</span>
                         </div>
-                        {p.description && <p className="text-[13px] text-slate-500 mb-4 flex-grow line-clamp-2">{p.description}</p>}
+                        {p.description && <p className="text-sm text-slate-500 mb-4 flex-grow line-clamp-2">{p.description}</p>}
                         {!p.description && <div className="flex-grow"></div>}
                         <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                           <Badge label={`${p.packPerBatch} pack/batch`} bg="#F0F9FF" color="#0284C7" border="#E0F2FE" />
@@ -746,7 +748,7 @@ export default function MasterDataPage() {
                       <PremiumCard danger={isLow}>
                         <div className="flex flex-col h-full">
                           <div className="flex justify-between items-start mb-3">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${isLow ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-pink-50 text-[#E85D8C] border border-pink-100'}`}>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${isLow ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-primary/10 text-[#E85D8C] border border-primary/20'}`}>
                               <span className="text-xl font-black">{v.name[0]}</span>
                             </div>
                             <div className="flex gap-1">
@@ -759,14 +761,14 @@ export default function MasterDataPage() {
                           
                           <div className="mt-auto pt-4 border-t border-slate-100 flex items-end justify-between">
                             <div>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Sisa Stok</p>
+                              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">Sisa Stok</p>
                               <div className="flex items-baseline gap-1">
                                 <p className={`text-2xl font-black tracking-tight ${isLow ? "text-red-600" : "text-slate-800"}`}>{v.currentStock}</p>
-                                <p className="text-[11px] font-bold text-slate-500">pcs</p>
+                                <p className="text-xs font-bold text-slate-500">pcs</p>
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Min. Stok</p>
+                              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Min. Stok</p>
                               <Badge label={`${v.minStock}`} bg="#F1F5F9" color="#475569" border="#E2E8F0" />
                             </div>
                           </div>
@@ -807,15 +809,15 @@ export default function MasterDataPage() {
                           
                           <div className="mt-auto">
                             <div className="flex items-baseline gap-1 mb-2">
-                              <p className={`text-2xl font-black tracking-tight ${isLow ? "text-red-600" : "text-slate-800"}`}>{(ing.currentStock ?? 0).toLocaleString("id-ID")}</p>
+                              <p className={`text-2xl font-black tracking-tight ${isLow ? "text-red-600" : "text-slate-800"}`}>{formatNumber(ing.currentStock)}</p>
                               <p className="text-[12px] font-bold text-slate-500 uppercase">{ing.baseUnit}</p>
                             </div>
                             <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mb-2">
                               <div className={`h-full transition-all duration-500 ease-out ${isLow ? "bg-red-500" : "bg-[#E85D8C]"}`} style={{ width: `${barPct}%` }} />
                             </div>
                             <div className="flex justify-between items-center">
-                              <p className="text-[11px] font-bold text-slate-400">Min: {(ing.minStock ?? 0).toLocaleString("id-ID")} {ing.baseUnit}</p>
-                              {isLow && <span className="text-[10px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded">LOW</span>}
+                              <p className="text-xs font-bold text-slate-400">Min: {formatNumber(ing.minStock)} {ing.baseUnit}</p>
+                              {isLow && <span className="text-xs font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded">LOW</span>}
                             </div>
                           </div>
                         </div>
@@ -841,7 +843,7 @@ export default function MasterDataPage() {
                           <Input type="number" placeholder="Min Stok" value={addonForm.minStock} onChange={e => setAddonForm(p => ({ ...p, minStock: e.target.value }))} className="h-12 w-32 rounded-xl text-sm focus-visible:ring-[#E85D8C]" />
                         </div>
                         
-                        <div className="mt-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                        <div className="mt-2 p-4 bg-brand-50 border border-slate-200 rounded-xl">
                           <p style={{ fontSize: "12px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "12px" }}>Afiliasi Channel</p>
                           <p style={{ fontSize: "11px", color: "#94A3B8", marginBottom: "12px" }}>Biarkan kosong jika Add-on ini tersedia di semua channel.</p>
                           <div className="flex flex-wrap gap-2">
@@ -853,7 +855,7 @@ export default function MasterDataPage() {
                             ].map(ch => {
                               const checked = addonForm.channels.includes(ch.id);
                               return (
-                                <label key={ch.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${checked ? 'border-[#E85D8C] bg-pink-50' : 'border-slate-200 bg-white'} cursor-pointer transition-colors`}>
+                                <label key={ch.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${checked ? 'border-[#E85D8C] bg-primary/10' : 'border-slate-200 bg-white'} cursor-pointer transition-colors`}>
                                   <input type="checkbox" checked={checked} className="accent-[#E85D8C]"
                                     onChange={(e) => {
                                       setAddonForm(p => ({
@@ -896,14 +898,14 @@ export default function MasterDataPage() {
                             
                             <div className="mt-auto pt-3 border-t border-slate-100 flex items-end justify-between">
                               <div>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Sisa Stok</p>
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">Sisa Stok</p>
                                 <div className="flex items-baseline gap-1">
                                   <p className={`text-2xl font-black tracking-tight ${isLow ? "text-red-600" : "text-slate-800"}`}>{a.currentStock}</p>
-                                  <p className="text-[11px] font-bold text-slate-500 uppercase">cup</p>
+                                  <p className="text-xs font-bold text-slate-500 uppercase">cup</p>
                                 </div>
                               </div>
                               <div className="text-right">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Min Stok</p>
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Min Stok</p>
                                 <Badge label={`${a.minStock} CUP`} bg="#F1F5F9" color="#475569" border="#E2E8F0" />
                               </div>
                             </div>
@@ -990,18 +992,18 @@ export default function MasterDataPage() {
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Tipe Pelanggan</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Tipe Pelanggan</label>
                             <select value={customerForm.customerType} onChange={e => setCustomerForm(p => ({ ...p, customerType: e.target.value }))}
-                              className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-[#E85D8C]/20 focus:border-[#E85D8C] transition-all">
+                              className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-brand-50 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-[#E85D8C]/20 focus:border-[#E85D8C] transition-all">
                               <option value="reguler">Reguler</option>
                               <option value="reseller">Reseller</option>
                               <option value="b2b">B2B (Bisnis)</option>
                             </select>
                           </div>
                           <div>
-                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Sumber Order</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Sumber Order</label>
                             <select value={customerForm.channel} onChange={e => setCustomerForm(p => ({ ...p, channel: e.target.value }))}
-                              className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-[#E85D8C]/20 focus:border-[#E85D8C] transition-all">
+                              className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-brand-50 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-[#E85D8C]/20 focus:border-[#E85D8C] transition-all">
                               <option value="walk_in">Walk-in</option>
                               <option value="whatsapp">WhatsApp</option>
                               <option value="shopee">Shopee</option>
@@ -1013,22 +1015,22 @@ export default function MasterDataPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">No. WhatsApp / HP</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">No. WhatsApp / HP</label>
                             <Input placeholder="Contoh: 08123456789" value={customerForm.phoneNumber} onChange={e => setCustomerForm(p => ({ ...p, phoneNumber: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-[#E85D8C]" />
                           </div>
                           <div>
-                            <label className="text-[11px] font-bold text-[#E85D8C] uppercase tracking-wider mb-2 block ml-1">Diskon Otomatis / Unit</label>
-                            <Input type="number" placeholder="Rp 0" value={customerForm.discountPerUnit} onChange={e => setCustomerForm(p => ({ ...p, discountPerUnit: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-[#E85D8C] border-pink-200 bg-pink-50/30" />
+                            <label className="text-xs font-bold text-[#E85D8C] uppercase tracking-wider mb-2 block ml-1">Diskon Otomatis / Unit</label>
+                            <Input type="number" placeholder="Rp 0" value={customerForm.discountPerUnit} onChange={e => setCustomerForm(p => ({ ...p, discountPerUnit: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-[#E85D8C] border-pink-200 bg-primary/10/30" />
                           </div>
                         </div>
 
                         <div>
-                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Alamat Pengiriman</label>
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Alamat Pengiriman</label>
                           <Input placeholder="Alamat lengkap (opsional)" value={customerForm.address} onChange={e => setCustomerForm(p => ({ ...p, address: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-[#E85D8C]" />
                         </div>
                         
                         <div>
-                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Catatan</label>
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Catatan</label>
                           <Input placeholder="Preferensi atau info lainnya" value={customerForm.notes} onChange={e => setCustomerForm(p => ({ ...p, notes: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-[#E85D8C]" />
                         </div>
 
@@ -1066,19 +1068,19 @@ export default function MasterDataPage() {
                             
                             <div className="mt-auto flex flex-col gap-2 pt-3 border-t border-slate-100">
                               <div className="flex items-center justify-between">
-                                <p className="text-[11px] font-bold text-slate-400 uppercase">Kontak</p>
+                                <p className="text-xs font-bold text-slate-400 uppercase">Kontak</p>
                                 <p className="text-[12px] font-bold text-slate-700">{c.phoneNumber || "-"}</p>
                               </div>
                               <div className="flex items-center justify-between">
-                                <p className="text-[11px] font-bold text-slate-400 uppercase">Asal Order</p>
+                                <p className="text-xs font-bold text-slate-400 uppercase">Asal Order</p>
                                 <p className="text-[12px] font-bold text-slate-700 capitalize">{c.channel?.replace("_", " ") || "-"}</p>
                               </div>
                             </div>
                             
                             {c.discountPerUnit > 0 && (
-                              <div className="mt-3 bg-pink-50 border border-pink-100 rounded-lg p-2 text-center">
-                                <p className="text-[10px] font-bold text-[#E85D8C] uppercase tracking-wider mb-0.5">Diskon Spesial</p>
-                                <p className="text-[14px] font-black text-[#D94E7A]">-{fmt(c.discountPerUnit)} <span className="text-[11px]">/ pcs</span></p>
+                              <div className="mt-3 bg-primary/10 border border-primary/20 rounded-lg p-2 text-center">
+                                <p className="text-xs font-bold text-[#E85D8C] uppercase tracking-wider mb-0.5">Diskon Spesial</p>
+                                <p className="text-[14px] font-black text-[#D94E7A]">-{fmt(c.discountPerUnit)} <span className="text-xs">/ pcs</span></p>
                               </div>
                             )}
                           </div>
@@ -1112,7 +1114,7 @@ function PremiumCard({ children, danger = false }: { children: React.ReactNode; 
 
 function Badge({ label, bg, color, border }: { label: string; bg: string; color: string; border: string }) {
   return (
-    <span style={{ backgroundColor: bg, color: color, borderColor: border }} className="px-2 py-1 rounded-[8px] border text-[10px] font-black uppercase tracking-wider">
+    <span style={{ backgroundColor: bg, color: color, borderColor: border }} className="px-2 py-1 rounded-[8px] border text-xs font-black uppercase tracking-wider">
       {label}
     </span>
   );
@@ -1120,8 +1122,8 @@ function Badge({ label, bg, color, border }: { label: string; bg: string; color:
 
 function EmptyState({ label, sub }: { label: string; sub: string }) {
   return (
-    <div className="bg-white rounded-[24px] p-16 text-center border-2 border-pink-100 border-dashed shadow-sm">
-      <div className="w-20 h-20 bg-pink-50 rounded-[20px] flex items-center justify-center mx-auto mb-5 border border-pink-100">
+    <div className="bg-white rounded-[24px] p-16 text-center border-2 border-primary/20 border-dashed shadow-sm">
+      <div className="w-20 h-20 bg-primary/10 rounded-[20px] flex items-center justify-center mx-auto mb-5 border border-primary/20">
         <Package size={32} className="text-[#E85D8C]" />
       </div>
       <p className="text-[16px] font-black text-slate-800">{label}</p>

@@ -6,10 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatRupiah } from "@/lib/utils";
+import { formatNumber, formatDateTime } from "@/lib/formatters";
 import { Loader2, Plus, X, Check, AlertTriangle, Search, ChevronDown, ChevronUp, ClipboardList, MoreHorizontal } from "lucide-react";
 import type { Ingredient } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+import { MutasiModal } from "./components/MutasiModal";
+
 type Tab = "produk" | "bahan" | "operasional" | "addon" | "opname";
 
 interface VariantStock {
@@ -99,6 +102,7 @@ export default function InventoryPage() {
   const [mutasiMovements, setMutasiMovements] = useState<any[]>([]);
   const [loadingMutasi, setLoadingMutasi] = useState(false);
 
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
@@ -139,14 +143,7 @@ export default function InventoryPage() {
     setIsMutasiOpen(true);
   }
 
-  function getSourceTypeLabel(src: string) {
-    if (src === "production") return "Produksi / Repack";
-    if (src === "sale") return "Penjualan / POS";
-    if (src === "opname") return "Stock Opname / Koreksi";
-    if (src === "expense") return "Pembelian / Pengeluaran";
-    return src;
-  }
-
+  // moved to MutasiModal
   const loadVariants = useCallback(async () => {
     const res = await fetchWithAuth("/api/products/stocks");
     if (res.ok) setVariants(await res.json());
@@ -226,19 +223,13 @@ export default function InventoryPage() {
       setOpnameSubmittingId("");
     }
   }
-
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleString("id-ID", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  function fmtDate(iso: string) {
+    return formatDateTime(iso);
   }
 
-  function formatNumber(n: number, unit: string) {
-    return `${n.toLocaleString("id-ID")} ${unit}`;
+  function fmtStock(n: number | null | undefined, unit: string) {
+    if (n == null) return "-";
+    return `${formatNumber(n)} ${unit}`;
   }
 
   // Opname produk jadi
@@ -298,13 +289,13 @@ export default function InventoryPage() {
     <div className="min-h-screen" style={{ background: "#FCABB4" }}>
 
       {/* ── Header (Glassmorphism, sticky) ── */}
-      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-xl border-b border-pink-100 shadow-sm">
+      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-xl border-b border-primary/20 shadow-sm">
         <div className="px-5 pt-6 pb-4">
           <h1 className="text-2xl font-black mb-1" style={{ color: "#1E293B" }}>Inventori</h1>
           <p className="text-sm font-semibold text-slate-500">Kelola stok dan bahan baku</p>
 
           {/* Search bar */}
-          <div className="flex items-center gap-2 mt-4 px-4 py-3 bg-slate-50/80 rounded-xl border border-slate-100 focus-within:ring-2 focus-within:ring-pink-500 focus-within:border-pink-200 transition-all">
+          <div className="flex items-center gap-2 mt-4 px-4 py-3 bg-brand-50/80 rounded-xl border border-slate-100 focus-within:ring-2 focus-within:ring-primary focus-within:border-pink-200 transition-all">
             <Search size={18} className="text-slate-400 flex-shrink-0" />
             <input
               type="text"
@@ -326,7 +317,7 @@ export default function InventoryPage() {
               data-testid={`tab-${t.key}`}
               className={`whitespace-nowrap px-4 py-3 text-sm transition-all border-b-2 font-bold ${
                 tab === t.key 
-                  ? "border-pink-500 text-pink-600" 
+                  ? "border-primary text-primary" 
                   : "border-transparent text-slate-400 hover:text-slate-600"
               }`}
             >
@@ -381,7 +372,7 @@ export default function InventoryPage() {
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
                               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                                isLow ? "bg-red-50 text-red-600 animate-pulse" : "bg-pink-50 text-pink-600"
+                                isLow ? "bg-red-50 text-red-600 animate-pulse" : "bg-primary/10 text-primary"
                               }`}>
                                 <span className="text-lg font-black">{v.name?.[0]?.toUpperCase() || "?"}</span>
                               </div>
@@ -392,31 +383,39 @@ export default function InventoryPage() {
                             </div>
                             
                             {!isEditing && (
-                              <div className="relative group">
-                                <button className="p-2 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors">
+                              <div className="relative">
+                                <button 
+                                  onClick={() => setOpenMenuId(openMenuId === v.id ? null : v.id)}
+                                  className="p-2 text-slate-400 hover:text-slate-700 bg-brand-50 hover:bg-slate-100 rounded-xl transition-colors"
+                                >
                                   <MoreHorizontal size={16} />
                                 </button>
-                                <div className="absolute right-0 mt-2 w-40 bg-white rounded-2xl shadow-xl border border-slate-100 p-1 hidden group-hover:block z-10">
-                                  <button
-                                    onClick={() => openMutasiModal(v.id, v.name, "pcs", "variant")}
-                                    className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 rounded-xl transition-colors"
-                                  >
-                                    Kartu Stok
-                                  </button>
-                                  <button
-                                    onClick={() => { setEditingVariantId(v.id); setOpnameValue(String(v.currentStock)); }}
-                                    className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-pink-600 rounded-xl transition-colors"
-                                  >
-                                    Stock Opname
-                                  </button>
-                                </div>
+                                {openMenuId === v.id && (
+                                  <>
+                                    <div className="fixed inset-0 z-0" onClick={() => setOpenMenuId(null)} />
+                                    <div className="absolute right-0 mt-2 w-40 bg-white rounded-2xl shadow-xl border border-slate-100 p-1 z-10">
+                                      <button
+                                        onClick={() => { setOpenMenuId(null); openMutasiModal(v.id, v.name, "pcs", "variant"); }}
+                                        className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-brand-50 hover:text-indigo-600 rounded-xl transition-colors"
+                                      >
+                                        Kartu Stok
+                                      </button>
+                                      <button
+                                        onClick={() => { setOpenMenuId(null); setEditingVariantId(v.id); setOpnameValue(String(v.currentStock)); }}
+                                        className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-brand-50 hover:text-primary rounded-xl transition-colors"
+                                      >
+                                        Stock Opname
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             )}
                           </div>
 
                           <div className="mt-auto">
                             <div className="flex justify-between items-end mb-2">
-                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sisa Stok</span>
+                              <span className="text-xs font-black uppercase tracking-widest text-slate-400">Sisa Stok</span>
                               <span className={`text-2xl font-black ${isLow ? "text-red-600" : "text-slate-800"}`}>
                                 {v.currentStock} <span className="text-xs font-bold text-slate-400">pcs</span>
                               </span>
@@ -452,7 +451,7 @@ export default function InventoryPage() {
                                   <button
                                     onClick={() => handleVariantOpname(v.id)}
                                     disabled={submitting}
-                                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-black text-white bg-pink-500 hover:bg-pink-600 transition-colors"
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-black text-white bg-primary hover:bg-primary transition-colors"
                                     data-testid={`save-opname-${v.id}`}
                                   >
                                     {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}
@@ -460,7 +459,7 @@ export default function InventoryPage() {
                                   </button>
                                   <button
                                     onClick={() => { setEditingVariantId(null); setOpnameValue(""); setOpnameNote(""); }}
-                                    className="px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+                                    className="px-4 py-2.5 rounded-xl text-sm font-bold bg-white text-slate-500 shadow-sm hover:bg-slate-200 transition-colors"
                                   >
                                     Batal
                                   </button>
@@ -510,9 +509,11 @@ export default function InventoryPage() {
                       filteredIngredients
                         .filter(i => !searchQuery || (i.name && i.name.toLowerCase().includes(searchQuery.toLowerCase())))
                         .map(ing => {
-                          const isLow = ing.currentStock < ing.minStock;
-                          const barPct = Math.min(100, (ing.currentStock / Math.max(ing.minStock * 2, 1)) * 100);
-                          const barColor = isLow ? "#DC2626" : ing.currentStock < ing.minStock * 1.5 ? "#D97706" : "#10B981";
+                          const current = ing.currentStock ?? 0;
+                          const min = ing.minStock ?? 0;
+                          const isLow = current < min;
+                          const barPct = Math.min(100, (current / Math.max(min * 2, 1)) * 100);
+                          const barColor = isLow ? "#DC2626" : current < min * 1.5 ? "#D97706" : "#10B981";
                           const isEditing = editingStock === ing.id;
                           
                           return (
@@ -532,38 +533,46 @@ export default function InventoryPage() {
                                   </div>
                                   <div>
                                     <p className="text-sm font-black text-slate-800 line-clamp-1">{ing.name}</p>
-                                    <p className="text-xs font-bold text-slate-400 mt-0.5">Min: {ing.minStock} {ing.baseUnit}</p>
+                                    <p className="text-xs font-bold text-slate-400 mt-0.5">Min: {min} {ing.baseUnit}</p>
                                   </div>
                                 </div>
                                 
                                 {!isEditing && (
-                                  <div className="relative group">
-                                    <button className="p-2 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors">
+                                  <div className="relative">
+                                    <button 
+                                      onClick={() => setOpenMenuId(openMenuId === ing.id ? null : ing.id)}
+                                      className="p-2 text-slate-400 hover:text-slate-700 bg-brand-50 hover:bg-slate-100 rounded-xl transition-colors"
+                                    >
                                       <MoreHorizontal size={16} />
                                     </button>
-                                    <div className="absolute right-0 mt-2 w-32 bg-white rounded-2xl shadow-xl border border-slate-100 p-1 hidden group-hover:block z-10">
-                                      <button
-                                        onClick={() => openMutasiModal(ing.id, ing.name, ing.baseUnit, "ingredient")}
-                                        className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 rounded-xl transition-colors"
-                                      >
-                                        Kartu Stok
-                                      </button>
-                                      <button
-                                        onClick={() => { setEditingStock(ing.id); setNewStockValue(String(ing.currentStock)); }}
-                                        className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-pink-600 rounded-xl transition-colors"
-                                      >
-                                        Edit Stok
-                                      </button>
-                                    </div>
+                                    {openMenuId === ing.id && (
+                                      <>
+                                        <div className="fixed inset-0 z-0" onClick={() => setOpenMenuId(null)} />
+                                        <div className="absolute right-0 mt-2 w-32 bg-white rounded-2xl shadow-xl border border-slate-100 p-1 z-10">
+                                          <button
+                                            onClick={() => { setOpenMenuId(null); openMutasiModal(ing.id, ing.name, ing.baseUnit, "ingredient"); }}
+                                            className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-brand-50 hover:text-indigo-600 rounded-xl transition-colors"
+                                          >
+                                            Kartu Stok
+                                          </button>
+                                          <button
+                                            onClick={() => { setOpenMenuId(null); setEditingStock(ing.id); setNewStockValue(String(current)); }}
+                                            className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-brand-50 hover:text-primary rounded-xl transition-colors"
+                                          >
+                                            Edit Stok
+                                          </button>
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 )}
                               </div>
 
                               <div className="mt-auto">
                                 <div className="flex justify-between items-end mb-2">
-                                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sisa Stok</span>
+                                  <span className="text-xs font-black uppercase tracking-widest text-slate-400">Sisa Stok</span>
                                   <span className={`text-2xl font-black ${isLow ? "text-red-600" : "text-slate-800"}`}>
-                                    {ing.currentStock.toLocaleString("id-ID")} <span className="text-xs font-bold text-slate-400">{ing.baseUnit}</span>
+                                    {formatNumber(current)} <span className="text-xs font-bold text-slate-400">{ing.baseUnit}</span>
                                   </span>
                                 </div>
 
@@ -596,14 +605,14 @@ export default function InventoryPage() {
                                       <button
                                         onClick={() => handleStockEdit(ing.id)}
                                         disabled={submitting}
-                                        className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-black text-white bg-pink-500 hover:bg-pink-600 transition-colors"
+                                        className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-black text-white bg-primary hover:bg-primary transition-colors"
                                       >
                                         {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />}
                                         Simpan
                                       </button>
                                       <button
                                         onClick={() => { setEditingStock(null); setNewStockValue(""); setStockNote(""); }}
-                                        className="px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+                                        className="px-4 py-2.5 rounded-xl text-sm font-bold bg-white text-slate-500 shadow-sm hover:bg-slate-200 transition-colors"
                                       >
                                         Batal
                                       </button>
@@ -661,7 +670,7 @@ export default function InventoryPage() {
                           >
                             <div>
                               <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>
-                                {formatDate(opname.date)}
+                                {fmtDate(opname.date)}
                               </p>
                               <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>
                                 {opname.totalIngredientsChecked}/{opname.totalIngredientsAll} bahan dicek
@@ -716,11 +725,11 @@ export default function InventoryPage() {
                                             }}
                                           >
                                             {item.difference > 0 ? "+" : ""}
-                                            {formatNumber(item.difference, unit)}
+                                            {fmtStock(item.difference, unit)}
                                           </span>
                                         </div>
                                         <p style={{ fontSize: "11px", color: "#94A3B8" }}>
-                                          Sistem: {formatNumber(item.systemStock, unit)} | Fisik: {formatNumber(physical, unit)}
+                                          Sistem: {fmtStock(item.systemStock, unit)} | Fisik: {fmtStock(physical, unit)}
                                         </p>
                                         <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
                                           <input
@@ -807,7 +816,7 @@ export default function InventoryPage() {
                       >
                         <div>
                           <p style={{ fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>
-                            {formatDate(opname.date)}
+                            {fmtDate(opname.date)}
                           </p>
                           <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "1px" }}>
                             {opname.totalIngredientsChecked} bahan dicek · Reviewer: {opname.reviewedBy}
@@ -834,134 +843,18 @@ export default function InventoryPage() {
         )}
 
         {/* ── Mutasi Modal ── */}
-        {isMutasiOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-            onClick={() => setIsMutasiOpen(false)}
-          >
-            <div
-              className="w-full max-w-lg bg-white rounded-3xl overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200"
-              style={{ boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-slate-800">Kartu Stok / Mutasi</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">{mutasiItemName} ({mutasiItemUnit})</p>
-                </div>
-                <button
-                  onClick={() => setIsMutasiOpen(false)}
-                  className="h-8 w-8 rounded-full flex items-center justify-center bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              {/* Filter Section */}
-              <div className="p-4 bg-slate-50 border-b border-slate-100 space-y-3">
-                {/* Filter Type Selector */}
-                <div className="flex gap-2">
-                  {(["hari", "minggu", "bulan"] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      onClick={() => {
-                        setMutasiFilter(mode);
-                        const now = new Date();
-                        if (mode === "hari" || mode === "minggu") {
-                          setMutasiDate(now.toISOString().split("T")[0]);
-                        } else {
-                          setMutasiDate(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
-                        }
-                      }}
-                      className={`flex-1 py-1.5 rounded-xl text-xs font-semibold capitalize transition-colors ${
-                        mutasiFilter === mode
-                          ? "bg-slate-800 text-white"
-                          : "bg-white text-slate-600 border border-slate-200"
-                      }`}
-                    >
-                      {mode}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Date Input Selector */}
-                <div className="flex items-center gap-3 bg-white px-3 py-2 rounded-xl border border-slate-200">
-                  <span className="text-xs font-semibold text-slate-400">Pilih Periode:</span>
-                  <input
-                    type={mutasiFilter === "bulan" ? "month" : "date"}
-                    value={mutasiDate}
-                    onChange={(e) => setMutasiDate(e.target.value)}
-                    className="flex-1 text-xs font-bold text-slate-700 outline-none bg-transparent"
-                  />
-                </div>
-
-                {/* Week Bounds Label for Mingguan */}
-                {mutasiFilter === "minggu" && mutasiDate && (
-                  <p className="text-[11px] font-semibold text-slate-500 text-center">
-                    Rentang: {(() => {
-                      const d = new Date(mutasiDate);
-                      const day = d.getDay();
-                      const diffToMonday = day === 0 ? -6 : 1 - day;
-                      const monday = new Date(d);
-                      monday.setDate(d.getDate() + diffToMonday);
-                      const sunday = new Date(monday);
-                      sunday.setDate(monday.getDate() + 6);
-                      return `${monday.toLocaleDateString("id-ID", { day: "numeric", month: "short" })} - ${sunday.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`;
-                    })()}
-                  </p>
-                )}
-              </div>
-
-              {/* Modal Body / History List */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-[300px]">
-                {loadingMutasi ? (
-                  <div className="flex flex-col items-center justify-center py-20 gap-2">
-                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-                    <p className="text-xs text-slate-400 font-medium">Memuat mutasi...</p>
-                  </div>
-                ) : mutasiMovements.length === 0 ? (
-                  <div className="py-20 text-center text-slate-400 space-y-1">
-                    <p className="text-xs font-semibold">Tidak ada data mutasi</p>
-                    <p className="text-[10px]">Silakan pilih periode atau filter yang lain</p>
-                  </div>
-                ) : (
-                  mutasiMovements.map((move) => {
-                    const isPositive = move.changeAmount > 0;
-                    return (
-                      <div
-                        key={move.id}
-                        className="p-3 bg-white rounded-2xl border border-slate-100 flex items-center justify-between gap-3 text-left"
-                      >
-                        <div className="space-y-0.5">
-                          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
-                            {getSourceTypeLabel(move.sourceType)}
-                          </p>
-                          <p className="text-xs font-semibold text-slate-700">{move.note || "Mutasi stok"}</p>
-                          <p className="text-[10px] text-slate-400">
-                            {formatDate(move.createdAt)}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p
-                            className="text-xs font-bold"
-                            style={{ color: isPositive ? "#16A34A" : "#DC2626" }}
-                          >
-                            {isPositive ? "+" : ""}
-                            {move.changeAmount.toLocaleString("id-ID")}
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">
-                            Saldo: {move.newStockAfter.toLocaleString("id-ID")}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        <MutasiModal
+          isOpen={isMutasiOpen}
+          onClose={() => setIsMutasiOpen(false)}
+          mutasiItemName={mutasiItemName}
+          mutasiItemUnit={mutasiItemUnit}
+          mutasiFilter={mutasiFilter}
+          setMutasiFilter={setMutasiFilter}
+          mutasiDate={mutasiDate}
+          setMutasiDate={setMutasiDate}
+          loadingMutasi={loadingMutasi}
+          mutasiMovements={mutasiMovements}
+        />
 
       </div>
     </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
+import { ingredientSchema } from "@/lib/validations";
 import type { Ingredient } from "@/types";
 
 export async function GET(req: NextRequest) {
@@ -42,13 +43,13 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const { name, category = "bahan_baku", baseUnit, minStock = 0, channels = [], unitAlternatives = [] } = body as {
-    name: string; category?: string; baseUnit: string; minStock?: number; channels?: string[];
-    unitAlternatives?: { unit: string; conversionToBase: number }[];
-  };
-  if (!name?.trim() || !baseUnit?.trim()) {
-    return NextResponse.json({ error: "Nama dan satuan wajib diisi" }, { status: 400 });
+  const parseResult = ingredientSchema.safeParse(body);
+  
+  if (!parseResult.success) {
+    return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
   }
+
+  const { name, category, baseUnit, minStock, channels, unitAlternatives } = parseResult.data;
 
   try {
     const ref = adminDb.collection("ingredients").doc();

@@ -33,28 +33,40 @@ export async function GET(req: NextRequest) {
       const data = doc.data();
       if (data.status === "void") continue;
 
-      let orderPemasukan = 0;
+      let orderPemasukan = data.totalOrderValue ?? 0;
+      let orderHpp = data.totalHpp ?? 0;
+
+      // Fallback for old orders that didn't have totalOrderValue saved
+      if (typeof data.totalOrderValue !== 'number') {
+        orderPemasukan = 0;
+        const itemsSnap = await doc.ref.collection("items").get();
+        for (const itemDoc of itemsSnap.docs) {
+          const item = itemDoc.data();
+          orderPemasukan += item.totalPrice ?? 0;
+          orderHpp += item.totalHpp ?? 0;
+        }
+      }
+
       // Add shipping cost as income if borne by the customer
       if (data.shippingBorneBy === "customer" && (data.shippingCost ?? 0) > 0) {
         orderPemasukan += data.shippingCost;
       }
+      
+      // Deduct platform fee from gross revenue? 
+      // User requested: "P&L Tidak Menghitung Platform Fee Sebagai Pengurang".
+      // We will deduct it from Pemasukan or treat it as an expense. It's better to deduct from Pemasukan.
+      const netOrderPemasukan = orderPemasukan - (data.platformFee ?? 0);
 
-      const itemsSnap = await doc.ref.collection("items").get();
-      for (const itemDoc of itemsSnap.docs) {
-        const item = itemDoc.data();
-        orderPemasukan += item.totalPrice ?? 0;
-        hppProduk += item.totalHpp ?? 0;
-      }
+      pemasukan += netOrderPemasukan;
+      hppProduk += orderHpp;
 
-      pemasukan += orderPemasukan;
-
-      // Classify payment method for cash flow
+      // Classify payment method for cash flow (use netOrderPemasukan to accurately reflect money received)
       if (data.paymentStatus === "sudah_bayar") {
         const method = data.paymentMethod ?? "cash";
         if (method === "cash") {
-          totalCashIn += orderPemasukan;
+          totalCashIn += netOrderPemasukan;
         } else if (method === "transfer" || method === "qris") {
-          totalBankIn += orderPemasukan;
+          totalBankIn += netOrderPemasukan;
         }
       }
     }

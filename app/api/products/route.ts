@@ -2,34 +2,44 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
+import { productSchema } from "@/lib/validations";
 import type { Product, PriceTier } from "@/types";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireRole(req, ["owner", "manager", "crew"]);
+  if (auth instanceof NextResponse) return auth;
+
   try {
-    const snap = await adminDb
-      .collection("products")
-      .where("isActive", "==", true)
-      .get();
+    const [snap, allTiersSnap] = await Promise.all([
+      adminDb.collection("products").where("isActive", "==", true).get(),
+      adminDb.collectionGroup("priceTiers").get()
+    ]);
 
-    const products: (Product & { priceTiers: PriceTier[] })[] = [];
+    // Group price tiers by productId
+    const tiersByProduct = new Map<string, PriceTier[]>();
+    for (const tDoc of allTiersSnap.docs) {
+      const productId = tDoc.ref.parent.parent?.id;
+      if (!productId) continue;
+      
+      const tData = tDoc.data();
+      const tier = {
+        id: tDoc.id,
+        minQty: tData.minQty,
+        maxQty: tData.maxQty ?? null,
+        price: tData.price,
+      };
+      
+      if (!tiersByProduct.has(productId)) {
+        tiersByProduct.set(productId, []);
+      }
+      tiersByProduct.get(productId)!.push(tier);
+    }
 
-    for (const doc of snap.docs) {
+    const products: (Product & { priceTiers: PriceTier[] })[] = snap.docs.map((doc) => {
       const data = doc.data();
-      const tiersSnap = await adminDb
-        .collection("products")
-        .doc(doc.id)
-        .collection("priceTiers")
-        .orderBy("minQty")
-        .get();
-
-      const priceTiers: PriceTier[] = tiersSnap.docs.map((t) => ({
-        id: t.id,
-        minQty: t.data().minQty,
-        maxQty: t.data().maxQty ?? null,
-        price: t.data().price,
-      }));
-
-      products.push({
+      const priceTiers = (tiersByProduct.get(doc.id) || []).sort((a, b) => a.minQty - b.minQty);
+      
+      return {
         id: doc.id,
         code: data.code,
         name: data.name,
@@ -40,8 +50,8 @@ export async function GET() {
         updatedAt: data.updatedAt?.toDate?.().toISOString() ?? "",
         channels: data.channels ?? [],
         priceTiers,
-      });
-    }
+      };
+    });
 
     return NextResponse.json(products.sort((a, b) => a.name.localeCompare(b.name)));
   } catch (err) {
@@ -58,15 +68,13 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const { name, code, description = "", packPerBatch = 1, priceTiers = [], channels = [] } = body as {
-    name: string; code: string; description?: string;
-    packPerBatch?: number; priceTiers?: { minQty: number; maxQty: number | null; price: number }[];
-    channels?: string[];
-  };
-
-  if (!name?.trim() || !code?.trim()) {
-    return NextResponse.json({ error: "Nama dan kode produk wajib diisi" }, { status: 400 });
+  const parseResult = productSchema.safeParse(body);
+  
+  if (!parseResult.success) {
+    return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
   }
+
+  const { name, code, description, packPerBatch, priceTiers = [], channels } = parseResult.data;
 
   try {
     const ref = adminDb.collection("products").doc();

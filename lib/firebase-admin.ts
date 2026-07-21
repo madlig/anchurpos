@@ -8,6 +8,14 @@ function getAdminApp(): App {
     return getApps()[0];
   }
 
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+  if (!projectId || !clientEmail || !privateKey) {
+    console.warn("⚠️ PERINGATAN: Environment variables untuk Firebase Admin belum lengkap!");
+  }
+
   return initializeApp({
     credential: cert({
       projectId: process.env.FIREBASE_PROJECT_ID,

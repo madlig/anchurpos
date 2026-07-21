@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
+import { employeeUpdateSchema } from "@/lib/validations";
 
 // PATCH /api/employees/[id] — edit info karyawan
 export async function PATCH(
@@ -13,11 +14,13 @@ export async function PATCH(
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const { name, role, phone, joinDate } = body as {
-    name?: string; role?: string; phone?: string | null; joinDate?: string | null;
-  };
+  const parseResult = employeeUpdateSchema.safeParse(body);
+  
+  if (!parseResult.success) {
+    return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
+  }
 
-  if (name !== undefined && !name.trim()) return NextResponse.json({ error: "Nama tidak boleh kosong" }, { status: 400 });
+  const { name, role, phone, joinDate } = parseResult.data;
 
   try {
     const ref = adminDb.collection("users").doc(id);

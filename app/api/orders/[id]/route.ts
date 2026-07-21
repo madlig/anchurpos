@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireRole, verifyAuth } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
+import { calculateProductHPP } from "@/lib/business-logic";
+import { orderSchema } from "@/lib/validations";
 
 export async function GET(
   req: NextRequest,
@@ -101,6 +103,11 @@ export async function PUT(
   const { id } = await params;
   const body = await req.json();
 
+  const parseResult = orderSchema.partial().safeParse(body);
+  if (!parseResult.success) {
+    return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
+  }
+
   const {
     customerId,
     customerName: directCustomerName,
@@ -121,27 +128,8 @@ export async function PUT(
     deliveryMethod,
     sauceDistribution,
     poNumber,
-  } = body as {
-    customerId?: string;
-    customerName?: string;
-    customerType?: string;
-    source: string;
-    orderChannel?: string;
-    items: { productId: string; variantId: string; qty: number; sauceId?: string; sauceName?: string }[];
-    paymentMethod?: string;
-    paymentStatus?: string;
-    shippingAddress?: string;
-    requestedDeliveryDate?: string;
-    orderNotes?: string;
-    platformFeePercent?: number;
-    platformFee?: number;
-    customDate?: string;
-    shippingCost?: number;
-    shippingBorneBy?: "seller" | "customer";
-    deliveryMethod?: "pickup" | "self_delivery" | "courier";
-    sauceDistribution?: Record<string, number>;
-    poNumber?: string | null;
-  };
+  } = parseResult.data;
+  // Proceed with update
 
   if (!items?.length) {
     return NextResponse.json({ error: "Pilih minimal 1 item" }, { status: 400 });
@@ -213,8 +201,9 @@ export async function PUT(
       const totalProductQty = productQtyMap.get(item.productId) ?? item.qty;
       const basePrice = await getApplicableTier(item.productId, totalProductQty);
       const totalPrice = (basePrice - discountPerUnit) * item.qty;
-      const hppPerUnit = 0;
-      const totalHpp = 0;
+      const packPerBatch = product?.packPerBatch || 1;
+      const hppPerUnit = await calculateProductHPP(item.productId, item.variantId, packPerBatch);
+      const totalHpp = hppPerUnit * item.qty;
       const margin = totalPrice - totalHpp;
 
       const itemData: Record<string, unknown> = {

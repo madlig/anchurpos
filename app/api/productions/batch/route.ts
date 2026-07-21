@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
+import { productionBatchSchema } from "@/lib/validations";
 
 interface BatchEntry {
   variantId: string;
@@ -17,13 +18,13 @@ export async function POST(req: NextRequest) {
   const user = auth as AuthUser;
 
   const body = await req.json();
-  const { entries, type, notes, crewId, customDate } = body as {
-    entries: BatchEntry[];
-    type?: "standard" | "tiktok";
-    notes?: string;
-    crewId?: string;
-    customDate?: string;
-  };
+  const parseResult = productionBatchSchema.safeParse(body);
+  
+  if (!parseResult.success) {
+    return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
+  }
+
+  const { entries, type, notes, crewId, customDate } = parseResult.data;
 
   if (!entries || entries.length === 0) {
     return NextResponse.json({ error: "Minimal 1 varian harus diisi" }, { status: 400 });

@@ -90,13 +90,13 @@ export default function CrewStockOpnamePage() {
             <h1 className="text-2xl font-extrabold tracking-tight text-slate-800">Stock Opname</h1>
             <p className="text-sm mt-1 text-slate-500">{filledCount}/{ingredients.length} bahan diisi</p>
           </div>
-          <div className="rounded-2xl px-3 py-1.5 bg-pink-50 border border-pink-100">
-            <span className="text-sm font-bold tabular-nums text-pink-600">{filledCount}/{ingredients.length}</span>
+          <div className="rounded-2xl px-3 py-1.5 bg-primary/10 border border-primary/20">
+            <span className="text-sm font-bold tabular-nums text-primary">{filledCount}/{ingredients.length}</span>
           </div>
         </div>
         {/* Progress bar */}
         <div className="h-1.5 rounded-full mt-4 overflow-hidden bg-slate-100">
-          <div className="h-full rounded-full transition-all bg-pink-500" style={{ width: `${ingredients.length > 0 ? (filledCount / ingredients.length) * 100 : 0}%` }} />
+          <div className="h-full rounded-full transition-all bg-primary" style={{ width: `${ingredients.length > 0 ? (filledCount / ingredients.length) * 100 : 0}%` }} />
         </div>
       </div>
 

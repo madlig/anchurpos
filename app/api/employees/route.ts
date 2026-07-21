@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
+import { employeeSchema } from "@/lib/validations";
 
 const EMAIL_DOMAIN = "anchur.internal";
 
@@ -40,15 +41,13 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const { name, username, password, role = "crew", phone = null, joinDate = null } = body as {
-    name: string; username: string; password: string;
-    role?: string; phone?: string | null; joinDate?: string | null;
-  };
+  const parseResult = employeeSchema.safeParse(body);
+  
+  if (!parseResult.success) {
+    return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
+  }
 
-  if (!name?.trim()) return NextResponse.json({ error: "Nama wajib diisi" }, { status: 400 });
-  if (!username?.trim()) return NextResponse.json({ error: "Username wajib diisi" }, { status: 400 });
-  if (!password || password.length < 6) return NextResponse.json({ error: "Password minimal 6 karakter" }, { status: 400 });
-  if (!["owner", "manager", "crew"].includes(role)) return NextResponse.json({ error: "Role tidak valid" }, { status: 400 });
+  const { name, username, password, role, phone, joinDate } = parseResult.data;
 
   const uname = username.toLowerCase().trim().replace(/[^a-z0-9_]/g, "");
   const email = `${uname}@${EMAIL_DOMAIN}`;

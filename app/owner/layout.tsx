@@ -57,7 +57,7 @@ function DesktopSidebar() {
           </div>
           <div className="min-w-0">
             <p className="text-xs font-semibold truncate" style={{ color: "#1C1C1E" }}>{user?.displayName ?? "Owner"}</p>
-            <p className="text-[11px]" style={{ color: "#E85D8C" }}>Owner</p>
+            <p className="text-xs" style={{ color: "#E85D8C" }}>Owner</p>
           </div>
         </div>
         <button
@@ -105,7 +105,7 @@ function MobileBottomNav() {
               >
                 <Icon size={18} strokeWidth={active ? 2.5 : 1.8} style={{ color: active ? "#E85D8C" : "#94A3B8" }} />
               </div>
-              <span className="text-[10px] font-semibold" style={{ color: active ? "#E85D8C" : "#94A3B8" }}>
+              <span className="text-xs font-semibold" style={{ color: active ? "#E85D8C" : "#94A3B8" }}>
                 {item.label}
               </span>
             </Link>

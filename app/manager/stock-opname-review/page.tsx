@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatNumber, formatDateTime } from "@/lib/formatters";
 import { Input } from "@/components/ui/input";
 import {
   Loader2,
@@ -153,17 +154,11 @@ export default function StockOpnameReviewPage() {
   }
 
   function formatDate(iso: string) {
-    return new Date(iso).toLocaleString("id-ID", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateTime(iso);
   }
 
-  function formatNumber(n: number, unit: string) {
-    return `${n.toLocaleString("id-ID")} ${unit}`;
+  function formatNum(n: number, unit: string) {
+    return `${formatNumber(n)} ${unit}`;
   }
 
   if (loading) {
@@ -228,12 +223,12 @@ export default function StockOpnameReviewPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {opname.hasDiscrepancy ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full flex items-center gap-1">
+                        <span className="text-xs font-bold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200/50 rounded-full flex items-center gap-1">
                           <AlertTriangle size={10} />
                           {discrepancyItems.length} selisih
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/50 rounded-full">
+                        <span className="text-xs font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/50 rounded-full">
                           ✓ Semua Sesuai
                         </span>
                       )}
@@ -250,13 +245,13 @@ export default function StockOpnameReviewPage() {
                       {/* Control Filter Toggle */}
                       {discrepancyItems.length > 0 && (
                         <div className="flex justify-between items-center mb-3">
-                          <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">
+                          <span className="text-xs font-bold text-stone-400 uppercase tracking-wide">
                             {showAll ? "Menampilkan Semua Bahan" : "Menampilkan Hanya Selisih"}
                           </span>
                           <button
                             type="button"
                             onClick={() => toggleShowAll(opname.id)}
-                            className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
+                            className="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
                           >
                             {showAll ? "Tampilkan Hanya Selisih" : "Tampilkan Semua Bahan"}
                           </button>
@@ -292,8 +287,8 @@ export default function StockOpnameReviewPage() {
                                   <p className="text-xs font-semibold text-stone-800">
                                     {ing?.name ?? item.ingredientId}
                                   </p>
-                                  <p className="text-[10px] text-stone-400 font-medium mt-0.5">
-                                    Sistem: {formatNumber(item.systemStock, unit)} | Fisik: {formatNumber(physical, unit)}
+                                  <p className="text-xs text-stone-400 font-medium mt-0.5">
+                                    Sistem: {formatNum(item.systemStock, unit)} | Fisik: {formatNum(physical, unit)}
                                   </p>
                                 </div>
                                 <div>
@@ -306,10 +301,10 @@ export default function StockOpnameReviewPage() {
                                       }`}
                                     >
                                       {item.difference > 0 ? "+" : ""}
-                                      {formatNumber(item.difference, unit)}
+                                      {formatNumber(item.difference)} {unit}
                                     </span>
                                   ) : (
-                                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50/60 border border-emerald-100 px-2 py-0.5 rounded-lg">
+                                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50/60 border border-emerald-100 px-2 py-0.5 rounded-lg">
                                       ✓ Sesuai
                                     </span>
                                   )}
@@ -329,7 +324,7 @@ export default function StockOpnameReviewPage() {
                                     }
                                     className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
                                   />
-                                  <span className="text-[10px] font-semibold text-stone-600">
+                                  <span className="text-xs font-semibold text-stone-600">
                                     Sesuaikan stok sistem ke angka fisik
                                   </span>
                                 </label>
@@ -401,7 +396,7 @@ export default function StockOpnameReviewPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span
-                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                        className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
                           opname.reviewAction === "adjusted"
                             ? "bg-blue-50 text-blue-700 border-blue-200/50"
                             : "bg-stone-100 text-stone-600 border-stone-200/50"
@@ -424,13 +419,13 @@ export default function StockOpnameReviewPage() {
                       {/* Control Filter Toggle */}
                       {discrepancyItems.length > 0 && (
                         <div className="flex justify-between items-center mb-3">
-                          <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">
+                          <span className="text-xs font-bold text-stone-400 uppercase tracking-wide">
                             {showAll ? "Menampilkan Semua Bahan" : "Menampilkan Hanya Selisih"}
                           </span>
                           <button
                             type="button"
                             onClick={() => toggleShowAll(opname.id)}
-                            className="text-[10px] font-bold text-stone-500 hover:text-stone-700 hover:underline"
+                            className="text-xs font-bold text-stone-500 hover:text-stone-700 hover:underline"
                           >
                             {showAll ? "Tampilkan Hanya Selisih" : "Tampilkan Semua Bahan"}
                           </button>
@@ -462,8 +457,8 @@ export default function StockOpnameReviewPage() {
                                   <p className="text-xs font-semibold text-stone-700">
                                     {ing?.name ?? item.ingredientId}
                                   </p>
-                                  <p className="text-[10px] text-stone-400 mt-0.5">
-                                    Sistem: {formatNumber(item.systemStock, unit)} | Fisik: {formatNumber(physical, unit)}
+                                  <p className="text-xs text-stone-400 mt-0.5">
+                                    Sistem: {formatNumber(item.systemStock)} {unit} | Fisik: {formatNumber(physical)} {unit}
                                   </p>
                                 </div>
                                 <div>
@@ -476,10 +471,10 @@ export default function StockOpnameReviewPage() {
                                       }`}
                                     >
                                       {item.difference > 0 ? "+" : ""}
-                                      {formatNumber(item.difference, unit)}
+                                      {formatNumber(item.difference)} {unit}
                                     </span>
                                   ) : (
-                                    <span className="text-[10px] font-bold text-stone-400 bg-stone-50 border border-stone-200/50 px-2 py-0.5 rounded-lg">
+                                    <span className="text-xs font-bold text-stone-400 bg-stone-50 border border-stone-200/50 px-2 py-0.5 rounded-lg">
                                       Sesuai
                                     </span>
                                   )}

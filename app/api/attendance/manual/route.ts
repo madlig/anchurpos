@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { verifyAuth } from "@/lib/auth-middleware";
+import { BUSINESS } from "@/lib/constants";
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,8 +48,8 @@ export async function POST(req: NextRequest) {
     // Simple rounding to 1 decimal place
     totalHours = Math.round(totalHours * 10) / 10;
     
-    const regularHours = Math.min(totalHours, 8);
-    const overtimeHours = Math.max(0, totalHours - 8);
+    const regularHours = Math.min(totalHours, BUSINESS.REGULAR_HOURS_PER_SHIFT);
+    const overtimeHours = Math.max(0, totalHours - BUSINESS.REGULAR_HOURS_PER_SHIFT);
 
     await adminDb.collection("attendance").doc(docId).set({
       employeeId,

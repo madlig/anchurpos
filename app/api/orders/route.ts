@@ -3,6 +3,8 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole, verifyAuth } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
+import { orderSchema } from "@/lib/validations";
+import { calculateProductHPP, getLatestIngredientCosts } from "@/lib/business-logic";
 
 export async function GET(req: NextRequest) {
   const auth = await requireRole(req, ["owner", "manager", "crew"]);
@@ -78,24 +80,6 @@ export async function GET(req: NextRequest) {
 }
 
 
-async function generateOrderNumber(customDate?: Date): Promise<string> {
-  const today = customDate || new Date();
-  const dateStr = today.toISOString().split("T")[0].replace(/-/g, "");
-  const prefix = `ORD-${dateStr}-`;
-
-  const snap = await adminDb
-    .collection("orders")
-    .where("orderNumber", ">=", prefix)
-    .where("orderNumber", "<=", prefix + "")
-    .orderBy("orderNumber", "desc")
-    .limit(1)
-    .get();
-
-  if (snap.empty) return `${prefix}0001`;
-  const last = snap.docs[0].data().orderNumber as string;
-  const seq = parseInt(last.split("-").pop()!) + 1;
-  return `${prefix}${String(seq).padStart(4, "0")}`;
-}
 
 async function getApplicableTier(productId: string, qty: number): Promise<number> {
   const tiersSnap = await adminDb
@@ -124,6 +108,12 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
+
+  const parseResult = orderSchema.safeParse(body);
+  if (!parseResult.success) {
+    return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
+  }
+
   const {
     customerId,
     customerName: directCustomerName,
@@ -138,34 +128,17 @@ export async function POST(req: NextRequest) {
     orderNotes,
     platformFeePercent: inputFeePercent,
     platformFee: inputFeeAmount,
-    customDate,
-    shippingCost,
-    shippingBorneBy,
-    deliveryMethod,
-    sauceDistribution,
-    poNumber,
-  } = body as {
-    customerId?: string;
-    customerName?: string;
-    customerType?: string;
-    source: string;
-    orderChannel?: string;
-    items: { productId: string; variantId: string; qty: number; sauceId?: string; sauceName?: string }[];
-    paymentMethod?: string;
-    paymentStatus?: string;
-    shippingAddress?: string;
-    requestedDeliveryDate?: string;
-    orderNotes?: string;
-    platformFeePercent?: number;
-    platformFee?: number;
-    customDate?: string;
-    shippingCost?: number;
-    shippingBorneBy?: "seller" | "customer";
-    deliveryMethod?: "pickup" | "self_delivery" | "courier";
-    sauceDistribution?: Record<string, number>;
-    poNumber?: string | null;
-  };
-
+    shippingCost: inputShippingCost,
+  } = parseResult.data;
+  
+  // customDate isn't in schema since it's a server override, extract from body manually
+  const customDate = body.customDate;
+  
+  // Extra fields not in zod validation (we need to add them to Zod or extract them)
+  const shippingBorneBy = body.shippingBorneBy;
+  const deliveryMethod = body.deliveryMethod;
+  const sauceDistribution = body.sauceDistribution;
+  const poNumber = body.poNumber;
 
   if (!items?.length) {
     return NextResponse.json({ error: "Pilih minimal 1 item" }, { status: 400 });
@@ -201,7 +174,6 @@ export async function POST(req: NextRequest) {
 
     const dateToUse = customDate ? new Date(customDate) : new Date();
     // Maintain correct timezone date prefix
-    const orderNumber = await generateOrderNumber(dateToUse);
     const orderRef = adminDb.collection("orders").doc();
     let needsProduction = false;
     let hasRainbow = false;
@@ -227,8 +199,10 @@ export async function POST(req: NextRequest) {
       const totalProductQty = productQtyMap.get(item.productId) ?? item.qty;
       const basePrice = await getApplicableTier(item.productId, totalProductQty);
       const totalPrice = (basePrice - discountPerUnit) * item.qty;
-      const hppPerUnit = 0;
-      const totalHpp = 0;
+      
+      const packPerBatch = product?.packPerBatch || 1;
+      const hppPerUnit = await calculateProductHPP(item.productId, item.variantId, packPerBatch);
+      const totalHpp = hppPerUnit * item.qty;
       const margin = totalPrice - totalHpp;
 
       const itemData: Record<string, unknown> = {
@@ -255,12 +229,32 @@ export async function POST(req: NextRequest) {
       processedItems.push(itemData);
     }
 
+    let orderNumber = "";
+
     await adminDb.runTransaction(async (tx) => {
       // Determine order channel
       const finalOrderChannel = orderChannel ?? "walkin";
       const isImmediate = ["walkin", "tiktok", "shopee"].includes(finalOrderChannel);
 
       // --- ALL READS MUST HAPPEN BEFORE ANY WRITES ---
+      
+      // 0. Generate Order Number
+      const dateStr = dateToUse.toISOString().split("T")[0].replace(/-/g, "");
+      const prefix = `ORD-${dateStr}-`;
+      const snap = await tx.get(
+        adminDb.collection("orders")
+          .where("orderNumber", ">=", prefix)
+          .where("orderNumber", "<=", prefix + "\uffff")
+          .orderBy("orderNumber", "desc")
+          .limit(1)
+      );
+      if (snap.empty) {
+        orderNumber = `${prefix}0001`;
+      } else {
+        const last = snap.docs[0].data().orderNumber as string;
+        const seq = parseInt(last.split("-").pop()!) + 1;
+        orderNumber = `${prefix}${String(seq).padStart(4, "0")}`;
+      }
       
       // 1. Read Add-ons for sauce distribution
       const addOnSnaps: Record<string, FirebaseFirestore.DocumentSnapshot> = {};
@@ -290,10 +284,11 @@ export async function POST(req: NextRequest) {
 
       // Calculate platform fee & net revenue
       const totalOrderValue = processedItems.reduce((sum, item) => sum + ((item.totalPrice as number) ?? 0), 0);
+      const totalOrderHpp = processedItems.reduce((sum, item) => sum + ((item.totalHpp as number) ?? 0), 0);
       const finalFeePercent = inputFeePercent ?? 0;
       const finalFeeAmount = inputFeeAmount ?? (totalOrderValue * finalFeePercent / 100);
       // Net revenue includes shipping if borne by customer
-      const netRevenue = (totalOrderValue - finalFeeAmount) + (shippingBorneBy === "customer" ? (shippingCost ?? 0) : 0);
+      const netRevenue = (totalOrderValue - finalFeeAmount) + (shippingBorneBy === "customer" ? (inputShippingCost ?? 0) : 0);
 
       tx.set(orderRef, {
         orderNumber,
@@ -309,6 +304,8 @@ export async function POST(req: NextRequest) {
         paymentMethod: paymentMethod ?? null,
         platformFeePercent: finalFeePercent,
         platformFee: finalFeeAmount,
+        totalOrderValue,
+        totalHpp: totalOrderHpp,
         netRevenue,
         needsProduction,
         createdBy: (user as AuthUser | null)?.uid ?? null,
@@ -318,7 +315,7 @@ export async function POST(req: NextRequest) {
         requestedDeliveryDate: requestedDeliveryDate ?? null,
         orderNotes: orderNotes ?? null,
         proofOfTransferUrl: null,
-        shippingCost: shippingCost ?? null,
+        shippingCost: inputShippingCost ?? null,
         shippingBorneBy: shippingBorneBy ?? null,
         deliveryMethod: deliveryMethod ?? null,
         shippingCostConfirmed: true,
@@ -359,7 +356,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Jika ongkir ditanggung penjual, otomatis catat sebagai pengeluaran (expense)
-      if (finalOrderChannel === "whatsapp" && (shippingCost ?? 0) > 0 && shippingBorneBy === "seller") {
+      if (finalOrderChannel === "whatsapp" && (inputShippingCost ?? 0) > 0 && shippingBorneBy === "seller") {
         const expenseRef = adminDb.collection("expenses").doc();
         tx.set(expenseRef, {
           date: dateToUse,
@@ -369,8 +366,8 @@ export async function POST(req: NextRequest) {
           qtyPurchased: 1,
           purchaseUnit: "kali",
           qtyInBaseUnit: 1,
-          totalPrice: shippingCost,
-          pricePerBaseUnit: shippingCost,
+          totalPrice: inputShippingCost,
+          pricePerBaseUnit: inputShippingCost,
           paymentMethod: "transfer",
           supplier: "Ekspedisi / Kurir",
           notes: `Ditanggung penjual untuk order #${orderNumber}`,
@@ -401,6 +398,11 @@ export async function POST(req: NextRequest) {
           const stockSnap = stockSnaps[stockId];
           const currStock = stockSnap && stockSnap.exists ? (stockSnap.data()?.currentStock ?? 0) : 0;
           const nextStock = currStock - changeQty;
+
+          if (nextStock < 0) {
+            const [prodId, varId] = [stockId.split("_")[0], stockId.split("_").slice(1).join("_")];
+            throw new Error(`Stok ${prodId} varian ${varId} tidak mencukupi (tersedia: ${currStock}, diminta: ${changeQty})`);
+          }
 
           tx.set(stockRef, {
             productId: stockId.split("_")[0],

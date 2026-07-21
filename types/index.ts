@@ -164,6 +164,7 @@ export interface Expense {
 export interface Production {
   id: string;
   date: string;
+  type?: "standard" | "tiktok";
   variantId: string;
   batches: number;
   loyangCount: number;

@@ -162,8 +162,8 @@ export default function CrewPrePackingPage() {
       <div className="px-5 pt-6 pb-6 mb-2 rounded-b-3xl sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl flex items-center justify-center bg-pink-50 border border-pink-100">
-              <PackageOpen size={20} className="text-pink-500" />
+            <div className="h-10 w-10 rounded-2xl flex items-center justify-center bg-primary/10 border border-primary/20">
+              <PackageOpen size={20} className="text-primary" />
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight text-slate-800" style={{ letterSpacing: "-0.02em" }}>
               {enableCustomDate && customDate ? `Pre-Packing: ${customDate}` : "Pre-Packing"}
@@ -251,13 +251,13 @@ export default function CrewPrePackingPage() {
                     <p className="text-xs font-bold uppercase tracking-widest mt-1" style={{ color: "#64748B" }}>loyang siap di-pack</p>
                     {bufferPcs > 0 && (
                       <div className="mt-3 text-xs font-bold px-3 py-1.5 rounded-xl inline-flex items-center gap-2" style={{ background: "#FEF1F5", color: "#E85D8C", border: "1px solid rgba(232,93,140,0.2)" }}>
-                        <span className="w-2 h-2 rounded-full bg-pink-500 animate-pulse"></span>
+                        <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
                         Stok buffer: {bufferPcs} pcs (akan dipakai)
                       </div>
                     )}
                   </div>
                   {pool.length > 0 && (
-                    <button onClick={() => setShowDetail(!showDetail)} className="flex flex-col items-center gap-1 text-[10px] uppercase tracking-widest font-bold tap-target px-3 py-2 rounded-xl" style={{ color: "#E85D8C", background: "#FEF1F5" }}>
+                    <button onClick={() => setShowDetail(!showDetail)} className="flex flex-col items-center gap-1 text-xs uppercase tracking-widest font-bold tap-target px-3 py-2 rounded-xl" style={{ color: "#E85D8C", background: "#FEF1F5" }}>
                       {showDetail ? "Tutup" : "Rincian"}
                       {showDetail ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
@@ -268,7 +268,7 @@ export default function CrewPrePackingPage() {
                     {pool.map((p) => (
                       <div key={p.productionId} className="flex justify-between text-sm items-center">
                         <span className="font-semibold text-slate-500">{new Date(p.date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</span>
-                        <span className="font-black text-pink-700 bg-pink-50 px-3 py-1 rounded-lg">{p.loyangRemaining} loyang</span>
+                        <span className="font-black text-pink-700 bg-primary/10 px-3 py-1 rounded-lg">{p.loyangRemaining} loyang</span>
                       </div>
                     ))}
                   </div>
@@ -284,7 +284,7 @@ export default function CrewPrePackingPage() {
                         <Minus size={18} strokeWidth={3} />
                       </button>
                       <Input type="number" min="0" step="0.5" value={loyangUsed} onChange={(e) => setLoyangUsed(e.target.value)} className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0 text-pink-900" />
-                      <button type="button" onClick={() => stepVal(setLoyangUsed, loyangUsed, 0.5, totalAvailable)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-pink-500 shadow-sm">
+                      <button type="button" onClick={() => stepVal(setLoyangUsed, loyangUsed, 0.5, totalAvailable)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-primary shadow-sm">
                         <Plus size={18} strokeWidth={3} />
                       </button>
                     </div>
@@ -299,7 +299,7 @@ export default function CrewPrePackingPage() {
                             <Minus size={18} strokeWidth={3} />
                           </button>
                           <Input type="number" min="0" step="1" value={resultRegularPacks} onChange={(e) => setResultRegularPacks(e.target.value)} className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0 text-pink-900" />
-                          <button type="button" onClick={() => stepVal(setResultRegularPacks, resultRegularPacks, 1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-pink-500 shadow-sm">
+                          <button type="button" onClick={() => stepVal(setResultRegularPacks, resultRegularPacks, 1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-primary shadow-sm">
                             <Plus size={18} strokeWidth={3} />
                           </button>
                         </div>
@@ -311,7 +311,7 @@ export default function CrewPrePackingPage() {
                             <Minus size={18} strokeWidth={3} />
                           </button>
                           <Input type="number" min="0" step="1" value={resultFullPacks} onChange={(e) => setResultFullPacks(e.target.value)} className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0 text-pink-900" />
-                          <button type="button" onClick={() => stepVal(setResultFullPacks, resultFullPacks, 1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-pink-500 shadow-sm">
+                          <button type="button" onClick={() => stepVal(setResultFullPacks, resultFullPacks, 1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-primary shadow-sm">
                             <Plus size={18} strokeWidth={3} />
                           </button>
                         </div>
@@ -325,7 +325,7 @@ export default function CrewPrePackingPage() {
                           <Minus size={18} strokeWidth={3} />
                         </button>
                         <Input type="number" min="0" step="1" value={resultTikTokPacks} onChange={(e) => setResultTikTokPacks(e.target.value)} className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0 text-pink-900" />
-                        <button type="button" onClick={() => stepVal(setResultTikTokPacks, resultTikTokPacks, 1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-pink-500 shadow-sm">
+                        <button type="button" onClick={() => stepVal(setResultTikTokPacks, resultTikTokPacks, 1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-primary shadow-sm">
                           <Plus size={18} strokeWidth={3} />
                         </button>
                       </div>
@@ -339,7 +339,7 @@ export default function CrewPrePackingPage() {
                         <Minus size={18} strokeWidth={3} />
                       </button>
                       <Input type="number" min="0" step="1" value={leftoverPcs} onChange={(e) => setLeftoverPcs(e.target.value)} className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 h-12 p-0 text-pink-900" />
-                      <button type="button" onClick={() => stepVal(setLeftoverPcs, leftoverPcs, 1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-pink-500 shadow-sm">
+                      <button type="button" onClick={() => stepVal(setLeftoverPcs, leftoverPcs, 1)} className="h-12 w-12 rounded-xl flex items-center justify-center tap-target text-white transition-all active:scale-95 bg-primary shadow-sm">
                         <Plus size={18} strokeWidth={3} />
                       </button>
                     </div>

@@ -29,14 +29,14 @@ export function BottomNav() {
                 )}>
                   <Icon size={26} className="text-white" />
                 </div>
-                <span className="mt-1 text-[10px] font-semibold text-emerald-700">{label}</span>
+                <span className="mt-1 text-xs font-semibold text-emerald-700">{label}</span>
               </Link>
             );
           }
           return (
             <Link key={href} href={href} className="flex flex-col items-center gap-1 py-1 px-3">
               <Icon size={22} className={active ? "text-emerald-600" : "text-stone-400"} />
-              <span className={cn("text-[10px] font-medium", active ? "text-emerald-700" : "text-stone-500")}>
+              <span className={cn("text-xs font-medium", active ? "text-emerald-700" : "text-stone-500")}>
                 {label}
               </span>
             </Link>

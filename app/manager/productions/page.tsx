@@ -99,7 +99,7 @@ export default function ManagerProductionsPage() {
               } catch (e) {}
             }}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 rounded-xl text-sm font-bold bg-slate-50 border-0 focus:ring-2 focus:ring-pink-500 transition-all text-slate-700"
+            className="w-full pl-12 pr-4 py-3 rounded-xl text-sm font-bold bg-brand-50 border-0 focus:ring-2 focus:ring-primary transition-all text-slate-700"
           />
         </div>
       </div>
@@ -111,7 +111,7 @@ export default function ManagerProductionsPage() {
             onClick={() => setActiveTab("produksi")}
             className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 tap-target ${
               activeTab === "produksi"
-                ? "bg-white text-pink-600 shadow-sm"
+                ? "bg-white text-primary shadow-sm"
                 : "text-slate-500 hover:text-slate-700"
             }`}
           >
@@ -122,7 +122,7 @@ export default function ManagerProductionsPage() {
             onClick={() => setActiveTab("prepacking")}
             className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 tap-target ${
               activeTab === "prepacking"
-                ? "bg-white text-pink-600 shadow-sm"
+                ? "bg-white text-primary shadow-sm"
                 : "text-slate-500 hover:text-slate-700"
             }`}
           >
@@ -133,7 +133,7 @@ export default function ManagerProductionsPage() {
             onClick={() => setActiveTab("histori")}
             className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 tap-target ${
               activeTab === "histori"
-                ? "bg-white text-pink-600 shadow-sm"
+                ? "bg-white text-primary shadow-sm"
                 : "text-slate-500 hover:text-slate-700"
             }`}
           >
@@ -144,7 +144,7 @@ export default function ManagerProductionsPage() {
 
         {loading && activeTab !== "histori" ? (
           <div className="flex justify-center py-10">
-            <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : activeTab === "histori" ? (
           <div className="space-y-4">
@@ -153,7 +153,7 @@ export default function ManagerProductionsPage() {
               <select
                 value={selectedHistoryVariantId}
                 onChange={(e) => setSelectedHistoryVariantId(e.target.value)}
-                className="w-full bg-slate-50 border-0 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-pink-500 outline-none"
+                className="w-full bg-brand-50 border-0 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-primary outline-none"
               >
                 <option value="">-- Pilih --</option>
                 {Object.values(variants).map(v => (
@@ -164,7 +164,7 @@ export default function ManagerProductionsPage() {
 
             {loadingHistory ? (
               <div className="flex justify-center py-10">
-                <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : historyItems.length === 0 ? (
               <div className="text-center py-10 bg-white rounded-3xl border border-dashed border-slate-200">
@@ -187,19 +187,19 @@ export default function ManagerProductionsPage() {
                           <p className="text-lg font-black text-slate-800">{variant?.name || p.variantId}</p>
                         </div>
                         <div className="text-right">
-                          <span className="text-[10px] font-bold text-pink-600 bg-pink-50 px-2 py-1 rounded-lg uppercase tracking-wider">
+                          <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-lg uppercase tracking-wider">
                             {new Date(p.createdAt).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                       </div>
-                      <div className="bg-slate-50 rounded-2xl p-4 flex gap-4 border border-slate-100/50">
+                      <div className="bg-brand-50 rounded-2xl p-4 flex gap-4 border border-slate-100/50">
                         <div className="flex-1">
-                          <p className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">Jml Batch</p>
+                          <p className="text-xs font-black text-slate-400 mb-1 uppercase tracking-widest">Jml Batch</p>
                           <p className="text-xl font-black text-slate-700 tracking-tight">{p.batches}</p>
                         </div>
                         <div className="w-px bg-slate-200"></div>
                         <div className="flex-1">
-                          <p className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">Total Loyang</p>
+                          <p className="text-xs font-black text-slate-400 mb-1 uppercase tracking-widest">Total Loyang</p>
                           <p className="text-xl font-black text-slate-700 tracking-tight">{p.loyangCount}</p>
                         </div>
                       </div>
@@ -229,19 +229,19 @@ export default function ManagerProductionsPage() {
                         <p className="text-lg font-black text-slate-800">{variant?.name || p.variantId}</p>
                       </div>
                       <div className="text-right">
-                        <span className="text-[10px] font-bold text-pink-600 bg-pink-50 px-2 py-1 rounded-lg uppercase tracking-wider">
+                        <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-lg uppercase tracking-wider">
                           {new Date(p.createdAt).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-slate-50 rounded-2xl p-4">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Jml Loyang</p>
+                      <div className="bg-brand-50 rounded-2xl p-4">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Jml Loyang</p>
                         <p className="text-2xl font-black text-slate-700">{p.loyangCount}</p>
                       </div>
-                      <div className="bg-pink-50 rounded-2xl p-4">
-                        <p className="text-[10px] font-bold text-pink-500 uppercase tracking-widest mb-1">Total Pcs</p>
+                      <div className="bg-primary/10 rounded-2xl p-4">
+                        <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">Total Pcs</p>
                         <p className="text-2xl font-black text-pink-700">{p.pcsCount || 0}</p>
                       </div>
                     </div>
@@ -270,14 +270,14 @@ export default function ManagerProductionsPage() {
                         <p className="text-lg font-black text-slate-800">{variant?.name || pack.variantId}</p>
                       </div>
                       <div className="text-right">
-                        <span className="text-[10px] font-bold text-pink-600 bg-pink-50 px-2 py-1 rounded-lg uppercase tracking-wider">
+                        <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-lg uppercase tracking-wider">
                           {new Date(pack.createdAt).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                     </div>
 
-                    <div className="bg-slate-50 rounded-2xl p-3 flex justify-between items-center px-4">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Loyang Dipakai</span>
+                    <div className="bg-brand-50 rounded-2xl p-3 flex justify-between items-center px-4">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Loyang Dipakai</span>
                       <span className="text-base font-black text-slate-700">{pack.totalLoyangUsed}</span>
                     </div>
 
@@ -285,17 +285,17 @@ export default function ManagerProductionsPage() {
                       {!pack.variantId.toLowerCase().includes("tiktok") ? (
                         <>
                           <div className="border border-slate-100 rounded-2xl p-3 text-center">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pack Reg (12)</p>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Pack Reg (12)</p>
                             <p className="text-xl font-black text-slate-700">{pack.resultRegularPacks || 0}</p>
                           </div>
                           <div className="border border-slate-100 rounded-2xl p-3 text-center">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pack Full (16)</p>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Pack Full (16)</p>
                             <p className="text-xl font-black text-slate-700">{pack.resultFullPacks || 0}</p>
                           </div>
                         </>
                       ) : (
                         <div className="col-span-2 border border-slate-100 rounded-2xl p-3 text-center">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pack TikTok (12)</p>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Pack TikTok (12)</p>
                           <p className="text-xl font-black text-slate-700">{pack.resultRegularPacks || 0}</p>
                         </div>
                       )}

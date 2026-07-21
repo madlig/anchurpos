@@ -167,26 +167,26 @@ export default function CrewDashboard() {
       {/* ── Absensi Widget (Embed di Home) ── */}
       <Card className="p-4 rounded-3xl border-none shadow-sm space-y-4 bg-white">
         <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
-          <UserCheck className="h-4 w-4 text-pink-500" />
+          <UserCheck className="h-4 w-4 text-primary" />
           <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Presensi Harian Crew</h3>
         </div>
 
         {loadingStatus ? (
           <div className="flex justify-center py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-pink-500" />
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
           </div>
         ) : (
           <div className="space-y-3.5">
             {/* Check-In / Check-Out Timestamps */}
             <div className="grid grid-cols-2 gap-2 text-xxs font-semibold text-slate-500">
-              <div className="p-3 bg-slate-50/50 border border-slate-100 rounded-2xl flex flex-col items-center">
-                <span className="text-[9px] uppercase tracking-wider text-slate-400">Masuk</span>
+              <div className="p-3 bg-brand-50/50 border border-slate-100 rounded-2xl flex flex-col items-center">
+                <span className="text-xs uppercase tracking-wider text-slate-400">Masuk</span>
                 <span className="font-bold text-slate-700 text-xs mt-1">
                   {checkInTime ? new Date(checkInTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "—"}
                 </span>
               </div>
-              <div className="p-3 bg-slate-50/50 border border-slate-100 rounded-2xl flex flex-col items-center">
-                <span className="text-[9px] uppercase tracking-wider text-slate-400">Pulang</span>
+              <div className="p-3 bg-brand-50/50 border border-slate-100 rounded-2xl flex flex-col items-center">
+                <span className="text-xs uppercase tracking-wider text-slate-400">Pulang</span>
                 <span className="font-bold text-slate-700 text-xs mt-1">
                   {checkOutTime ? new Date(checkOutTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "—"}
                 </span>
@@ -198,7 +198,7 @@ export default function CrewDashboard() {
               <button
                 onClick={handleCheckIn}
                 disabled={actionLoading}
-                className="w-full h-11 flex items-center justify-center gap-2 bg-pink-500 hover:bg-pink-600 text-white rounded-2xl font-bold text-xs active:scale-[0.98] transition-all disabled:opacity-50"
+                className="w-full h-11 flex items-center justify-center gap-2 bg-primary hover:bg-primary text-white rounded-2xl font-bold text-xs active:scale-[0.98] transition-all disabled:opacity-50"
               >
                 {actionLoading ? <Loader2 className="animate-spin" size={14} /> : <Clock size={14} />}
                 Mulai Kerja (Check-In)
@@ -220,7 +220,7 @@ export default function CrewDashboard() {
 
             {/* Review warning */}
             {hasCheckedIn && needsReview && (
-              <p className="text-[10px] text-amber-600 font-semibold text-center mt-1">
+              <p className="text-xs text-amber-600 font-semibold text-center mt-1">
                 ⚠️ Absen masuk menunggu review manager (Di luar IP Toko).
               </p>
             )}
@@ -238,14 +238,14 @@ export default function CrewDashboard() {
               <Card 
                 key={idx}
                 onClick={() => router.push(item.href)}
-                className="p-4 rounded-3xl border-none shadow-sm bg-white cursor-pointer active:scale-[0.97] transition-all flex flex-col justify-between hover:bg-slate-50 min-h-[110px]"
+                className="p-4 rounded-3xl border-none shadow-sm bg-white cursor-pointer active:scale-[0.97] transition-all flex flex-col justify-between hover:bg-brand-50 min-h-[110px]"
               >
                 <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: item.bg, color: item.text }}>
                   <Icon size={16} />
                 </div>
                 <div className="mt-4">
                   <h4 className="text-xs font-bold text-slate-800">{item.label}</h4>
-                  <p className="text-[9px] text-slate-400 font-semibold leading-tight mt-0.5">{item.desc}</p>
+                  <p className="text-xs text-slate-400 font-semibold leading-tight mt-0.5">{item.desc}</p>
                 </div>
               </Card>
             );

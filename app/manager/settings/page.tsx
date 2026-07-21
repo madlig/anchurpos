@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatDateTime } from "@/lib/formatters";
 import { Input } from "@/components/ui/input";
 import {
   Loader2,
@@ -209,7 +210,7 @@ export default function ManagerSettingsPage() {
                 {config.lastDetectedIp}
                 {config.lastDetectedAt && (
                   <span className="text-amber-500 ml-1">
-                    ({new Date(config.lastDetectedAt).toLocaleString("id-ID")})
+                    ({formatDateTime(config.lastDetectedAt)})
                   </span>
                 )}
               </p>
@@ -343,7 +344,7 @@ export default function ManagerSettingsPage() {
       <Card className="p-5 space-y-4">
         <div className="flex items-center gap-2">
           <div style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Tag size={16} className="text-pink-500" />
+            <Tag size={16} className="text-primary" />
           </div>
           <div>
             <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>Fee Platform Marketplace</p>

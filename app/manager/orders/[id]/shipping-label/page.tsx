@@ -73,7 +73,7 @@ export default function ShippingLabelPage() {
       <div className="print:hidden p-4 bg-slate-100 flex justify-end gap-3 sticky top-0 border-b border-slate-200">
         <button 
           onClick={() => window.close()}
-          className="px-4 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 text-sm font-bold hover:bg-slate-50"
+          className="px-4 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 text-sm font-bold hover:bg-brand-50"
         >
           Tutup
         </button>
@@ -94,20 +94,20 @@ export default function ShippingLabelPage() {
           <div className="flex justify-between items-start mb-4 border-b-2 border-black pb-4">
             <div>
               <h1 className="text-2xl font-black tracking-tighter uppercase">ANCHUR.US</h1>
-              <p className="text-[10px] font-bold mt-1 max-w-[150px]">Jl. Cempaka Putih Raya No. 123, Jakarta Pusat</p>
+              <p className="text-xs font-bold mt-1 max-w-[150px]">Jl. Cempaka Putih Raya No. 123, Jakarta Pusat</p>
             </div>
             <div className="text-right">
               <div className="inline-block border-2 border-black px-2 py-1 mb-1">
                 <p className="text-sm font-black uppercase">{channelLabel}</p>
               </div>
               <p className="text-xs font-bold">#{order.orderNumber.split("-").pop()}</p>
-              <p className="text-[10px] mt-1">{new Date(order.createdAt).toLocaleDateString('id-ID')}</p>
+              <p className="text-xs mt-1">{new Date(order.createdAt).toLocaleDateString('id-ID')}</p>
             </div>
           </div>
 
           {/* Penerima */}
           <div className="mb-4">
-            <h2 className="text-[10px] font-black uppercase tracking-widest mb-1 border-b border-dashed border-black/30 inline-block pb-1">PENERIMA</h2>
+            <h2 className="text-xs font-black uppercase tracking-widest mb-1 border-b border-dashed border-black/30 inline-block pb-1">PENERIMA</h2>
             <p className="text-lg font-black leading-tight mt-1">{order.customerName}</p>
             {order.customerPhone && <p className="text-sm font-bold mt-1 font-mono">{order.customerPhone}</p>}
             <p className="text-xs mt-2 leading-snug break-words">
@@ -117,9 +117,9 @@ export default function ShippingLabelPage() {
 
           {/* Pengirim */}
           <div className="mb-4 border-t-2 border-black pt-4">
-             <h2 className="text-[10px] font-black uppercase tracking-widest mb-1 border-b border-dashed border-black/30 inline-block pb-1">PENGIRIM</h2>
+             <h2 className="text-xs font-black uppercase tracking-widest mb-1 border-b border-dashed border-black/30 inline-block pb-1">PENGIRIM</h2>
              <p className="text-sm font-black mt-1">Anchur.us Admin</p>
-             <p className="text-[10px] mt-0.5">0812-3456-7890</p>
+             <p className="text-xs mt-0.5">0812-3456-7890</p>
           </div>
 
           {/* Fragile warning */}
@@ -127,7 +127,7 @@ export default function ShippingLabelPage() {
             <AlertTriangle size={24} />
             <div className="text-center">
               <p className="text-sm font-black uppercase tracking-widest">FRAGILE - JANGAN DIBANTING</p>
-              <p className="text-[10px] font-bold uppercase">Berisi Kue Kering & Dessert</p>
+              <p className="text-xs font-bold uppercase">Berisi Kue Kering & Dessert</p>
             </div>
             <AlertTriangle size={24} />
           </div>
@@ -153,7 +153,7 @@ export default function ShippingLabelPage() {
                   <td className="py-2 align-top font-black text-sm">{item.qty}x</td>
                   <td className="py-2">
                     <p className="font-bold leading-tight">{item.productName}</p>
-                    <p className="text-[10px] text-gray-600 mt-0.5">{item.variantName}</p>
+                    <p className="text-xs text-gray-600 mt-0.5">{item.variantName}</p>
                   </td>
                 </tr>
               ))}
@@ -162,7 +162,7 @@ export default function ShippingLabelPage() {
 
           {order.orderNotes && (
             <div className="mt-3 pt-3 border-t-2 border-black">
-              <p className="text-[10px] font-black uppercase">Catatan Pembeli:</p>
+              <p className="text-xs font-black uppercase">Catatan Pembeli:</p>
               <p className="text-xs italic mt-1 font-bold">"{order.orderNotes}"</p>
             </div>
           )}

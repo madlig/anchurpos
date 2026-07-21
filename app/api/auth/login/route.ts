@@ -3,8 +3,26 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
 const EMAIL_DOMAIN = "anchur.internal";
 
+// Simple in-memory rate limiter (resets on server restart, good enough for basic protection)
+const rateLimitMap = new Map<string, { count: number; expiresAt: number }>();
+const MAX_ATTEMPTS = 5;
+const WINDOW_MS = 60 * 1000; // 1 minute
+
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+    const now = Date.now();
+    const rateLimit = rateLimitMap.get(ip);
+    
+    if (rateLimit && now < rateLimit.expiresAt) {
+      if (rateLimit.count >= MAX_ATTEMPTS) {
+        return NextResponse.json({ error: "Terlalu banyak percobaan login. Coba lagi dalam 1 menit." }, { status: 429 });
+      }
+      rateLimitMap.set(ip, { count: rateLimit.count + 1, expiresAt: rateLimit.expiresAt });
+    } else {
+      rateLimitMap.set(ip, { count: 1, expiresAt: now + WINDOW_MS });
+    }
+
     const { username, password } = await req.json();
     if (!username || !password) {
       return NextResponse.json(

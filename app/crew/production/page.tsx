@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
-import { Loader2, Check, Minus, Plus, ChefHat } from "lucide-react";
+import { Loader2, Check, Minus, Plus, ChefHat, History, X, Calendar } from "lucide-react";
 import type { Variant, Production } from "@/types";
 
 interface EntryInput {
@@ -32,6 +32,11 @@ export default function CrewProductionPage() {
   const [enableCustomDate, setEnableCustomDate] = useState(false);
   const [customDate, setCustomDate] = useState("");
 
+  // History states
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyVariantId, setHistoryVariantId] = useState("");
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyData, setHistoryData] = useState<Production[]>([]);
 
   const fetchWithAuth = useCallback(
     async (url: string, options?: RequestInit) => {
@@ -69,6 +74,29 @@ export default function CrewProductionPage() {
   }, [fetchWithAuth, activeTab, enableCustomDate, customDate]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  const loadHistory = useCallback(async (vId: string) => {
+    if (!vId) return;
+    setHistoryLoading(true);
+    try {
+      const res = await fetchWithAuth(`/api/productions?variantId=${vId}`);
+      if (res.ok) {
+        setHistoryData(await res.json());
+      } else {
+        setHistoryData([]);
+      }
+    } catch {
+      setHistoryData([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [fetchWithAuth]);
+
+  useEffect(() => {
+    if (showHistory && historyVariantId) {
+      loadHistory(historyVariantId);
+    }
+  }, [showHistory, historyVariantId, loadHistory]);
 
   // Draft loading and saving
   useEffect(() => {
@@ -212,7 +240,7 @@ export default function CrewProductionPage() {
             <h1 className="text-2xl font-extrabold tracking-tight text-slate-800" style={{ letterSpacing: "-0.02em" }}>
               {enableCustomDate && customDate ? `Produksi: ${customDate}` : "Produksi Hari Ini"}
             </h1>
-            <p className="text-[13px] text-slate-500 mt-1 font-medium">
+            <p className="text-sm text-slate-500 mt-1 font-medium">
               {todayProductions.length} item produksi tercatat
             </p>
           </div>
@@ -239,9 +267,85 @@ export default function CrewProductionPage() {
                 className="text-xs border border-white/30 bg-white/20 text-white rounded-lg px-2 py-1 outline-none"
               />
             )}
+            <button
+              onClick={() => setShowHistory(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/30 hover:bg-white/40 text-pink-900 transition-colors"
+            >
+              <History size={14} /> Riwayat
+            </button>
           </div>
         </div>
       </div>
+
+      {/* History Modal */}
+      {showHistory && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowHistory(false)} />
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-100 flex flex-col max-h-[85vh] overflow-hidden slide-up">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-brand-50">
+              <div>
+                <h2 className="text-base font-extrabold text-slate-800">Riwayat Produksi</h2>
+                <p className="text-xs font-bold text-slate-500 mt-0.5">Cek kapan produk terakhir dibuat</p>
+              </div>
+              <button onClick={() => setShowHistory(false)} className="p-2 bg-white rounded-xl text-slate-400 hover:text-slate-600 shadow-sm transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="p-4 border-b border-slate-100">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Pilih Produk</label>
+              <select
+                value={historyVariantId}
+                onChange={(e) => setHistoryVariantId(e.target.value)}
+                className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="">-- Pilih Produk --</option>
+                {variants.map(v => (
+                  <option key={v.id} value={v.id}>{v.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 bg-brand-50/50">
+              {!historyVariantId ? (
+                <div className="text-center py-10">
+                  <History size={32} className="mx-auto text-slate-200 mb-3" />
+                  <p className="text-sm font-bold text-slate-400">Pilih produk di atas untuk melihat riwayat</p>
+                </div>
+              ) : historyLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : historyData.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-sm font-bold text-slate-400">Belum ada riwayat produksi</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {historyData.map(prod => (
+                    <div key={prod.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
+                      <div>
+                        <p className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                          <Calendar size={14} className="text-primary" />
+                          {new Date(prod.date).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                        </p>
+                        <p className="text-xs font-bold text-slate-400 mt-1">
+                          {prod.loyangCount} loyang • {prod.pcsCount} pcs
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="px-2 py-1 rounded-lg text-xs font-black uppercase tracking-widest bg-primary/10 text-primary">
+                          {prod.type}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sub-tabs Selector */}
       <div className="px-4 mb-6 mt-4 md:px-8 md:max-w-3xl">
@@ -337,6 +441,28 @@ export default function CrewProductionPage() {
             Tambah Produksi ({activeTab === "standard" ? "Standar" : "TikTok"})
           </p>
         </div>
+
+        {(role === "owner" || role === "manager") && (
+          <div className="mb-6 p-4 rounded-2xl bg-brand-50 border border-slate-100 flex flex-col gap-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input 
+                type="checkbox" 
+                className="w-5 h-5 rounded text-primary focus:ring-primary border-slate-300" 
+                checked={enableCustomDate}
+                onChange={(e) => setEnableCustomDate(e.target.checked)}
+              />
+              <span className="text-sm font-bold text-slate-700">Input Data Backdated (Mundur)</span>
+            </label>
+            {enableCustomDate && (
+              <input
+                type="date"
+                value={customDate}
+                onChange={(e) => setCustomDate(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm font-bold bg-white border border-slate-200 focus:ring-2 focus:ring-primary transition-all"
+              />
+            )}
+          </div>
+        )}
 
       {/* Variant chips */}
       <div className="mb-5">

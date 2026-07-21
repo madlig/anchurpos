@@ -46,7 +46,7 @@ export function Sidebar() {
               <Icon className="h-4.5 w-4.5 shrink-0" size={18} />
               <span className="flex-1">{label}</span>
               {badge && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-600 text-white">
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-600 text-white">
                   {badge}
                 </span>
               )}
@@ -63,7 +63,7 @@ export function Sidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-stone-900 truncate">Rina Wulandari</p>
-            <p className="text-[11px] text-stone-500 truncate">Owner · Jakarta</p>
+            <p className="text-xs text-stone-500 truncate">Owner · Jakarta</p>
           </div>
           <Settings className="h-3.5 w-3.5 text-stone-400 shrink-0" />
         </div>

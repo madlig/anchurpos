@@ -74,7 +74,7 @@ export default function ManagerProfilePage() {
           </div>
           <div>
             <p className="text-base font-extrabold" style={{ color: "#1C1C1E" }}>{user?.displayName ?? "Manager"}</p>
-            <span className="inline-block text-[9px] font-bold px-2 py-0.5 mt-1 rounded-full text-pink-600 bg-pink-50 border border-pink-100 uppercase">
+            <span className="inline-block text-xs font-bold px-2 py-0.5 mt-1 rounded-full text-primary bg-primary/10 border border-primary/20 uppercase">
               {role ?? "Manager"}
             </span>
           </div>
@@ -113,7 +113,7 @@ export default function ManagerProfilePage() {
               type="password"
               value={oldPassword}
               onChange={e => setOldPassword(e.target.value)}
-              className="w-full rounded-2xl px-4 py-3 text-xs outline-none transition-colors border border-slate-200 bg-slate-50 focus:bg-white"
+              className="w-full rounded-2xl px-4 py-3 text-xs outline-none transition-colors border border-slate-200 bg-brand-50 focus:bg-white"
             />
           </div>
 
@@ -123,7 +123,7 @@ export default function ManagerProfilePage() {
               type="password"
               value={newPassword}
               onChange={e => setNewPassword(e.target.value)}
-              className="w-full rounded-2xl px-4 py-3 text-xs outline-none transition-colors border border-slate-200 bg-slate-50 focus:bg-white"
+              className="w-full rounded-2xl px-4 py-3 text-xs outline-none transition-colors border border-slate-200 bg-brand-50 focus:bg-white"
             />
           </div>
 
@@ -133,7 +133,7 @@ export default function ManagerProfilePage() {
               type="password"
               value={confirmPassword}
               onChange={e => setConfirmPassword(e.target.value)}
-              className="w-full rounded-2xl px-4 py-3 text-xs outline-none transition-colors border border-slate-200 bg-slate-50 focus:bg-white"
+              className="w-full rounded-2xl px-4 py-3 text-xs outline-none transition-colors border border-slate-200 bg-brand-50 focus:bg-white"
             />
           </div>
 

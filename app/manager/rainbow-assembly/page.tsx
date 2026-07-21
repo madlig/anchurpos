@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Check, Palette } from "lucide-react";
+import { formatDateTime } from "@/lib/formatters";
 
 interface RainbowOrder {
   orderId: string;
@@ -65,12 +66,7 @@ export default function RainbowAssemblyPage() {
   }
 
   function formatDate(iso: string) {
-    return new Date(iso).toLocaleString("id-ID", {
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateTime(iso);
   }
 
   if (loading) {

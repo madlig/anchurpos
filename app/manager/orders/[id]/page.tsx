@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { formatRupiah } from "@/lib/utils";
+import { formatDateTime } from "@/lib/formatters";
 import { useAuth } from "@/lib/auth-context";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, CheckCircle2, Clock, CreditCard, Ban, Package, User, Printer, Calendar, MapPin, Truck } from "lucide-react";
@@ -27,7 +29,7 @@ function fmt(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 }
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return formatDateTime(iso);
 }
 
 export default function OrderDetailPage() {
@@ -92,9 +94,85 @@ export default function OrderDetailPage() {
     } finally { setActionLoading(""); }
   }
 
+  function printReceipt() {
+    if (!order) return;
+    
+    // Receipt format tailored for 58mm POS printer
+    const html = `
+      <html>
+        <head>
+          <title>Receipt ${order.orderNumber}</title>
+          <style>
+            body { font-family: 'Courier New', Courier, monospace; font-size: 12px; margin: 0; padding: 10px; width: 58mm; color: #000; }
+            .center { text-align: center; }
+            .bold { font-weight: bold; }
+            .line { border-bottom: 1px dashed #000; margin: 8px 0; }
+            .item { display: flex; justify-content: space-between; margin-bottom: 4px; }
+            .item-name { width: 60%; }
+            .item-qty { width: 15%; text-align: right; }
+            .item-total { width: 25%; text-align: right; }
+            @media print {
+              body { width: 100%; margin: 0; padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="center bold" style="font-size: 16px; margin-bottom: 4px;">ANCHUR BANDUNG</div>
+          <div class="center">Jl. Buah Batu No. 123</div>
+          <div class="center">IG: @anchur.id</div>
+          <div class="line"></div>
+          <div>No: ${order.orderNumber}</div>
+          <div>Tgl: ${formatDateTime(order.createdAt)}</div>
+          <div>Plg: ${order.customerName || "Walk-in"}</div>
+          <div class="line"></div>
+          
+          ${order.items.map(item => `
+            <div>${item.productName} ${item.variantName ? `- ${item.variantName}` : ""}</div>
+            <div class="item">
+              <span class="item-qty">${item.qty}x</span>
+              <span class="item-name">${fmt(item.basePrice)}</span>
+              <span class="item-total">${fmt(item.totalPrice)}</span>
+            </div>
+          `).join("")}
+          
+          <div class="line"></div>
+          
+          <div class="item">
+            <span class="item-name">Subtotal</span>
+            <span class="item-total">${fmt(order.items.reduce((s, i) => s + i.totalPrice, 0))}</span>
+          </div>
+          ${order.shippingCost ? `
+          <div class="item">
+            <span class="item-name">Ongkir</span>
+            <span class="item-total">${fmt(order.shippingCost)}</span>
+          </div>
+          ` : ""}
+          <div class="item bold" style="font-size: 14px; margin-top: 8px;">
+            <span class="item-name">TOTAL</span>
+            <span class="item-total">${fmt(order.items.reduce((s, i) => s + i.totalPrice, 0) + (order.shippingCostConfirmed ? (order.shippingCost ?? 0) : 0))}</span>
+          </div>
+          <div class="line"></div>
+          <div class="center">Terima kasih atas pesanan Anda!</div>
+          <div class="center" style="margin-top: 4px; font-size: 10px;">anchurpos.vercel.app</div>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
+    }
+  }
+
   if (loading) return (
     <div className="flex h-screen items-center justify-center" style={{ background: "#FCABB4" }}>
-      <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   );
 
@@ -105,7 +183,7 @@ export default function OrderDetailPage() {
         <p className="text-base font-bold text-slate-500">Order tidak ditemukan</p>
         <button 
           onClick={() => router.push('/manager/orders')} 
-          className="mt-6 px-6 py-2.5 rounded-xl bg-pink-500 text-white font-bold hover:bg-pink-600 transition-colors tap-target shadow-md shadow-pink-500/20"
+          className="mt-6 px-6 py-2.5 rounded-xl bg-primary text-white font-bold hover:bg-primary transition-colors tap-target shadow-md shadow-primary/20"
         >
           Kembali
         </button>
@@ -128,17 +206,17 @@ export default function OrderDetailPage() {
           <button 
             onClick={() => router.push('/manager/orders')} 
             data-testid="back-button"
-            className="w-10 h-10 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center tap-target hover:bg-slate-50 transition-colors"
+            className="w-10 h-10 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center tap-target hover:bg-brand-50 transition-colors"
           >
             <ArrowLeft size={20} className="text-slate-600" />
           </button>
           <div>
             <h1 className="text-lg font-black text-slate-800 tracking-tight">#{order.orderNumber.split("-").pop()}</h1>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{order.channel === "walkin" ? "Walk-in" : order.channel}</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">{order.channel === "walkin" ? "Walk-in" : order.channel}</p>
           </div>
         </div>
         
-        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${
+        <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-sm ${
           isVoid ? "bg-red-500 text-white shadow-red-500/20" : 
           isDone ? "bg-green-500 text-white shadow-green-500/20" : 
           "bg-amber-400 text-amber-900 shadow-amber-400/20"
@@ -180,13 +258,13 @@ export default function OrderDetailPage() {
           {/* Customer Info */}
           <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm hover:shadow-md hover:shadow-slate-200/50 transition-shadow group">
             <div className="flex items-center gap-2 mb-4 pb-3 border-b border-dashed border-slate-100">
-              <div className="bg-pink-50 p-1.5 rounded-lg">
-                <User size={16} className="text-pink-500" />
+              <div className="bg-primary/10 p-1.5 rounded-lg">
+                <User size={16} className="text-primary" />
               </div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pelanggan</span>
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Pelanggan</span>
             </div>
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-xl font-black text-slate-300 shrink-0 group-hover:scale-110 group-hover:rotate-3 group-hover:bg-pink-50 group-hover:text-pink-400 group-hover:border-pink-100 transition-all duration-300">
+              <div className="w-14 h-14 rounded-2xl bg-brand-50 border border-slate-100 flex items-center justify-center text-xl font-black text-slate-300 shrink-0 group-hover:scale-110 group-hover:rotate-3 group-hover:bg-primary/10 group-hover:text-pink-400 group-hover:border-primary/20 transition-all duration-300">
                 {order.customerName[0].toUpperCase()}
               </div>
               <div>
@@ -196,7 +274,7 @@ export default function OrderDetailPage() {
             </div>
             {order.orderNotes && (
               <div className="mt-5 bg-amber-50 p-3 rounded-2xl border border-amber-100/50">
-                <p className="text-[10px] font-black text-amber-600/70 uppercase tracking-widest mb-1">Catatan</p>
+                <p className="text-xs font-black text-amber-600/70 uppercase tracking-widest mb-1">Catatan</p>
                 <p className="text-sm font-bold text-amber-800">"{order.orderNotes}"</p>
               </div>
             )}
@@ -208,12 +286,12 @@ export default function OrderDetailPage() {
               <div className="bg-blue-50 p-1.5 rounded-lg">
                 <CreditCard size={16} className="text-blue-500" />
               </div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pembayaran</span>
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Pembayaran</span>
             </div>
             
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
-                <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm ${
+                <span className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm ${
                   isPaid ? "bg-green-100 text-green-700 border border-green-200/50" : "bg-red-50 text-red-600 border border-red-200/50 animate-pulse"
                 }`}>
                   {isPaid ? "Lunas" : "Belum Bayar"}
@@ -222,7 +300,7 @@ export default function OrderDetailPage() {
                   <button
                     onClick={markAsPaid}
                     disabled={actionLoading === "payment"}
-                    className="px-3 py-1.5 rounded-xl bg-green-500 text-white text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-green-600 disabled:opacity-50 transition-colors flex items-center gap-1"
+                    className="px-3 py-1.5 rounded-xl bg-green-500 text-white text-xs font-black uppercase tracking-widest shadow-sm hover:bg-green-600 disabled:opacity-50 transition-colors flex items-center gap-1"
                   >
                     {actionLoading === "payment" ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
                     Tandai Lunas
@@ -232,18 +310,18 @@ export default function OrderDetailPage() {
               
               {order.paymentMethod && (
                 <div className="flex items-center gap-1.5 text-slate-500">
-                  <span className="text-[10px] font-black uppercase tracking-widest">VIA</span>
-                  <span className="px-3 py-1 rounded-xl bg-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-600 border border-slate-200/50">
+                  <span className="text-xs font-black uppercase tracking-widest">VIA</span>
+                  <span className="px-3 py-1 rounded-xl bg-slate-100 text-xs font-black uppercase tracking-widest text-slate-600 border border-slate-200/50">
                     {order.paymentMethod === "cash" ? "Tunai" : order.paymentMethod}
                   </span>
                 </div>
               )}
             </div>
 
-            <div className="bg-slate-50 rounded-2xl p-4 flex items-center justify-between border border-slate-100/50">
+            <div className="bg-brand-50 rounded-2xl p-4 flex items-center justify-between border border-slate-100/50">
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Tagihan</p>
-                <p className="text-xl font-black text-pink-600 tracking-tight">{fmt(grandTotal)}</p>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Tagihan</p>
+                <p className="text-xl font-black text-primary tracking-tight">{fmt(grandTotal)}</p>
               </div>
               <div className="w-10 h-10 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center">
                 <CreditCard size={18} className="text-slate-300" />
@@ -257,12 +335,12 @@ export default function OrderDetailPage() {
               <div className="bg-purple-50 p-1.5 rounded-lg">
                 <Package size={16} className="text-purple-500" />
               </div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rincian Item</span>
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rincian Item</span>
             </div>
 
             <div className="space-y-2 mb-6">
               {order.items.map((item, idx) => (
-                <div key={item.id} className="flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 transition-colors group">
+                <div key={item.id} className="flex items-center justify-between p-3 rounded-2xl hover:bg-brand-50 transition-colors group">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200/50 flex items-center justify-center text-sm font-black text-slate-600 shrink-0 group-hover:bg-purple-50 group-hover:text-purple-600 group-hover:border-purple-100 transition-colors">
                       {item.qty}x
@@ -277,7 +355,7 @@ export default function OrderDetailPage() {
               ))}
             </div>
 
-            <div className="bg-slate-50 rounded-2xl p-5 space-y-3 border border-slate-100/50">
+            <div className="bg-brand-50 rounded-2xl p-5 space-y-3 border border-slate-100/50">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Subtotal Item</span>
                 <span className="text-sm font-black text-slate-700">{fmt(itemsTotal)}</span>
@@ -290,7 +368,7 @@ export default function OrderDetailPage() {
               )}
               <div className="pt-3 mt-1 border-t border-dashed border-slate-200 flex justify-between items-center">
                 <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Total Keseluruhan</span>
-                <span className="text-2xl font-black text-pink-600 tracking-tight">{fmt(grandTotal)}</span>
+                <span className="text-2xl font-black text-primary tracking-tight">{fmt(grandTotal)}</span>
               </div>
             </div>
           </div>
@@ -299,7 +377,7 @@ export default function OrderDetailPage() {
         {/* ── Action Buttons ── */}
         {!isVoid && (
           <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm mt-4">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Tindakan</span>
+            <span className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-4">Tindakan</span>
 
             <div className="flex flex-col gap-3">
               {/* Print Invoice — B2B and Reseller */}
@@ -321,6 +399,17 @@ export default function OrderDetailPage() {
                 >
                   <Truck size={18} />
                   Cetak Label Pengiriman
+                </button>
+              )}
+
+              {/* Print Receipt (Resi Ala-ala) */}
+              {(order.channel === "walkin" || order.channel === "whatsapp") && (
+                <button
+                  onClick={printReceipt}
+                  className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-primary/10 text-primary font-black hover:bg-primary/20 transition-colors tap-target shadow-sm"
+                >
+                  <Printer size={18} />
+                  Cetak Resi
                 </button>
               )}
 
@@ -375,10 +464,10 @@ export default function OrderDetailPage() {
               value={voidReason}
               onChange={(e) => setVoidReason(e.target.value)}
               placeholder="Tulis alasan pembatalan..."
-              className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-4 focus:ring-red-500/20 focus:border-red-500 transition-all text-sm font-bold resize-none mb-2"
+              className="w-full p-4 rounded-2xl bg-brand-50 border border-slate-200 focus:ring-4 focus:ring-red-500/20 focus:border-red-500 transition-all text-sm font-bold resize-none mb-2"
               rows={3}
             />
-            {voidReasonError && <p className="text-[10px] font-black text-red-500 mb-4 px-2 uppercase tracking-widest">{voidReasonError}</p>}
+            {voidReasonError && <p className="text-xs font-black text-red-500 mb-4 px-2 uppercase tracking-widest">{voidReasonError}</p>}
             
             <div className="flex gap-3 mt-4">
               <button 

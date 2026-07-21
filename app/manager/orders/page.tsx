@@ -78,7 +78,7 @@ export default function OrdersListPage() {
             </p>
           </div>
           <div className="h-12 w-12 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center">
-            <ClipboardList size={22} className="text-pink-500" />
+            <ClipboardList size={22} className="text-primary" />
           </div>
         </div>
 
@@ -93,8 +93,8 @@ export default function OrdersListPage() {
                 data-testid={`tab-${t.key}`}
                 className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all duration-300 tap-target ${
                   active 
-                    ? t.key === "void" ? "bg-red-500 text-white shadow-md shadow-red-500/20" : "bg-pink-500 text-white shadow-md shadow-pink-500/20"
-                    : "bg-white text-slate-500 border border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                    ? t.key === "void" ? "bg-red-500 text-white shadow-md shadow-red-500/20" : "bg-primary text-white shadow-md shadow-primary/20"
+                    : "bg-white text-slate-500 border border-slate-200 hover:border-slate-300 hover:bg-brand-50"
                 }`}
               >
                 {t.label}
@@ -108,11 +108,11 @@ export default function OrdersListPage() {
       <div className="px-4 pt-4 flex flex-col gap-3 md:px-8 md:max-w-5xl mx-auto">
         {loading ? (
           <div className="flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : orders.length === 0 ? (
           <div className="mt-8 flex flex-col items-center justify-center p-10 bg-white rounded-3xl border border-dashed border-slate-200">
-            <div className="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center mb-4">
+            <div className="h-16 w-16 rounded-full bg-brand-50 flex items-center justify-center mb-4">
               {isVoidTab
                 ? <Ban className="text-slate-300" size={32} />
                 : <ClipboardList className="text-slate-300" size={32} />
@@ -148,7 +148,7 @@ export default function OrdersListPage() {
                       <div className="bg-red-100 p-1.5 rounded-lg">
                         <Ban size={14} className="text-red-600" />
                       </div>
-                      <span className="text-[11px] font-black text-red-600 uppercase tracking-widest">
+                      <span className="text-xs font-black text-red-600 uppercase tracking-widest">
                         Dibatalkan {order.voidReason && <span className="text-red-400 font-bold ml-1">({order.voidReason})</span>}
                       </span>
                     </div>
@@ -168,19 +168,19 @@ export default function OrdersListPage() {
                         <p className={`text-base font-black tracking-tight ${isVoidCard ? "text-slate-400 line-through decoration-slate-300" : "text-slate-800"}`}>
                           {order.customerName}
                         </p>
-                        <p className="text-[11px] font-bold text-slate-400 mt-0.5">#{order.orderNumber.split("-").pop()}</p>
+                        <p className="text-xs font-bold text-slate-400 mt-0.5">#{order.orderNumber.split("-").pop()}</p>
                       </div>
                     </div>
                     
                     <div className="flex flex-col items-end gap-2">
                       <span 
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm"
                         style={{ color: statusStyle.color, background: statusStyle.bg, border: `1px solid ${statusStyle.color}20` }}
                       >
                         {statusStyle.icon}
                         {statusStyle.text}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
+                      <span className="text-xs font-bold text-slate-400 bg-brand-50 px-2 py-1 rounded-lg border border-slate-100">
                         {formatTime(order.createdAt)}
                       </span>
                     </div>
@@ -188,12 +188,12 @@ export default function OrdersListPage() {
 
                   {/* Row 2: channel + payment status */}
                   <div className="flex items-center gap-2 relative z-10 pt-4 border-t border-dashed border-slate-100">
-                    <span className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 bg-slate-100 border border-slate-200/60">
+                    <span className="px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 bg-slate-100 border border-slate-200/60">
                       {CHANNEL_LABELS[order.orderChannel] ?? order.source?.replace(/_/g, " ") ?? "-"}
                     </span>
                     
                     {order.paymentStatus === "belum_bayar" && !isVoidCard && (
-                      <span className="px-3 py-1.5 rounded-xl bg-red-50 border border-red-100 text-[10px] font-black uppercase tracking-widest text-red-600 animate-pulse shadow-sm">
+                      <span className="px-3 py-1.5 rounded-xl bg-red-50 border border-red-100 text-xs font-black uppercase tracking-widest text-red-600 animate-pulse shadow-sm">
                         Belum Bayar
                       </span>
                     )}

@@ -3,14 +3,20 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
 /**
- * Development-only endpoint untuk seed data awal
- * POST /api/seed  dengan header: Authorization: Bearer anchurpos-seed-2025
+ * Development-only endpoint untuk seed data awal.
+ * DIBLOKIR di production. Hanya jalan jika NODE_ENV !== "production"
+ * dan SEED_SECRET_KEY diset di .env.local.
  */
 export async function POST(req: NextRequest) {
+  // Block in production
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Endpoint ini dinonaktifkan di production" }, { status: 403 });
+  }
+
   const authHeader = req.headers.get("Authorization") ?? "";
-  const seedKey = process.env.SEED_SECRET_KEY ?? "anchurpos-seed-2025";
-  if (!authHeader.includes(seedKey)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const seedKey = process.env.SEED_SECRET_KEY;
+  if (!seedKey || !authHeader.includes(seedKey)) {
+    return NextResponse.json({ error: "Unauthorized — set SEED_SECRET_KEY di .env.local" }, { status: 401 });
   }
 
   try {

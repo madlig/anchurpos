@@ -249,7 +249,7 @@ export default function OwnerReportsPage() {
                   <span className="font-semibold text-slate-800">{fmt(data.mutasiBankToCash ?? 0)}</span>
                 </div>
               </div>
-              <p className="text-[10px] text-slate-400 mt-3 text-center italic">
+              <p className="text-xs text-slate-400 mt-3 text-center italic">
                 * Saldo dihitung berdasarkan data tercatat di sistem pada periode ini.
               </p>
             </div>

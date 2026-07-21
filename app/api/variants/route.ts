@@ -4,7 +4,10 @@ import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { Variant } from "@/types";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireRole(req, ["owner", "manager", "crew"]);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const snap = await adminDb
       .collection("variants")

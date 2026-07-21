@@ -166,7 +166,7 @@ export default function OwnerApprovalPage() {
               <Icon size={14} />
               <span className="hidden sm:inline">{t.label}</span>
               {counts[t.key] > 0 && (
-                <span className="absolute -top-1 -right-0.5 h-4 w-4 rounded-full text-[10px] font-bold text-white flex items-center justify-center" style={{ background: "#E85D8C" }}>{counts[t.key]}</span>
+                <span className="absolute -top-1 -right-0.5 h-4 w-4 rounded-full text-xs font-bold text-white flex items-center justify-center" style={{ background: "#E85D8C" }}>{counts[t.key]}</span>
               )}
             </button>
           );
@@ -232,7 +232,7 @@ export default function OwnerApprovalPage() {
                       {expanded && (
                         <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 text-xs">
                           {/* Log check-in and check-out */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-brand-50 rounded-xl">
                             <div>
                               <p className="text-slate-400 font-medium">Absen Masuk:</p>
                               <p className="font-semibold text-slate-700">
@@ -249,13 +249,13 @@ export default function OwnerApprovalPage() {
 
                           {/* Adjustment fields */}
                           <div className="space-y-3">
-                            <p className="font-bold text-slate-800 uppercase tracking-wider text-[10px]">
+                            <p className="font-bold text-slate-800 uppercase tracking-wider text-xs">
                               Koreksi Absensi & Lembur
                             </p>
                             
                             <div className="grid grid-cols-3 gap-2">
                               <div>
-                                <label className="text-[10px] font-bold text-slate-400 block mb-1">Total Jam</label>
+                                <label className="text-xs font-bold text-slate-400 block mb-1">Total Jam</label>
                                 <input
                                   type="number"
                                   step="0.1"
@@ -265,7 +265,7 @@ export default function OwnerApprovalPage() {
                                 />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-slate-400 block mb-1">Lembur (Jam)</label>
+                                <label className="text-xs font-bold text-slate-400 block mb-1">Lembur (Jam)</label>
                                 <input
                                   type="number"
                                   step="0.1"
@@ -275,7 +275,7 @@ export default function OwnerApprovalPage() {
                                 />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-slate-400 block mb-1">Bonus Lembur (Rp)</label>
+                                <label className="text-xs font-bold text-slate-400 block mb-1">Bonus Lembur (Rp)</label>
                                 <input
                                   type="number"
                                   step="1000"

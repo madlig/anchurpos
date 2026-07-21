@@ -12,9 +12,9 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { label: "Beranda", href: "/manager/dashboard", icon: LayoutDashboard },
   { label: "Transaksi", href: "/manager/orders", icon: ClipboardList },
-  { label: "Produksi", href: "/manager/productions", icon: ChefHat },
+  { label: "Buku Kas", href: "/manager/expenses", icon: Banknote },
   { label: "Kasir", href: "/manager/pos", icon: ShoppingCart, isPosButton: true },
-  { label: "Inventori", href: "/manager/inventory", icon: Package },
+  { label: "Belanja", href: "/manager/purchases", icon: Package },
   { label: "Profil", href: "/manager/profile", icon: User },
 ];
 
@@ -62,7 +62,7 @@ function DesktopSidebar() {
           </div>
           <div className="min-w-0">
             <p className="text-xs font-semibold truncate" style={{ color: "#1C1C1E" }}>{user?.displayName ?? "Manager"}</p>
-            <p className="text-[11px]" style={{ color: "#E85D8C" }}>Manager</p>
+            <p className="text-xs" style={{ color: "#E85D8C" }}>Manager</p>
           </div>
         </div>
         <button
@@ -119,7 +119,7 @@ function MobileBottomNav() {
                 >
                   <Icon size={20} className="text-white" strokeWidth={2.5} />
                 </div>
-                <span className="text-[10px] font-bold mt-1" style={{ color: active ? "#E85D8C" : "#94A3B8" }}>
+                <span className="text-xs font-bold mt-1" style={{ color: active ? "#E85D8C" : "#94A3B8" }}>
                   {item.label}
                 </span>
               </Link>
@@ -139,7 +139,7 @@ function MobileBottomNav() {
               >
                 <Icon size={18} strokeWidth={active ? 2.5 : 1.8} style={{ color: active ? "#E85D8C" : "#94A3B8" }} />
               </div>
-              <span className="text-[10px] font-bold" style={{ color: active ? "#E85D8C" : "#94A3B8" }}>
+              <span className="text-xs font-bold" style={{ color: active ? "#E85D8C" : "#94A3B8" }}>
                 {item.label}
               </span>
             </Link>
