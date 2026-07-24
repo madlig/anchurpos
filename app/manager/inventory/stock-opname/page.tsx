@@ -249,12 +249,12 @@ export default function StockOpnamePage() {
       </div>
 
       {/* Floating Save Button */}
-      <div className="fixed bottom-0 md:bottom-6 left-0 right-0 md:left-[17rem] p-4 bg-gradient-to-t from-white via-white to-transparent md:bg-none z-20 pointer-events-none">
+      <div className="fixed bottom-16 md:bottom-6 left-0 right-0 md:left-[17rem] p-4 bg-gradient-to-t from-white via-white to-transparent md:bg-none z-20 pointer-events-none">
         <div className="max-w-5xl mx-auto flex justify-end pointer-events-auto">
            <button
              onClick={handleSubmit}
              disabled={submitting || Object.keys(opnameData).length === 0}
-             className="h-14 px-8 rounded-2xl text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-0 disabled:translate-y-4 flex items-center justify-center gap-2 shadow-xl shadow-primary/30"
+             className="h-14 px-8 rounded-2xl text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-0 disabled:translate-y-4 flex items-center justify-center gap-2 shadow-xl shadow-primary/30 w-full md:w-auto"
              style={{ background: "linear-gradient(135deg, #E85D8C 0%, #D84275 100%)" }}
            >
              {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save size={18} /> Terapkan Penyesuaian</>}
