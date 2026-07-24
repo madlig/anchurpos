@@ -4,40 +4,20 @@ import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { 
-  Loader2, UserCheck, ChefHat, PackageOpen, ClipboardList, 
-  Clock, Calendar
+  Loader2, CheckCircle2, ChevronRight, PackageOpen, ChefHat, ClipboardList, Clock
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
-
-interface AttendanceItem {
-  time: string;
-  ipAddress: string;
-  ipValid: boolean;
-}
-
-interface DailyAttendance {
-  id: string;
-  date: string;
-  checkIn: AttendanceItem | null;
-  checkOut: AttendanceItem | null;
-  totalHours: number | null;
-  status: string;
-  flaggedReason?: string | null;
-}
-
-interface AttendanceStatusResponse {
-  today: DailyAttendance | null;
-  history: any[];
-}
 
 export default function CrewDashboard() {
   const { user, getToken } = useAuth();
   const router = useRouter();
   const { alert, confirm } = useAlertConfirm();
-  const [status, setStatus] = useState<AttendanceStatusResponse | null>(null);
+  const [status, setStatus] = useState<any>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
+
   const [time, setTime] = useState("");
   const [date, setDate] = useState("");
 
@@ -45,212 +25,194 @@ export default function CrewDashboard() {
     const token = await getToken();
     return fetch(url, {
       ...opts,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        ...opts?.headers,
-      },
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...opts?.headers },
     });
   }, [getToken]);
 
-  const loadStatus = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
-      const res = await fetchWithAuth("/api/attendance/my-status");
-      if (res.ok) setStatus(await res.json());
+      const [statusRes, tasksRes] = await Promise.all([
+        fetchWithAuth("/api/attendance/my-status"),
+        fetchWithAuth("/api/tasks?status=pending")
+      ]);
+      if (statusRes.ok) setStatus(await statusRes.json());
+      if (tasksRes.ok) setTasks(await tasksRes.json());
     } catch (err) {
       console.error(err);
     } finally {
       setLoadingStatus(false);
+      setLoadingTasks(false);
     }
   }, [fetchWithAuth]);
 
   useEffect(() => {
-    loadStatus();
-    // Live clock
+    loadData();
     const timer = setInterval(() => {
       const d = new Date();
       setTime(d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-      setDate(d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
+      setDate(d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" }));
     }, 1000);
     return () => clearInterval(timer);
-  }, [loadStatus]);
+  }, [loadData]);
 
   async function handleCheckIn() {
     setActionLoading(true);
     try {
       const res = await fetchWithAuth("/api/attendance/check-in", { method: "POST" });
       const data = await res.json();
-      if (!res.ok) {
-        await alert(data.error ?? "Gagal Check-in", "Absensi Gagal", "danger");
-      } else {
-        await alert(
-          data.needsReview 
-            ? "Check-in berhasil diajukan! (Menunggu review manager karena berada di luar jaringan utama)"
-            : "Check-in berhasil secara instan!",
-          "Absensi Berhasil",
-          "success"
-        );
-        loadStatus();
+      if (!res.ok) await alert(data.error ?? "Gagal Check-in", "Absensi Gagal", "danger");
+      else {
+        await alert(data.needsReview ? "Check-in berhasil diajukan! (Menunggu review)" : "Check-in berhasil!", "Sukses", "success");
+        loadData();
       }
     } catch {
-      await alert("Kesalahan jaringan saat melakukan check-in", "Kesalahan Koneksi", "danger");
+      await alert("Kesalahan jaringan", "Error", "danger");
     } finally {
       setActionLoading(false);
     }
   }
 
   async function handleCheckOut() {
-    const confirmed = await confirm(
-      "Apakah Anda yakin ingin Check-out (pulang) sekarang?",
-      "Konfirmasi Check-out",
-      { destructive: true, confirmLabel: "Ya, Check-out", cancelLabel: "Batal" }
-    );
-    if (!confirmed) return;
-
+    const ok = await confirm("Apakah Anda yakin ingin Check-out (pulang) sekarang?", "Konfirmasi Check-out", { destructive: true, confirmLabel: "Ya, Check-out", cancelLabel: "Batal" });
+    if (!ok) return;
     setActionLoading(true);
     try {
       const res = await fetchWithAuth("/api/attendance/check-out", { method: "POST" });
       const data = await res.json();
-      if (!res.ok) {
-        await alert(data.error ?? "Gagal Check-out", "Absensi Gagal", "danger");
-      } else {
-        await alert("Check-out berhasil disimpan!", "Absensi Berhasil", "success");
-        loadStatus();
+      if (!res.ok) await alert(data.error ?? "Gagal Check-out", "Absensi Gagal", "danger");
+      else {
+        await alert("Check-out berhasil disimpan!", "Sukses", "success");
+        loadData();
       }
     } catch {
-      await alert("Kesalahan jaringan saat melakukan check-out", "Kesalahan Koneksi", "danger");
+      await alert("Kesalahan jaringan", "Error", "danger");
     } finally {
       setActionLoading(false);
     }
   }
 
-  const MENU_ITEMS = [
-    { label: "Mulai Produksi", desc: "Buat adonan & goreng churros", href: "/crew/production", icon: ChefHat, bg: "#FEF1F5", text: "#E85D8C" },
-    { label: "Pre-Packing", desc: "Timbang adonan & cup saos", href: "/crew/pre-packing", icon: PackageOpen, bg: "#EFF6FF", text: "#2563EB" },
-    { label: "Packing Box", desc: "Kemas churros & saos ke box", href: "/crew/packing", icon: PackageOpen, bg: "#F0FDF4", text: "#16A34A" },
-    { label: "Stock Opname", desc: "Hitung & update stok fisik harian", href: "/crew/stock-opname", icon: ClipboardList, bg: "#FFFBF0", text: "#D97706" },
-  ];
+  async function handleCompleteTask(taskId: string, type: string) {
+    if (type === "stock_opname") {
+      return router.push("/crew/stock-opname");
+    }
+    
+    const ok = await confirm("Apakah Anda yakin telah menyelesaikan tugas ini?", "Konfirmasi");
+    if (!ok) return;
+
+    setActionLoading(true);
+    try {
+      const res = await fetchWithAuth(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "done" })
+      });
+      if (res.ok) {
+        await alert("Tugas berhasil diselesaikan!", "Sukses", "success");
+        loadData();
+      } else {
+        const data = await res.json();
+        await alert(data.error || "Gagal menyelesaikan tugas", "Error", "danger");
+      }
+    } catch {
+      await alert("Terjadi kesalahan koneksi", "Error", "danger");
+    } finally {
+      setActionLoading(false);
+    }
+  }
 
   const todayData = status?.today;
   const hasCheckedIn = !!todayData?.checkIn?.time;
   const hasCheckedOut = !!todayData?.checkOut?.time;
-  const checkInTime = todayData?.checkIn?.time;
-  const checkOutTime = todayData?.checkOut?.time;
-  const ipAddress = todayData?.checkIn?.ipAddress;
-  const allowedSubnet = todayData?.checkIn?.ipValid;
-  const needsReview = todayData?.status === "menunggu_persetujuan" || todayData?.checkIn?.ipValid === false;
 
+  if (loadingStatus) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-primary" size={32} /></div>;
+  }
+
+  // JIKA BELUM ABSEN MASUK, HALAMAN FULL ABSEN MASUK
+  if (!hasCheckedIn) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)" }}>
+        <div className="text-white text-center mb-10">
+          <p className="text-sm font-bold uppercase tracking-widest opacity-80 mb-2">{date}</p>
+          <h1 className="text-5xl font-black tabular-nums">{time}</h1>
+          <p className="mt-4 font-medium text-lg">Halo, {user?.displayName}!</p>
+          <p className="opacity-80 text-sm">Silakan Absen Masuk untuk melihat tugas hari ini.</p>
+        </div>
+        
+        <button
+          onClick={handleCheckIn}
+          disabled={actionLoading}
+          className="w-full max-w-xs h-24 rounded-[32px] bg-white text-primary font-black text-xl shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-80"
+        >
+          {actionLoading ? <Loader2 className="animate-spin" size={28} /> : "ABSEN MASUK"}
+        </button>
+      </div>
+    );
+  }
+
+  // JIKA SUDAH ABSEN MASUK -> MUNCULKAN DAFTAR TUGAS
   return (
-    <div className="px-5 pt-6 pb-24 max-w-md mx-auto space-y-5">
-      {/* ── Header Welcome ── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-black text-slate-800">Halo, {user?.displayName ?? "Crew"}! 👋</h1>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-0.5">Anchur Churros Workspace</p>
-        </div>
-        <div className="h-10 w-10 rounded-2xl flex items-center justify-center text-white font-extrabold shadow-md"
-          style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)" }}>
-          {(user?.displayName ?? "C")[0].toUpperCase()}
+    <div className="min-h-screen bg-slate-50 pb-24">
+      {/* HEADER KECIL */}
+      <div className="bg-white px-5 pt-6 pb-4 rounded-b-[32px] shadow-sm mb-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{date}</p>
+            <h1 className="text-lg font-black text-slate-800">Tugas Anda Hari Ini</h1>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-bold text-primary">{time}</p>
+            <p className="text-[10px] text-slate-400 font-medium">Status: Bekerja</p>
+          </div>
         </div>
       </div>
 
-      {/* ── Live Clock Widget ── */}
-      <div className="p-4 rounded-3xl text-white text-center relative overflow-hidden"
-        style={{
-          background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)",
-          boxShadow: "0 8px 24px rgba(232,93,140,0.25)"
-        }}>
-        <p className="text-xxs font-bold uppercase tracking-widest text-pink-100 opacity-80">{date || "Memuat Hari..."}</p>
-        <h2 className="text-3xl font-black mt-1 tabular-nums">{time || "00:00:00"}</h2>
-      </div>
-
-      {/* ── Absensi Widget (Embed di Home) ── */}
-      <Card className="p-4 rounded-3xl border-none shadow-sm space-y-4 bg-white">
-        <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
-          <UserCheck className="h-4 w-4 text-primary" />
-          <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Presensi Harian Crew</h3>
-        </div>
-
-        {loadingStatus ? (
-          <div className="flex justify-center py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      {/* DAFTAR TUGAS */}
+      <div className="px-5 space-y-4 max-w-md mx-auto">
+        {loadingTasks ? (
+          <div className="flex justify-center py-10"><Loader2 className="animate-spin text-slate-400" /></div>
+        ) : tasks.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-200">
+            <CheckCircle2 size={48} className="mx-auto text-slate-200 mb-3" />
+            <h3 className="font-bold text-slate-800">Hore! Tidak ada tugas</h3>
+            <p className="text-xs text-slate-400 mt-1">Standby untuk instruksi selanjutnya.</p>
           </div>
         ) : (
-          <div className="space-y-3.5">
-            {/* Check-In / Check-Out Timestamps */}
-            <div className="grid grid-cols-2 gap-2 text-xxs font-semibold text-slate-500">
-              <div className="p-3 bg-brand-50/50 border border-slate-100 rounded-2xl flex flex-col items-center">
-                <span className="text-xs uppercase tracking-wider text-slate-400">Masuk</span>
-                <span className="font-bold text-slate-700 text-xs mt-1">
-                  {checkInTime ? new Date(checkInTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "—"}
-                </span>
+          tasks.map(t => (
+            <div key={t.id} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 relative overflow-hidden">
+              <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${t.type === 'produksi' ? 'bg-emerald-500' : t.type === 'pre_packing' ? 'bg-blue-500' : 'bg-amber-500'}`} />
+              
+              <div className="flex items-start gap-3">
+                <div className={`p-3 rounded-2xl ${t.type === 'produksi' ? 'bg-emerald-50 text-emerald-600' : t.type === 'pre_packing' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
+                  {t.type === 'produksi' ? <ChefHat size={24} /> : t.type === 'pre_packing' ? <PackageOpen size={24} /> : <ClipboardList size={24} />}
+                </div>
+                <div className="flex-1">
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">{t.type.replace('_', ' ')}</span>
+                  <h3 className="font-bold text-slate-800 text-lg leading-tight mt-0.5">{t.title}</h3>
+                  {t.description && <p className="text-xs text-slate-500 mt-1">{t.description}</p>}
+                  {t.productionData && <p className="text-xs font-bold text-emerald-600 mt-1">Target: {t.productionData.batches} Batch {t.productionData.variantName}</p>}
+                </div>
               </div>
-              <div className="p-3 bg-brand-50/50 border border-slate-100 rounded-2xl flex flex-col items-center">
-                <span className="text-xs uppercase tracking-wider text-slate-400">Pulang</span>
-                <span className="font-bold text-slate-700 text-xs mt-1">
-                  {checkOutTime ? new Date(checkOutTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "—"}
-                </span>
-              </div>
+
+              <button 
+                onClick={() => handleCompleteTask(t.id, t.type)}
+                disabled={actionLoading}
+                className="mt-5 w-full h-14 rounded-2xl bg-slate-900 text-white font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg disabled:opacity-70"
+              >
+                {t.type === 'stock_opname' ? "BUKA FORM OPNAME" : "LAPOR SELESAI"} <ChevronRight size={18} />
+              </button>
             </div>
-
-            {/* Tombol Aksi */}
-            {!hasCheckedIn ? (
-              <button
-                onClick={handleCheckIn}
-                disabled={actionLoading}
-                className="w-full h-11 flex items-center justify-center gap-2 bg-primary hover:bg-primary text-white rounded-2xl font-bold text-xs active:scale-[0.98] transition-all disabled:opacity-50"
-              >
-                {actionLoading ? <Loader2 className="animate-spin" size={14} /> : <Clock size={14} />}
-                Mulai Kerja (Check-In)
-              </button>
-            ) : !hasCheckedOut ? (
-              <button
-                onClick={handleCheckOut}
-                disabled={actionLoading}
-                className="w-full h-11 flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-bold text-xs active:scale-[0.98] transition-all disabled:opacity-50"
-              >
-                {actionLoading ? <Loader2 className="animate-spin" size={14} /> : <Clock size={14} />}
-                Selesai Kerja (Check-Out)
-              </button>
-            ) : (
-              <div className="p-3 rounded-2xl bg-green-50 border border-green-200 text-green-700 text-center text-xs font-bold">
-                ✓ Presensi Anda hari ini telah selesai dilakukan.
-              </div>
-            )}
-
-            {/* Review warning */}
-            {hasCheckedIn && needsReview && (
-              <p className="text-xs text-amber-600 font-semibold text-center mt-1">
-                ⚠️ Absen masuk menunggu review manager (Di luar IP Toko).
-              </p>
-            )}
-          </div>
+          ))
         )}
-      </Card>
-
-      {/* ── Fitur Kerja Grid ── */}
-      <div className="space-y-2.5">
-        <h3 className="text-xxs font-extrabold text-slate-500 uppercase tracking-widest pl-1">Fitur Menu Crew</h3>
-        <div className="grid grid-cols-2 gap-3">
-          {MENU_ITEMS.map((item, idx) => {
-            const Icon = item.icon;
-            return (
-              <Card 
-                key={idx}
-                onClick={() => router.push(item.href)}
-                className="p-4 rounded-3xl border-none shadow-sm bg-white cursor-pointer active:scale-[0.97] transition-all flex flex-col justify-between hover:bg-brand-50 min-h-[110px]"
-              >
-                <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: item.bg, color: item.text }}>
-                  <Icon size={16} />
-                </div>
-                <div className="mt-4">
-                  <h4 className="text-xs font-bold text-slate-800">{item.label}</h4>
-                  <p className="text-xs text-slate-400 font-semibold leading-tight mt-0.5">{item.desc}</p>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+      </div>
+      {/* CHECK OUT BUTTON */}
+      <div className="px-5 mt-8 max-w-md mx-auto">
+        <button 
+          onClick={handleCheckOut}
+          disabled={actionLoading}
+          className="w-full h-12 rounded-2xl bg-amber-100 text-amber-700 font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+        >
+          {actionLoading ? <Loader2 size={16} className="animate-spin" /> : "Selesai Kerja (Check Out)"}
+        </button>
       </div>
     </div>
   );
