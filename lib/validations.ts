@@ -16,12 +16,12 @@ export const orderItemSchema = z.object({
 });
 
 export const orderSchema = z.object({
-  source: z.enum(["marketplace_manual", "wa_form", "walk_in"]),
-  orderChannel: z.enum(["walkin", "whatsapp", "tiktok", "shopee"]),
+  source: z.string().default("walk_in"),
+  orderChannel: z.string().min(1),
   customerId: z.string().nullable().optional(),
   customerName: z.string().min(1, "Nama customer wajib diisi"),
   customerPhone: z.string().nullable().optional(),
-  customerType: z.enum(["reguler", "b2b", "reseller"]).nullable().optional(),
+  customerType: z.string().nullable().optional(),
   platformFeePercent: z.number().min(0).max(100).default(0),
   platformFee: z.number().min(0).default(0),
   shippingAddress: z.string().nullable().optional(),
@@ -30,9 +30,9 @@ export const orderSchema = z.object({
   shippingCost: z.number().min(0).nullable().optional(),
   items: z.array(orderItemSchema).min(1, "Minimal 1 item pesanan"),
   paymentStatus: z.enum(["belum_bayar", "sudah_bayar"]).default("sudah_bayar"),
-  paymentMethod: z.enum(["cash", "transfer", "qris"]).nullable().optional(),
-  shippingBorneBy: z.enum(["seller", "customer"]).nullable().optional(),
-  deliveryMethod: z.enum(["pickup", "self_delivery", "courier"]).nullable().optional(),
+  paymentMethod: z.string().nullable().optional(),
+  shippingBorneBy: z.string().nullable().optional(),
+  deliveryMethod: z.string().nullable().optional(),
   sauceDistribution: z.record(z.number()).nullable().optional(),
   poNumber: z.string().nullable().optional(),
   customDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal YYYY-MM-DD").optional(),
@@ -52,22 +52,24 @@ export const publicOrderSchema = z.object({
 });
 
 export const expenseCreateSchema = z.object({
-  category: z.enum(["operasional", "lain_lain"]),
+  category: z.string().min(1),
   itemName: z.string().min(1, "Nama pengeluaran wajib diisi"),
   totalPrice: z.number().min(0, "Total tidak boleh negatif"),
-  paymentMethod: z.enum(["cash", "transfer", "qris"]),
+  paymentMethod: z.string().min(1),
   notes: z.string().optional().default(""),
   supplier: z.string().nullable().optional(),
   customDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal YYYY-MM-DD").optional(),
 });
 
 export const purchaseCreateSchema = z.object({
-  category: z.enum(["bahan_baku", "packaging"]),
-  ingredientId: z.string().min(1, "Bahan baku wajib dipilih"),
-  qtyPurchased: z.number().positive("Kuantitas harus lebih dari 0"),
-  purchaseUnit: z.string().min(1, "Satuan beli wajib dipilih"),
-  totalPrice: z.number().min(0, "Total harga tidak boleh negatif"),
-  paymentMethod: z.enum(["cash", "transfer", "qris"]),
+  items: z.array(z.object({
+    category: z.string().min(1),
+    ingredientId: z.string().min(1, "Bahan baku wajib dipilih"),
+    qtyPurchased: z.number().positive("Kuantitas harus lebih dari 0"),
+    purchaseUnit: z.string().min(1, "Satuan beli wajib dipilih"),
+    totalPrice: z.number().min(0, "Total harga tidak boleh negatif"),
+  })).min(1, "Minimal 1 barang harus dibeli"),
+  paymentMethod: z.string().min(1),
   supplier: z.string().nullable().optional(),
   notes: z.string().optional().default(""),
   customDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal YYYY-MM-DD").optional(),
@@ -83,7 +85,7 @@ export const productionSchema = z.object({
 });
 
 export const productionBatchSchema = z.object({
-  type: z.enum(["standard", "tiktok"]).optional().default("standard"),
+  type: z.string().optional().default("standard"),
   notes: z.string().optional().default(""),
   crewId: z.string().optional(),
   customDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal YYYY-MM-DD").optional(),
@@ -122,6 +124,7 @@ export const productSchema = z.object({
   isActive: z.boolean().default(true),
   channels: z.array(z.string()).default([]),
   priceTiers: z.array(priceTierSchema).optional(),
+  freeSauceAllowance: z.number().int().min(0).default(0),
 });
 
 export const ingredientSchema = z.object({
@@ -134,4 +137,5 @@ export const ingredientSchema = z.object({
     unit: z.string(),
     conversionToBase: z.number()
   })).default([]),
+  defaultCostPerBaseUnit: z.number().min(0).default(0),
 });

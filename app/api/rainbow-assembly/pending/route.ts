@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   try {
     const ordersSnap = await adminDb
       .collection("orders")
-      .where("status", "==", "belum_selesai")
+      .where("status", "==", "pending")
       .orderBy("createdAt", "desc")
       .get();
 

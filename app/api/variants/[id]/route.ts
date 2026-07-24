@@ -13,8 +13,8 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
-  const { name, sortOrder, minStock, currentStock, adjustment, note } = body as {
-    name?: string; sortOrder?: number; minStock?: number;  // edit info
+  const { name, sortOrder, minStock, freeSauceAllowance, currentStock, adjustment, note } = body as {
+    name?: string; sortOrder?: number; minStock?: number; freeSauceAllowance?: number; // edit info
     currentStock?: number; adjustment?: number; note?: string;  // stock opname
   };
 
@@ -30,6 +30,7 @@ export async function PATCH(
         name: name.trim(),
         ...(sortOrder !== undefined ? { sortOrder } : {}),
         ...(minStock !== undefined ? { minStock } : {}),
+        ...(freeSauceAllowance !== undefined ? { freeSauceAllowance } : { freeSauceAllowance: FieldValue.delete() }),
         updatedAt: FieldValue.serverTimestamp(),
       });
       return NextResponse.json({ id, name: name.trim() });
@@ -92,6 +93,13 @@ export async function DELETE(
     const ref = adminDb.doc(`variants/${id}`);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Varian tidak ditemukan" }, { status: 404 });
+
+    // Guard: Cek apakah dipakai di resep
+    const recipeCheck = await adminDb.collection("recipes").where("variantId", "==", id).limit(1).get();
+    if (!recipeCheck.empty) {
+      return NextResponse.json({ error: "Tidak bisa dihapus karena Varian ini masih terikat dengan sebuah Resep. Hapus atau ubah Resep terkait terlebih dahulu." }, { status: 400 });
+    }
+
     await ref.delete();
     return NextResponse.json({ success: true });
   } catch (err) {
@@ -116,6 +124,7 @@ export async function GET(
       currentStock: d.currentStock ?? 0,
       minStock: d.minStock ?? 10,
       sortOrder: d.sortOrder ?? 0,
+      freeSauceAllowance: d.freeSauceAllowance,
     });
   } catch (err) {
     console.error("GET /api/variants/[id] error:", err);

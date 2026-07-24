@@ -99,6 +99,28 @@ export default function ManagerProfilePage() {
         </div>
       </div>
 
+      {/* Operasional Crew Links */}
+      <div className="rounded-3xl p-5 mb-5" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 4px 20px rgba(0,0,0,0.02)" }}>
+        <div className="flex items-center gap-2 mb-4">
+          <Shield size={15} style={{ color: "#E85D8C" }} />
+          <h2 className="text-sm font-bold" style={{ color: "#1C1C1E" }}>Operasional Crew</h2>
+        </div>
+        <div className="space-y-2">
+          <a href="/manager/pre-packing" className="flex items-center justify-between p-3 rounded-2xl transition-colors tap-target" style={{ background: "#FEF1F5" }}>
+            <span className="text-xs font-semibold text-slate-700">Modul Pre-Packing</span>
+            <span className="text-xs font-bold" style={{ color: "#E85D8C" }}>Buka &rarr;</span>
+          </a>
+          <a href="/manager/packing" className="flex items-center justify-between p-3 rounded-2xl transition-colors tap-target" style={{ background: "#FEF1F5" }}>
+            <span className="text-xs font-semibold text-slate-700">Modul Packing</span>
+            <span className="text-xs font-bold" style={{ color: "#E85D8C" }}>Buka &rarr;</span>
+          </a>
+          <a href="/manager/production" className="flex items-center justify-between p-3 rounded-2xl transition-colors tap-target" style={{ background: "#FEF1F5" }}>
+            <span className="text-xs font-semibold text-slate-700">Modul Produksi</span>
+            <span className="text-xs font-bold" style={{ color: "#E85D8C" }}>Buka &rarr;</span>
+          </a>
+        </div>
+      </div>
+
       {/* Change Password Form */}
       <div className="rounded-3xl p-5 mb-5" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 4px 20px rgba(0,0,0,0.02)" }}>
         <div className="flex items-center gap-2 mb-4">

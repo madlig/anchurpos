@@ -13,7 +13,7 @@ export async function PATCH(
   const { id } = await params;
   const { status } = (await req.json()) as { status: string };
 
-  if (!["belum_selesai", "selesai"].includes(status)) {
+  if (!["pending", "selesai"].includes(status)) {
     return NextResponse.json({ error: "Status tidak valid" }, { status: 400 });
   }
 

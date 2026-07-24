@@ -13,6 +13,7 @@ export async function GET() {
       const data = doc.data();
       return {
         id: doc.id,
+        productId: data.productId ?? "",
         name: data.name,
         isProductionVariant: data.isProductionVariant ?? true,
         sortOrder: data.sortOrder ?? 0,

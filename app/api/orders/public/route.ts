@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
         customerName: name,
         customerPhone: phoneNumber,
         channel: "walk_in",
-        status: "belum_selesai",
+        status: "pending",
         paymentStatus: "belum_bayar",
         paymentMethod: null,
         needsProduction: false,

@@ -33,7 +33,7 @@ export function OrderFulfillmentTab({ ingredients, onSuccess }: Props) {
     setLoadingOrders(true);
     try {
       const token = await getToken();
-      const res = await fetch("/api/orders?status=belum_selesai", {
+      const res = await fetch("/api/orders?status=proses", {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {

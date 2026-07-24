@@ -69,9 +69,7 @@ export async function GET(req: NextRequest) {
       orders = orders.filter((o) => o.status !== "void");
     }
 
-    // Apply client-side limit after filtering
-    orders = orders.slice(0, 50);
-
+    // Removed slice to allow full client-side filtering of up to 200 recent orders
     return NextResponse.json(orders);
   } catch (err) {
     console.error("GET /api/orders error:", err);
@@ -158,6 +156,7 @@ export async function POST(req: NextRequest) {
     let resolvedChannel = "walk_in";
     let resolvedCustomerId = customerId ?? null;
     let resolvedCustomerType = inputCustomerType ?? null;
+    let resolvedCustomerAddress = shippingAddress ?? null;
     let discountPerUnit = 0;
 
     if (customerId) {
@@ -166,9 +165,11 @@ export async function POST(req: NextRequest) {
       if (customer) {
         resolvedCustomerName = customer.name ?? resolvedCustomerName;
         resolvedCustomerPhone = customer.phoneNumber ?? null;
-        resolvedChannel = customer.channel ?? "walk_in";
         resolvedCustomerType = customer.customerType ?? resolvedCustomerType;
         discountPerUnit = customer.discountPerUnit ?? 0;
+        if (!resolvedCustomerAddress && customer.address) {
+          resolvedCustomerAddress = customer.address;
+        }
       }
     }
 
@@ -292,14 +293,14 @@ export async function POST(req: NextRequest) {
 
       tx.set(orderRef, {
         orderNumber,
-        source: source ?? "walk_in",
-        orderChannel: finalOrderChannel,
+        source: orderChannel === "walkin" ? "walk_in" : (orderChannel === "whatsapp" ? "wa_form" : "marketplace_manual"),
+        orderChannel: orderChannel,
+        channel: finalOrderChannel,
         customerId: resolvedCustomerId,
         customerName: resolvedCustomerName,
         customerType: resolvedCustomerType,
         customerPhone: resolvedCustomerPhone,
-        channel: resolvedChannel,
-        status: isImmediate ? "selesai" : "belum_selesai",
+        status: isImmediate ? "selesai" : (inputPaymentStatus === "sudah_bayar" ? "proses" : "pending"),
         paymentStatus: inputPaymentStatus ?? "sudah_bayar",
         paymentMethod: paymentMethod ?? null,
         platformFeePercent: finalFeePercent,
@@ -311,7 +312,7 @@ export async function POST(req: NextRequest) {
         createdBy: (user as AuthUser | null)?.uid ?? null,
         createdAt: dateToUse,
         completedAt: isImmediate ? dateToUse : null,
-        shippingAddress: shippingAddress ?? null,
+        shippingAddress: resolvedCustomerAddress,
         requestedDeliveryDate: requestedDeliveryDate ?? null,
         orderNotes: orderNotes ?? null,
         proofOfTransferUrl: null,

@@ -71,11 +71,7 @@ export async function POST(req: NextRequest) {
   }
 
   const {
-    category,
-    ingredientId,
-    qtyPurchased,
-    purchaseUnit,
-    totalPrice,
+    items,
     paymentMethod,
     supplier,
     notes,
@@ -83,85 +79,111 @@ export async function POST(req: NextRequest) {
   } = parseResult.data;
 
   try {
-    const purchaseRef = adminDb.collection("purchases").doc();
     const dateToUse = customDate ? new Date(customDate) : new Date();
+    
+    // Validate no duplicate ingredients in the request to prevent transaction conflicts on same doc
+    const uniqueIds = new Set(items.map(i => i.ingredientId));
+    if (uniqueIds.size !== items.length) {
+      return NextResponse.json({ error: "Terdapat bahan baku yang sama di dalam keranjang nota. Harap gabungkan kuantitasnya menjadi satu baris." }, { status: 400 });
+    }
 
-    let qtyInBaseUnit = 0;
-    let pricePerBaseUnit = 0;
-    let ingredientName = "";
+    const savedIds: string[] = [];
 
     await adminDb.runTransaction(async (tx) => {
-      // 1. Validasi Master Data Bahan Baku
-      const ingRef = adminDb.collection("ingredients").doc(ingredientId);
-      const ingSnap = await tx.get(ingRef);
-
-      if (!ingSnap.exists) {
-        throw new Error("Bahan baku tidak ditemukan di Master Data.");
+      // 1. Read all required ingredients first
+      const ingDataMap = new Map();
+      for (const item of items) {
+        const ingRef = adminDb.collection("ingredients").doc(item.ingredientId);
+        const ingSnap = await tx.get(ingRef);
+        if (!ingSnap.exists) {
+          throw new Error(`Bahan baku dengan ID ${item.ingredientId} tidak ditemukan.`);
+        }
+        ingDataMap.set(item.ingredientId, { ref: ingRef, data: ingSnap.data()! });
       }
 
-      const ingData = ingSnap.data()!;
-      ingredientName = ingData.name;
+      // 2. Process writes for all items
+      for (const item of items) {
+        const { ref: ingRef, data: ingData } = ingDataMap.get(item.ingredientId);
+        const ingredientName = ingData.name;
 
-      // 2. Hitung Konversi Unit
-      const result = convertToBaseUnit(
-        qtyPurchased,
-        purchaseUnit,
-        ingData.baseUnit,
-        ingData.unitAlternatives ?? []
-      );
+        // Hitung Konversi Unit
+        let qtyInBaseUnit = 0;
+        let pricePerBaseUnit = 0;
 
-      if (result) {
-        qtyInBaseUnit = result.qtyInBaseUnit;
-        pricePerBaseUnit = qtyInBaseUnit > 0 ? totalPrice / qtyInBaseUnit : 0;
-      } else {
-        // Jika satuan beli = satuan dasar (misal sama-sama "gram")
-        qtyInBaseUnit = qtyPurchased;
-        pricePerBaseUnit = totalPrice / qtyPurchased;
+        const result = convertToBaseUnit(
+          item.qtyPurchased,
+          item.purchaseUnit,
+          ingData.baseUnit,
+          ingData.unitAlternatives ?? []
+        );
+
+        if (result) {
+          qtyInBaseUnit = result.qtyInBaseUnit;
+          pricePerBaseUnit = qtyInBaseUnit > 0 ? item.totalPrice / qtyInBaseUnit : 0;
+        } else {
+          qtyInBaseUnit = item.qtyPurchased;
+          pricePerBaseUnit = item.totalPrice / item.qtyPurchased;
+        }
+
+        // Tambah Stok Bahan Baku (Inventory) & Update HPP Dasar (Time-Aware)
+        const currentStock = ingData.currentStock ?? 0;
+        const newStock = currentStock + qtyInBaseUnit;
+        
+        const lastHppDateStr = ingData.lastHppUpdateDate;
+        const purchaseDateStr = dateToUse.toISOString();
+        
+        const updateData: any = {
+          currentStock: newStock,
+        };
+
+        // Update HPP ONLY IF this purchase is newer or equal to the last recorded HPP date, OR if current HPP is 0
+        if (!lastHppDateStr || purchaseDateStr >= lastHppDateStr || ingData.defaultCostPerBaseUnit === 0) {
+          updateData.defaultCostPerBaseUnit = pricePerBaseUnit;
+          updateData.lastHppUpdateDate = purchaseDateStr;
+        }
+
+        tx.update(ingRef, updateData);
+
+        // Catat Log Pembelian (Purchases)
+        const purchaseRef = adminDb.collection("purchases").doc();
+        savedIds.push(purchaseRef.id);
+        
+        tx.set(purchaseRef, {
+          date: dateToUse,
+          category: item.category,
+          ingredientId: item.ingredientId,
+          itemName: ingredientName,
+          qtyPurchased: item.qtyPurchased,
+          purchaseUnit: item.purchaseUnit,
+          qtyInBaseUnit,
+          totalPrice: item.totalPrice,
+          pricePerBaseUnit,
+          paymentMethod,
+          supplier: supplier ?? "",
+          notes: notes ?? "",
+          createdBy: user.uid,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+
+        // Catat Log Pergerakan Stok (Stock Movements)
+        const movementRef = adminDb.collection("stockMovements").doc();
+        tx.set(movementRef, {
+          ingredientId: item.ingredientId,
+          changeAmount: qtyInBaseUnit,
+          newStockAfter: newStock,
+          sourceType: "purchase",
+          sourceId: purchaseRef.id,
+          note: `Restock via Pembelian`,
+          createdBy: user.uid,
+          createdAt: dateToUse,
+        });
       }
-
-      // 3. Tambah Stok Bahan Baku (Inventory)
-      const currentStock = ingData.currentStock ?? 0;
-      const newStock = currentStock + qtyInBaseUnit;
-      tx.update(ingRef, { currentStock: newStock });
-
-      // 4. Catat Log Pembelian (Purchases)
-      tx.set(purchaseRef, {
-        date: dateToUse,
-        category,
-        ingredientId,
-        itemName: ingredientName,
-        qtyPurchased,
-        purchaseUnit,
-        qtyInBaseUnit,
-        totalPrice,
-        pricePerBaseUnit,
-        paymentMethod,
-        supplier: supplier ?? "",
-        notes: notes ?? "",
-        createdBy: user.uid,
-        createdAt: FieldValue.serverTimestamp(),
-      });
-
-      // 5. Catat Log Pergerakan Stok (Stock Movements)
-      const movementRef = adminDb.collection("stockMovements").doc();
-      tx.set(movementRef, {
-        ingredientId,
-        changeAmount: qtyInBaseUnit,
-        newStockAfter: newStock,
-        sourceType: "purchase",
-        sourceId: purchaseRef.id,
-        note: `Restock via Pembelian`,
-        createdBy: user.uid,
-        createdAt: dateToUse,
-      });
     });
 
     return NextResponse.json({
       success: true,
-      id: purchaseRef.id,
-      ingredientName,
-      qtyInBaseUnit,
-      pricePerBaseUnit,
+      ids: savedIds,
+      message: `${items.length} barang berhasil dibeli.`
     });
   } catch (err: any) {
     console.error("POST /api/purchases error:", err);

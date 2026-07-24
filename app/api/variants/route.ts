@@ -18,11 +18,13 @@ export async function GET(req: NextRequest) {
       const data = doc.data();
       return {
         id: doc.id,
+        productId: data.productId ?? "",
         name: data.name,
         isProductionVariant: data.isProductionVariant ?? true,
         sortOrder: data.sortOrder ?? 0,
         currentStock: data.currentStock ?? 0,
         minStock: data.minStock ?? 10,
+        freeSauceAllowance: data.freeSauceAllowance,
       };
     });
 
@@ -39,8 +41,8 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const { name, sortOrder = 99, minStock = 10 } = body as {
-    name: string; sortOrder?: number; minStock?: number;
+  const { name, sortOrder = 99, minStock = 10, freeSauceAllowance } = body as {
+    name: string; sortOrder?: number; minStock?: number; freeSauceAllowance?: number;
   };
   if (!name?.trim()) {
     return NextResponse.json({ error: "Nama varian wajib diisi" }, { status: 400 });
@@ -54,6 +56,7 @@ export async function POST(req: NextRequest) {
       sortOrder,
       currentStock: 0,
       minStock,
+      ...(typeof freeSauceAllowance === "number" ? { freeSauceAllowance } : {}),
       createdAt: FieldValue.serverTimestamp(),
     });
     return NextResponse.json({ id: ref.id, name: name.trim(), currentStock: 0, minStock });

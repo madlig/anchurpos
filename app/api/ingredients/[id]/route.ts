@@ -13,9 +13,10 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
-  const { name, baseUnit, category, minStock, channels, unitAlternatives } = body as {
+  const { name, baseUnit, category, minStock, channels, unitAlternatives, defaultCostPerBaseUnit } = body as {
     name?: string; baseUnit?: string; category?: string; minStock?: number; channels?: string[];
     unitAlternatives?: { unit: string; conversionToBase: number }[];
+    defaultCostPerBaseUnit?: number;
   };
 
   if (!name?.trim() || !baseUnit?.trim()) {
@@ -34,6 +35,10 @@ export async function PATCH(
       minStock: minStock ?? 0,
       channels: channels ?? [],
       ...(unitAlternatives ? { unitAlternatives } : {}),
+      ...(typeof defaultCostPerBaseUnit === "number" ? { 
+        defaultCostPerBaseUnit,
+        lastHppUpdateDate: new Date().toISOString()
+      } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     });
 
@@ -57,6 +62,12 @@ export async function DELETE(
     const ref = adminDb.collection("ingredients").doc(id);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Bahan tidak ditemukan" }, { status: 404 });
+
+    // Referential Integrity Guard
+    const recipeCheck = await adminDb.collection("recipes").where("ingredientId", "==", id).limit(1).get();
+    if (!recipeCheck.empty) {
+      return NextResponse.json({ error: "Tidak bisa dihapus karena bahan ini sedang dipakai di dalam Resep. Hapus atau ubah resep yang terkait terlebih dahulu." }, { status: 400 });
+    }
 
     await ref.delete();
     return NextResponse.json({ success: true });

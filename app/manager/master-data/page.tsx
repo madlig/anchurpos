@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatNumber } from "@/lib/formatters";
 
-type Tab = "produk" | "varian" | "bahan" | "pelanggan" | "addons" | "suppliers";
+type Tab = "produk" | "varian" | "bahan" | "pelanggan" | "addons" | "suppliers" | "configs";
 
 function fmt(n: number) {
   return formatNumber(n);
@@ -50,10 +50,12 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   const isEdit = !!initial;
   const [form, setForm] = useState<{
     name: string; code: string; description: string; packPerBatch: string; channels: string[];
+    freeSauceAllowance: string;
   }>({
     name: initial?.name ?? "", code: initial?.code ?? "",
     description: initial?.description ?? "", packPerBatch: String(initial?.packPerBatch ?? "1"),
     channels: initial?.channels ?? [],
+    freeSauceAllowance: String(initial?.freeSauceAllowance ?? "0"),
   });
   const hasMultipleTiers = initial?.priceTiers && (initial.priceTiers.length > 1 || initial.priceTiers.some(t => t.minQty > 1 || t.maxQty !== null));
   const [hasTiering, setHasTiering] = useState<boolean>(hasMultipleTiers || false);
@@ -84,7 +86,7 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
     try {
       const url = isEdit ? `/api/products/${initial!.id}` : "/api/products";
       const method = isEdit ? "PATCH" : "POST";
-      const res = await fetchWithAuth(url, { method, body: JSON.stringify({ ...form, packPerBatch: parseInt(form.packPerBatch) || 1, priceTiers, channels: form.channels }) });
+      const res = await fetchWithAuth(url, { method, body: JSON.stringify({ ...form, packPerBatch: parseInt(form.packPerBatch) || 1, freeSauceAllowance: parseInt(form.freeSauceAllowance) || 0, priceTiers, channels: form.channels }) });
       if (!res.ok) { setErr((await res.json()).error ?? "Gagal"); return; }
       onSuccess();
     } finally { setSaving(false); }
@@ -104,7 +106,9 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
           <Input placeholder="Deskripsi (Opsional)" value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
             className="flex-1 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
           <Input type="number" placeholder="Pack/batch" value={form.packPerBatch} onChange={e => setForm(p => ({ ...p, packPerBatch: e.target.value }))}
-            className="w-32 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
+            className="w-24 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" title="Jumlah pack yang dihasilkan dari 1 batch produksi" />
+          <Input type="number" placeholder="Jatah Saus/Pack" value={form.freeSauceAllowance} onChange={e => setForm(p => ({ ...p, freeSauceAllowance: e.target.value }))}
+            className="w-32 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" title="Jatah saus gratis per pack (Contoh: 2)" />
         </div>
         
         <div className="mt-2 p-4 bg-brand-50 border border-slate-200 rounded-xl">
@@ -202,6 +206,7 @@ function VariantForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   const isEdit = !!initial;
   const [form, setForm] = useState({
     name: initial?.name ?? "", sortOrder: String(initial?.sortOrder ?? "99"), minStock: String(initial?.minStock ?? "10"),
+    freeSauceAllowance: initial?.freeSauceAllowance !== undefined ? String(initial.freeSauceAllowance) : "",
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -212,7 +217,13 @@ function VariantForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
     try {
       const url = isEdit ? `/api/variants/${initial!.id}` : "/api/variants";
       const method = isEdit ? "PATCH" : "POST";
-      const res = await fetchWithAuth(url, { method, body: JSON.stringify({ name: form.name.trim(), sortOrder: parseInt(form.sortOrder) || 99, minStock: parseInt(form.minStock) || 10 }) });
+      const payload = { 
+        name: form.name.trim(), 
+        sortOrder: parseInt(form.sortOrder) || 99, 
+        minStock: parseInt(form.minStock) || 10,
+        freeSauceAllowance: form.freeSauceAllowance !== "" ? parseInt(form.freeSauceAllowance) || 0 : undefined
+      };
+      const res = await fetchWithAuth(url, { method, body: JSON.stringify(payload) });
       if (!res.ok) { setErr((await res.json()).error ?? "Gagal"); return; }
       onSuccess();
     } finally { setSaving(false); }
@@ -226,9 +237,11 @@ function VariantForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
           className="h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" data-testid="variant-name-input" />
         <div className="flex gap-3">
           <Input type="number" placeholder="Urutan (contoh: 1)" value={form.sortOrder} onChange={e => setForm(p => ({ ...p, sortOrder: e.target.value }))}
+            className="w-24 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
+          <Input type="number" placeholder="Stok min" value={form.minStock} onChange={e => setForm(p => ({ ...p, minStock: e.target.value }))}
             className="flex-1 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
-          <Input type="number" placeholder="Stok minimum" value={form.minStock} onChange={e => setForm(p => ({ ...p, minStock: e.target.value }))}
-            className="flex-1 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
+          <Input type="number" placeholder="Override Jatah Saus" value={form.freeSauceAllowance} onChange={e => setForm(p => ({ ...p, freeSauceAllowance: e.target.value }))}
+            className="flex-1 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" title="Kosongkan jika ingin mengikuti jatah Produk" />
         </div>
         {err && <p style={{ fontSize: "13px", color: "#DC2626", fontWeight: "500" }}>{err}</p>}
         <div className="flex gap-3 mt-2 pt-4 border-t border-slate-100">
@@ -253,11 +266,13 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   const [form, setForm] = useState<{
     name: string; baseUnit: string; minStock: string; category: string; channels: string[];
     unitAlternatives: { unit: string; conversionToBase: string }[];
+    defaultCostPerBaseUnit: string;
   }>({
     name: initial?.name ?? "", baseUnit: initial?.baseUnit ?? "",
     minStock: String(initial?.minStock ?? "0"), category: initial?.category ?? "bahan_baku",
     channels: initial?.channels ?? [],
     unitAlternatives: initial?.unitAlternatives?.map(u => ({ unit: u.unit, conversionToBase: String(u.conversionToBase) })) ?? [],
+    defaultCostPerBaseUnit: String(initial?.defaultCostPerBaseUnit ?? "0"),
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -280,7 +295,8 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
           category: form.category, 
           minStock: parseFloat(form.minStock) || 0, 
           channels: form.channels,
-          unitAlternatives: parsedAlternatives
+          unitAlternatives: parsedAlternatives,
+          defaultCostPerBaseUnit: parseFloat(form.defaultCostPerBaseUnit) || 0
         }) 
       });
       if (!res.ok) { setErr((await res.json()).error ?? "Gagal"); return; }
@@ -306,7 +322,9 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
             <option value="operasional">Operasional</option>
           </select>
           <Input type="number" placeholder="Stok min" value={form.minStock} onChange={e => setForm(p => ({ ...p, minStock: e.target.value }))}
-            className="w-32 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
+            className="w-24 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
+          <Input type="number" placeholder="HPP Dasar" value={form.defaultCostPerBaseUnit} onChange={e => setForm(p => ({ ...p, defaultCostPerBaseUnit: e.target.value }))}
+            className="flex-1 h-12 rounded-xl border-slate-200 text-sm focus-visible:ring-[#E85D8C]" />
         </div>
 
         <div className="mt-2 p-4 bg-brand-50 border border-slate-200 rounded-xl space-y-3">
@@ -441,6 +459,10 @@ export default function MasterDataPage() {
   const [supplierDeleteTarget, setSupplierDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deletingSupplier, setDeletingSupplier] = useState(false);
 
+  // ── Configs state ──
+  const [configs, setConfigs] = useState<{ paymentMethods: string[], deliveryMethods: string[], shippingBorneBy: string[] }>({ paymentMethods: [], deliveryMethods: [], shippingBorneBy: [] });
+  const [savingConfigs, setSavingConfigs] = useState(false);
+
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
     return fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...opts?.headers } });
@@ -449,13 +471,14 @@ export default function MasterDataPage() {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, v, i, c, a, s] = await Promise.all([
+      const [p, v, i, c, a, s, configsRes] = await Promise.all([
         fetchWithAuth("/api/products").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/variants").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/ingredients").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/customers").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/addons").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/suppliers").then(r => r.ok ? r.json() : []),
+        fetchWithAuth("/api/system-configs").then(r => r.ok ? r.json() : null),
       ]);
       setProducts(Array.isArray(p) ? p : []);
       setVariants(Array.isArray(v) ? v : []);
@@ -463,6 +486,13 @@ export default function MasterDataPage() {
       setCustomers(Array.isArray(c) ? c : []);
       setAddOns(Array.isArray(a) ? a : []);
       setSuppliers(Array.isArray(s) ? s : []);
+      if (configsRes) {
+        setConfigs({
+          paymentMethods: configsRes.paymentMethods || [],
+          deliveryMethods: configsRes.deliveryMethods || [],
+          shippingBorneBy: configsRes.shippingBorneBy || [],
+        });
+      }
     } finally { setLoading(false); }
   }, [fetchWithAuth]);
 
@@ -597,6 +627,25 @@ export default function MasterDataPage() {
     } finally { setDeletingSupplier(false); }
   }
 
+  // Configs Handlers
+  async function handleSaveConfigs() {
+    setSavingConfigs(true);
+    try {
+      const res = await fetchWithAuth("/api/system-configs", {
+        method: "POST",
+        body: JSON.stringify({
+          paymentMethods: configs.paymentMethods,
+          expenseCategories: ["bahan_baku", "packaging", "operasional", "lain_lain"], // Keep existing defaults for now
+          deliveryMethods: configs.deliveryMethods,
+          shippingBorneBy: configs.shippingBorneBy
+        })
+      });
+      if (res.ok) {
+        await loadAll();
+      }
+    } finally { setSavingConfigs(false); }
+  }
+
   const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "produk", label: "Produk", icon: Package },
     { key: "varian", label: "Varian", icon: Layers },
@@ -604,8 +653,8 @@ export default function MasterDataPage() {
     { key: "pelanggan", label: "Pelanggan", icon: Users },
     { key: "addons", label: "Add-on", icon: Plus },
     { key: "suppliers", label: "Supplier", icon: Store },
+    { key: "configs", label: "Pembayaran & Pengiriman", icon: Store },
   ];
-
   const q = search.toLowerCase();
   const filteredProducts = products.filter(p => !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q));
   const filteredVariants = variants.filter(v => !q || v.name.toLowerCase().includes(q));
@@ -1094,6 +1143,88 @@ export default function MasterDataPage() {
                 </>
               )}
 
+            </div>
+          </div>
+        )}
+
+        {/* ─── CONFIGS TAB ─── */}
+        {tab === "configs" && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl">
+            <div className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100">
+              <h2 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
+                <Store size={24} className="text-[#E85D8C]" /> Konfigurasi Pembayaran & Pengiriman
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Payment Methods */}
+                <div className="bg-slate-50 p-5 rounded-[16px] border border-slate-100">
+                  <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">Metode Pembayaran</h3>
+                  <div className="flex flex-col gap-2 mb-4">
+                    {configs.paymentMethods.map((m, i) => (
+                      <div key={i} className="flex gap-2">
+                        <Input value={m} onChange={e => {
+                          const newM = [...configs.paymentMethods];
+                          newM[i] = e.target.value;
+                          setConfigs({ ...configs, paymentMethods: newM });
+                        }} className="bg-white" />
+                        <button onClick={() => {
+                          const newM = configs.paymentMethods.filter((_, idx) => idx !== i);
+                          setConfigs({ ...configs, paymentMethods: newM });
+                        }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={16}/></button>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => setConfigs({ ...configs, paymentMethods: [...configs.paymentMethods, ""] })} className="text-sm font-bold text-[#E85D8C] flex items-center gap-1 hover:bg-pink-50 p-2 rounded-lg transition-colors"><Plus size={16}/> Tambah Metode</button>
+                </div>
+
+                {/* Delivery Methods */}
+                <div className="bg-slate-50 p-5 rounded-[16px] border border-slate-100">
+                  <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">Metode Pengiriman</h3>
+                  <div className="flex flex-col gap-2 mb-4">
+                    {configs.deliveryMethods.map((m, i) => (
+                      <div key={i} className="flex gap-2">
+                        <Input value={m} onChange={e => {
+                          const newM = [...configs.deliveryMethods];
+                          newM[i] = e.target.value;
+                          setConfigs({ ...configs, deliveryMethods: newM });
+                        }} className="bg-white" />
+                        <button onClick={() => {
+                          const newM = configs.deliveryMethods.filter((_, idx) => idx !== i);
+                          setConfigs({ ...configs, deliveryMethods: newM });
+                        }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={16}/></button>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => setConfigs({ ...configs, deliveryMethods: [...configs.deliveryMethods, ""] })} className="text-sm font-bold text-[#E85D8C] flex items-center gap-1 hover:bg-pink-50 p-2 rounded-lg transition-colors"><Plus size={16}/> Tambah Metode</button>
+                </div>
+
+                {/* Shipping Borne By */}
+                <div className="bg-slate-50 p-5 rounded-[16px] border border-slate-100 md:col-span-2">
+                  <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">Penanggung Ongkir</h3>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {configs.shippingBorneBy.map((m, i) => (
+                      <div key={i} className="flex gap-2 items-center bg-white p-2 rounded-lg border border-slate-200">
+                        <Input value={m} onChange={e => {
+                          const newM = [...configs.shippingBorneBy];
+                          newM[i] = e.target.value;
+                          setConfigs({ ...configs, shippingBorneBy: newM });
+                        }} className="border-none shadow-none h-8 w-32 focus-visible:ring-0" />
+                        <button onClick={() => {
+                          const newM = configs.shippingBorneBy.filter((_, idx) => idx !== i);
+                          setConfigs({ ...configs, shippingBorneBy: newM });
+                        }} className="p-1 text-red-500 hover:bg-red-50 rounded-md"><Trash2 size={14}/></button>
+                      </div>
+                    ))}
+                    <button onClick={() => setConfigs({ ...configs, shippingBorneBy: [...configs.shippingBorneBy, ""] })} className="text-sm font-bold text-[#E85D8C] flex items-center gap-1 hover:bg-pink-50 p-2 rounded-lg transition-colors"><Plus size={16}/> Tambah Opsi</button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end">
+                <button onClick={handleSaveConfigs} disabled={savingConfigs} className="bg-[#E85D8C] text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-pink-600 transition-colors shadow-sm">
+                  {savingConfigs ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />} Simpan Konfigurasi
+                </button>
+              </div>
             </div>
           </div>
         )}

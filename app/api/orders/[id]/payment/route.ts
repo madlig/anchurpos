@@ -20,8 +20,16 @@ export async function PATCH(
   }
 
   try {
+    const doc = await adminDb.doc(`orders/${id}`).get();
+    if (!doc.exists) return NextResponse.json({ error: "Order tidak ditemukan" }, { status: 404 });
+    const data = doc.data() as { status: string };
+
     const updates: Record<string, unknown> = { paymentStatus };
     if (paymentMethod) updates.paymentMethod = paymentMethod;
+
+    if (paymentStatus === "sudah_bayar" && data.status === "pending") {
+      updates.status = "proses";
+    }
 
     await adminDb.doc(`orders/${id}`).update(updates);
     return NextResponse.json({ success: true });

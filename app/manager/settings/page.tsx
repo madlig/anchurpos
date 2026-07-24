@@ -14,6 +14,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Tag,
+  Package,
 } from "lucide-react";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 
@@ -41,6 +42,20 @@ export default function ManagerSettingsPage() {
   const [savingFees, setSavingFees] = useState(false);
   const [feeSaved, setFeeSaved] = useState("");
 
+  // Inventory Keywords state
+  const [inventoryKeywords, setInventoryKeywords] = useState<string[]>([]);
+  const [newKeyword, setNewKeyword] = useState("");
+  const [savingInventory, setSavingInventory] = useState(false);
+  const [inventorySaved, setInventorySaved] = useState("");
+
+  function handleAddKeyword() {
+    const val = newKeyword.trim().toLowerCase();
+    if (val && !inventoryKeywords.includes(val)) {
+      setInventoryKeywords([...inventoryKeywords, val]);
+    }
+    setNewKeyword("");
+  }
+
   const fetchWithAuth = useCallback(
     async (url: string, options?: RequestInit) => {
       const token = await getToken();
@@ -58,10 +73,11 @@ export default function ManagerSettingsPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const [res, targetRes, feeRes] = await Promise.all([
+      const [res, targetRes, feeRes, invRes] = await Promise.all([
         fetchWithAuth("/api/settings/attendance"),
         fetchWithAuth("/api/settings/production"),
         fetchWithAuth("/api/settings/marketplace-fee"),
+        fetchWithAuth("/api/settings/inventory"),
       ]);
       if (res.ok) {
         const c = await res.json();
@@ -76,6 +92,11 @@ export default function ManagerSettingsPage() {
       if (targetRes.ok) {
         const t = await targetRes.json();
         setDailyLoyangTarget(t.dailyLoyangTarget ?? 8);
+      }
+      
+      if (invRes.ok) {
+        const i = await invRes.json();
+        setInventoryKeywords(i.glazeKeywords || []);
       }
     } catch (err) {
       console.error(err);
@@ -389,6 +410,78 @@ export default function ManagerSettingsPage() {
           Simpan Fee Marketplace
         </Button>
         {feeSaved && <p style={{ fontSize: "12px", color: "#16A34A", fontWeight: "600" }}>✓ {feeSaved}</p>}
+      </Card>
+      {/* ── Inventaris & Repacking ── */}
+      <Card className="p-5 space-y-4 mb-8">
+        <div className="flex items-center gap-2">
+          <div style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Package size={16} className="text-primary" />
+          </div>
+          <div>
+            <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>Kata Kunci Bahan Repacking</p>
+            <p style={{ fontSize: "11px", color: "#94A3B8" }}>Daftar kata kunci yang membuat bahan baku muncul di dropdown Repack Saos dapur.</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-2">
+          {inventoryKeywords.map((kw, i) => (
+            <div key={i} className="flex items-center gap-1 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-xs font-bold">
+              <span>{kw}</span>
+              <button 
+                onClick={() => setInventoryKeywords(p => p.filter((_, idx) => idx !== i))}
+                className="hover:text-red-500 ml-1 transition-colors"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
+          {inventoryKeywords.length === 0 && <span className="text-xs text-slate-400">Belum ada kata kunci.</span>}
+        </div>
+
+        <div className="flex gap-2">
+          <Input 
+            type="text" 
+            placeholder="Tambah kata (misal: taburan)..." 
+            value={newKeyword}
+            onChange={e => setNewKeyword(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddKeyword();
+              }
+            }}
+            className="flex-1 text-sm h-10 rounded-xl"
+          />
+          <Button 
+            onClick={handleAddKeyword} 
+            disabled={!newKeyword.trim()} 
+            className="h-10 px-4 rounded-xl"
+            variant="outline"
+          >
+            <Plus size={16} />
+          </Button>
+        </div>
+
+        <Button
+          onClick={async () => {
+            setSavingInventory(true);
+            setInventorySaved("");
+            try {
+              const res = await fetchWithAuth("/api/settings/inventory", {
+                method: "POST",
+                body: JSON.stringify({ glazeKeywords: inventoryKeywords })
+              });
+              if (res.ok) setInventorySaved("Kata kunci berhasil disimpan!");
+            } finally { setSavingInventory(false); }
+          }}
+          disabled={savingInventory}
+          className="w-full h-11 rounded-xl text-sm font-bold"
+          style={{ background: "#E85D8C", color: "#fff" }}
+        >
+          {savingInventory ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
+          Simpan Kata Kunci
+        </Button>
+        {inventorySaved && <p style={{ fontSize: "12px", color: "#16A34A", fontWeight: "600" }}>✓ {inventorySaved}</p>}
       </Card>
     </div>
   );

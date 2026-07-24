@@ -12,7 +12,8 @@ interface OrderDetail {
   createdAt: string; completedAt: string | null;
   paymentStatus: string; paymentMethod: string | null; shippingCost: number | null;
   platformFee: number; netRevenue: number | null;
-  orderNotes: string | null; items: OrderItem[];
+  orderNotes: string | null; shippingAddress: string | null; items: OrderItem[];
+  sauceDistribution: Record<string, number> | null;
 }
 
 
@@ -109,12 +110,27 @@ export default function InvoicePage() {
           <div>
             <p style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "6px" }}>Kepada</p>
             <p style={{ fontSize: "15px", fontWeight: "700", color: "#1C1C1E", margin: "0 0 3px" }}>{order.customerName}</p>
-            {order.customerPhone && <p style={{ fontSize: "12px", color: "#64748B", margin: 0 }}>{order.customerPhone}</p>}
+            {order.customerPhone && <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 2px" }}>{order.customerPhone}</p>}
+            {order.shippingAddress && <p style={{ fontSize: "12px", color: "#64748B", margin: 0 }}>{order.shippingAddress}</p>}
           </div>
           <div>
             <p style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "6px" }}>Detail Pembayaran</p>
-            {order.paymentMethod && <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 2px" }}>Metode: {order.paymentMethod === "cash" ? "Tunai" : order.paymentMethod === "transfer" ? "Transfer Bank" : "QRIS"}</p>}
-            {order.completedAt && <p style={{ fontSize: "12px", color: "#64748B", margin: 0 }}>Selesai: {fmtDate(order.completedAt)}</p>}
+            {isPaid ? (
+              <>
+                <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 2px" }}>
+                  Status: <strong style={{ color: "#16A34A" }}>LUNAS</strong>
+                </p>
+                {order.paymentMethod && <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 2px" }}>Metode: {order.paymentMethod.toUpperCase()}</p>}
+                {order.completedAt && <p style={{ fontSize: "12px", color: "#64748B", margin: 0 }}>Tgl. Lunas: {fmtDate(order.completedAt)}</p>}
+              </>
+            ) : (
+              <div style={{ background: "#F1F5F9", padding: "10px", borderRadius: "8px", borderLeft: "3px solid #E85D8C" }}>
+                <p style={{ fontSize: "11px", color: "#475569", margin: "0 0 4px", fontWeight: "600" }}>Instruksi Pembayaran</p>
+                <p style={{ fontSize: "11px", color: "#64748B", margin: 0, lineHeight: "1.4" }}>
+                  Mohon lakukan pembayaran sesuai nominal tagihan melalui metode yang telah disepakati sebelum pesanan dikirim/diambil.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -129,17 +145,31 @@ export default function InvoicePage() {
             </tr>
           </thead>
           <tbody>
-            {order.items.map((item, i) => (
-              <tr key={i} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                <td style={{ padding: "12px", fontSize: "13px" }}>
-                  <p style={{ fontWeight: "600", color: "#1C1C1E", margin: "0 0 2px" }}>{item.productName}</p>
-                  <p style={{ fontSize: "11px", color: "#94A3B8", margin: 0 }}>{item.variantName}</p>
-                </td>
-                <td style={{ padding: "12px", textAlign: "center", fontSize: "13px", color: "#64748B" }}>{item.qty}</td>
-                <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", color: "#64748B" }}>{fmt(item.basePrice)}</td>
-                <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{fmt(item.totalPrice)}</td>
-              </tr>
-            ))}
+            {order.items.map((item, i) => {
+              const hasSauces = i === 0 && order.sauceDistribution && Object.values(order.sauceDistribution).some(q => q > 0);
+              return (
+                <tr key={i} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                  <td style={{ padding: "12px", fontSize: "13px", verticalAlign: "top" }}>
+                    <p style={{ fontWeight: "600", color: "#1C1C1E", margin: "0 0 2px" }}>{item.productName}</p>
+                    {item.variantName && <p style={{ fontSize: "11px", color: "#94A3B8", margin: 0 }}>Varian: {item.variantName}</p>}
+                    
+                    {hasSauces && (
+                      <div style={{ marginTop: "8px", background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "6px 10px", borderRadius: "6px", display: "inline-block" }}>
+                        <p style={{ fontSize: "10px", fontWeight: "700", color: "#64748B", margin: "0 0 4px", textTransform: "uppercase" }}>Saus (Include):</p>
+                        {Object.entries(order.sauceDistribution!).map(([sauceId, qty], idx) => qty > 0 && (
+                          <p key={`s-${idx}`} style={{ fontSize: "11px", color: "#475569", margin: "0 0 2px" }}>
+                            • {qty}x {sauceId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ padding: "12px", textAlign: "center", fontSize: "13px", color: "#64748B", verticalAlign: "top" }}>{item.qty}</td>
+                  <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", color: "#64748B", verticalAlign: "top" }}>{fmt(item.basePrice)}</td>
+                  <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", fontWeight: "600", color: "#1C1C1E", verticalAlign: "top" }}>{fmt(item.totalPrice)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 

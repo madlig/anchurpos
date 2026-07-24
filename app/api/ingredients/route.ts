@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
         opnameMethod: data.opnameMethod ?? "direct",
         packagedConfig: data.packagedConfig ?? null,
         channels: data.channels ?? [],
+        defaultCostPerBaseUnit: data.defaultCostPerBaseUnit ?? 0,
       };
     });
 
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
   }
 
-  const { name, category, baseUnit, minStock, channels, unitAlternatives } = parseResult.data;
+  const { name, category, baseUnit, minStock, channels, unitAlternatives, defaultCostPerBaseUnit } = parseResult.data;
 
   try {
     const ref = adminDb.collection("ingredients").doc();
@@ -59,6 +60,8 @@ export async function POST(req: NextRequest) {
       unitAlternatives, opnameMethod: "direct",
       packagedConfig: null,
       channels,
+      defaultCostPerBaseUnit: defaultCostPerBaseUnit ?? 0,
+      lastHppUpdateDate: new Date().toISOString(),
       createdAt: FieldValue.serverTimestamp(),
     });
     return NextResponse.json({ id: ref.id, name: name.trim() }, { status: 201 });

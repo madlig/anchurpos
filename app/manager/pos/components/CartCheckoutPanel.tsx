@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import { X, CheckCircle2, CreditCard, MessageCircle, Store, Smartphone, ShoppingBag } from "lucide-react";
+import { X, CheckCircle2, CreditCard, MessageCircle, Store, Smartphone, ShoppingBag, Plus, Minus } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 
@@ -19,6 +19,7 @@ interface Props {
   onClose: () => void;
   onSuccess: (orderId: string) => void;
   removeFromCart: (idx: number) => void;
+  configs: { paymentMethods: string[], deliveryMethods: string[], shippingBorneBy: string[] } | null;
 }
 
 function fmt(n: number) {
@@ -37,7 +38,7 @@ function getChannelIcon(channel: string, size = 14) {
 
 export function CartCheckoutPanel({
   cart, cartTotal, orderChannel, customers, setCustomers,
-  addOns, marketplaceFees, onClose, onSuccess, removeFromCart
+  addOns, marketplaceFees, onClose, onSuccess, removeFromCart, configs
 }: Props) {
   const { getToken, role } = useAuth();
   const router = useRouter();
@@ -70,11 +71,9 @@ export function CartCheckoutPanel({
     if (!addOns.length) return dist;
     const defaultCoklat = addOns.find(a => a.id === "saus-coklat" || a.id === "saus-coklat-tiktok")?.id || "saus-coklat";
     cart.forEach(item => {
-      const hasSauce = item.productId.toLowerCase().includes("churros") || (item.productName || "").toLowerCase().includes("churros");
-      if (hasSauce) {
-        dist[defaultCoklat] = (dist[defaultCoklat] ?? 0) + item.qty;
-        const chosenSauce = item.sauceId || defaultCoklat;
-        dist[chosenSauce] = (dist[chosenSauce] ?? 0) + item.qty;
+      const allowance = item.freeSauceAllowance ?? 0;
+      if (allowance > 0) {
+        dist[defaultCoklat] = (dist[defaultCoklat] ?? 0) + (item.qty * allowance);
       }
     });
     return dist;
@@ -85,6 +84,30 @@ export function CartCheckoutPanel({
   useEffect(() => {
     setSauceDist(computedSauceDist);
   }, [computedSauceDist]);
+
+  function adjustSauceQty(sauceId: string, delta: number) {
+    setSauceDist(prev => {
+      const curr = prev[sauceId] ?? 0;
+      const next = Math.max(0, curr + delta);
+      const currentTotal = Object.values(prev).reduce((sum, val) => sum + val, 0);
+      const totalWithNext = currentTotal - curr + next;
+      if (totalWithNext > totalSaucesNeeded) return prev;
+      return { ...prev, [sauceId]: next };
+    });
+  }
+
+  function setSauceQtyExact(sauceId: string, val: number) {
+    if (isNaN(val) || val < 0) val = 0;
+    setSauceDist(prev => {
+      const curr = prev[sauceId] ?? 0;
+      const currentTotal = Object.values(prev).reduce((sum, v) => sum + v, 0);
+      let next = val;
+      if (currentTotal - curr + next > totalSaucesNeeded) {
+        next = totalSaucesNeeded - (currentTotal - curr);
+      }
+      return { ...prev, [sauceId]: next };
+    });
+  }
 
   const filteredCustomers = useMemo(() => {
     const q = customerSearch.toLowerCase().trim();
@@ -119,6 +142,7 @@ export function CartCheckoutPanel({
           body: JSON.stringify({
             name: customerSearch.trim(), customerType: newCustomerType,
             poNumber: showPoNumber && poNumber.trim() ? poNumber.trim() : null,
+            orderChannel: orderChannel,
             channel: orderChannel === "whatsapp" ? "whatsapp" : "walk_in",
             createdVia: "pos"
           }),
@@ -136,8 +160,20 @@ export function CartCheckoutPanel({
         body: JSON.stringify({
           customerName: finalCustomerName, customerId, customerType: isNewCustomer ? newCustomerType : (selectedCustomer?.customerType ?? null),
           source: orderChannel === "walkin" ? "walk_in" : orderChannel === "whatsapp" ? "wa_form" : "marketplace_manual",
-          orderChannel, items: cart.map(c => ({ productId: c.productId, variantId: c.variantId, qty: c.qty, sauceId: c.sauceId, sauceName: c.sauceName })),
-          orderNotes: orderNotes.trim() || null, paymentMethod: payMethod, paymentStatus: isPaid ? "sudah_bayar" : "belum_bayar",
+          orderChannel, items: cart.map(c => ({ 
+            productId: c.productId, 
+            productName: c.productName,
+            variantId: c.variantId, 
+            variantName: c.variantName,
+            qty: c.qty, 
+            basePrice: c.basePrice,
+            appliedTier: c.appliedTier,
+            discountPerUnit: c.discountPerUnit,
+            totalPrice: c.totalPrice,
+            sauceId: c.sauceId, 
+            sauceName: c.sauceName 
+          })),
+          orderNotes: orderNotes.trim() || null, paymentMethod: isPaid ? payMethod : null, paymentStatus: isPaid ? "sudah_bayar" : "belum_bayar",
           poNumber: showPoNumber && poNumber.trim() ? poNumber.trim() : null,
           customDate: enableCustomDate && customOrderDate ? customOrderDate : undefined,
           shippingCost: orderChannel === "whatsapp" && deliveryMethod !== "pickup" ? (parseInt(shippingCost) || 0) : null,
@@ -254,9 +290,9 @@ export function CartCheckoutPanel({
               <button onClick={() => setIsPaid(false)} className={`flex-1 flex items-center justify-center gap-1.5 p-2 rounded-xl text-xs font-semibold ${!isPaid ? "bg-red-600 text-white" : "bg-red-100 text-red-600"}`}><CreditCard size={13} /> Belum Bayar</button>
             </div>
             {(orderChannel === "walkin" || (orderChannel === "whatsapp" && isPaid)) && (
-              <div className="flex gap-2">
-                {(["cash", "transfer", "qris"] as const).map(m => (
-                  <button key={m} onClick={() => setPayMethod(m)} className={`flex-1 p-2 rounded-xl text-xs font-semibold ${payMethod === m ? "bg-primary/10 text-primary" : "bg-white text-slate-500"}`}>{m === "cash" ? "Tunai" : m === "transfer" ? "Transfer" : "QRIS"}</button>
+              <div className="flex flex-wrap gap-2">
+                {(configs?.paymentMethods || ["cash", "transfer", "qris"]).map(m => (
+                  <button key={m} onClick={() => setPayMethod(m as any)} className={`flex-1 p-2 rounded-xl text-xs font-semibold ${payMethod === m ? "bg-primary/10 text-primary" : "bg-white text-slate-500"}`}>{m.charAt(0).toUpperCase() + m.slice(1)}</button>
                 ))}
               </div>
             )}
@@ -267,21 +303,22 @@ export function CartCheckoutPanel({
         {orderChannel === "whatsapp" && (
           <div className="mb-3 p-3 rounded-xl bg-brand-50 border border-slate-200">
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest block mb-2">Metode Pengiriman</label>
-            <div className="flex gap-2 mb-2">
-              {([ { key: "pickup", label: "Pickup" }, { key: "self_delivery", label: "Diantar Kita" }, { key: "courier", label: "Kurir" } ] as const).map(opt => (
-                <button key={opt.key} onClick={() => { setDeliveryMethod(opt.key); if (opt.key === "pickup") { setShippingCost(""); setShippingBorneBy("customer"); } }} className={`flex-1 p-1.5 rounded-lg text-xs font-semibold ${deliveryMethod === opt.key ? "bg-primary/10 text-primary" : "bg-white text-slate-500"}`}>{opt.label}</button>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {(configs?.deliveryMethods || ["pickup", "delivery"]).map(m => (
+                <button key={m} onClick={() => { setDeliveryMethod(m as any); if (m === "pickup") { setShippingCost(""); setShippingBorneBy("customer"); } }} className={`flex-1 p-1.5 rounded-lg text-xs font-semibold ${deliveryMethod === m ? "bg-primary/10 text-primary" : "bg-white text-slate-500"}`}>{m.replace("_", " ").toUpperCase()}</button>
               ))}
             </div>
-            {(deliveryMethod === "self_delivery" || deliveryMethod === "courier") && (
+            {(deliveryMethod !== "pickup") && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-sm text-slate-500 font-semibold">Rp</span>
                   <input type="number" placeholder="0" value={shippingCost} onChange={e => setShippingCost(e.target.value)} className="flex-1 p-2 rounded-lg border border-slate-200 text-sm outline-none" />
                 </div>
                 <p className="text-xs text-slate-400 mb-1">Ditanggung Oleh:</p>
-                <div className="flex gap-2">
-                  <button onClick={() => setShippingBorneBy("customer")} className={`flex-1 p-1.5 rounded-lg text-xs font-semibold ${shippingBorneBy === "customer" ? "bg-primary/10 text-primary" : "bg-white text-slate-500"}`}>Pembeli</button>
-                  <button onClick={() => setShippingBorneBy("seller")} className={`flex-1 p-1.5 rounded-lg text-xs font-semibold ${shippingBorneBy === "seller" ? "bg-primary/10 text-primary" : "bg-white text-slate-500"}`}>Toko</button>
+                <div className="flex flex-wrap gap-2">
+                  {(configs?.shippingBorneBy || ["seller", "customer"]).map(m => (
+                    <button key={m} onClick={() => setShippingBorneBy(m as any)} className={`flex-1 p-1.5 rounded-lg text-xs font-semibold ${shippingBorneBy === m ? "bg-primary/10 text-primary" : "bg-white text-slate-500"}`}>{m === "customer" ? "Pembeli" : m === "seller" ? "Toko" : m}</button>
+                  ))}
                 </div>
               </div>
             )}
@@ -302,12 +339,23 @@ export function CartCheckoutPanel({
         {/* Sauce Info */}
         {totalSaucesNeeded > 0 && addOns.length > 0 && (
           <div className="mb-3 p-3 rounded-xl bg-primary/10 border border-pink-200">
-            <span className="text-xs font-bold text-primary uppercase block mb-1.5">Rincian Saus (Otomatis)</span>
-            <div className="flex flex-col gap-1">
-              {Object.entries(sauceDist).map(([sauceId, qty]) => {
-                if (qty <= 0) return null;
-                const name = addOns.find(a => a.id === sauceId)?.name || sauceId;
-                return <div key={sauceId} className="flex justify-between items-center text-xs font-semibold text-slate-700 border-b border-dashed border-slate-200 pb-1 pt-1"><span>🍮 {name}</span><span className="text-primary font-bold">{qty} cup</span></div>;
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-primary uppercase">Rincian Saus ({Object.values(sauceDist).reduce((a,b)=>a+b,0)}/{totalSaucesNeeded})</span>
+              {Object.values(sauceDist).reduce((a,b)=>a+b,0) < totalSaucesNeeded && <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full animate-pulse">Sisa {totalSaucesNeeded - Object.values(sauceDist).reduce((a,b)=>a+b,0)}</span>}
+            </div>
+            <div className="flex flex-col gap-2">
+              {addOns.map(addon => {
+                const qty = sauceDist[addon.id] ?? 0;
+                return (
+                  <div key={addon.id} className="flex justify-between items-center border-b border-dashed border-slate-200 pb-1">
+                    <span className="text-xs font-semibold text-slate-700">🍮 {addon.name}</span>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => adjustSauceQty(addon.id, -1)} className="w-6 h-6 rounded-md bg-white border border-slate-200 flex items-center justify-center tap-target shadow-sm"><Minus size={12} /></button>
+                      <input type="number" min="0" max={totalSaucesNeeded} value={qty || ""} onChange={(e) => setSauceQtyExact(addon.id, parseInt(e.target.value) || 0)} className="w-8 h-6 text-center text-xs font-bold bg-white border border-slate-200 rounded-md outline-none focus:border-primary no-spinners" />
+                      <button onClick={() => adjustSauceQty(addon.id, 1)} className="w-6 h-6 rounded-md bg-primary text-white flex items-center justify-center tap-target shadow-sm"><Plus size={12} /></button>
+                    </div>
+                  </div>
+                );
               })}
             </div>
           </div>

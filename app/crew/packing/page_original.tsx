@@ -96,7 +96,7 @@ export default function CrewPackingPage() {
   const loadOrders = useCallback(async () => {
     setLoadingOrders(true);
     try {
-      const res = await fetchWithAuth("/api/orders?status=belum_selesai");
+      const res = await fetchWithAuth("/api/orders?status=pending");
       if (res.ok) {
         const data: Order[] = await res.json();
         setOrders(data);

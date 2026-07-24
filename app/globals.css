@@ -99,3 +99,13 @@ a,
   user-select: none;
   -webkit-touch-callout: none; /* Disables callout sheets on long press */
 }
+
+/* Hide number input spin buttons */
+.no-spinners::-webkit-outer-spin-button,
+.no-spinners::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinners {
+  -moz-appearance: textfield;
+}

@@ -60,6 +60,7 @@ export default function KasirPage() {
     const token = await getToken();
     return fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...opts?.headers } });
   }, [getToken]);
+  const [configs, setConfigs] = useState<{ paymentMethods: string[], deliveryMethods: string[], shippingBorneBy: string[] } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -69,13 +70,23 @@ export default function KasirPage() {
       fetchWithAuth("/api/products/stocks").then(r => r.json()),
       fetchWithAuth("/api/settings/marketplace-fee").then(r => r.ok ? r.json() : { tiktok: 0, shopee: 0 }),
       fetchWithAuth("/api/addons").then(r => r.json()),
-    ]).then(([p, v, c, s, fees, addonsData]) => {
+      fetchWithAuth("/api/system-configs").then(r => r.ok ? r.json() : null),
+    ]).then(([p, v, c, s, fees, addonsData, configsData]) => {
       setProducts(Array.isArray(p) ? p : []);
       setVariants(Array.isArray(v) ? v : []);
       setCustomers(Array.isArray(c) ? c : []);
       setProductStocks(Array.isArray(s) ? s : []);
       setMarketplaceFees({ tiktok: fees.tiktok ?? 0, shopee: fees.shopee ?? 0 });
       setAddOns(Array.isArray(addonsData) ? addonsData : []);
+      if (configsData) {
+        setConfigs({
+          paymentMethods: configsData.paymentMethods || ["cash", "transfer", "qris"],
+          deliveryMethods: configsData.deliveryMethods || ["pickup", "delivery"],
+          shippingBorneBy: configsData.shippingBorneBy || ["seller", "customer"]
+        });
+      } else {
+        setConfigs({ paymentMethods: ["cash", "transfer", "qris"], deliveryMethods: ["pickup", "delivery"], shippingBorneBy: ["seller", "customer"] });
+      }
     }).finally(() => setLoading(false));
   }, [fetchWithAuth]);
 
@@ -98,8 +109,18 @@ export default function KasirPage() {
       const product = products.find(p => p.id === item.productId);
       if (!product) return item;
       const accumulatedQty = productQtyMap.get(item.productId) ?? item.qty;
-      const price = getPrice(product, accumulatedQty);
-      return { ...item, price };
+      const basePrice = getPrice(product, accumulatedQty);
+      
+      const totalPrice = basePrice * item.qty;
+
+      return { 
+        ...item, 
+        price: basePrice, 
+        basePrice, 
+        appliedTier: `${accumulatedQty} pcs`, 
+        discountPerUnit: 0, 
+        totalPrice 
+      };
     });
   }, [products]);
 
@@ -111,7 +132,8 @@ export default function KasirPage() {
         if (idx >= 0) {
           next[idx] = { ...next[idx], qty: next[idx].qty + ni.qty };
         } else {
-          next.push({ ...ni, price: 0 }); // price recalculated right after
+          // price, basePrice, etc. will be recalculated right after
+          next.push({ ...ni, price: 0, basePrice: 0, appliedTier: "", discountPerUnit: 0, totalPrice: 0 }); 
         }
       }
       return recalculateCartPrices(next);
@@ -229,6 +251,7 @@ export default function KasirPage() {
               setCustomers={setCustomers}
               addOns={addOns}
               marketplaceFees={marketplaceFees}
+              configs={configs}
               onClose={() => {}}
               onSuccess={(orderId) => router.push(`/manager/orders/${orderId}`)}
               removeFromCart={removeFromCart}
@@ -264,6 +287,7 @@ export default function KasirPage() {
           setCustomers={setCustomers}
           addOns={addOns}
           marketplaceFees={marketplaceFees}
+          configs={configs}
           onClose={() => setShowMobileCart(false)}
           onSuccess={(orderId) => router.push(`/manager/orders/${orderId}`)}
           removeFromCart={removeFromCart}

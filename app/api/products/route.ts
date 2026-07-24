@@ -44,11 +44,12 @@ export async function GET(req: NextRequest) {
         code: data.code,
         name: data.name,
         description: data.description ?? "",
-        packPerBatch: data.packPerBatch,
-        isActive: data.isActive,
+        packPerBatch: data.packPerBatch ?? 1,
+        isActive: data.isActive ?? true,
         createdAt: data.createdAt?.toDate?.().toISOString() ?? "",
         updatedAt: data.updatedAt?.toDate?.().toISOString() ?? "",
         channels: data.channels ?? [],
+        freeSauceAllowance: data.freeSauceAllowance ?? 0,
         priceTiers,
       };
     });
@@ -74,14 +75,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
   }
 
-  const { name, code, description, packPerBatch, priceTiers = [], channels } = parseResult.data;
+  const { code, name, description, packPerBatch, isActive, channels, freeSauceAllowance, priceTiers = [] } = parseResult.data;
 
   try {
     const ref = adminDb.collection("products").doc();
     await ref.set({
-      name: name.trim(), code: code.trim().toUpperCase(),
-      description, packPerBatch, isActive: true,
+      code: code.trim(),
+      name: name.trim(),
+      description: description.trim(),
+      packPerBatch,
+      isActive,
       channels,
+      freeSauceAllowance: freeSauceAllowance ?? 0,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });

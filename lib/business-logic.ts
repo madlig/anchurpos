@@ -11,17 +11,11 @@ export async function getLatestIngredientCosts(ingredientIds: string[]): Promise
   // but we run them in parallel to avoid sequential blocking.
   await Promise.all(
     ingredientIds.map(async (id) => {
-      const snap = await adminDb
-        .collection("expenses")
-        .where("ingredientId", "==", id)
-        .orderBy("date", "desc")
-        .limit(1)
-        .get();
-        
-      if (!snap.empty) {
-        costs[id] = snap.docs[0].data().pricePerBaseUnit ?? 0;
+      const snap = await adminDb.collection("ingredients").doc(id).get();
+      if (snap.exists) {
+        costs[id] = snap.data()?.defaultCostPerBaseUnit ?? 0;
       } else {
-        costs[id] = 0; // fallback if no expense history
+        costs[id] = 0;
       }
     })
   );

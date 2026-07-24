@@ -4,7 +4,7 @@ import { RoleGuard } from "@/components/shared/RoleGuard";
 import { useAuth } from "@/lib/auth-context";
 import {
   LayoutDashboard, ShoppingCart, Package, User,
-  ClipboardList, LogOut, Banknote, ChefHat
+  ClipboardList, LogOut, Banknote, ChefHat, Beaker, Settings, BookOpen
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -47,6 +47,33 @@ function DesktopSidebar() {
               href={item.href}
               data-testid={`sidebar-${item.label.toLowerCase()}`}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
+              style={active ? { background: "#FEF1F5", color: "#E85D8C" } : { color: "#64748B" }}
+            >
+              <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />
+              <span className="text-sm font-semibold">{item.label}</span>
+            </Link>
+          );
+        })}
+        
+        <div className="mt-6 mb-2 px-3">
+          <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Operasional & Gudang</p>
+        </div>
+        {[
+          { label: "Pre-Packing", href: "/manager/pre-packing", icon: ClipboardList },
+          { label: "Packing (Kirim)", href: "/manager/packing", icon: Package },
+          { label: "Produksi", href: "/manager/production", icon: ChefHat },
+          { label: "BOM & Resep", href: "/manager/bom", icon: BookOpen },
+          { label: "Inventory", href: "/manager/inventory", icon: ClipboardList },
+          { label: "Stock Opname", href: "/manager/inventory/stock-opname", icon: ClipboardList },
+          { label: "Pengaturan", href: "/manager/settings", icon: Settings },
+        ].map((item) => {
+          const active = pathname === item.href || (pathname.startsWith(item.href + '/') && !['/manager/inventory', '/manager/pre-packing'].includes(item.href));
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all tap-target"
               style={active ? { background: "#FEF1F5", color: "#E85D8C" } : { color: "#64748B" }}
             >
               <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />

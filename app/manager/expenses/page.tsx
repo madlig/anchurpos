@@ -74,11 +74,13 @@ function CashbookForm({
   fetchWithAuth: any;
   suppliers: Supplier[];
   loadSuppliers: () => Promise<void>;
+  configs: { paymentMethods: string[], deliveryMethods: string[], shippingBorneBy: string[] } | null;
 }) {
   const [category, setCategory] = useState<"operasional" | "lain_lain">("operasional");
+  const defaultPaymentMethod = configs?.paymentMethods?.[0] || "cash";
   const [itemName, setItemName] = useState("");
   const [totalCost, setTotalCost] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer" | "qris">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<string>(defaultPaymentMethod);
   const [notes, setNotes] = useState("");
   const [customDate, setCustomDate] = useState(() => new Date().toISOString().split("T")[0]);
 
@@ -218,9 +220,9 @@ function CashbookForm({
 
       <div>
         <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 block">Metode Pembayaran</label>
-        <div className="grid grid-cols-3 gap-1.5">
-          {(["cash", "transfer", "qris"] as const).map((method) => (
-            <button key={method} type="button" onClick={() => setPaymentMethod(method)} className={`p-2 rounded-xl text-xs font-bold flex justify-center items-center ${paymentMethod === method ? 'bg-primary text-white' : 'bg-white text-slate-500 shadow-sm'}`}>
+        <div className="flex flex-wrap gap-1.5">
+          {(configs?.paymentMethods || ["cash", "transfer", "qris"]).map((method) => (
+            <button key={method} type="button" onClick={() => setPaymentMethod(method)} className={`flex-1 p-2 rounded-xl text-xs font-bold flex justify-center items-center ${paymentMethod === method ? 'bg-primary text-white' : 'bg-white text-slate-500 shadow-sm'}`}>
               {getPaymentMethodLabel(method, 14, paymentMethod === method)}
             </button>
           ))}
@@ -254,6 +256,7 @@ export default function ExpensesPage() {
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [configs, setConfigs] = useState<{ paymentMethods: string[], deliveryMethods: string[], shippingBorneBy: string[] } | null>(null);
   const [prevMonthTotal, setPrevMonthTotal] = useState(0);
 
   // Filters
@@ -283,8 +286,12 @@ export default function ExpensesPage() {
     setLoading(true);
     try {
       // Load current period
-      const res = await fetchWithAuth(`/api/expenses?startDate=${startDate}&endDate=${endDate}`);
+      const [res, resConfigs] = await Promise.all([
+        fetchWithAuth(`/api/expenses?startDate=${startDate}&endDate=${endDate}`),
+        fetchWithAuth(`/api/system-configs`),
+      ]);
       if (res.ok) setExpenses(await res.json());
+      if (resConfigs.ok) setConfigs(await resConfigs.json());
 
       // Load previous month for trend
       const date = new Date(startDate);
@@ -346,6 +353,7 @@ export default function ExpensesPage() {
       fetchWithAuth={fetchWithAuth} 
       suppliers={suppliers} 
       loadSuppliers={loadSuppliers} 
+      configs={configs}
     />
   );
 
@@ -407,9 +415,9 @@ export default function ExpensesPage() {
                 <Filter size={14} className="text-slate-400" />
                 <select value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)} className="bg-transparent focus:outline-none">
                   <option value="all">Semua Bayar</option>
-                  <option value="cash">Tunai</option>
-                  <option value="transfer">Transfer</option>
-                  <option value="qris">QRIS</option>
+                  {(configs?.paymentMethods || ["cash", "transfer", "qris"]).map(m => (
+                    <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
+                  ))}
                 </select>
               </div>
               <div className="flex items-center gap-1.5 px-3 h-10 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600">

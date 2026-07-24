@@ -23,6 +23,7 @@ export interface Product {
   packPerBatch: number;
   isActive: boolean;
   channels?: OrderChannel[];
+  freeSauceAllowance?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,9 +38,11 @@ export interface PriceTier {
 // --- 3. variants/{variantId} ---
 export interface Variant {
   id: string;
+  productId: string;
   name: string;
-  isProductionVariant: boolean;
+  minStock: number;
   sortOrder: number;
+  freeSauceAllowance?: number;
 }
 
 export interface ProductStock {
@@ -81,6 +84,8 @@ export interface Ingredient {
   opnameMethod: OpnameMethod;
   packagedConfig: PackagedConfig | null;
   channels?: OrderChannel[];
+  defaultCostPerBaseUnit: number;
+  lastHppUpdateDate?: string;
 }
 
 // --- 4b. stockMovements/{movementId} ---
@@ -319,7 +324,7 @@ export interface Alert {
 // --- 10. orders/{orderId} ---
 export type OrderSource = "marketplace_manual" | "wa_form" | "walk_in";
 export type OrderChannel = "walkin" | "whatsapp" | "tiktok" | "shopee";
-export type OrderStatus = "belum_selesai" | "selesai" | "void";
+export type OrderStatus = "pending" | "proses" | "selesai" | "void";
 export type PaymentStatus = "belum_bayar" | "sudah_bayar";
 
 export interface Order {
@@ -424,4 +429,27 @@ export interface Payroll {
   status: PayrollStatus;
   paidAt: string | null;
   isLocked: boolean;
+}
+
+// --- 12. Master Data Configurations ---
+export interface CustomerTier {
+  id: string; // e.g. "reguler", "b2b", "reseller", "distributor"
+  name: string;
+  isB2B: boolean; // if true, requires PO number, etc.
+  themeColor: { bg: string; color: string; border: string; };
+  isActive: boolean;
+}
+
+export interface OrderChannelConfig {
+  id: string; // e.g. "walkin", "tiktok", "gofood"
+  name: string;
+  defaultPlatformFeePercent: number;
+  isActive: boolean;
+}
+
+export interface OperationalConfig {
+  id: "global"; // Singleton document in "system_configs"
+  paymentMethods: string[];
+  expenseCategories: string[];
+  deliveryMethods: string[];
 }
