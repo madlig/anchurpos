@@ -124,7 +124,7 @@ export default function KasirPage() {
     });
   }, [products]);
 
-  function handleAddToCart(newItems: Omit<CartItem, "price">[]) {
+  function handleAddToCart(newItems: Omit<CartItem, "price" | "basePrice" | "appliedTier" | "discountPerUnit" | "totalPrice">[]) {
     setCart(prev => {
       const next = [...prev];
       for (const ni of newItems) {

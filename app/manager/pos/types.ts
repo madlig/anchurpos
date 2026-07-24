@@ -5,7 +5,7 @@ export interface ProductItem {
   freeSauceAllowance?: number;
 }
 export interface Variant {
-  id: string; name: string; currentStock: number; minStock: number; sortOrder: number;
+  id: string; name: string; currentStock: number; minStock: number; sortOrder: number; freeSauceAllowance?: number;
 }
 export interface CustomerItem {
   id: string; name: string; channel: string; customerType: string; phoneNumber: string | null;

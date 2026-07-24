@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { 
   Loader2, Bell, AlertTriangle, ChevronRight, 
   ShoppingCart, ClipboardList, Banknote, FileText, 
-  Settings, Users, Package, Database
+  Settings, Users, Package, Database, BookOpen, ChefHat
 } from "lucide-react";
 import Link from "next/link";
 
@@ -203,6 +203,49 @@ export default function ManagerDashboardPage() {
               <Database size={20} style={{ color: "#64748B" }} />
             </div>
             <span className="text-xs font-bold text-slate-700 text-center mt-1.5">Master Data</span>
+          </Link>
+
+          {/* Extra Operational Menus */}
+          <Link href="/manager/purchases" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-emerald-50">
+              <Package size={20} className="text-emerald-500" />
+            </div>
+            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">Belanja<br/>Bahan</span>
+          </Link>
+
+          <Link href="/manager/inventory/stock-opname" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-amber-50">
+              <ClipboardList size={20} className="text-amber-500" />
+            </div>
+            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">Stock<br/>Opname</span>
+          </Link>
+
+          <Link href="/manager/bom" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-rose-50">
+              <BookOpen size={20} className="text-rose-500" />
+            </div>
+            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">BOM &<br/>Resep</span>
+          </Link>
+
+          <Link href="/manager/production" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-orange-50">
+              <ChefHat size={20} className="text-orange-500" />
+            </div>
+            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">Produksi<br/>Dapur</span>
+          </Link>
+
+          <Link href="/manager/pre-packing" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-indigo-50">
+              <ClipboardList size={20} className="text-indigo-500" />
+            </div>
+            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">Pre<br/>Packing</span>
+          </Link>
+
+          <Link href="/manager/packing" className="flex flex-col items-center tap-target">
+            <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-cyan-50">
+              <Package size={20} className="text-cyan-500" />
+            </div>
+            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">Packing<br/>Kirim</span>
           </Link>
         </div>
 

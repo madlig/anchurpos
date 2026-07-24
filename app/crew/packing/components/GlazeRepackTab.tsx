@@ -8,6 +8,7 @@ import { Loader2, Package, ArrowRight } from "lucide-react";
 interface Ingredient {
   id: string;
   name: string;
+  category?: string;
   baseUnit: string;
 }
 

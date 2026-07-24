@@ -12,7 +12,7 @@ interface Props {
   addOns: AddonItem[];
   orderChannel: string;
   onClose: () => void;
-  onAddToCart: (newItems: Omit<CartItem, "price">[]) => void;
+  onAddToCart: (newItems: Omit<CartItem, "price" | "basePrice" | "appliedTier" | "discountPerUnit" | "totalPrice">[]) => void;
 }
 
 function fmt(n: number) {
@@ -57,10 +57,10 @@ export function VariantSelectorModal({
     });
   }
 
-  const totalVariantSelected = Object.values(variantSelections).reduce((s, qty) => s + (typeof qty === "number" ? qty : 0), 0);
+  const totalVariantSelected = Object.values(variantSelections).reduce<number>((s, qty) => s + (typeof qty === "number" ? qty : (Number(qty) || 0)), 0);
 
   function addToCart() {
-    const newItems: Omit<CartItem, "price">[] = [];
+    const newItems: Omit<CartItem, "price" | "basePrice" | "appliedTier" | "discountPerUnit" | "totalPrice">[] = [];
     const hasSauce = selectedProduct.id.toLowerCase().includes("churros");
 
     for (const [variantId, qty] of Object.entries(variantSelections)) {

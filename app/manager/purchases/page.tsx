@@ -385,6 +385,7 @@ export default function PurchasesPage() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [configs, setConfigs] = useState<{ paymentMethods: string[], deliveryMethods: string[], shippingBorneBy: string[] } | null>(null);
   const [prevMonthTotal, setPrevMonthTotal] = useState(0);
 
   // Filters
@@ -411,15 +412,20 @@ export default function PurchasesPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [purRes, supRes, ingRes] = await Promise.all([
+      const [purRes, supRes, ingRes, confRes] = await Promise.all([
         fetchWithAuth(`/api/purchases?startDate=${startDate}&endDate=${endDate}`),
         fetchWithAuth("/api/suppliers"),
-        fetchWithAuth("/api/ingredients")
+        fetchWithAuth("/api/ingredients"),
+        fetchWithAuth("/api/configs/system")
       ]);
       
       if (purRes.ok) setPurchases(await purRes.json());
       if (supRes.ok) setSuppliers(await supRes.json());
       if (ingRes.ok) setIngredients(await ingRes.json());
+      if (confRes.ok) {
+        const cData = await confRes.json();
+        setConfigs(cData);
+      }
 
       // Prev Month Trend
       const date = new Date(startDate);
@@ -461,6 +467,7 @@ export default function PurchasesPage() {
       fetchWithAuth={fetchWithAuth} 
       suppliers={suppliers} 
       ingredients={ingredients} 
+      configs={configs}
     />
   );
 

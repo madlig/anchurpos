@@ -106,6 +106,14 @@ function DesktopSidebar() {
   );
 }
 
+const MOBILE_NAV_ITEMS = [
+  { label: "Beranda", href: "/manager/dashboard", icon: LayoutDashboard },
+  { label: "Transaksi", href: "/manager/orders", icon: ClipboardList },
+  { label: "Kasir", href: "/manager/pos", icon: ShoppingCart, isPosButton: true },
+  { label: "Buku Kas", href: "/manager/expenses", icon: Banknote },
+  { label: "Profil", href: "/manager/profile", icon: User },
+];
+
 function MobileBottomNav() {
   const pathname = usePathname();
   return (
@@ -121,7 +129,7 @@ function MobileBottomNav() {
       }}
     >
       <div className="relative flex items-end justify-around px-1 pt-1 pb-1.5 min-h-[58px]">
-        {NAV_ITEMS.map((item) => {
+        {MOBILE_NAV_ITEMS.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;
 

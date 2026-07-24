@@ -338,7 +338,7 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
               <MapPin size={16} className="text-slate-400 shrink-0 mt-0.5" />
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Alamat / Tipe</p>
-                <p className="text-xs font-medium text-slate-700">{order.shippingAddress || (order.deliveryMethod === 'delivery' ? 'Delivery (Menunggu Alamat)' : (order.deliveryMethod === 'pickup' ? 'Ambil Sendiri (Pickup)' : (order.orderChannel === 'walkin' ? 'Walk-in' : 'Ambil Sendiri')))}</p>
+                <p className="text-xs font-medium text-slate-700">{order.shippingAddress || (order.deliveryMethod === 'delivery' ? 'Delivery (Menunggu Alamat)' : (order.deliveryMethod === 'pickup' ? 'Ambil Sendiri (Pickup)' : (order.channel === 'walkin' ? 'Walk-in' : 'Ambil Sendiri')))}</p>
               </div>
             </div>
             <div className="bg-white border border-slate-100 rounded-2xl p-3 flex items-start gap-2">

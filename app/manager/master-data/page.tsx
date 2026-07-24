@@ -14,9 +14,9 @@ function fmt(n: number) {
 }
 
 interface PriceTier { minQty: number; maxQty: number | null; price: number; }
-interface ProductItem { id: string; name: string; code: string; description: string; packPerBatch: number; priceTiers: PriceTier[]; channels?: string[]; }
-interface VariantItem { id: string; name: string; sortOrder: number; currentStock: number; minStock: number; }
-interface IngredientItem { id: string; name: string; category: string; baseUnit: string; currentStock: number; minStock: number; channels?: string[]; unitAlternatives?: { unit: string; conversionToBase: number }[]; }
+interface ProductItem { id: string; name: string; code: string; description: string; packPerBatch: number; priceTiers: PriceTier[]; channels?: string[]; freeSauceAllowance?: number; }
+interface VariantItem { id: string; name: string; sortOrder: number; currentStock: number; minStock: number; freeSauceAllowance?: number; }
+interface IngredientItem { id: string; name: string; category: string; baseUnit: string; currentStock: number; minStock: number; channels?: string[]; unitAlternatives?: { unit: string; conversionToBase: number }[]; defaultCostPerBaseUnit?: number; }
 interface AddonItem { id: string; name: string; price: number; currentStock: number; minStock: number; channels?: string[]; }
 interface SupplierItem { id: string; name: string; contactPerson?: string; phoneNumber?: string; }
 interface CustomerItem { id: string; name: string; customerType: string; channel: string; phoneNumber: string | null; address: string | null; notes: string; discountPerUnit: number; }

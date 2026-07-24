@@ -43,6 +43,8 @@ export interface Variant {
   minStock: number;
   sortOrder: number;
   freeSauceAllowance?: number;
+  isProductionVariant?: boolean;
+  currentStock?: number;
 }
 
 export interface ProductStock {

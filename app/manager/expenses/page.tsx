@@ -67,7 +67,7 @@ function getPaymentMethodLabel(method: string, size = 16, active = false) {
 
 // --- Form Component ---
 function CashbookForm({ 
-  onSuccess, onCancel, fetchWithAuth, suppliers, loadSuppliers 
+  onSuccess, onCancel, fetchWithAuth, suppliers, loadSuppliers, configs
 }: { 
   onSuccess: () => void; 
   onCancel: () => void; 
