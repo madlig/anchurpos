@@ -1018,9 +1018,18 @@ export default function ManagerEmployeesPage() {
                         Setujui Semua ({reviewCount})
                       </button>
                     </div>
-                    {reviewItems.map(a => (
-                      <AttendanceReviewCard key={a.id} a={a} onReview={handleReviewAttendance} reviewingId={reviewingId} />
-                    ))}
+                    {reviewItems.map(a => {
+                      const empPayroll = payrolls.find(p => p.employeeId === a.employeeId);
+                      return (
+                        <AttendanceReviewCard 
+                          key={a.id} 
+                          a={a} 
+                          onReview={handleReviewAttendance} 
+                          reviewingId={reviewingId} 
+                          dailyWage={empPayroll?.dailyWage}
+                        />
+                      );
+                    })}
                   </div>
                 )
               ) : (
@@ -1437,6 +1446,7 @@ export default function ManagerEmployeesPage() {
                                     isCorrectionMode={true}
                                     editData={shiftEdits[a.id]}
                                     onEditChange={(field, val) => handleEditChange(a.id, field, val)}
+                                    dailyWage={p.dailyWage}
                                   />
                                 ))}
 

@@ -162,13 +162,14 @@ function fmtDateFull(d: string) {
   }
 }
 
-export function AttendanceReviewCard({ a, onReview, reviewingId, isCorrectionMode = false, editData, onEditChange }: { 
+export function AttendanceReviewCard({ a, onReview, reviewingId, isCorrectionMode = false, editData, onEditChange, dailyWage }: { 
   a: AttendanceRecord; 
   onReview?: (id: string, a: AttendanceRecord, actionType: "approve" | "adjust" | "reject", data?: any) => void;
   reviewingId?: string | null;
   isCorrectionMode?: boolean;
   editData?: { tot: string, ovt: string, bonus: string };
   onEditChange?: (field: "tot" | "ovt" | "bonus", val: string) => void;
+  dailyWage?: number;
 }) {
   const [totLocal, setTotLocal] = useState(String(a.totalHours ?? 8));
   const [ovtLocal, setOvtLocal] = useState(String(a.overtimeHours ?? 0));
@@ -177,6 +178,8 @@ export function AttendanceReviewCard({ a, onReview, reviewingId, isCorrectionMod
   const tot = isCorrectionMode && editData ? editData.tot : totLocal;
   const ovt = isCorrectionMode && editData ? editData.ovt : ovtLocal;
   const bonus = isCorrectionMode && editData ? editData.bonus : bonusLocal;
+
+  const totalGajiShift = (dailyWage || 0) + Number(bonus || 0);
 
   const handleTot = (v: string) => { if (isCorrectionMode && onEditChange) onEditChange("tot", v); else setTotLocal(v); };
   const handleOvt = (v: string) => { if (isCorrectionMode && onEditChange) onEditChange("ovt", v); else setOvtLocal(v); };
@@ -211,6 +214,11 @@ export function AttendanceReviewCard({ a, onReview, reviewingId, isCorrectionMod
           {a.checkOut?.time && (
             <p style={{ fontSize: "11px", color: "#64748B", background: "#F1F5F9", padding: "2px 8px", borderRadius: "100px", fontWeight: "600" }}>
               Pulang: <span className="text-slate-700">{fmtTime(a.checkOut.time)}</span>
+            </p>
+          )}
+          {dailyWage !== undefined && (
+            <p style={{ fontSize: "11px", color: "#059669", background: "#D1FAE5", padding: "2px 8px", borderRadius: "100px", fontWeight: "700" }}>
+              Gaji Shift: {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(totalGajiShift)}
             </p>
           )}
         </div>
