@@ -227,11 +227,11 @@ export default function ManagerDashboardPage() {
             <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">BOM &<br/>Resep</span>
           </Link>
 
-          <Link href="/manager/production" className="flex flex-col items-center tap-target">
+          <Link href="/manager/productions" className="flex flex-col items-center tap-target">
             <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-orange-50">
               <ChefHat size={20} className="text-orange-500" />
             </div>
-            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">Produksi<br/>Dapur</span>
+            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">Laporan<br/>Produksi</span>
           </Link>
 
           <Link href="/manager/pre-packing" className="flex flex-col items-center tap-target">

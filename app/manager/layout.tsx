@@ -61,7 +61,7 @@ function DesktopSidebar() {
         {[
           { label: "Pre-Packing", href: "/manager/pre-packing", icon: ClipboardList },
           { label: "Packing (Kirim)", href: "/manager/packing", icon: Package },
-          { label: "Produksi", href: "/manager/production", icon: ChefHat },
+          { label: "Laporan Produksi", href: "/manager/productions", icon: ChefHat },
           { label: "BOM & Resep", href: "/manager/bom", icon: BookOpen },
           { label: "Inventory", href: "/manager/inventory", icon: ClipboardList },
           { label: "Stock Opname", href: "/manager/inventory/stock-opname", icon: ClipboardList },
