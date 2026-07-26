@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { verifyAuth, requireRole } from "@/lib/auth-middleware";
-import type { WorkOrder } from "@/types";
 
 export async function GET(req: NextRequest) {
   const auth = await verifyAuth(req);
@@ -26,7 +25,7 @@ export async function GET(req: NextRequest) {
     query = query.orderBy("createdAt", "desc").limit(parseInt(limitParam, 10));
 
     const snap = await query.get();
-    let tasks = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as WorkOrder[];
+    let tasks = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
 
     if (dateFilter) {
       tasks = tasks.filter(t => t.createdAt.startsWith(dateFilter));
@@ -60,7 +59,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Data tugas tidak lengkap" }, { status: 400 });
     }
 
-    const newTask: Omit<WorkOrder, "id"> = {
+    const newTask: any = {
       type,
       title,
       description: description || "",

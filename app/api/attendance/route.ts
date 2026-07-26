@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 
 export async function GET(req: NextRequest) {
@@ -18,6 +19,48 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // ── AUTO-CHECKOUT ROUTINE ──
+    const today = new Date();
+    // Offset by UTC+7 for local Indonesian date
+    const offsetDate = new Date(today.getTime() + 7 * 60 * 60 * 1000);
+    const todayStr = offsetDate.toISOString().split("T")[0];
+
+    const unclosedSnap = await adminDb.collection("attendance")
+      .where("status", "==", "berjalan")
+      .where("date", "<", todayStr)
+      .get();
+    
+    if (!unclosedSnap.empty) {
+      const batch = adminDb.batch();
+      unclosedSnap.docs.forEach(doc => {
+        // Auto checkout at 23:59:59 local time of that date
+        const docDate = doc.data().date;
+        const autoCheckOutTime = new Date(`${docDate}T23:59:59+07:00`).toISOString();
+        const checkInTime = doc.data().checkIn?.time;
+        let totalHours = 0;
+        
+        if (checkInTime) {
+           const inDate = new Date(checkInTime);
+           const outDate = new Date(autoCheckOutTime);
+           totalHours = Math.round((outDate.getTime() - inDate.getTime()) / (1000 * 60 * 60) * 100) / 100;
+        }
+
+        batch.update(doc.ref, {
+          status: "lengkap",
+          checkOut: {
+            time: autoCheckOutTime,
+            ipAddress: "auto-checkout",
+            ipValid: false
+          },
+          totalHours: totalHours,
+          flaggedReason: "Auto-Checkout",
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
+      await batch.commit();
+    }
+    // ───────────────────────────
+
     const query = adminDb.collection("attendance");
     let snap;
 

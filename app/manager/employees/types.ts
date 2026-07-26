@@ -8,6 +8,7 @@ export interface Employee {
   phone: string | null;
   joinDate: string | null;
   isActive: boolean;
+  dailyWage?: number;
 }
 
 export interface AttendanceRecord {
@@ -22,6 +23,25 @@ export interface AttendanceRecord {
   overtimeHours?: number | null;
   overtimeBonus?: number | null;
   flaggedReason?: string | null;
+}
+
+export interface PayrollRecord {
+  id: string;
+  month: string;
+  employeeId: string;
+  employeeName: string;
+  workDays: number;
+  dailyWage: number;
+  totalRegularPay: number;
+  totalOvertimeBonus: number;
+  performanceBonus: number;
+  performanceBonusNote?: string;
+  deductions?: number;
+  deductionNote?: string;
+  totalPaid: number;
+  isLocked: boolean;
+  lockedAt?: string;
+  workPeriod?: string;
 }
 
 export const ROLE_LABEL: Record<string, string> = { owner: "Owner", manager: "Manager", crew: "Crew" };

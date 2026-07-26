@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { verifyAuth } from "@/lib/auth-middleware";
 import { FieldValue } from "firebase-admin/firestore";
-import type { WorkOrder } from "@/types";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await verifyAuth(req);
@@ -17,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: "Tugas tidak ditemukan" }, { status: 404 });
     }
 
-    const task = snap.data() as WorkOrder;
+    const task = snap.data() as any;
     if (task.status === "done") {
       return NextResponse.json({ error: "Tugas sudah diselesaikan sebelumnya" }, { status: 400 });
     }
@@ -62,7 +61,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
               source: "production",
               timestamp: now,
               userId: auth.uid,
-              userName: auth.name,
+              userName: (auth as any).name || "Unknown",
               notes: `Produksi ${batches} batch (Tugas: ${task.title})`
             });
           }
@@ -99,7 +98,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         source: "production",
         timestamp: now,
         userId: auth.uid,
-        userName: auth.name,
+        userName: (auth as any).name || "Unknown",
         notes: `Hasil Produksi ${batches} batch (Tugas: ${task.title})`
       });
     }

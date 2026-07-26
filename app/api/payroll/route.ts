@@ -3,8 +3,9 @@ import { adminDb } from "@/lib/firebase-admin";
 import { requireRole } from "@/lib/auth-middleware";
 
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(req, ["owner", "manager"]);
+  const auth = await requireRole(req, ["owner", "manager", "crew"]);
   if (auth instanceof NextResponse) return auth;
+  const user = auth as any; // We know it's AuthUser
 
   const { searchParams } = new URL(req.url);
   const month = searchParams.get("month");
@@ -14,11 +15,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const snap = await adminDb
+    let query = adminDb
       .collection("payroll")
-      .where("month", "==", month)
-      .orderBy("employeeName", "asc")
-      .get();
+      .where("month", "==", month);
+      
+    if (user.role === "crew") {
+       query = query.where("employeeId", "==", user.uid).where("isLocked", "==", true);
+    } else {
+       query = query.orderBy("employeeName", "asc");
+    }
+
+    const snap = await query.get();
 
     const records = snap.docs.map((doc) => {
       const d = doc.data();
@@ -33,11 +40,10 @@ export async function GET(req: NextRequest) {
         totalOvertimeBonus: d.totalOvertimeBonus,
         performanceBonus: d.performanceBonus ?? 0,
         performanceBonusNote: d.performanceBonusNote ?? "",
+        deductions: d.deductions ?? 0,
+        deductionNote: d.deductionNote ?? "",
         workPeriod: d.workPeriod ?? "",
         totalPaid: d.totalPaid,
-        pendingReview: d.pendingReview,
-        dataStatus: d.dataStatus,
-        status: d.status,
         paidAt: d.paidAt?.toDate?.().toISOString() ?? d.paidAt,
         isLocked: d.isLocked ?? false,
       };

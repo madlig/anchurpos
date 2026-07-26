@@ -241,7 +241,7 @@ export function AttendanceReviewCard({ a, onReview, reviewingId, isCorrectionMod
             </div>
           </div>
           <div>
-            <label className="text-xs font-bold text-slate-400 block mb-1">BONUS (Rp)</label>
+            <label className="text-xs font-bold text-slate-400 block mb-1">LEMBUR (Rp)</label>
             <input type="number" step="1000" value={bonus} onChange={(e) => handleBonus(e.target.value)} style={{ background: isDirty("bonus") ? "#FEF9C3" : "" }} className={`w-full h-9 rounded-lg border ${isDirty("bonus") ? "border-yellow-400 text-yellow-900" : "border-slate-200 text-slate-700"} px-3 font-bold focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-pink-300 text-xs transition-all`} />
           </div>
         </div>
