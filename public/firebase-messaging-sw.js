@@ -17,9 +17,15 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
   
-  const notificationTitle = payload.notification?.title || "Instruksi Baru";
+  // Prevent double notification if the server already sent a 'notification' block
+  if (payload.notification) {
+    console.log("Firebase automatically shows the notification. Skipping manual show.");
+    return;
+  }
+
+  const notificationTitle = payload.data?.title || "Instruksi Baru";
   const notificationOptions = {
-    body: payload.notification?.body || "Anda mendapatkan instruksi baru dari Manager.",
+    body: payload.data?.body || "Anda mendapatkan instruksi baru dari Manager.",
     icon: '/logo.png',
     badge: '/logo.png',
     data: payload.data,

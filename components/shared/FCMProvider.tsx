@@ -42,6 +42,8 @@ export function FCMProvider() {
       // Optional: Since it's already an in-app dashboard, 
       // we don't necessarily need to show an alert, it will just appear in the task list 
       // when they refresh or we could show a toast here.
+      // Dispatch a custom event so the UI can auto-refresh
+      window.dispatchEvent(new CustomEvent('fcm_message', { detail: payload }));
     });
 
     return () => {

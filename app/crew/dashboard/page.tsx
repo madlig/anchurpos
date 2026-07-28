@@ -52,7 +52,18 @@ export default function CrewDashboard() {
       setTime(d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
       setDate(d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" }));
     }, 1000);
-    return () => clearInterval(timer);
+    
+    // Listen for incoming FCM messages to auto-refresh data
+    const handleFcmMessage = () => {
+      console.log("Auto-refreshing dashboard due to new FCM message");
+      loadData();
+    };
+    window.addEventListener('fcm_message', handleFcmMessage);
+    
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('fcm_message', handleFcmMessage);
+    };
   }, [loadData]);
 
   async function handleCheckIn() {
