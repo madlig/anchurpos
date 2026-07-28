@@ -61,6 +61,14 @@ export default function CrewDashboard() {
     };
     window.addEventListener('fcm_message', handleFcmMessage);
     
+    // FAILSAFE: Auto-poll data every 15 seconds if the app is active in foreground
+    // This handles mobile browsers that aggressively block foreground WebSockets/Push Events
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadData();
+      }
+    }, 15000);
+    
     // Listen for app coming back to foreground (if app was in background when notif arrived)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -72,6 +80,7 @@ export default function CrewDashboard() {
     
     return () => {
       clearInterval(timer);
+      clearInterval(pollInterval);
       window.removeEventListener('fcm_message', handleFcmMessage);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
