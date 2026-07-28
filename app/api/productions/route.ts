@@ -12,20 +12,23 @@ export async function GET(req: NextRequest) {
   const variantId = searchParams.get("variantId");
 
   try {
-    let query = adminDb.collection("productions").orderBy("date", "desc") as FirebaseFirestore.Query;
+    let query = adminDb.collection("productions") as FirebaseFirestore.Query;
 
     if (dateStr) {
       const d = new Date(dateStr);
       d.setHours(0, 0, 0, 0);
       const next = new Date(d);
       next.setDate(next.getDate() + 1);
-      query = query.where("date", ">=", d).where("date", "<", next);
+      // For date query, orderBy is on the same field so it doesn't need a composite index
+      query = query.where("date", ">=", d).where("date", "<", next).orderBy("date", "desc");
     } else if (variantId) {
-      // If no date is specified but variantId is, we filter by variantId.
+      // Just where, no orderBy to avoid FAILED_PRECONDITION composite index error
       query = query.where("variantId", "==", variantId);
+    } else {
+      query = query.orderBy("date", "desc").limit(100);
     }
 
-    const snap = await query.limit(100).get();
+    const snap = await query.get();
 
     const productions = snap.docs.map((doc) => {
       const data = doc.data();
@@ -43,6 +46,14 @@ export async function GET(req: NextRequest) {
         createdAt: data.createdAt?.toDate?.().toISOString() ?? "",
       };
     });
+
+    if (variantId) {
+      productions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // limit to 50 most recent history for variant
+      if (productions.length > 50) {
+        productions.splice(50);
+      }
+    }
 
     if (type) {
       return NextResponse.json(productions.filter((p) => p.type === type));

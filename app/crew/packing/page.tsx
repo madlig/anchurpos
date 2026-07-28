@@ -56,7 +56,7 @@ export default function CrewPackingPage() {
   }, [ingredients]);
 
   return (
-    <div className="min-h-screen pb-24" style={{ background: "#FCABB4" }}>
+    <div className="min-h-screen pb-24" >
       {/* Header */}
       <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200">
         <div className="flex items-center gap-2 mb-1">
@@ -72,23 +72,25 @@ export default function CrewPackingPage() {
 
       <div className="px-4 pt-4 md:px-8 max-w-4xl mx-auto">
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap bg-white/20 backdrop-blur-md rounded-2xl p-1.5 gap-1 mb-6" style={{ border: "1px solid rgba(255,255,255,0.3)", boxShadow: "0 4px 12px rgba(232,93,140,0.1)" }}>
+        <div className="flex flex-wrap bg-white rounded-2xl p-1.5 gap-1 mb-6 shadow-sm border border-slate-200">
           {[
             { key: "pack_order", label: "Pack Pesanan" },
             { key: "repack_glaze", label: "Repack Saos" },
             { key: "repack_cinnamon", label: "Repack Gula Cinnamon" },
             { key: "repack_reg_to_full", label: "Repack Regular -> Full" },
             { key: "manual_usage", label: "Pemakaian Manual" },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as any)}
-              className="flex-1 min-w-[120px] py-2.5 rounded-xl text-xs font-bold transition-all tap-target"
-              style={activeTab === tab.key ? { background: "#fff", color: "#E85D8C", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" } : { color: "#fff" }}
-            >
-              {tab.label}
-            </button>
-          ))}
+          ].map((tab) => {
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key as any)}
+                className={`flex-1 min-w-[120px] py-2.5 rounded-xl text-xs font-bold transition-all tap-target ${active ? 'bg-primary/10 text-primary shadow-sm' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Tab Content */}

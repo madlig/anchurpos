@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import type { Ingredient } from "@/types";
@@ -13,11 +14,10 @@ interface Props {
 
 export function ManualUsageTab({ ingredients, onSuccess }: Props) {
   const { getToken } = useAuth();
+  const { alert } = useAlertConfirm();
   const [manualEntries, setManualEntries] = useState<Map<string, string>>(new Map());
   const [manualNotes, setManualNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
 
   const manualIngredientsList = useMemo<Ingredient[]>(() => {
     return ingredients.filter(
@@ -41,8 +41,6 @@ export function ManualUsageTab({ ingredients, onSuccess }: Props) {
   };
 
   async function handleManualUsage() {
-    setError("");
-    setSuccessMsg("");
     setSubmitting(true);
 
     const updates = Array.from(manualEntries.entries())
@@ -53,7 +51,7 @@ export function ManualUsageTab({ ingredients, onSuccess }: Props) {
       }));
 
     if (updates.length === 0) {
-      setError("Isi minimal 1 bahan yang digunakan");
+      await alert("Isi minimal 1 bahan yang digunakan", "Peringatan", "danger");
       setSubmitting(false);
       return;
     }
@@ -72,15 +70,15 @@ export function ManualUsageTab({ ingredients, onSuccess }: Props) {
 
       const d = await res.json();
       if (!res.ok) {
-        setError(d.error || "Sebagian atau seluruh data gagal disimpan");
+        await alert(d.error || "Sebagian atau seluruh data gagal disimpan", "Error", "danger");
       } else {
-        setSuccessMsg(`Berhasil mencatat pemakaian manual ${updates.length} bahan`);
+        await alert(`Berhasil mencatat pemakaian manual ${updates.length} bahan`, "Sukses!", "success");
         setManualEntries(new Map());
         setManualNotes("");
         onSuccess();
       }
     } catch (err) {
-      setError("Terjadi kesalahan jaringan");
+      await alert("Terjadi kesalahan jaringan", "Error", "danger");
     } finally {
       setSubmitting(false);
     }
@@ -90,9 +88,6 @@ export function ManualUsageTab({ ingredients, onSuccess }: Props) {
     <div className="bg-white rounded-3xl p-5 shadow-sm border border-primary/20 border-opacity-40 space-y-4">
       <h2 className="text-sm font-extrabold text-slate-800 mb-2">Pemakaian Bahan Manual</h2>
       <p className="text-xs text-slate-500">Catat pemakaian box, lakban, plastik kresek, atau bahan operasional lainnya yang tidak terikat langsung dengan recipe.</p>
-
-      {error && <div className="bg-red-50 text-red-600 text-xs p-3.5 rounded-xl border border-red-100">{error}</div>}
-      {successMsg && <div className="bg-green-50 text-green-700 text-xs p-3.5 rounded-xl border border-green-100">{successMsg}</div>}
 
       <div className="space-y-3">
         <label className="text-xs font-bold text-slate-700">Daftar Bahan Packaging & Operasional</label>
@@ -129,8 +124,7 @@ export function ManualUsageTab({ ingredients, onSuccess }: Props) {
       <button
         onClick={handleManualUsage}
         disabled={submitting || Array.from(manualEntries.values()).every(v => !v || parseFloat(v) <= 0)}
-        className="w-full h-12 rounded-xl text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 flex justify-center items-center gap-2"
-        style={{ background: "linear-gradient(135deg, #E85D8C 0%, #D84275 100%)" }}
+        className="w-full h-12 rounded-xl text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 flex justify-center items-center gap-2 bg-gradient-to-br from-primary to-rose-600 shadow-md shadow-pink-500/20"
       >
         {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Simpan Catatan Pemakaian"}
       </button>

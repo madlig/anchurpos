@@ -49,7 +49,7 @@ export function CartCheckoutPanel({
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [saveNewCustomer, setSaveNewCustomer] = useState(false);
   const [newCustomerType, setNewCustomerType] = useState<"reguler" | "b2b" | "reseller">("reguler");
-  const [payMethod, setPayMethod] = useState<"cash" | "transfer" | "qris">("cash");
+  const [payMethod, setPayMethod] = useState<"cash" | "transfer" | "qris">(orderChannel === "walkin" ? "cash" : "transfer");
   const [isPaid, setIsPaid] = useState(true);
   const [orderNotes, setOrderNotes] = useState("");
   const [poNumber, setPoNumber] = useState("");
@@ -263,6 +263,19 @@ export function CartCheckoutPanel({
                       <button key={ct} onClick={() => setNewCustomerType(ct)} className={`flex-1 p-1.5 rounded-lg text-xs font-semibold ${newCustomerType === ct ? "bg-primary/10 text-primary" : "bg-white text-slate-500"}`}>{ct.charAt(0).toUpperCase() + ct.slice(1)}</button>
                     ))}
                   </div>
+                )}
+              </div>
+            )}
+            
+            {/* Purchase Order (PO) Number - Only for B2B/Reseller */}
+            {isB2B && (
+              <div className="mt-3 p-2.5 rounded-xl border border-dashed border-slate-300 bg-white">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={showPoNumber} onChange={e => setShowPoNumber(e.target.checked)} className="accent-primary" />
+                  <span className="text-xs font-bold text-slate-600">Lampirkan Nomor PO / Referensi</span>
+                </label>
+                {showPoNumber && (
+                  <input type="text" placeholder="Masukkan Nomor PO / Referensi..." value={poNumber} onChange={e => setPoNumber(e.target.value)} className="w-full mt-2 p-2 rounded-lg border border-slate-200 text-xs outline-none focus:border-primary" />
                 )}
               </div>
             )}

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 
@@ -12,11 +13,10 @@ interface Props {
 
 export function CinnamonBlenderTab({ bulkCinnamonStock, onSuccess }: Props) {
   const { getToken } = useAuth();
+  const { alert, confirm } = useAlertConfirm();
   const [cinnamonBatchCount, setCinnamonBatchCount] = useState("1");
   const [cinnamonProducedQty, setCinnamonProducedQty] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
 
   const cinnamonSugarEstUsage = useMemo(() => {
     const batches = parseInt(cinnamonBatchCount) || 0;
@@ -33,12 +33,10 @@ export function CinnamonBlenderTab({ bulkCinnamonStock, onSuccess }: Props) {
   }, [cinnamonProducedQty]);
 
   async function handleBlenderCinnamon() {
-    setError("");
-    setSuccessMsg("");
     const batches = parseInt(cinnamonBatchCount) || 0;
 
     if (batches <= 0) {
-      setError("Jumlah batch blender harus lebih dari 0");
+      await alert("Jumlah batch blender harus lebih dari 0", "Peringatan", "danger");
       return;
     }
 
@@ -53,31 +51,29 @@ export function CinnamonBlenderTab({ bulkCinnamonStock, onSuccess }: Props) {
 
       const d = await res.json();
       if (!res.ok) {
-        setError(d.error || "Gagal memproses blender gula cinnamon");
+        await alert(d.error || "Gagal memproses blender gula cinnamon", "Error", "danger");
       } else {
-        setSuccessMsg(`Berhasil memblender gula cinnamon: ${batches} batch!`);
+        await alert(`Berhasil memblender gula cinnamon: ${batches} batch!`, "Sukses!", "success");
         setCinnamonBatchCount("1");
         onSuccess();
       }
     } catch (err) {
-      setError("Terjadi kesalahan jaringan");
+      await alert("Terjadi kesalahan jaringan", "Error", "danger");
     } finally {
       setSubmitting(false);
     }
   }
 
   async function handleRepackCinnamonClip() {
-    setError("");
-    setSuccessMsg("");
     const grams = parseInt(cinnamonProducedQty) || 0;
     const produced = Math.floor(grams / 5);
 
     if (grams <= 0) {
-      setError("Jumlah berat gula curah dikemas harus lebih dari 0");
+      await alert("Jumlah berat gula curah dikemas harus lebih dari 0", "Peringatan", "danger");
       return;
     }
     if (produced <= 0) {
-      setError("Minimal 5 gram untuk menghasilkan minimal 1 clip");
+      await alert("Minimal 5 gram untuk menghasilkan minimal 1 clip", "Peringatan", "danger");
       return;
     }
 
@@ -92,23 +88,27 @@ export function CinnamonBlenderTab({ bulkCinnamonStock, onSuccess }: Props) {
 
       const d = await res.json();
       if (!res.ok) {
-        setError(d.error || "Gagal mengemas clip gula cinnamon");
+        await alert(d.error || "Gagal mengemas clip gula cinnamon", "Error", "danger");
       } else {
-        setSuccessMsg(`Berhasil mengemas ${produced} pcs clip gula cinnamon!`);
+        await alert(`Berhasil mengemas ${produced} pcs clip gula cinnamon!`, "Sukses!", "success");
         setCinnamonProducedQty("");
         onSuccess();
       }
     } catch (err) {
-      setError("Terjadi kesalahan jaringan");
+      await alert("Terjadi kesalahan jaringan", "Error", "danger");
     } finally {
       setSubmitting(false);
     }
   }
 
   async function handleClearCinnamonBulk() {
-    if (!window.confirm("Apakah Anda yakin ingin mengosongkan seluruh sisa stok gula cinnamon curah di toples?")) return;
-    setError("");
-    setSuccessMsg("");
+    const isConfirm = await confirm(
+      "Apakah Anda yakin ingin mengosongkan seluruh sisa stok gula cinnamon curah di toples?",
+      "Kosongkan Toples",
+      { type: "danger" }
+    );
+    if (!isConfirm) return;
+
     setSubmitting(true);
     try {
       const token = await getToken();
@@ -120,13 +120,13 @@ export function CinnamonBlenderTab({ bulkCinnamonStock, onSuccess }: Props) {
 
       const d = await res.json();
       if (!res.ok) {
-        setError(d.error || "Gagal mengosongkan stok toples");
+        await alert(d.error || "Gagal mengosongkan stok toples", "Error", "danger");
       } else {
-        setSuccessMsg("Stok gula cinnamon curah di toples berhasil dikosongkan.");
+        await alert("Stok gula cinnamon curah di toples berhasil dikosongkan.", "Sukses!", "success");
         onSuccess();
       }
     } catch (err) {
-      setError("Terjadi kesalahan jaringan");
+      await alert("Terjadi kesalahan jaringan", "Error", "danger");
     } finally {
       setSubmitting(false);
     }
@@ -134,8 +134,6 @@ export function CinnamonBlenderTab({ bulkCinnamonStock, onSuccess }: Props) {
 
   return (
     <div className="space-y-4">
-      {error && <div className="bg-red-50 text-red-600 text-xs p-3.5 rounded-xl border border-red-100">{error}</div>}
-      {successMsg && <div className="bg-green-50 text-green-700 text-xs p-3.5 rounded-xl border border-green-100">{successMsg}</div>}
 
       <div className="bg-white rounded-3xl p-5 shadow-sm border border-primary/20 border-opacity-40 space-y-4">
         <h2 className="text-sm font-extrabold text-slate-800">1. Blender Cinnamon (Produksi Curah)</h2>

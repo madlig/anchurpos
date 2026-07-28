@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 import { Input } from "@/components/ui/input";
 import { Loader2, Package, ArrowRight } from "lucide-react";
 
@@ -24,14 +25,13 @@ interface Props {
 
 export function GlazeRepackTab({ onSuccess }: Props) {
   const { getToken } = useAuth();
+  const { alert } = useAlertConfirm();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [addons, setAddons] = useState<Addon[]>([]);
   const [keywords, setKeywords] = useState<string[]>(["glaze", "saus", "jam", "selai", "krim", "cream", "curah"]);
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState("");
-  const [error, setError] = useState("");
 
   const [form, setForm] = useState({
     glazeId: "",
@@ -64,13 +64,11 @@ export function GlazeRepackTab({ onSuccess }: Props) {
   async function handleRepackGlaze(e: React.FormEvent) {
     e.preventDefault();
     if (!form.glazeId || !form.glazeQty || !form.cupId || !form.cupQty || !form.sauceId || !form.yieldQty) {
-      setError("Semua field wajib diisi");
+      await alert("Semua field wajib diisi", "Peringatan", "danger");
       return;
     }
 
     setSubmitting(true);
-    setError("");
-    setSuccess("");
 
     try {
       const res = await fetchWithAuth("/api/inventory/repack-sauce", {
@@ -79,14 +77,14 @@ export function GlazeRepackTab({ onSuccess }: Props) {
       });
       if (!res.ok) {
         const d = await res.json();
-        setError(d.error || "Gagal melakukan repacking");
+        await alert(d.error || "Gagal melakukan repacking", "Error", "danger");
       } else {
-        setSuccess("Berhasil merepack glaze! Stok telah disesuaikan.");
+        await alert("Berhasil merepack glaze! Stok telah disesuaikan.", "Sukses!", "success");
         setForm({ glazeId: "", glazeQty: "", cupId: "", cupQty: "", sauceId: "", yieldQty: "" });
         onSuccess();
       }
     } catch(err) {
-      setError("Gagal menghubungi server");
+      await alert("Gagal menghubungi server", "Error", "danger");
     } finally {
       setSubmitting(false);
     }
@@ -107,9 +105,6 @@ export function GlazeRepackTab({ onSuccess }: Props) {
         <p className="text-xs text-slate-500">Pindahkan glaze curah (bulk) ke dalam kemasan cup/plastik agar siap dijual sebagai Add-on.</p>
       </div>
 
-      {error && <div className="p-3.5 bg-red-50 text-red-600 rounded-xl text-xs font-semibold border border-red-100">{error}</div>}
-      {success && <div className="p-3.5 bg-green-50 text-green-700 rounded-xl text-xs font-semibold border border-green-200">{success}</div>}
-
       <form onSubmit={handleRepackGlaze} className="space-y-6">
         
         {/* STEP 1: BAHAN MENTAH */}
@@ -123,7 +118,7 @@ export function GlazeRepackTab({ onSuccess }: Props) {
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-700">Glaze (Bulk)</label>
               <select 
-                className="w-full text-sm font-medium border-slate-200 rounded-xl h-11 bg-slate-50 text-slate-800 pl-4 pr-10 appearance-none focus:border-primary/50 outline-none"
+                className="w-full text-sm font-medium border-slate-200 rounded-xl h-11 bg-slate-50 text-slate-800 pl-4 pr-10 appearance-none focus:border-primary/50 outline-none focus:ring-2 focus:ring-primary/20"
                 value={form.glazeId} onChange={e => setForm({...form, glazeId: e.target.value})}
               >
                 <option value="">-- Pilih Glaze --</option>
@@ -140,7 +135,7 @@ export function GlazeRepackTab({ onSuccess }: Props) {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-700">Kuantitas Terpakai</label>
-              <Input type="number" step="0.1" placeholder="Misal: 1000 (gram)" className="h-11 rounded-xl bg-slate-50 border-slate-200 text-sm font-medium" value={form.glazeQty} onChange={e => setForm({...form, glazeQty: e.target.value})} />
+              <Input type="number" step="0.1" placeholder="Misal: 1000 (gram)" className="h-11 rounded-xl bg-slate-50 border-slate-200 text-sm font-medium focus-visible:ring-primary/20" value={form.glazeQty} onChange={e => setForm({...form, glazeQty: e.target.value})} />
             </div>
           </div>
 
@@ -148,7 +143,7 @@ export function GlazeRepackTab({ onSuccess }: Props) {
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-700">Cup / Packaging</label>
               <select 
-                className="w-full text-sm font-medium border-slate-200 rounded-xl h-11 bg-slate-50 text-slate-800 pl-4 pr-10 appearance-none focus:border-primary/50 outline-none"
+                className="w-full text-sm font-medium border-slate-200 rounded-xl h-11 bg-slate-50 text-slate-800 pl-4 pr-10 appearance-none focus:border-primary/50 outline-none focus:ring-2 focus:ring-primary/20"
                 value={form.cupId} onChange={e => setForm({...form, cupId: e.target.value})}
               >
                 <option value="">-- Pilih Kemasan --</option>
@@ -161,7 +156,7 @@ export function GlazeRepackTab({ onSuccess }: Props) {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-700">Kuantitas Terpakai</label>
-              <Input type="number" placeholder="Misal: 50 (pcs)" className="h-11 rounded-xl bg-slate-50 border-slate-200 text-sm font-medium" value={form.cupQty} onChange={e => setForm({...form, cupQty: e.target.value})} />
+              <Input type="number" placeholder="Misal: 50 (pcs)" className="h-11 rounded-xl bg-slate-50 border-slate-200 text-sm font-medium focus-visible:ring-primary/20" value={form.cupQty} onChange={e => setForm({...form, cupQty: e.target.value})} />
             </div>
           </div>
         </div>
@@ -183,7 +178,7 @@ export function GlazeRepackTab({ onSuccess }: Props) {
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-700">Saus (Siap Jual)</label>
               <select 
-                className="w-full text-sm font-medium border-brand-200 rounded-xl h-11 bg-brand-50 text-slate-800 pl-4 pr-10 appearance-none focus:border-brand-500 outline-none"
+                className="w-full text-sm font-medium border-brand-200 rounded-xl h-11 bg-brand-50 text-slate-800 pl-4 pr-10 appearance-none focus:border-brand-500 outline-none focus:ring-2 focus:ring-brand-500/20"
                 value={form.sauceId} onChange={e => setForm({...form, sauceId: e.target.value})}
               >
                 <option value="">-- Pilih Add-on Saus --</option>
@@ -194,7 +189,7 @@ export function GlazeRepackTab({ onSuccess }: Props) {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-700">Jumlah Dihasilkan</label>
-              <Input type="number" className="h-11 rounded-xl border-brand-200 bg-brand-50 text-sm font-medium" placeholder="Misal: 50 (pcs)" value={form.yieldQty} onChange={e => setForm({...form, yieldQty: e.target.value})} />
+              <Input type="number" className="h-11 rounded-xl border-brand-200 bg-brand-50 text-sm font-medium focus-visible:ring-brand-500/20" placeholder="Misal: 50 (pcs)" value={form.yieldQty} onChange={e => setForm({...form, yieldQty: e.target.value})} />
             </div>
           </div>
         </div>
@@ -202,11 +197,7 @@ export function GlazeRepackTab({ onSuccess }: Props) {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full h-12 rounded-xl text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
-          style={{
-            background: "linear-gradient(135deg, #E85D8C 0%, #D84275 100%)",
-            boxShadow: "0 4px 12px rgba(232,93,140,0.2)",
-          }}
+          className="w-full h-12 rounded-xl text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 mt-4 bg-gradient-to-br from-primary to-rose-600 shadow-md shadow-pink-500/20"
         >
           {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Package size={18} /> Simpan Repack Saos</>}
         </button>

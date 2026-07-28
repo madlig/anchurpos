@@ -157,7 +157,7 @@ export default function CrewPrePackingPage() {
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} /></div>;
 
   return (
-    <div className="page-enter min-h-screen pb-10" style={{ background: "#FCABB4" }}>
+    <div className="page-enter min-h-screen pb-10" >
       {/* Header (Glassmorphism) */}
       <div className="px-5 pt-6 pb-6 mb-2 rounded-b-3xl sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Clock, CheckCircle2, AlertTriangle, Wifi } from "lucide-react";
+import { Loader2, Clock, CheckCircle2, AlertTriangle, MapPin, Camera } from "lucide-react";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { storage } from "@/lib/firebase-client";
 
 interface TodayStatus {
   id: string; date: string;
-  checkIn: { time: string; ipAddress: string; ipValid: boolean };
-  checkOut: { time: string; ipAddress: string; ipValid: boolean } | null;
+  checkIn: { time: string; photoUrl: string | null; latitude: number | null; longitude: number | null };
+  checkOut: { time: string; photoUrl: string | null; latitude: number | null; longitude: number | null } | null;
   totalHours: number | null;
   status: "belum_lengkap" | "lengkap" | "direview";
   flaggedReason: string | null;
@@ -32,6 +34,9 @@ export default function CrewAttendancePage() {
   const [attendanceMonth, setAttendanceMonth] = useState(() => {
     const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingActionType, setPendingActionType] = useState<"check-in" | "check-out" | null>(null);
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
@@ -58,25 +63,111 @@ export default function CrewAttendancePage() {
   const hasCheckedOut = !!today?.checkOut?.time;
   const isDone = hasCheckedIn && hasCheckedOut;
 
-  async function handleAction(type: "check-in" | "check-out") {
-    setError(""); setSubmitting(true);
+  const handleBtnClick = async (type: "check-in" | "check-out") => {
+    if (type === "check-out" && hoursWorked < 8) {
+      const confirmed = await confirm(
+        "Anda baru bekerja kurang dari 8 jam. Apakah Anda yakin ingin checkout sekarang?",
+        "Checkout Awal",
+        { destructive: true, confirmLabel: "Ya, Pulang", cancelLabel: "Batal" }
+      );
+      if (!confirmed) return;
+    }
+    setPendingActionType(type);
+    fileInputRef.current?.click(); // Buka kamera
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !pendingActionType) return;
+    
+    setError(""); 
+    setSubmitting(true);
+
     try {
-      const res = await fetchWithAuth(`/api/attendance/${type}`, { 
-         method: "POST"
+      // 1. Get GPS Location
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
+      }).catch(err => {
+        throw new Error("Akses lokasi (GPS) ditolak atau gagal. Izinkan akses GPS untuk absen.");
+      }) as GeolocationPosition;
+      
+      const { latitude, longitude } = position.coords;
+
+      // 2. Compress Photo using Canvas
+      const compressedBase64 = await compressImage(file);
+
+      // 3. Upload to Firebase Storage
+      const storageRef = ref(storage, `attendance/${attendanceMonth}/${user?.uid}_${Date.now()}.jpg`);
+      await uploadString(storageRef, compressedBase64, 'data_url');
+      const photoUrl = await getDownloadURL(storageRef);
+
+      // 4. Send to API
+      const res = await fetchWithAuth(`/api/attendance/${pendingActionType}`, { 
+         method: "POST",
+         body: JSON.stringify({ photoUrl, latitude, longitude })
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Gagal absen. Pastikan terhubung ke WiFi rumah produksi."); return; }
-      await loadStatus();
-    } catch { setError("Gagal menghubungi server"); } finally { setSubmitting(false); }
-  }
+      if (!res.ok) { 
+        setError(data.error ?? "Gagal memproses absen."); 
+      } else {
+        await loadStatus();
+      }
+    } catch (err: any) { 
+      setError(err.message || "Gagal menghubungi server"); 
+    } finally { 
+      setSubmitting(false); 
+      setPendingActionType(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // Helper untuk kompresi gambar
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 600;
+          const MAX_HEIGHT = 600;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", 0.6)); // Kualitas 60% (~50kb)
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
 
   const todayLabel = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
 
-  // Hitung sudah berapa jam sejak check-in
   const checkInTime = today?.checkIn?.time ? new Date(today.checkIn.time).getTime() : null;
   const hoursWorked = checkInTime ? (Date.now() - checkInTime) / (1000 * 60 * 60) : 0;
 
-  // Status config for the gradient card
   const statusCard = (() => {
     if (!hasCheckedIn) return { label: "Belum Absen", sub: "Tap tombol di bawah untuk absen masuk", gradient: "linear-gradient(135deg,#E85D8C,#F2A0B7)" };
     if (!hasCheckedOut) return {
@@ -88,25 +179,11 @@ export default function CrewAttendancePage() {
     return { label: "Sudah Pulang", sub: today!.totalHours ? `Total ${today!.totalHours.toFixed(1)} jam` : "Terima kasih!", gradient: "linear-gradient(135deg,#22C55E,#16A34A)" };
   })();
 
-  // Button config — tombol PULANG selalu aktif
   const btnConfig = (() => {
-    if (!hasCheckedIn) return { label: "MASUK", action: () => handleAction("check-in"), bg: "linear-gradient(135deg,#E85D8C,#C94A73)", shadow: "0 10px 40px rgba(232,93,140,0.4)", testId: "attendance-check-in-btn", disabled: false, subLabel: "" };
+    if (!hasCheckedIn) return { label: "MASUK", action: () => handleBtnClick("check-in"), bg: "linear-gradient(135deg,#E85D8C,#C94A73)", shadow: "0 10px 40px rgba(232,93,140,0.4)", testId: "attendance-check-in-btn", disabled: false, subLabel: "" };
     if (!hasCheckedOut) return {
       label: "PULANG",
-      action: async () => {
-        if (hoursWorked < 8) {
-          const confirmed = await confirm(
-            "Anda baru bekerja kurang dari 8 jam. Apakah Anda yakin ingin checkout sekarang?",
-            "Checkout Awal",
-            { destructive: true, confirmLabel: "Ya, Pulang", cancelLabel: "Batal" }
-          );
-          if (confirmed) {
-            handleAction("check-out");
-          }
-        } else {
-          handleAction("check-out");
-        }
-      },
+      action: () => handleBtnClick("check-out"),
       bg: "linear-gradient(135deg,#EF4444,#DC2626)",
       shadow: "0 10px 40px rgba(220,38,38,0.35)",
       testId: "attendance-check-out-btn",
@@ -117,15 +194,14 @@ export default function CrewAttendancePage() {
   })();
 
   if (loading) return (
-    <div className="flex h-screen items-center justify-center" style={{ background: "#FCABB4" }}>
+    <div className="flex h-screen items-center justify-center" >
       <Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} />
     </div>
   );
 
   return (
-    <div className="page-enter min-h-screen" style={{ background: "#FCABB4" }}>
+    <div className="page-enter min-h-screen" >
 
-      {/* Header (Glassmorphism) */}
       <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200">
         <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">Absensi</h1>
         <p className="text-[12px] font-medium mt-1 text-slate-500">
@@ -135,7 +211,6 @@ export default function CrewAttendancePage() {
 
       <div className="px-4 pt-4 pb-4 md:px-8 md:max-w-2xl">
 
-        {/* Status Card — gradient pink */}
         <div
           data-testid="attendance-status-card"
           style={{
@@ -153,9 +228,15 @@ export default function CrewAttendancePage() {
           <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)" }}>{statusCard.sub}</p>
         </div>
 
+        <input 
+          type="file" 
+          accept="image/*" 
+          capture="user" 
+          ref={fileInputRef} 
+          style={{ display: "none" }} 
+          onChange={handleFileChange} 
+        />
 
-
-        {/* Circular Clock-in/out Button */}
         {btnConfig && (
           <div className="flex flex-col items-center gap-3" style={{ marginBottom: "20px" }}>
             <button
@@ -175,7 +256,7 @@ export default function CrewAttendancePage() {
                 <Loader2 size={30} color="#fff" className="animate-spin" />
               ) : (
                 <>
-                  <Clock size={30} color="#fff" />
+                  <Camera size={30} color="#fff" />
                   <span style={{ color: "#fff", fontWeight: "700", fontSize: "13px", marginTop: "6px", letterSpacing: "1px" }}>
                     {btnConfig.label}
                   </span>
@@ -183,15 +264,14 @@ export default function CrewAttendancePage() {
               )}
             </button>
             <div className="flex items-center gap-1.5 text-center">
-              <Wifi size={12} style={{ color: "#94A3B8" }} />
+              <MapPin size={12} style={{ color: "#94A3B8" }} />
               <p style={{ fontSize: "11px", color: "#64748B" }}>
-                {btnConfig.subLabel || `Tekan untuk absen ${btnConfig.label === "MASUK" ? "masuk" : "pulang"}`}
+                {btnConfig.subLabel || `Kamera & GPS diperlukan`}
               </p>
             </div>
           </div>
         )}
 
-        {/* Done state */}
         {isDone && (
           <div className="flex justify-center mb-4">
             <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 20px", borderRadius: "100px", background: "#fff", border: "1px solid #F1F5F9" }}>
@@ -201,7 +281,6 @@ export default function CrewAttendancePage() {
           </div>
         )}
 
-        {/* Error */}
         {error && (
           <div style={{ padding: "12px 14px", borderRadius: "12px", background: "#FEF2F2", border: "1px solid #FECACA", marginBottom: "12px" }} data-testid="attendance-error">
             <div className="flex items-center gap-2">
@@ -211,7 +290,6 @@ export default function CrewAttendancePage() {
           </div>
         )}
 
-        {/* Log Hari Ini */}
         {today && (
           <div style={{ marginBottom: "20px" }}>
             <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "10px" }}>Log Hari Ini</p>
@@ -236,11 +314,9 @@ export default function CrewAttendancePage() {
           </div>
         )}
 
-        {/* Riwayat Absensi Bulanan */}
         <div>
           <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "10px" }}>Riwayat Absensi Bulanan</p>
           
-          {/* Month picker */}
           <div className="flex items-center gap-2 mb-3">
             <button 
               onClick={() => { 
@@ -250,7 +326,7 @@ export default function CrewAttendancePage() {
               }}
               style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}
             >
-              ‹
+              ◀
             </button>
             <p style={{ flex: 1, textAlign: "center", fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>
               {new Date(attendanceMonth + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
@@ -263,7 +339,7 @@ export default function CrewAttendancePage() {
               }}
               style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}
             >
-              ›
+              ▶
             </button>
           </div>
 

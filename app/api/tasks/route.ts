@@ -27,6 +27,18 @@ export async function GET(req: NextRequest) {
     const snap = await query.get();
     let tasks = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
 
+    // Filter out 'umum' tasks that the current crew has already completed
+    if (auth.role === "crew") {
+      tasks = tasks.filter(t => {
+        if (t.type === "umum" && t.completedByList && Array.isArray(t.completedByList)) {
+          const hasCompleted = t.completedByList.some((c: any) => c.uid === auth.uid);
+          // If statusFilter is pending, we don't show it if they completed it
+          if (statusFilter === "pending" && hasCompleted) return false;
+        }
+        return true;
+      });
+    }
+
     if (dateFilter) {
       tasks = tasks.filter(t => t.createdAt.startsWith(dateFilter));
     }
@@ -72,6 +84,42 @@ export async function POST(req: NextRequest) {
     };
 
     const docRef = await adminDb.collection("tasks").add(newTask);
+    
+    // SEND PUSH NOTIFICATION
+    try {
+      const { adminMessaging } = await import("@/lib/firebase-admin");
+      
+      // Get users with role "crew" or matching assignedRole who have fcmToken
+      let usersQuery = adminDb.collection("users").where("role", "==", "crew");
+      const usersSnap = await usersQuery.get();
+      
+      const tokens: string[] = [];
+      usersSnap.forEach(doc => {
+        const u = doc.data();
+        if (u.fcmToken) {
+          tokens.push(u.fcmToken);
+        }
+      });
+      
+      if (tokens.length > 0) {
+        await adminMessaging.sendEachForMulticast({
+          tokens,
+          notification: {
+            title: `Instruksi Baru: ${title}`,
+            body: description || `Tugas ${type} baru telah ditugaskan.`,
+          },
+          data: {
+            url: "/crew/dashboard",
+            taskId: docRef.id
+          }
+        });
+        console.log(`Push notification sent to ${tokens.length} devices.`);
+      }
+    } catch (pushErr) {
+      console.error("Failed to send push notification:", pushErr);
+      // We don't fail the API request if push fails
+    }
+
     return NextResponse.json({ id: docRef.id, ...newTask });
   } catch (error: any) {
     console.error("POST Tasks error:", error);

@@ -16,8 +16,8 @@ export interface AttendanceRecord {
   employeeId: string;
   employeeName: string;
   date: string;
-  checkIn: { time: string; ipAddress?: string; ipValid?: boolean } | null;
-  checkOut: { time: string | null; ipAddress?: string; ipValid?: boolean } | null;
+  checkIn: { time: string; ipAddress?: string; ipValid?: boolean; photoUrl?: string; locationValid?: boolean } | null;
+  checkOut: { time: string | null; ipAddress?: string; ipValid?: boolean; photoUrl?: string; locationValid?: boolean } | null;
   totalHours: number | null;
   status: string;
   overtimeHours?: number | null;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Check, CalendarDays } from "lucide-react";
+import { Loader2, Check, CalendarDays, Camera, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Employee, Role, ROLE_LABEL, AttendanceRecord } from "../types";
 
@@ -195,25 +195,58 @@ export function AttendanceReviewCard({ a, onReview, reviewingId, isCorrectionMod
 
   return (
     <div style={{ background: "#fff", borderRadius: "16px", padding: "16px", border: "1px solid #F1F5F9", boxShadow: "0 2px 10px rgba(0,0,0,0.015)" }}>
-      <div className="flex items-start justify-between border-b border-slate-50 pb-3 mb-3">
-        <div>
-          <p style={{ fontSize: "14px", fontWeight: "800", color: "#1C1C1E" }}>{a.employeeName}</p>
-          <div className="flex items-center gap-1.5 mt-1 text-slate-400">
-            <CalendarDays size={12} />
-            <span style={{ fontSize: "11px", fontWeight: "600" }}>
-              {fmtDateFull(a.date)} {a.flaggedReason ? `· ${a.flaggedReason}` : ""}
-            </span>
+      <div className="flex flex-col md:flex-row md:items-start justify-between border-b border-slate-50 pb-3 mb-3 gap-3">
+        <div className="flex gap-3">
+          {/* Tampilkan Foto Selfie Terakhir (Check-out atau Check-in) */}
+          {a.checkOut?.photoUrl || a.checkIn?.photoUrl ? (
+            <div className="relative group cursor-pointer" onClick={() => window.open(a.checkOut?.photoUrl || a.checkIn?.photoUrl, "_blank")}>
+              <img 
+                src={a.checkOut?.photoUrl || a.checkIn?.photoUrl} 
+                alt="Selfie" 
+                className="w-12 h-12 rounded-lg object-cover border border-slate-200"
+              />
+              <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera size={14} color="#fff" />
+              </div>
+            </div>
+          ) : (
+            <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center border border-slate-200">
+              <Camera size={16} className="text-slate-400" />
+            </div>
+          )}
+
+          <div>
+            <p style={{ fontSize: "14px", fontWeight: "800", color: "#1C1C1E" }}>{a.employeeName}</p>
+            <div className="flex items-center gap-1.5 mt-1 text-slate-400">
+              <CalendarDays size={12} />
+              <span style={{ fontSize: "11px", fontWeight: "600" }}>
+                {fmtDateFull(a.date)} 
+              </span>
+            </div>
+            {/* Indikator Anomali */}
+            {a.flaggedReason && (
+              <p style={{ fontSize: "10px", color: "#DC2626", background: "#FEF2F2", padding: "2px 6px", borderRadius: "4px", marginTop: "4px", display: "inline-block", fontWeight: "600" }}>
+                A {a.flaggedReason}
+              </p>
+            )}
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1 text-right">
+
+        <div className="flex flex-col items-start md:items-end gap-1 w-full md:w-auto">
           {a.checkIn && (
-            <p style={{ fontSize: "11px", color: "#64748B", background: "#F1F5F9", padding: "2px 8px", borderRadius: "100px", fontWeight: "600" }}>
+            <p style={{ fontSize: "11px", color: "#64748B", background: "#F1F5F9", padding: "2px 8px", borderRadius: "100px", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
               Masuk: <span className="text-slate-700">{fmtTime(a.checkIn.time)}</span>
+              {a.checkIn.locationValid !== undefined && (
+                <MapPin size={10} color={a.checkIn.locationValid ? "#16A34A" : "#DC2626"} />
+              )}
             </p>
           )}
           {a.checkOut?.time && (
-            <p style={{ fontSize: "11px", color: "#64748B", background: "#F1F5F9", padding: "2px 8px", borderRadius: "100px", fontWeight: "600" }}>
+            <p style={{ fontSize: "11px", color: "#64748B", background: "#F1F5F9", padding: "2px 8px", borderRadius: "100px", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}>
               Pulang: <span className="text-slate-700">{fmtTime(a.checkOut.time)}</span>
+              {a.checkOut.locationValid !== undefined && (
+                <MapPin size={10} color={a.checkOut.locationValid ? "#16A34A" : "#DC2626"} />
+              )}
             </p>
           )}
           {dailyWage !== undefined && (

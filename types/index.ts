@@ -249,12 +249,16 @@ export interface CheckInData {
   time: string;
   ipAddress: string;
   ipValid: boolean;
+  photoUrl?: string;
+  locationValid?: boolean;
 }
 
 export interface CheckOutData {
   time: string | null;
   ipAddress: string | null;
   ipValid: boolean | null;
+  photoUrl?: string;
+  locationValid?: boolean;
 }
 
 export type AttendanceStatus = "belum_lengkap" | "lengkap" | "direview";

@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 import { Input } from "@/components/ui/input";
 import { Loader2, RefreshCw, PackageOpen, AlertTriangle, Check } from "lucide-react";
 import type { Order, OrderItem, Ingredient } from "@/types";
@@ -17,6 +18,7 @@ interface Props {
 
 export function OrderFulfillmentTab({ ingredients, onSuccess }: Props) {
   const { getToken } = useAuth();
+  const { alert } = useAlertConfirm();
   
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
@@ -26,8 +28,6 @@ export function OrderFulfillmentTab({ ingredients, onSuccess }: Props) {
   const [glazeSelections, setGlazeSelections] = useState<Record<string, string>>({});
   
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
 
   const loadOrders = useCallback(async () => {
     setLoadingOrders(true);
@@ -49,7 +49,6 @@ export function OrderFulfillmentTab({ ingredients, onSuccess }: Props) {
 
   const loadOrderDetail = useCallback(async (orderId: string) => {
     setLoadingOrderDetail(true);
-    setError("");
     try {
       const token = await getToken();
       const res = await fetch(`/api/orders/${orderId}`, {
@@ -60,14 +59,14 @@ export function OrderFulfillmentTab({ ingredients, onSuccess }: Props) {
         setSelectedOrder(data);
         setGlazeSelections({});
       } else {
-        setError("Gagal memuat detail pesanan");
+        await alert("Gagal memuat detail pesanan", "Error", "danger");
       }
     } catch (err) {
-      setError("Gagal memuat detail pesanan");
+      await alert("Gagal memuat detail pesanan", "Error", "danger");
     } finally {
       setLoadingOrderDetail(false);
     }
-  }, [getToken]);
+  }, [getToken, alert]);
 
   useEffect(() => {
     loadOrders();
@@ -139,15 +138,13 @@ export function OrderFulfillmentTab({ ingredients, onSuccess }: Props) {
 
   async function handlePackOrder() {
     if (!selectedOrderId || !selectedOrder) return;
-    setError("");
-    setSuccessMsg("");
 
     if (orderRequirements.reqGlazeStandard > 0 && glazeSelectionsTotals.selectedStandardTotal !== orderRequirements.reqGlazeStandard) {
-      setError(`Jumlah cup glaze standard tidak sesuai. Dibutuhkan: ${orderRequirements.reqGlazeStandard} pcs, terpilih: ${glazeSelectionsTotals.selectedStandardTotal} pcs.`);
+      await alert(`Jumlah cup glaze standard tidak sesuai. Dibutuhkan: ${orderRequirements.reqGlazeStandard} pcs, terpilih: ${glazeSelectionsTotals.selectedStandardTotal} pcs.`, "Peringatan", "danger");
       return;
     }
     if (orderRequirements.reqGlazeTikTok > 0 && glazeSelectionsTotals.selectedTikTokTotal !== orderRequirements.reqGlazeTikTok) {
-      setError(`Jumlah plastik glaze TikTok tidak sesuai. Dibutuhkan: ${orderRequirements.reqGlazeTikTok} pcs, terpilih: ${glazeSelectionsTotals.selectedTikTokTotal} pcs.`);
+      await alert(`Jumlah plastik glaze TikTok tidak sesuai. Dibutuhkan: ${orderRequirements.reqGlazeTikTok} pcs, terpilih: ${glazeSelectionsTotals.selectedTikTokTotal} pcs.`, "Peringatan", "danger");
       return;
     }
 
@@ -168,16 +165,16 @@ export function OrderFulfillmentTab({ ingredients, onSuccess }: Props) {
 
       const d = await res.json();
       if (!res.ok) {
-        setError(d.error || "Gagal menyelesaikan packing");
+        await alert(d.error || "Gagal menyelesaikan packing", "Error", "danger");
       } else {
-        setSuccessMsg(`Berhasil memproses packing untuk order ${selectedOrder.orderNumber}!`);
+        await alert(`Berhasil memproses packing untuk order ${selectedOrder.orderNumber}!`, "Sukses!", "success");
         setSelectedOrderId(null);
         setSelectedOrder(null);
         await loadOrders();
         onSuccess();
       }
     } catch (err) {
-      setError("Terjadi kesalahan jaringan");
+      await alert("Terjadi kesalahan jaringan", "Error", "danger");
     } finally {
       setSubmitting(false);
     }
@@ -185,8 +182,6 @@ export function OrderFulfillmentTab({ ingredients, onSuccess }: Props) {
 
   return (
     <div className="space-y-4">
-      {error && <div className="bg-red-50 text-red-600 text-xs p-3.5 rounded-xl border border-red-100">{error}</div>}
-      {successMsg && <div className="bg-green-50 text-green-700 text-xs p-3.5 rounded-xl border border-green-100">{successMsg}</div>}
 
       <div className="bg-white rounded-3xl p-5 shadow-sm border border-primary/20 border-opacity-40">
         <div className="flex items-center justify-between mb-4">
@@ -205,20 +200,22 @@ export function OrderFulfillmentTab({ ingredients, onSuccess }: Props) {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-2 max-h-[220px] overflow-y-auto pr-1">
-            {orders.map((order) => (
-              <button
-                key={order.id}
-                onClick={() => setSelectedOrderId(order.id)}
-                className="w-full text-left p-3.5 rounded-xl border text-xs font-medium transition-all flex items-center justify-between hover:bg-primary/10"
-                style={selectedOrderId === order.id ? { border: "2px solid #E85D8C", background: "#FEF1F5" } : { border: "1px solid #F1F5F9", background: "#fff" }}
-              >
+            {orders.map((order) => {
+              const isSelected = selectedOrderId === order.id;
+              return (
+                <button
+                  key={order.id}
+                  onClick={() => setSelectedOrderId(order.id)}
+                  className={`w-full text-left p-3.5 rounded-xl border text-xs font-medium transition-all flex items-center justify-between tap-target ${isSelected ? 'border-primary bg-pink-50 shadow-sm' : 'border-slate-100 bg-white hover:bg-slate-50'}`}
+                >
                 <div>
                   <p className="font-extrabold text-slate-800 text-sm mb-0.5">{order.orderNumber}</p>
                   <p className="text-slate-400 text-xxs">Customer: {order.customerName}</p>
                 </div>
                 <span className="font-bold px-2 py-0.5 rounded-full text-xs" style={{ background: "#F1F5F9", color: "#64748B" }}>{order.channel.toUpperCase()}</span>
               </button>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -277,7 +274,7 @@ export function OrderFulfillmentTab({ ingredients, onSuccess }: Props) {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-xs">
                       <div><p className="font-bold text-slate-800">Cup Glaze Standard</p><p className="text-xxs text-slate-400">Pilih rasa (2 cup per pack)</p></div>
-                      <span className="font-bold px-2 py-0.5 rounded-lg text-xxs" style={glazeSelectionsTotals.selectedStandardTotal === orderRequirements.reqGlazeStandard ? { background: "#DCFCE7", color: "#16A34A" } : { background: "#FEE2E2", color: "#DC2626" }}>
+                      <span className={`font-bold px-2 py-0.5 rounded-lg text-xxs ${glazeSelectionsTotals.selectedStandardTotal === orderRequirements.reqGlazeStandard ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
                         {glazeSelectionsTotals.selectedStandardTotal} / {orderRequirements.reqGlazeStandard} pcs
                       </span>
                     </div>
@@ -296,7 +293,7 @@ export function OrderFulfillmentTab({ ingredients, onSuccess }: Props) {
                   <div className="space-y-3 border-t border-slate-100 border-dashed pt-4">
                     <div className="flex items-center justify-between text-xs">
                       <div><p className="font-bold text-slate-800">Plastik Glaze TikTok</p><p className="text-xxs text-slate-400">Pilih rasa (2 plastik per pack)</p></div>
-                      <span className="font-bold px-2 py-0.5 rounded-lg text-xxs" style={glazeSelectionsTotals.selectedTikTokTotal === orderRequirements.reqGlazeTikTok ? { background: "#DCFCE7", color: "#16A34A" } : { background: "#FEE2E2", color: "#DC2626" }}>
+                      <span className={`font-bold px-2 py-0.5 rounded-lg text-xxs ${glazeSelectionsTotals.selectedTikTokTotal === orderRequirements.reqGlazeTikTok ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
                         {glazeSelectionsTotals.selectedTikTokTotal} / {orderRequirements.reqGlazeTikTok} pcs
                       </span>
                     </div>
@@ -315,8 +312,7 @@ export function OrderFulfillmentTab({ ingredients, onSuccess }: Props) {
               <button
                 onClick={handlePackOrder}
                 disabled={submitting || orderRequirements.hasPendingRainbow || (orderRequirements.reqGlazeStandard > 0 && glazeSelectionsTotals.selectedStandardTotal !== orderRequirements.reqGlazeStandard) || (orderRequirements.reqGlazeTikTok > 0 && glazeSelectionsTotals.selectedTikTokTotal !== orderRequirements.reqGlazeTikTok)}
-                className="w-full min-h-[56px] rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 active:scale-[0.98] transition-all disabled:opacity-50 tap-target"
-                style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)", boxShadow: "0 8px 20px rgba(232,93,140,0.3)" }}
+                className="w-full min-h-[56px] rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 active:scale-[0.98] transition-all disabled:opacity-50 tap-target bg-gradient-to-br from-primary to-rose-600 shadow-md shadow-pink-500/20"
               >
                 {submitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
                 Selesai Packing & Tandai Order Selesai

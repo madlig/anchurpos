@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     const todayStr = offsetDate.toISOString().split("T")[0];
 
     const unclosedSnap = await adminDb.collection("attendance")
-      .where("status", "==", "berjalan")
+      .where("status", "==", "belum_lengkap")
       .where("date", "<", todayStr)
       .get();
     
@@ -53,6 +53,10 @@ export async function GET(req: NextRequest) {
             ipValid: false
           },
           totalHours: totalHours,
+          regularHours: Math.min(totalHours, 8),
+          overtimeHours: 0,
+          overtimeBlocks: 0,
+          overtimeBonus: 0,
           flaggedReason: "Auto-Checkout",
           updatedAt: FieldValue.serverTimestamp(),
         });

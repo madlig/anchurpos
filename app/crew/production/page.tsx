@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 import { Input } from "@/components/ui/input";
 import { Loader2, Check, Minus, Plus, ChefHat, History, X, Calendar } from "lucide-react";
 import type { Variant, Production } from "@/types";
@@ -15,6 +16,7 @@ interface EntryInput {
 
 export default function CrewProductionPage() {
   const { getToken, role } = useAuth();
+  const { alert } = useAlertConfirm();
   const [variants, setVariants] = useState<Variant[]>([]);
   const [todayProductions, setTodayProductions] = useState<Production[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -22,8 +24,6 @@ export default function CrewProductionPage() {
   const [notes, setNotes] = useState("");
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [loyangTarget, setLoyangTarget] = useState(8);
   const [activeTab, setActiveTab] = useState<"standard" | "tiktok">("standard");
@@ -98,52 +98,68 @@ export default function CrewProductionPage() {
     }
   }, [showHistory, historyVariantId, loadHistory]);
 
-  // Draft loading and saving
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && !draftLoaded) {
       try {
-        const savedEntries = localStorage.getItem("prod_draft_entries_" + activeTab);
+        const savedEntriesStr = localStorage.getItem("prod_draft_entries_" + activeTab);
         const savedNotes = localStorage.getItem("prod_draft_notes_" + activeTab);
-        if (savedEntries) {
-          const parsed = JSON.parse(savedEntries);
-          const map = new Map<string, EntryInput>(parsed);
-          setEntries(map);
-          setSelected(new Set(map.keys()));
-        } else {
-          setEntries(new Map());
-          setSelected(new Set());
+        if (savedNotes) setNotes(savedNotes);
+        if (savedEntriesStr) {
+          const parsed = JSON.parse(savedEntriesStr);
+          if (Array.isArray(parsed)) {
+            const nextEntries = new Map<string, EntryInput>();
+            const nextSelected = new Set<string>();
+            parsed.forEach((item: any) => {
+              if (item && item.variantId) {
+                nextEntries.set(item.variantId, item);
+                nextSelected.add(item.variantId);
+              }
+            });
+            setEntries(nextEntries);
+            setSelected(nextSelected);
+          }
         }
-        setNotes(savedNotes || "");
-      } catch (e) {
-        console.error("Gagal meload draft", e);
+      } catch (err) {
+        console.error("Failed to load draft", err);
+      } finally {
+        setDraftLoaded(true);
       }
-      setDraftLoaded(true);
-      setSuccess("");
-      setError("");
     }
-  }, [activeTab]);
+  }, [activeTab, draftLoaded]);
 
   useEffect(() => {
     if (draftLoaded && typeof window !== "undefined") {
-      localStorage.setItem("prod_draft_entries_" + activeTab, JSON.stringify(Array.from(entries.entries())));
-      localStorage.setItem("prod_draft_notes_" + activeTab, notes);
+      try {
+        const toSave = Array.from(entries.values());
+        if (toSave.length > 0) {
+          localStorage.setItem("prod_draft_entries_" + activeTab, JSON.stringify(toSave));
+        } else {
+          localStorage.removeItem("prod_draft_entries_" + activeTab);
+        }
+        if (notes) {
+          localStorage.setItem("prod_draft_notes_" + activeTab, notes);
+        } else {
+          localStorage.removeItem("prod_draft_notes_" + activeTab);
+        }
+      } catch (err) {
+        console.error("Failed to save draft", err);
+      }
     }
-  }, [entries, notes, draftLoaded, activeTab]);
+  }, [entries, notes, activeTab, draftLoaded]);
 
-  function toggleVariant(id: string) {
-    const next = new Set(selected);
-    if (next.has(id)) {
-      next.delete(id);
-      const nextEntries = new Map(entries);
-      nextEntries.delete(id);
-      setEntries(nextEntries);
+  function toggleVariant(variantId: string) {
+    const nextSelected = new Set(selected);
+    const nextEntries = new Map(entries);
+
+    if (nextSelected.has(variantId)) {
+      nextSelected.delete(variantId);
+      nextEntries.delete(variantId);
     } else {
-      next.add(id);
-      const nextEntries = new Map(entries);
-      nextEntries.set(id, { variantId: id, batches: "", loyangCount: "", pcsCount: "" });
-      setEntries(nextEntries);
+      nextSelected.add(variantId);
+      nextEntries.set(variantId, { variantId, batches: "0", loyangCount: "0", pcsCount: "0" });
     }
-    setSelected(next);
+    setSelected(nextSelected);
+    setEntries(nextEntries);
   }
 
   function updateEntry(variantId: string, field: "batches" | "loyangCount" | "pcsCount", value: string) {
@@ -165,8 +181,6 @@ export default function CrewProductionPage() {
   }
 
   async function handleSubmit() {
-    setError("");
-    setSuccess("");
     setSubmitting(true);
 
     const batchEntries = Array.from(entries.values())
@@ -179,7 +193,7 @@ export default function CrewProductionPage() {
       }));
 
     if (batchEntries.length === 0) {
-      setError("Isi minimal 1 varian");
+      await alert("Pilih minimal 1 varian dan isi jumlahnya", "Peringatan", "danger");
       setSubmitting(false);
       return;
     }
@@ -197,14 +211,17 @@ export default function CrewProductionPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Gagal menyimpan");
+        await alert(data.error || "Gagal menyimpan", "Error", "danger");
         return;
       }
 
-      setSuccess(`Tersimpan — ${data.entriesSaved} varian`);
+      let msg = `Berhasil menyimpan ${data.entriesSaved} data produksi.`;
       if (data.warnings?.length > 0) {
-        setSuccess((s) => s + ` (peringatan: ${data.warnings.join(", ")})`);
+        msg += `\n(Peringatan: ${data.warnings.join(", ")})`;
       }
+
+      await alert(msg, "Produksi Disimpan!", "success");
+
       setSelected(new Set());
       setEntries(new Map());
       setNotes("");
@@ -214,7 +231,7 @@ export default function CrewProductionPage() {
       }
       await loadData();
     } catch {
-      setError("Gagal menyimpan produksi");
+      await alert("Gagal koneksi, coba lagi", "Error", "danger");
     } finally {
       setSubmitting(false);
     }
@@ -222,8 +239,8 @@ export default function CrewProductionPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center" style={{ background: "#FCABB4" }}>
-        <Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} />
+      <div className="flex h-screen items-center justify-center" >
+        <Loader2 className="h-7 w-7 animate-spin text-primary" />
       </div>
     );
   }
@@ -232,12 +249,12 @@ export default function CrewProductionPage() {
   const progressPct = Math.round((totalLoyang / loyangTarget) * 100);
 
   return (
-    <div className="page-enter min-h-screen pb-10" style={{ background: "#FCABB4" }}>
+    <div className="page-enter min-h-screen pb-10 bg-slate-50" >
       {/* Header (Glassmorphism) */}
-      <div className="px-5 pt-6 pb-6 mb-2 rounded-b-3xl sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200">
+      <div className="px-5 pt-6 pb-6 mb-2 rounded-b-3xl sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-100">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-800" style={{ letterSpacing: "-0.02em" }}>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-800 -tracking-[0.02em]">
               {enableCustomDate && customDate ? `Produksi: ${customDate}` : "Produksi Hari Ini"}
             </h1>
             <p className="text-sm text-slate-500 mt-1 font-medium">
@@ -264,12 +281,12 @@ export default function CrewProductionPage() {
                 type="date"
                 value={customDate}
                 onChange={(e) => setCustomDate(e.target.value)}
-                className="text-xs border border-white/30 bg-white/20 text-white rounded-lg px-2 py-1 outline-none"
+                className="text-xs border border-slate-300 bg-white text-slate-700 rounded-lg px-2 py-1 outline-none"
               />
             )}
             <button
               onClick={() => setShowHistory(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/30 hover:bg-white/40 text-pink-900 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-pink-50 hover:bg-pink-100 text-pink-900 transition-colors"
             >
               <History size={14} /> Riwayat
             </button>
@@ -306,7 +323,7 @@ export default function CrewProductionPage() {
               </select>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 bg-brand-50/50">
+            <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
               {!historyVariantId ? (
                 <div className="text-center py-10">
                   <History size={32} className="mx-auto text-slate-200 mb-3" />
@@ -349,7 +366,7 @@ export default function CrewProductionPage() {
 
       {/* Sub-tabs Selector */}
       <div className="px-4 mb-6 mt-4 md:px-8 md:max-w-3xl">
-        <div className="flex bg-white/20 backdrop-blur-md rounded-2xl p-1.5 gap-1" style={{ border: "1px solid rgba(255,255,255,0.3)", boxShadow: "0 4px 12px rgba(232,93,140,0.1)" }}>
+        <div className="flex bg-white rounded-2xl p-1.5 gap-1 shadow-sm border border-slate-200">
           {[
             { key: "standard", label: "Churros Standar (Mentah)" },
             { key: "tiktok", label: "Churros TikTok (Setengah Matang)" },
@@ -359,12 +376,7 @@ export default function CrewProductionPage() {
               <button
                 key={t.key}
                 onClick={() => setActiveTab(t.key as "standard" | "tiktok")}
-                className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all tap-target"
-                style={
-                  active
-                    ? { background: "#fff", color: "#E85D8C", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }
-                    : { color: "#fff" }
-                }
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all tap-target ${active ? 'bg-primary/10 text-primary shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
               >
                 {t.label}
               </button>
@@ -379,22 +391,20 @@ export default function CrewProductionPage() {
       {todayProductions.length > 0 && (
         <div
           data-testid="production-summary-card"
-          className="rounded-3xl transition-all"
-          style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.5)", overflow: "hidden", boxShadow: "0 10px 30px rgba(232,93,140,0.2)" }}
+          className="rounded-3xl transition-all bg-white shadow-sm border border-slate-200 overflow-hidden"
         >
-          <div className="flex" style={{ borderBottom: "1px solid rgba(241,245,249,0.5)" }}>
+          <div className="flex border-b border-slate-100">
             {[
-              { label: "Selesai", value: String(totalLoyang), color: "#E85D8C" },
-              { label: "Target", value: String(loyangTarget), color: "#64748B" },
-              { label: "Progress", value: `${progressPct}%`, color: progressPct >= 100 ? "#16A34A" : "#D97706" },
+              { label: "Selesai", value: String(totalLoyang), color: "text-primary" },
+              { label: "Target", value: String(loyangTarget), color: "text-slate-600" },
+              { label: "Progress", value: `${progressPct}%`, color: progressPct >= 100 ? "text-green-600" : "text-amber-600" },
             ].map((s, i) => (
               <div
                 key={s.label}
-                className="flex-1 text-center py-4"
-                style={{ borderRight: i < 2 ? "1px solid rgba(241,245,249,0.5)" : "none" }}
+                className={`flex-1 text-center py-4 ${i < 2 ? 'border-r border-slate-100' : ''}`}
               >
-                <p style={{ fontSize: "24px", fontWeight: "800", color: s.color, letterSpacing: "-0.02em" }}>{s.value}</p>
-                <p style={{ fontSize: "12px", color: "#64748B", marginTop: "2px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</p>
+                <p className={`text-2xl font-extrabold -tracking-[0.02em] ${s.color}`}>{s.value}</p>
+                <p className="text-xs text-slate-500 mt-0.5 font-semibold uppercase tracking-[0.05em]">{s.label}</p>
               </div>
             ))}
           </div>
@@ -404,26 +414,26 @@ export default function CrewProductionPage() {
       {/* Today's productions */}
       {todayProductions.length > 0 && (
         <div>
-          <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E", marginBottom: "12px" }}>Sudah Dicatat</p>
-          <div className="rounded-3xl" style={{ background: "rgba(255,255,255,0.95)", overflow: "hidden", border: "1px solid rgba(255,255,255,0.5)", boxShadow: "0 10px 30px rgba(232,93,140,0.15)" }}>
+          <p className="text-sm font-bold text-slate-800 mb-3">Sudah Dicatat</p>
+          <div className="rounded-3xl bg-white overflow-hidden border border-slate-200 shadow-sm">
             {todayProductions.map((p, i) => {
               const barPct = Math.min(100, (p.loyangCount / loyangTarget) * 100);
               return (
                 <div
                   key={p.id}
-                  style={{ padding: "16px 20px", borderBottom: i < todayProductions.length - 1 ? "1px solid rgba(241,245,249,0.6)" : "none" }}
+                  className={`p-4 md:px-5 ${i < todayProductions.length - 1 ? 'border-b border-slate-100' : ''}`}
                   data-testid={`today-production-${i}`}
                 >
-                  <div className="flex items-center justify-between" style={{ marginBottom: "10px" }}>
-                    <span style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>{p.variantId}</span>
-                    <span style={{ fontSize: "12px", fontWeight: "700", color: "#E85D8C", padding: "4px 10px", borderRadius: "100px", background: "#FEF1F5" }}>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className="text-sm font-bold text-slate-800">{p.variantId}</span>
+                    <span className="text-xs font-bold text-primary px-2.5 py-1 rounded-full bg-primary/10">
                       {p.loyangCount} loyang
                     </span>
                   </div>
-                  <div style={{ height: "6px", borderRadius: "3px", background: "#F1F5F9", overflow: "hidden" }}>
-                    <div style={{ height: "6px", borderRadius: "3px", background: "linear-gradient(90deg, #E85D8C 0%, #F472B6 100%)", width: `${barPct}%`, transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }} />
+                  <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-primary to-pink-400 transition-all duration-500" style={{ width: `${barPct}%` }} />
                   </div>
-                  <p style={{ fontSize: "12px", color: "#64748B", marginTop: "8px", fontWeight: "500" }}>{p.batches} adonan</p>
+                  <p className="text-xs text-slate-500 mt-2 font-medium">{p.batches} adonan</p>
                 </div>
               );
             })}
@@ -432,18 +442,18 @@ export default function CrewProductionPage() {
       )}
 
       {/* Add Production Form */}
-      <div className="rounded-3xl p-6" style={{ background: "#fff", border: "1px solid rgba(255,255,255,0.8)", boxShadow: "0 10px 40px rgba(232,93,140,0.2)" }}>
+      <div className="rounded-3xl p-6 bg-white border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2 mb-6">
-          <div className="h-10 w-10 rounded-2xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
-            <ChefHat size={20} style={{ color: "#E85D8C" }} />
+          <div className="h-10 w-10 rounded-2xl flex items-center justify-center bg-primary/10">
+            <ChefHat size={20} className="text-primary" />
           </div>
-          <p style={{ fontSize: "16px", fontWeight: "800", color: "#1C1C1E" }}>
+          <p className="text-base font-extrabold text-slate-800">
             Tambah Produksi ({activeTab === "standard" ? "Standar" : "TikTok"})
           </p>
         </div>
 
         {(role === "owner" || role === "manager") && (
-          <div className="mb-6 p-4 rounded-2xl bg-brand-50 border border-slate-100 flex flex-col gap-3">
+          <div className="mb-6 p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col gap-3">
             <label className="flex items-center gap-3 cursor-pointer">
               <input 
                 type="checkbox" 
@@ -466,7 +476,7 @@ export default function CrewProductionPage() {
 
       {/* Variant chips */}
       <div className="mb-5">
-        <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "#94A3B8" }}>Pilih Varian</p>
+        <p className="text-xs font-bold uppercase tracking-widest mb-3 text-slate-400">Pilih Varian</p>
         <div className="flex flex-wrap gap-2" data-testid="variant-chips">
           {variants.map((v) => {
             const isSelected = selected.has(v.id);
@@ -475,11 +485,7 @@ export default function CrewProductionPage() {
                 key={v.id}
                 onClick={() => toggleVariant(v.id)}
                 data-testid={`variant-chip-${v.id}`}
-                className="min-h-[48px] px-5 py-2.5 rounded-full text-sm font-bold transition-all duration-200 border tap-target"
-                style={isSelected
-                  ? { background: "#E85D8C", color: "#fff", borderColor: "#E85D8C", boxShadow: "0 4px 12px rgba(232,93,140,0.3)" }
-                  : { background: "#fff", color: "#334155", borderColor: "#E2E8F0" }
-                }
+                className={`min-h-[48px] px-5 py-2.5 rounded-full text-sm font-bold transition-all duration-200 border tap-target ${isSelected ? 'bg-primary text-white border-primary shadow-md shadow-pink-500/20' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
               >
                 {v.name}
               </button>
@@ -497,14 +503,13 @@ export default function CrewProductionPage() {
           return (
             <div
               key={vid}
-              className="rounded-3xl p-6 page-enter"
-              style={{ background: "#FEF1F5", border: "1px solid rgba(232,93,140,0.1)", boxShadow: "0 4px 15px rgba(232,93,140,0.05)" }}
+              className="rounded-3xl p-6 page-enter bg-pink-50/50 border border-pink-100 shadow-sm"
               data-testid={`entry-card-${vid}`}
             >
-              <p className="font-extrabold text-lg mb-5" style={{ color: "#831843" }}>{variant.name}</p>
+              <p className="font-extrabold text-lg mb-5 text-pink-900">{variant.name}</p>
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>
+                  <label className="text-xs font-bold uppercase tracking-widest mb-2 block text-slate-500">
                     Jumlah Adonan
                   </label>
                   <Stepper
@@ -516,7 +521,7 @@ export default function CrewProductionPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>
+                  <label className="text-xs font-bold uppercase tracking-widest mb-2 block text-slate-500">
                     Jumlah Loyang
                   </label>
                   <Stepper
@@ -528,7 +533,7 @@ export default function CrewProductionPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "#94A3B8" }}>
+                  <label className="text-xs font-bold uppercase tracking-widest mb-2 block text-slate-500">
                     Total Pcs Churros
                   </label>
                   <Stepper
@@ -538,7 +543,7 @@ export default function CrewProductionPage() {
                     step="12"
                     testId={`stepper-pcs-${vid}`}
                   />
-                  <p className="text-xs text-stone-400 mt-1.5">Sesuai pcs yang dihasilkan</p>
+                  <p className="text-xs text-slate-400 mt-1.5">Sesuai pcs yang dihasilkan</p>
                 </div>
               </div>
             </div>
@@ -549,14 +554,13 @@ export default function CrewProductionPage() {
       {selected.size > 0 && (
         <>
           <div className="mb-6">
-            <label className="text-xs font-bold uppercase tracking-widest mb-3 block" style={{ color: "#94A3B8" }}>
+            <label className="text-xs font-bold uppercase tracking-widest mb-3 block text-slate-400">
               Catatan (Opsional)
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-2xl px-5 py-4 text-sm resize-none focus:outline-none transition-all"
-              style={{ border: "2px solid #F1F5F9", background: "#F8FAFC", color: "#1C1C1E", minHeight: "100px" }}
+              className="w-full rounded-2xl px-5 py-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all border border-slate-200 bg-slate-50 text-slate-800 min-h-[100px]"
               placeholder="Tambahkan catatan khusus hari ini..."
               data-testid="production-notes"
             />
@@ -565,25 +569,13 @@ export default function CrewProductionPage() {
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full min-h-[60px] rounded-2xl text-white font-extrabold text-base flex items-center justify-center gap-3 active:scale-[0.98] transition-all disabled:opacity-70 tap-target hover:shadow-lg"
-            style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)", boxShadow: "0 10px 25px rgba(232,93,140,0.4)" }}
+            className="w-full min-h-[60px] rounded-2xl text-white font-extrabold text-base flex items-center justify-center gap-3 active:scale-[0.98] transition-all disabled:opacity-70 tap-target hover:shadow-lg bg-gradient-to-br from-primary to-rose-600 shadow-md shadow-pink-500/20"
             data-testid="save-production-button"
           >
             {submitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
             Simpan Semua Produksi
           </button>
         </>
-      )}
-
-      {error && (
-        <div className="rounded-2xl px-4 py-3 mt-4" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }} data-testid="production-error">
-          <p className="text-sm font-medium" style={{ color: "#DC2626" }}>{error}</p>
-        </div>
-      )}
-      {success && (
-        <div className="rounded-2xl px-4 py-3 mt-4" style={{ background: "#F0FDF4", border: "1px solid #BBF7D0" }} data-testid="production-success">
-          <p className="text-sm font-medium" style={{ color: "#16A34A" }}>{success}</p>
-        </div>
       )}
 
       </div>{/* /Add Production Form */}
@@ -607,15 +599,14 @@ function Stepper({
   testId?: string;
 }) {
   return (
-    <div className="flex items-center rounded-full p-1 gap-1" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }} data-testid={testId}>
+    <div className="flex items-center rounded-2xl p-1 gap-1 bg-white border border-slate-200 shadow-sm" data-testid={testId}>
       <button
         type="button"
         onClick={() => onStep(-1)}
-        className="h-12 w-12 rounded-full flex items-center justify-center transition-colors tap-target"
-        style={{ background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", color: "#334155" }}
+        className="h-14 w-14 rounded-xl flex items-center justify-center transition-colors tap-target bg-slate-50 hover:bg-slate-100 text-slate-600 active:scale-95"
         data-testid={testId ? `${testId}-minus` : undefined}
       >
-        <Minus size={18} strokeWidth={2.5} />
+        <Minus size={20} strokeWidth={2.5} />
       </button>
       <Input
         type="number"
@@ -623,18 +614,16 @@ function Stepper({
         min="0"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 h-14 p-0"
-        style={{ color: "#831843" }}
+        className="flex-1 text-center font-black text-2xl tabular-nums border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 h-14 p-0 text-pink-900"
         data-testid={testId ? `${testId}-input` : undefined}
       />
       <button
         type="button"
         onClick={() => onStep(1)}
-        className="h-12 w-12 rounded-full flex items-center justify-center text-white transition-colors tap-target"
-        style={{ background: "#E85D8C", boxShadow: "0 2px 8px rgba(232,93,140,0.3)" }}
+        className="h-14 w-14 rounded-xl flex items-center justify-center transition-colors tap-target bg-primary/10 hover:bg-primary/20 text-primary active:scale-95"
         data-testid={testId ? `${testId}-plus` : undefined}
       >
-        <Plus size={18} strokeWidth={2.5} />
+        <Plus size={20} strokeWidth={2.5} />
       </button>
     </div>
   );

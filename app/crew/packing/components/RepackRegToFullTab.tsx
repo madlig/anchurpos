@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 import { Input } from "@/components/ui/input";
 import { Loader2, ArrowRight, Check } from "lucide-react";
 import type { Variant } from "@/types";
@@ -13,16 +14,15 @@ interface Props {
 
 export function RepackRegToFullTab({ variants, onSuccess }: Props) {
   const { getToken } = useAuth();
+  const { alert } = useAlertConfirm();
   
-  const [repackVariantId, setRepackVariantId] = useState("");
+  const [repackVariantId, setRepackVariantId] = useState<string>(variants[0]?.id || "");
   const [regularPacksToUnpack, setRegularPacksToUnpack] = useState("");
   const [repackProductStocks, setRepackProductStocks] = useState<Record<string, number>>({});
   const [repackBuffers, setRepackBuffers] = useState<Record<string, number>>({});
   
   const [loadingRepackData, setLoadingRepackData] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
 
   useEffect(() => {
     if (variants.length > 0 && !repackVariantId) {
@@ -70,16 +70,14 @@ export function RepackRegToFullTab({ variants, onSuccess }: Props) {
   }, [regularPacksToUnpack, repackBuffers, repackVariantId]);
 
   async function handleRepackRegToFull() {
-    setError("");
-    setSuccessMsg("");
     const regPacks = parseInt(regularPacksToUnpack) || 0;
 
     if (!repackVariantId) {
-      setError("Pilih varian produk");
+      await alert("Pilih varian produk", "Peringatan", "danger");
       return;
     }
     if (regPacks <= 0) {
-      setError("Jumlah regular pack yang dibongkar harus lebih dari 0");
+      await alert("Jumlah regular pack yang dibongkar harus lebih dari 0", "Peringatan", "danger");
       return;
     }
 
@@ -98,15 +96,15 @@ export function RepackRegToFullTab({ variants, onSuccess }: Props) {
 
       const d = await res.json();
       if (!res.ok) {
-        setError(d.error || "Gagal memproses repack regular ke full");
+        await alert(d.error || "Gagal memproses repack regular ke full", "Error", "danger");
       } else {
-        setSuccessMsg(`Berhasil membongkar ${regPacks} pack Regular ${repackVariantId} menjadi ${d.producedFullPacks} pack Full (sisa buffer baru: ${d.leftoverBufferPcs} pcs).`);
+        await alert(`Berhasil membongkar ${regPacks} pack Regular ${repackVariantId} menjadi ${d.producedFullPacks} pack Full (sisa buffer baru: ${d.leftoverBufferPcs} pcs).`, "Sukses!", "success");
         setRegularPacksToUnpack("");
         onSuccess();
         fetchRepackStockAndBuffer(repackVariantId);
       }
     } catch (err) {
-      setError("Terjadi kesalahan jaringan");
+      await alert("Terjadi kesalahan jaringan", "Error", "danger");
     } finally {
       setSubmitting(false);
     }
@@ -118,9 +116,6 @@ export function RepackRegToFullTab({ variants, onSuccess }: Props) {
       <p className="text-xs text-slate-400">
         Bongkar pack Regular (isi 12 pcs) yang ada untuk dipack ulang ke Full (isi 16 pcs). Sisa pcs yang tidak cukup menjadi 1 pack Full otomatis disimpan ke stok buffer varian tersebut.
       </p>
-
-      {error && <div className="bg-red-50 text-red-600 text-xs p-3.5 rounded-xl border border-red-100">{error}</div>}
-      {successMsg && <div className="bg-green-50 text-green-700 text-xs p-3.5 rounded-xl border border-green-100">{successMsg}</div>}
 
       <div className="space-y-3">
         <div>
@@ -201,8 +196,7 @@ export function RepackRegToFullTab({ variants, onSuccess }: Props) {
       <button
         onClick={handleRepackRegToFull}
         disabled={submitting || !regularPacksToUnpack || parseInt(regularPacksToUnpack) <= 0}
-        className="w-full min-h-[56px] rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 active:scale-[0.98] transition-all disabled:opacity-70 tap-target"
-        style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)", boxShadow: "0 8px 20px rgba(232,93,140,0.3)" }}
+        className="w-full min-h-[56px] rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 active:scale-[0.98] transition-all disabled:opacity-70 tap-target bg-gradient-to-br from-primary to-rose-600 shadow-md shadow-pink-500/20"
       >
         {submitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
         Simpan Repack Regular ke Full

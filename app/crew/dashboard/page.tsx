@@ -63,6 +63,7 @@ export default function CrewDashboard() {
       if (!res.ok) await alert(data.error ?? "Gagal Check-in", "Absensi Gagal", "danger");
       else {
         await alert(data.needsReview ? "Check-in berhasil diajukan! (Menunggu review)" : "Check-in berhasil!", "Sukses", "success");
+        window.dispatchEvent(new Event('attendance-updated'));
         loadData();
       }
     } catch {
@@ -130,7 +131,7 @@ export default function CrewDashboard() {
   // JIKA BELUM ABSEN MASUK, HALAMAN FULL ABSEN MASUK
   if (!hasCheckedIn) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)" }}>
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-primary to-rose-600">
         <div className="text-white text-center mb-10">
           <p className="text-sm font-bold uppercase tracking-widest opacity-80 mb-2">{date}</p>
           <h1 className="text-5xl font-black tabular-nums">{time}</h1>
@@ -141,7 +142,7 @@ export default function CrewDashboard() {
         <button
           onClick={handleCheckIn}
           disabled={actionLoading}
-          className="w-full max-w-xs h-24 rounded-[32px] bg-white text-primary font-black text-xl shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-80"
+          className="w-full max-w-xs h-20 rounded-full bg-white text-primary font-black text-xl shadow-2xl active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-80"
         >
           {actionLoading ? <Loader2 className="animate-spin" size={28} /> : "ABSEN MASUK"}
         </button>
@@ -151,9 +152,9 @@ export default function CrewDashboard() {
 
   // JIKA SUDAH ABSEN MASUK -> MUNCULKAN DAFTAR TUGAS
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
+    <div className="min-h-screen bg-slate-50 pb-28">
       {/* HEADER KECIL */}
-      <div className="bg-white px-5 pt-6 pb-4 rounded-b-[32px] shadow-sm mb-6">
+      <div className="bg-white px-5 pt-6 pb-4 rounded-b-[32px] shadow-sm mb-6 border-b border-slate-100">
         <div className="flex justify-between items-center">
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{date}</p>
@@ -178,7 +179,7 @@ export default function CrewDashboard() {
           </div>
         ) : (
           tasks.map(t => (
-            <div key={t.id} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 relative overflow-hidden">
+            <div key={t.id} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 relative overflow-hidden transition-all hover:shadow-md">
               <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${t.type === 'produksi' ? 'bg-emerald-500' : t.type === 'pre_packing' ? 'bg-blue-500' : 'bg-amber-500'}`} />
               
               <div className="flex items-start gap-3">
@@ -189,27 +190,28 @@ export default function CrewDashboard() {
                   <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">{t.type.replace('_', ' ')}</span>
                   <h3 className="font-bold text-slate-800 text-lg leading-tight mt-0.5">{t.title}</h3>
                   {t.description && <p className="text-xs text-slate-500 mt-1">{t.description}</p>}
-                  {t.productionData && <p className="text-xs font-bold text-emerald-600 mt-1">Target: {t.productionData.batches} Batch {t.productionData.variantName}</p>}
+                  {t.productionData && <p className="text-xs font-bold text-emerald-600 mt-1.5 bg-emerald-50 inline-block px-2 py-0.5 rounded-md">Target: {t.productionData.batches} Batch {t.productionData.variantName}</p>}
                 </div>
               </div>
 
               <button 
                 onClick={() => handleCompleteTask(t.id, t.type)}
                 disabled={actionLoading}
-                className="mt-5 w-full h-14 rounded-2xl bg-slate-900 text-white font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg disabled:opacity-70"
+                className="mt-5 w-full h-12 rounded-xl bg-slate-900 text-white font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-slate-900/20 disabled:opacity-70 text-sm"
               >
-                {t.type === 'stock_opname' ? "BUKA FORM OPNAME" : "LAPOR SELESAI"} <ChevronRight size={18} />
+                {t.type === 'stock_opname' ? "BUKA FORM OPNAME" : "LAPOR SELESAI"} <ChevronRight size={16} />
               </button>
             </div>
           ))
         )}
       </div>
-      {/* CHECK OUT BUTTON */}
-      <div className="px-5 mt-8 max-w-md mx-auto">
+
+      {/* CHECK OUT BUTTON (GHOST STYLE) */}
+      <div className="px-5 mt-10 max-w-md mx-auto">
         <button 
           onClick={handleCheckOut}
           disabled={actionLoading}
-          className="w-full h-12 rounded-2xl bg-amber-100 text-amber-700 font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+          className="w-full py-4 text-xs font-bold text-slate-400 hover:text-slate-600 active:scale-95 transition-all flex items-center justify-center gap-2 border border-dashed border-slate-300 rounded-2xl bg-white/50"
         >
           {actionLoading ? <Loader2 size={16} className="animate-spin" /> : "Selesai Kerja (Check Out)"}
         </button>

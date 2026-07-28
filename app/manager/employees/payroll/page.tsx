@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, CalendarDays, Check, Search, Lock, Edit3, Save, X, FileText } from "lucide-react";
+import { Loader2, CalendarDays, Check, Search, Lock, Edit3, Save, X, FileText, LayoutList, Wallet, Settings2, ChevronDown, CheckCircle2 } from "lucide-react";
 import { AttendanceRecord, Employee, PayrollRecord } from "../types";
-import { AttendanceReviewCard } from "../components/SharedForms";
+import { AdaptivePanel } from "@/components/shared/AdaptivePanel";
 
 const fmtDateFull = (dStr: string) => {
   const [y, m, d] = dStr.split("-");
@@ -33,8 +33,9 @@ export default function PayrollPage() {
 
   const [expandedPayrollId, setExpandedPayrollId] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [isPayingAll, setIsPayingAll] = useState(false);
 
-  // Edit states
+  // Edit states for Bottom Sheet
   const [editingPayrollId, setEditingPayrollId] = useState<string | null>(null);
   const [editWorkDays, setEditWorkDays] = useState("");
   const [editDailyWage, setEditDailyWage] = useState("");
@@ -96,11 +97,9 @@ export default function PayrollPage() {
       const empAtt = attendance.filter(a => a.employeeId === emp.id);
       const workDays = empAtt.length;
       const dailyWage = emp.dailyWage || 60000;
-      const totalRegularPay = workDays * dailyWage;
       const totalOvertimeBonus = empAtt.reduce((sum, a) => sum + (a.overtimeBonus || 0), 0);
       
       const pId = `${selectedMonth}_${emp.id}`;
-      // Maintain edit states if currently editing, otherwise use calculated/locked values
       const isEditing = editingPayrollId === pId;
       
       const finalWorkDays = isEditing && editWorkDays !== "" ? Number(editWorkDays) : workDays;
@@ -142,33 +141,52 @@ export default function PayrollPage() {
     setEditDeductionNote(p.deductionNote || "");
   };
 
-  const handleSaveEdit = async (p: PayrollRecord) => {
-    setEditingPayrollId(null); // Just saves it to the local live calc. Will be persisted when locked.
+  const handleSaveEdit = async () => {
+    // Just closes the modal, local state applies automatically via useMemo
+    setEditingPayrollId(null); 
   };
 
   const handlePay = async (p: PayrollRecord) => {
-    if (!confirm(`Tandai gaji ${p.employeeName} sudah dibayar? Data ini akan dikunci dan slip gaji digital akan diterbitkan.`)) return;
+    if (!confirm(`Tandai gaji ${p.employeeName} sudah dibayar? Data ini akan dikunci.`)) return;
     setPayingId(p.id);
     try {
       const res = await fetchWithAuth(`/api/payroll/${p.id}`, {
         method: "PUT",
-        body: JSON.stringify({
-          ...p,
-          isLocked: true,
-          lockedAt: new Date().toISOString()
-        })
+        body: JSON.stringify({ ...p, isLocked: true, lockedAt: new Date().toISOString() })
       });
-      if (res.ok) {
-        loadData();
-      } else {
-        alert("Gagal mengunci gaji");
-      }
+      if (res.ok) loadData();
+      else alert("Gagal mengunci gaji");
     } catch (e) {
       alert("Error jaringan");
     } finally {
       setPayingId(null);
     }
   };
+
+  const handlePayAll = async () => {
+    const unlocked = livePayrolls.filter(p => !p.isLocked);
+    if (unlocked.length === 0) return;
+    
+    if (!confirm(`Terdapat ${unlocked.length} gaji karyawan yang belum dikunci.\n\nApakah Anda yakin sudah mengecek semua bonus dan potongan? Tindakan ini akan mengunci seluruh gaji secara bersamaan.`)) return;
+    
+    setIsPayingAll(true);
+    try {
+      const promises = unlocked.map(p => 
+        fetchWithAuth(`/api/payroll/${p.id}`, {
+          method: "PUT",
+          body: JSON.stringify({ ...p, isLocked: true, lockedAt: new Date().toISOString() })
+        })
+      );
+      await Promise.all(promises);
+      await loadData();
+    } catch (e) {
+      alert("Beberapa gaji gagal dikunci. Silakan coba lagi.");
+    } finally {
+      setIsPayingAll(false);
+    }
+  };
+
+  const unlockedCount = livePayrolls.filter(p => !p.isLocked).length;
 
   return (
     <div className="animate-in fade-in">
@@ -191,6 +209,24 @@ export default function PayrollPage() {
         </div>
       </div>
 
+      {/* Fitur Bayar Semua Karyawan (Batch Action) */}
+      {!loading && unlockedCount > 0 && (
+        <div className="mb-6 p-4 rounded-[16px] bg-emerald-50 border border-emerald-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-emerald-900 font-bold text-sm">Ada {unlockedCount} gaji yang belum dibayar</h3>
+            <p className="text-emerald-700 text-xs mt-1">Pastikan Anda sudah mengecek semua potongan atau bonus sebelum membayar sekaligus.</p>
+          </div>
+          <button 
+            onClick={handlePayAll}
+            disabled={isPayingAll}
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-colors shadow-sm shadow-emerald-200 tap-target"
+          >
+            {isPayingAll ? <Loader2 size={16} className="animate-spin" /> : <Wallet size={16} />}
+            Bayar & Kunci Semua
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-10"><Loader2 className="animate-spin text-slate-400" /></div>
       ) : livePayrolls.length === 0 ? (
@@ -198,116 +234,102 @@ export default function PayrollPage() {
       ) : (
         <div className="flex flex-col gap-4">
           {livePayrolls.map(p => {
-            const isEditing = editingPayrollId === p.id;
             const empAtt = attendance.filter(a => a.employeeId === p.employeeId);
             const isExpanded = expandedPayrollId === p.id;
 
             return (
               <div key={p.id} style={{ background: "#fff", borderRadius: "16px", overflow: "hidden", border: p.isLocked ? "2px solid #10B981" : "1px solid #E2E8F0", boxShadow: "0 4px 15px rgba(0,0,0,0.02)" }}>
-                <div className="p-4">
-                  <div className="flex justify-between items-start mb-3">
+                <div className="p-4 md:p-5">
+                  <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1C1C1E" }}>{p.employeeName}</h3>
-                      <p style={{ fontSize: "12px", color: "#64748B", fontWeight: "600", marginTop: "2px" }}>Periode: {p.workPeriod}</p>
+                      <h3 style={{ fontSize: "16px", fontWeight: "900", color: "#1C1C1E" }}>{p.employeeName}</h3>
+                      <p style={{ fontSize: "11px", color: "#64748B", fontWeight: "600", marginTop: "2px", background: "#F1F5F9", padding: "2px 8px", borderRadius: "100px", display: "inline-block" }}>
+                        Periode: {p.workPeriod}
+                      </p>
                     </div>
-                    <div className="text-right">
+                    <div>
                       {p.isLocked ? (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", background: "#D1FAE5", color: "#065F46", padding: "4px 8px", borderRadius: "100px", fontSize: "11px", fontWeight: "800" }}>
-                          <Lock size={12} /> DIBAYAR & DIKUNCI
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", background: "#D1FAE5", color: "#065F46", padding: "4px 8px", borderRadius: "100px", fontSize: "10px", fontWeight: "800" }}>
+                          <CheckCircle2 size={12} /> DIKUNCI
                         </span>
                       ) : (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", background: "#FEF3C7", color: "#D97706", padding: "4px 8px", borderRadius: "100px", fontSize: "11px", fontWeight: "800" }}>
-                          LIVE CALCULATION
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", background: "#FEF3C7", color: "#D97706", padding: "4px 8px", borderRadius: "100px", fontSize: "10px", fontWeight: "800" }}>
+                          LIVE
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {isEditing ? (
-                    <div className="bg-slate-50 p-4 rounded-xl mb-4 border border-slate-200">
-                      <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 block mb-1">TOTAL HARI KERJA</label>
-                          <input type="number" value={editWorkDays} onChange={e => setEditWorkDays(e.target.value)} className="w-full h-9 rounded-lg border border-slate-300 px-3 font-bold text-xs" />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 block mb-1">TARIF GAJI / HARI (Rp)</label>
-                          <input type="number" value={editDailyWage} onChange={e => setEditDailyWage(e.target.value)} className="w-full h-9 rounded-lg border border-slate-300 px-3 font-bold text-xs" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 block mb-1">TAMBAHAN BONUS (Rp)</label>
-                          <input type="number" value={editPerformanceBonus} onChange={e => setEditPerformanceBonus(e.target.value)} className="w-full h-9 rounded-lg border border-slate-300 px-3 font-bold text-xs text-emerald-700" />
-                          <input type="text" placeholder="Keterangan Bonus..." value={editPerformanceBonusNote} onChange={e => setEditPerformanceBonusNote(e.target.value)} className="w-full h-8 mt-1 rounded-lg border border-slate-300 px-3 text-xs" />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 block mb-1">POTONGAN / DEDUCTIONS (Rp)</label>
-                          <input type="number" value={editDeductions} onChange={e => setEditDeductions(e.target.value)} className="w-full h-9 rounded-lg border border-slate-300 px-3 font-bold text-xs text-red-600" />
-                          <input type="text" placeholder="Keterangan Potongan..." value={editDeductionNote} onChange={e => setEditDeductionNote(e.target.value)} className="w-full h-8 mt-1 rounded-lg border border-slate-300 px-3 text-xs" />
-                        </div>
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => setEditingPayrollId(null)} className="px-3 py-2 rounded-lg text-xs font-bold text-slate-500 border border-slate-300">Batal</button>
-                        <button onClick={() => handleSaveEdit(p)} className="px-3 py-2 rounded-lg text-xs font-bold bg-slate-800 text-white">Terapkan Perubahan</button>
-                      </div>
+                  {/* Compact Breakdown (Mobile First) */}
+                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mb-4 space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-500 font-semibold">Gaji Pokok ({p.workDays} hr)</span>
+                      <span className="text-slate-700 font-bold">{fmtRupiah(p.totalRegularPay)}</span>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-                      <div className="bg-slate-50 p-2 rounded-lg text-center">
-                        <p style={{ fontSize: "10px", color: "#64748B", fontWeight: "700" }}>GAJI POKOK ({p.workDays} Hari)</p>
-                        <p style={{ fontSize: "14px", fontWeight: "900", color: "#334155" }}>{fmtRupiah(p.totalRegularPay)}</p>
+                    {(p.totalOvertimeBonus > 0 || p.performanceBonus > 0) && (
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-emerald-600 font-semibold">Lembur + Bonus</span>
+                        <span className="text-emerald-700 font-bold">+{fmtRupiah(p.totalOvertimeBonus + p.performanceBonus)}</span>
                       </div>
-                      <div className="bg-slate-50 p-2 rounded-lg text-center">
-                        <p style={{ fontSize: "10px", color: "#64748B", fontWeight: "700" }}>LEMBUR</p>
-                        <p style={{ fontSize: "14px", fontWeight: "900", color: "#334155" }}>{fmtRupiah(p.totalOvertimeBonus)}</p>
+                    )}
+                    {(p.deductions || 0) > 0 && (
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-red-600 font-semibold">Potongan / Kasbon</span>
+                        <span className="text-red-700 font-bold">-{fmtRupiah(p.deductions || 0)}</span>
                       </div>
-                      <div className="bg-emerald-50 border border-emerald-100 p-2 rounded-lg text-center">
-                        <p style={{ fontSize: "10px", color: "#065F46", fontWeight: "700" }}>BONUS</p>
-                        <p style={{ fontSize: "14px", fontWeight: "900", color: "#059669" }}>{fmtRupiah(p.performanceBonus || 0)}</p>
-                        {p.performanceBonusNote && <p className="text-[9px] text-emerald-600 truncate mt-1">{p.performanceBonusNote}</p>}
-                      </div>
-                      <div className="bg-red-50 border border-red-100 p-2 rounded-lg text-center">
-                        <p style={{ fontSize: "10px", color: "#991B1B", fontWeight: "700" }}>POTONGAN</p>
-                        <p style={{ fontSize: "14px", fontWeight: "900", color: "#DC2626" }}>-{fmtRupiah(p.deductions || 0)}</p>
-                        {p.deductionNote && <p className="text-[9px] text-red-600 truncate mt-1">{p.deductionNote}</p>}
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
-                  <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-1">
-                    <p style={{ fontSize: "12px", fontWeight: "700", color: "#64748B" }}>TOTAL DITERIMA:</p>
-                    <p style={{ fontSize: "20px", fontWeight: "900", color: p.isLocked ? "#10B981" : "#1E293B" }}>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between pt-1 gap-2">
+                    <p style={{ fontSize: "12px", fontWeight: "800", color: "#94A3B8", letterSpacing: "0.5px" }}>TOTAL DITERIMA</p>
+                    <p style={{ fontSize: "28px", fontWeight: "900", color: p.isLocked ? "#10B981" : "#1E293B", lineHeight: "1" }}>
                       {fmtRupiah(p.totalPaid)}
                     </p>
                   </div>
                 </div>
 
+                {/* Bottom Actions */}
                 <div className="flex border-t border-slate-100 bg-slate-50">
-                  <button onClick={() => setExpandedPayrollId(isExpanded ? null : p.id)} className="flex-1 py-3 text-xs font-bold text-slate-600 flex justify-center items-center gap-2 border-r border-slate-100 hover:bg-slate-100 transition-colors">
-                    <FileText size={14} /> {isExpanded ? "Tutup Rincian" : "Rincian Shift"}
+                  <button onClick={() => setExpandedPayrollId(isExpanded ? null : p.id)} className="flex-1 py-3.5 text-xs font-bold text-slate-600 flex justify-center items-center gap-2 border-r border-slate-200 hover:bg-slate-200 transition-colors tap-target">
+                    {isExpanded ? <ChevronDown size={14} className="rotate-180" /> : <LayoutList size={14} />} 
+                    {isExpanded ? "Tutup Rincian" : "Rincian"}
                   </button>
                   {!p.isLocked && (
                     <>
-                      <button onClick={() => handleStartEdit(p)} className="px-4 py-3 text-xs font-bold text-blue-600 flex justify-center items-center gap-2 border-r border-slate-100 hover:bg-slate-100 transition-colors">
-                        <Edit3 size={14} /> Koreksi
+                      <button onClick={() => handleStartEdit(p)} className="flex-1 py-3.5 text-xs font-bold text-blue-600 flex justify-center items-center gap-2 border-r border-slate-200 hover:bg-slate-200 transition-colors tap-target">
+                        <Settings2 size={14} /> Koreksi
                       </button>
-                      <button onClick={() => handlePay(p)} disabled={payingId === p.id} className="flex-1 py-3 text-xs font-bold text-emerald-700 bg-emerald-100/50 hover:bg-emerald-100 flex justify-center items-center gap-2 transition-colors">
-                        {payingId === p.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Bayar & Kunci
+                      <button onClick={() => handlePay(p)} disabled={payingId === p.id} className="flex-1 py-3.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 flex justify-center items-center gap-2 transition-colors tap-target">
+                        {payingId === p.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Kunci
                       </button>
                     </>
                   )}
                 </div>
 
+                {/* Compact Rincian Shift List */}
                 {isExpanded && (
-                  <div className="p-4 bg-slate-50 border-t border-slate-200">
-                    <p className="text-xs font-bold text-slate-500 mb-3">RINCIAN {empAtt.length} SHIFT KERJA</p>
+                  <div className="p-4 bg-white border-t border-slate-200">
+                    <p className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wide">Rincian {empAtt.length} Shift Kerja</p>
                     {empAtt.length === 0 ? (
-                      <p className="text-xs text-slate-400">Tidak ada kehadiran.</p>
+                      <p className="text-xs text-slate-400 italic">Tidak ada kehadiran.</p>
                     ) : (
-                      <div className="flex flex-col gap-2">
-                        {empAtt.map(a => (
-                          <AttendanceReviewCard key={a.id} a={a} dailyWage={p.dailyWage} />
+                      <div className="flex flex-col gap-0 border border-slate-100 rounded-xl overflow-hidden">
+                        {empAtt.map((a, i) => (
+                          <div key={a.id} className={`flex justify-between items-center p-3 ${i !== empAtt.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                            <div>
+                              <p className="text-xs font-bold text-slate-700">{fmtDateFull(a.date)}</p>
+                              <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                                Masuk: {a.checkIn ? new Date(a.checkIn.time).toLocaleTimeString("id-ID", {hour: '2-digit', minute:'2-digit'}) : "-"}
+                                {a.flaggedReason && <span className="text-red-500 ml-1">(! {a.flaggedReason})</span>}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs font-bold text-slate-800">{a.totalHours} Jam</p>
+                              {a.overtimeBonus ? (
+                                <p className="text-[10px] font-bold text-emerald-600">Lembur: {fmtRupiah(a.overtimeBonus)}</p>
+                              ) : null}
+                            </div>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -318,6 +340,48 @@ export default function PayrollPage() {
           })}
         </div>
       )}
+
+      {/* Adaptive Panel for Edit/Koreksi */}
+      <AdaptivePanel 
+        isOpen={editingPayrollId !== null} 
+        onClose={() => setEditingPayrollId(null)}
+        title="Koreksi Penggajian"
+        icon={<Settings2 size={18} />}
+      >
+        <div className="p-4 md:p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 block mb-1">TOTAL HARI KERJA</label>
+              <input type="number" value={editWorkDays} onChange={e => setEditWorkDays(e.target.value)} className="w-full h-10 rounded-lg border border-slate-300 px-3 font-bold text-sm bg-slate-50" />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 block mb-1">TARIF GAJI / HARI (Rp)</label>
+              <input type="number" value={editDailyWage} onChange={e => setEditDailyWage(e.target.value)} className="w-full h-10 rounded-lg border border-slate-300 px-3 font-bold text-sm bg-slate-50" />
+            </div>
+          </div>
+          
+          <div className="pt-2 border-t border-slate-100">
+            <label className="text-[10px] font-bold text-emerald-600 block mb-1">TAMBAHAN BONUS PERFORMA (Rp)</label>
+            <input type="number" value={editPerformanceBonus} onChange={e => setEditPerformanceBonus(e.target.value)} className="w-full h-10 rounded-lg border border-emerald-300 px-3 font-bold text-sm text-emerald-700 bg-emerald-50 mb-2" />
+            <input type="text" placeholder="Catatan bonus (Opsional)..." value={editPerformanceBonusNote} onChange={e => setEditPerformanceBonusNote(e.target.value)} className="w-full h-9 rounded-lg border border-slate-200 px-3 text-xs" />
+          </div>
+
+          <div className="pt-2 border-t border-slate-100">
+            <label className="text-[10px] font-bold text-red-600 block mb-1">POTONGAN / KASBON (Rp)</label>
+            <input type="number" value={editDeductions} onChange={e => setEditDeductions(e.target.value)} className="w-full h-10 rounded-lg border border-red-300 px-3 font-bold text-sm text-red-700 bg-red-50 mb-2" />
+            <input type="text" placeholder="Catatan potongan (Opsional)..." value={editDeductionNote} onChange={e => setEditDeductionNote(e.target.value)} className="w-full h-9 rounded-lg border border-slate-200 px-3 text-xs" />
+          </div>
+
+          <div className="pt-6">
+            <button onClick={handleSaveEdit} className="w-full h-12 rounded-xl bg-slate-900 text-white font-bold text-sm shadow-lg shadow-slate-200 tap-target">
+              Terapkan Perubahan
+            </button>
+            <button onClick={() => setEditingPayrollId(null)} className="w-full h-12 mt-2 rounded-xl text-slate-500 font-bold text-sm tap-target">
+              Batal
+            </button>
+          </div>
+        </div>
+      </AdaptivePanel>
     </div>
   );
 }

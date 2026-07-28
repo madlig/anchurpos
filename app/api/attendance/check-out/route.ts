@@ -5,60 +5,18 @@ import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
 import { BUSINESS } from "@/lib/constants";
 
-function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  const real = req.headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
-}
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3; // metres
+  const p1 = lat1 * Math.PI / 180; 
+  const p2 = lat2 * Math.PI / 180;
+  const dp = (lat2 - lat1) * Math.PI / 180;
+  const dl = (lon2 - lon1) * Math.PI / 180;
 
-function isIpWhitelisted(clientIp: string, whitelist: string[]): boolean {
-  const cleanClient = clientIp.trim();
-  if (cleanClient === "unknown") return false;
-
-  return whitelist.some((whitelisted) => {
-    const w = whitelisted.trim();
-    if (!w) return false;
-
-    // 1. Exact match
-    if (w === cleanClient) return true;
-
-    // 2. Wildcard match (e.g. "182.10.131.*" or "182.10.131.--")
-    if (w.includes("*") || w.includes("-")) {
-      const cleanPattern = w.replace(/--/g, "*").replace(/\*/g, ".*");
-      const regexStr = "^" + cleanPattern.replace(/\./g, "\\.") + "$";
-      try {
-        const regex = new RegExp(regexStr);
-        return regex.test(cleanClient);
-      } catch {
-        return false;
-      }
-    }
-
-    // 3. Subnet ending with .0 (e.g. "182.10.131.0")
-    if (w.endsWith(".0")) {
-      const prefix = w.substring(0, w.lastIndexOf(".") + 1); // e.g. "182.10.131."
-      return cleanClient.startsWith(prefix);
-    }
-
-    // 4. Subnet slash notation (e.g. "182.10.131.0/24")
-    if (w.includes("/")) {
-      const [baseIp, rangeStr] = w.split("/");
-      const range = parseInt(rangeStr, 10);
-      if (range === 24) {
-        const prefix = baseIp.substring(0, baseIp.lastIndexOf(".") + 1); // e.g. "182.10.131."
-        return cleanClient.startsWith(prefix);
-      }
-    }
-
-    // 5. General check if it ends with dot (e.g. "182.10.131.")
-    if (w.endsWith(".")) {
-      return cleanClient.startsWith(w);
-    }
-
-    return false;
-  });
+  const a = Math.sin(dp/2) * Math.sin(dp/2) +
+            Math.cos(p1) * Math.cos(p2) *
+            Math.sin(dl/2) * Math.sin(dl/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
 }
 
 export async function POST(req: NextRequest) {
@@ -66,19 +24,24 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const user = auth as AuthUser;
 
-  const ip = getClientIp(req);
+  let payload: { photoUrl?: string, latitude?: number, longitude?: number } = {};
+  try { payload = await req.json(); } catch(e) {}
+  const { photoUrl = null, latitude = null, longitude = null } = payload;
 
   try {
     const configSnap = await adminDb.doc("settings/attendanceConfig").get();
-    const config = configSnap.data();
-    const whitelist: string[] = config?.whitelistedIps ?? [];
-    const ipValid = isIpWhitelisted(ip, whitelist);
+    const config = configSnap.data() || {};
+    
+    const storeLat = config.storeLat ?? -6.200000; 
+    const storeLng = config.storeLng ?? 106.816666;
+    const allowedRadius = config.radiusMeter ?? 50; 
 
-    if (!ipValid) {
-      await adminDb.doc("settings/attendanceConfig").set(
-        { lastDetectedIp: ip, lastDetectedAt: FieldValue.serverTimestamp() },
-        { merge: true }
-      );
+    let distance = null;
+    let locationValid = false;
+
+    if (latitude !== null && longitude !== null) {
+      distance = calculateDistance(latitude, longitude, storeLat, storeLng);
+      locationValid = distance <= allowedRadius;
     }
 
     const today = new Date().toISOString().split("T")[0];
@@ -104,17 +67,19 @@ export async function POST(req: NextRequest) {
     const now = new Date();
     const totalHours = (now.getTime() - checkInTime) / (1000 * 60 * 60);
     const regularHours = Math.min(totalHours, BUSINESS.REGULAR_HOURS_PER_SHIFT);
-    const overtimeHours = Math.max(0, totalHours - BUSINESS.REGULAR_HOURS_PER_SHIFT);
-    const overtimeBlocks = Math.floor(overtimeHours / 2);
-    const overtimeBonus = overtimeBlocks * BUSINESS.OVERTIME_BONUS_PER_BLOCK;
+    
+    // Best Practice: Lembur tidak otomatis didapat hanya karena telat pulang. Harus manual dari Manager.
+    const overtimeHours = 0;
+    const overtimeBlocks = 0;
+    const overtimeBonus = 0;
 
     // Build list of anomalies
     const anomalies: string[] = [];
-    if (data.checkIn?.ipValid === false) {
-      anomalies.push("IP Check-in tidak dikenal");
+    if (data.checkIn?.locationValid === false) {
+      anomalies.push(`Check-in di luar radius (${Math.round(data.checkIn.distance || 0)}m)`);
     }
-    if (!ipValid) {
-      anomalies.push("IP Check-out tidak dikenal");
+    if (locationValid === false && latitude !== null) {
+      anomalies.push(`Check-out di luar radius (${Math.round(distance || 0)}m)`);
     }
     if (totalHours < 8) {
       anomalies.push("Check-out awal (<8 jam)");
@@ -127,8 +92,11 @@ export async function POST(req: NextRequest) {
     await adminDb.doc(`attendance/${attendanceId}`).update({
       checkOut: {
         time: now.toISOString(),
-        ipAddress: ip,
-        ipValid,
+        photoUrl,
+        latitude,
+        longitude,
+        distance,
+        locationValid,
       },
       totalHours: Math.round(totalHours * 100) / 100,
       regularHours: Math.round(regularHours * 100) / 100,

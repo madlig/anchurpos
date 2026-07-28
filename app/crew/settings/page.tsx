@@ -54,7 +54,7 @@ export default function CrewSettingsPage() {
   }
 
   return (
-    <div className="page-enter min-h-screen" style={{ background: "#FCABB4" }}>
+    <div className="page-enter min-h-screen" >
       {/* Header (Glassmorphism) */}
       <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200">
         <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">Pengaturan Akun</h1>

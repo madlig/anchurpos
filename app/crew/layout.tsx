@@ -1,17 +1,13 @@
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
 import { RoleGuard } from "@/components/shared/RoleGuard";
 import { useAuth } from "@/lib/auth-context";
-import { LayoutDashboard, User, LogOut } from "lucide-react";
+import { LayoutDashboard, User, LogOut, ChefHat, PackageOpen, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV_ITEMS = [
-  { label: "Beranda", href: "/crew/dashboard", icon: LayoutDashboard },
-  { label: "Profil", href: "/crew/settings", icon: User },
-];
-
-function DesktopSidebar() {
+function DesktopSidebar({ navItems }: { navItems: any[] }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   return (
@@ -31,7 +27,7 @@ function DesktopSidebar() {
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
@@ -72,22 +68,15 @@ function DesktopSidebar() {
   );
 }
 
-function MobileBottomNav() {
+function MobileBottomNav({ navItems }: { navItems: any[] }) {
   const pathname = usePathname();
   return (
     <nav
       data-testid="crew-bottom-nav"
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden"
-      style={{
-        background: "rgba(255,255,255,0.94)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        borderTop: "1px solid rgba(0,0,0,0.06)",
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
-      }}
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white/90 backdrop-blur-xl border-t border-slate-100 pb-[env(safe-area-inset-bottom,0px)]"
     >
-      <div className="flex items-center justify-around px-2 pt-2 pb-2">
-        {NAV_ITEMS.map((item) => {
+      <div className="flex items-center justify-around px-2 pt-2 pb-2 h-16">
+        {navItems.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
@@ -95,15 +84,14 @@ function MobileBottomNav() {
               key={item.href}
               href={item.href}
               data-testid={`crew-nav-${item.label.toLowerCase().replace(" ", "")}`}
-              className="flex flex-col items-center gap-0.5 min-w-[60px] min-h-[50px] justify-center tap-target"
+              className="flex flex-col items-center gap-1 w-16 h-14 justify-center tap-target relative"
             >
               <div
-                className="flex items-center justify-center h-8 w-8 rounded-xl transition-all duration-200"
-                style={active ? { background: "#FEF1F5" } : {}}
+                className={`flex items-center justify-center h-8 w-14 rounded-full transition-all duration-300 ${active ? 'bg-primary/10' : ''}`}
               >
-                <Icon size={18} strokeWidth={active ? 2.5 : 1.8} style={{ color: active ? "#E85D8C" : "#94A3B8" }} />
+                <Icon size={20} strokeWidth={active ? 2.5 : 2} className={active ? "text-primary" : "text-slate-400"} />
               </div>
-              <span className="text-xs font-semibold" style={{ color: active ? "#E85D8C" : "#94A3B8" }}>
+              <span className={`text-[10px] font-bold transition-colors ${active ? "text-primary" : "text-slate-400"}`}>
                 {item.label}
               </span>
             </Link>
@@ -114,16 +102,55 @@ function MobileBottomNav() {
   );
 }
 
+import { FCMProvider } from "@/components/shared/FCMProvider";
+
 export default function CrewLayout({ children }: { children: React.ReactNode }) {
+  const { getToken } = useAuth();
+  const [hasCheckedIn, setHasCheckedIn] = useState(false);
+  
+  const checkStatus = useCallback(async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch("/api/attendance/my-status", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHasCheckedIn(!!data?.today?.checkIn?.time);
+      }
+    } catch (e) {
+      console.error("Failed to check status", e);
+    }
+  }, [getToken]);
+
+  useEffect(() => {
+    checkStatus();
+    const handleStatusUpdate = () => checkStatus();
+    window.addEventListener('attendance-updated', handleStatusUpdate);
+    return () => window.removeEventListener('attendance-updated', handleStatusUpdate);
+  }, [checkStatus]);
+
+  const NAV_ITEMS = [
+    { label: "Tugas", href: "/crew/dashboard", icon: LayoutDashboard },
+    ...(hasCheckedIn ? [
+      { label: "Produksi", href: "/crew/production", icon: ChefHat },
+      { label: "Packing", href: "/crew/packing", icon: PackageOpen },
+      { label: "Opname", href: "/crew/stock-opname", icon: ClipboardList },
+    ] : []),
+    { label: "Profil", href: "/crew/settings", icon: User },
+  ];
+
   return (
     <RoleGuard allowedRoles={["owner", "manager", "crew"]}>
-      <div className="min-h-screen" style={{ background: "#FCABB4" }}>
-        <DesktopSidebar />
+      <FCMProvider />
+      <div className="min-h-screen bg-slate-50">
+        <DesktopSidebar navItems={NAV_ITEMS} />
         <div className="md:ml-60 pb-24 md:pb-6">
           {children}
         </div>
       </div>
-      <MobileBottomNav />
+      <MobileBottomNav navItems={NAV_ITEMS} />
     </RoleGuard>
   );
 }

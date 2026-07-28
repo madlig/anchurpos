@@ -3,11 +3,12 @@ import { adminDb } from "@/lib/firebase-admin";
 import { verifyAuth } from "@/lib/auth-middleware";
 import { FieldValue } from "firebase-admin/firestore";
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await verifyAuth(req);
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const taskId = params.id;
+  const p = await params;
+  const taskId = p.id;
   try {
     const taskRef = adminDb.collection("tasks").doc(taskId);
     const snap = await taskRef.get();
@@ -28,12 +29,29 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const now = new Date().toISOString();
     const batch = adminDb.batch();
+    const userName = (auth as any).name || (auth as any).displayName || "Crew";
 
+    if (task.type === "umum") {
+      // LOGIKA MULTI-CREW: Cukup simpan nama ke daftar, jangan ubah status jadi done secara global.
+      // Jika butuh batas, manager bisa manual close, tapi secara default ini terus menerima array.
+      batch.update(taskRef, {
+        completedByList: FieldValue.arrayUnion({
+          uid: auth.uid,
+          name: userName,
+          time: now
+        })
+      });
+      await batch.commit();
+      return NextResponse.json({ success: true, type: "umum", completedAt: now });
+    }
+
+    // UNTUK PRODUKSI DAN LAINNYA: KLAIM CEPAT (SIAPA CEPAT DIA DAPAT)
     // 1. Mark task as done
     batch.update(taskRef, {
       status: "done",
       completedAt: now,
       completedBy: auth.uid,
+      completedByName: userName
     });
 
     // 2. Jika tipe tugas = produksi, jalankan logika potong stok BOM (MVP Opsi B / Integrasi Produksi)
@@ -61,7 +79,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
               source: "production",
               timestamp: now,
               userId: auth.uid,
-              userName: (auth as any).name || "Unknown",
+              userName: userName,
               notes: `Produksi ${batches} batch (Tugas: ${task.title})`
             });
           }
@@ -98,7 +116,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         source: "production",
         timestamp: now,
         userId: auth.uid,
-        userName: (auth as any).name || "Unknown",
+        userName: userName,
         notes: `Hasil Produksi ${batches} batch (Tugas: ${task.title})`
       });
     }
