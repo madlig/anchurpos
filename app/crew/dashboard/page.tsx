@@ -53,16 +53,26 @@ export default function CrewDashboard() {
       setDate(d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" }));
     }, 1000);
     
-    // Listen for incoming FCM messages to auto-refresh data
+    // Listen for incoming FCM messages (if app was open in foreground)
     const handleFcmMessage = () => {
       console.log("Auto-refreshing dashboard due to new FCM message");
       loadData();
     };
     window.addEventListener('fcm_message', handleFcmMessage);
     
+    // Listen for app coming back to foreground (if app was in background when notif arrived)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("App resumed, refreshing data...");
+        loadData();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    
     return () => {
       clearInterval(timer);
       window.removeEventListener('fcm_message', handleFcmMessage);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [loadData]);
 
