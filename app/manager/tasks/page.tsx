@@ -45,15 +45,22 @@ export default function ManagerTasksPage() {
   }, [loadData]);
 
   const handleCreate = async () => {
-    if (!title) return alert("Judul tugas harus diisi", "Error", "danger");
-    if (type === "produksi" && (!variantId || batches <= 0)) {
-      return alert("Pilih varian dan jumlah batch", "Error", "danger");
+    let finalTitle = title;
+    
+    if (type === "produksi") {
+      const v = variants.find(x => x.id === variantId);
+      if (!v || batches <= 0) {
+        return alert("Pilih varian dan jumlah batch", "Error", "danger");
+      }
+      finalTitle = `Produksi ${batches} Batch - ${v.name}`;
     }
+
+    if (!finalTitle) return alert("Judul tugas harus diisi", "Error", "danger");
 
     setLoading(true);
     try {
       const payload: any = {
-        title,
+        title: finalTitle,
         type,
         description,
         assignedRole: "crew"
@@ -77,6 +84,8 @@ export default function ManagerTasksPage() {
         await alert("Tugas berhasil dikirim ke layar Crew!", "Sukses", "success");
         setTitle("");
         setDescription("");
+        setBatches(0);
+        setVariantId("");
         loadData();
       } else {
         const d = await res.json();
@@ -123,10 +132,12 @@ export default function ManagerTasksPage() {
           </div>
 
           <div className="space-y-4">
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase ml-1 mb-1 block">Judul Instruksi</label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Contoh: Tolong bersihkan chiller..." className="h-12 rounded-xl bg-slate-50 border-none font-medium focus-visible:ring-1 focus-visible:ring-slate-300" />
-            </div>
+            {type !== "produksi" && (
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase ml-1 mb-1 block">Judul Instruksi</label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Contoh: Tolong bersihkan chiller..." className="h-12 rounded-xl bg-slate-50 border-none font-medium focus-visible:ring-1 focus-visible:ring-slate-300" />
+              </div>
+            )}
 
             {type === "produksi" && (
               <div className="flex gap-2">
