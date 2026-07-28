@@ -24,6 +24,7 @@ export default function CrewDashboard() {
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
     return fetch(url, {
+      cache: 'no-store', // Prevent browser/Next.js from serving stale cached data
       ...opts,
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...opts?.headers },
     });
