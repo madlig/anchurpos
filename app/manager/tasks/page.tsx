@@ -129,18 +129,14 @@ export default function ManagerTasksPage() {
         <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-200">
           <h2 className="text-sm font-bold text-slate-800 mb-4">Buat Tugas Baru</h2>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-            <button onClick={() => setType("umum")} className={`p-3 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${type === 'umum' ? 'bg-primary text-white border-primary shadow-md shadow-primary/20' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border-transparent'}`}>
+          <div className="flex gap-2 mb-4">
+            <button onClick={() => setType("umum")} className={`flex-1 p-3 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${type === 'umum' ? 'bg-primary text-white border-primary shadow-md shadow-primary/20' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border-transparent'}`}>
               <ClipboardList size={20} />
               <span className="text-[10px] font-bold uppercase">Umum</span>
             </button>
-            <button onClick={() => setType("produksi")} className={`p-3 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${type === 'produksi' ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border-transparent'}`}>
+            <button onClick={() => setType("produksi")} className={`flex-1 p-3 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${type === 'produksi' ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border-transparent'}`}>
               <ChefHat size={20} />
               <span className="text-[10px] font-bold uppercase">Produksi</span>
-            </button>
-            <button onClick={() => setType("pre_packing")} className={`p-3 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${type === 'pre_packing' ? 'bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-500/20' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border-transparent'}`}>
-              <PackageOpen size={20} />
-              <span className="text-[10px] font-bold uppercase">Packing</span>
             </button>
           </div>
 
