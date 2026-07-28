@@ -53,6 +53,12 @@ export default function ManagerTasksPage() {
         return alert("Pilih varian dan jumlah adonan", "Error", "danger");
       }
       finalTitle = `Buat ${batches} Adonan - ${v.name}`;
+    } else if (type === "pre_packing") {
+      const v = variants.find(x => x.id === variantId);
+      if (!v || batches <= 0) {
+        return alert("Pilih varian dan jumlah pack", "Error", "danger");
+      }
+      finalTitle = `Packing ${batches} Pack - ${v.name}`;
     }
 
     if (!finalTitle) return alert("Judul tugas harus diisi", "Error", "danger");
@@ -72,6 +78,13 @@ export default function ManagerTasksPage() {
           variantId,
           variantName: v?.name || "Produk",
           batches
+        };
+      } else if (type === "pre_packing") {
+        const v = variants.find(x => x.id === variantId);
+        payload.packingData = {
+          variantId,
+          variantName: v?.name || "Produk",
+          targetQty: batches
         };
       }
 
@@ -132,14 +145,14 @@ export default function ManagerTasksPage() {
           </div>
 
           <div className="space-y-4">
-            {type !== "produksi" && (
+            {type === "umum" && (
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase ml-1 mb-1 block">Judul Instruksi</label>
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Contoh: Tolong bersihkan chiller..." className="h-12 rounded-xl bg-slate-50 border-none font-medium focus-visible:ring-1 focus-visible:ring-slate-300" />
               </div>
             )}
 
-            {type === "produksi" && (
+            {type !== "umum" && (
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="text-xs font-bold text-slate-400 uppercase ml-1 mb-1 block">Pilih Produk (Varian)</label>
@@ -149,7 +162,7 @@ export default function ManagerTasksPage() {
                   </select>
                 </div>
                 <div className="w-24">
-                  <label className="text-xs font-bold text-slate-400 uppercase ml-1 mb-1 block">Jml Adonan</label>
+                  <label className="text-xs font-bold text-slate-400 uppercase ml-1 mb-1 block">{type === "produksi" ? "Jml Adonan" : "Jml Pack"}</label>
                   <Input type="number" step="0.5" value={batches} onChange={(e) => setBatches(parseFloat(e.target.value))} className="h-12 rounded-xl bg-slate-50 border-none font-medium text-center focus-visible:ring-1 focus-visible:ring-slate-300" />
                 </div>
               </div>
@@ -190,6 +203,7 @@ export default function ManagerTasksPage() {
                     <p className="font-bold text-slate-800">{t.title}</p>
                     {t.description && <p className="text-xs text-slate-500 mt-1">{t.description}</p>}
                     {t.productionData && <p className="text-xs font-semibold text-primary mt-1.5 bg-primary/5 inline-block px-2 py-1 rounded-lg">Target: {t.productionData.batches} Adonan {t.productionData.variantName}</p>}
+                    {t.packingData && <p className="text-xs font-semibold text-blue-600 mt-1.5 bg-blue-50 border border-blue-100 inline-block px-2 py-1 rounded-lg">Target: {t.packingData.targetQty} Pack {t.packingData.variantName}</p>}
                   </div>
                   
                   <div className="flex flex-col items-end shrink-0 pl-4">
