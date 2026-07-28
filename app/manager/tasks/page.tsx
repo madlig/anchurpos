@@ -50,9 +50,9 @@ export default function ManagerTasksPage() {
     if (type === "produksi") {
       const v = variants.find(x => x.id === variantId);
       if (!v || batches <= 0) {
-        return alert("Pilih varian dan jumlah batch", "Error", "danger");
+        return alert("Pilih varian dan jumlah adonan", "Error", "danger");
       }
-      finalTitle = `Produksi ${batches} Batch - ${v.name}`;
+      finalTitle = `Buat ${batches} Adonan - ${v.name}`;
     }
 
     if (!finalTitle) return alert("Judul tugas harus diisi", "Error", "danger");
@@ -149,7 +149,7 @@ export default function ManagerTasksPage() {
                   </select>
                 </div>
                 <div className="w-24">
-                  <label className="text-xs font-bold text-slate-400 uppercase ml-1 mb-1 block">Batch</label>
+                  <label className="text-xs font-bold text-slate-400 uppercase ml-1 mb-1 block">Jml Adonan</label>
                   <Input type="number" step="0.5" value={batches} onChange={(e) => setBatches(parseFloat(e.target.value))} className="h-12 rounded-xl bg-slate-50 border-none font-medium text-center focus-visible:ring-1 focus-visible:ring-slate-300" />
                 </div>
               </div>
@@ -189,7 +189,7 @@ export default function ManagerTasksPage() {
                     </div>
                     <p className="font-bold text-slate-800">{t.title}</p>
                     {t.description && <p className="text-xs text-slate-500 mt-1">{t.description}</p>}
-                    {t.productionData && <p className="text-xs font-semibold text-primary mt-1.5 bg-primary/5 inline-block px-2 py-1 rounded-lg">Target: {t.productionData.batches} Batch {t.productionData.variantName}</p>}
+                    {t.productionData && <p className="text-xs font-semibold text-primary mt-1.5 bg-primary/5 inline-block px-2 py-1 rounded-lg">Target: {t.productionData.batches} Adonan {t.productionData.variantName}</p>}
                   </div>
                   
                   <div className="flex flex-col items-end shrink-0 pl-4">

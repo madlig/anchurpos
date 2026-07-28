@@ -221,7 +221,7 @@ export default function CrewDashboard() {
                   <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">{t.type.replace('_', ' ')}</span>
                   <h3 className="font-bold text-slate-800 text-lg leading-tight mt-0.5">{t.title}</h3>
                   {t.description && <p className="text-xs text-slate-500 mt-1">{t.description}</p>}
-                  {t.productionData && <p className="text-xs font-bold text-emerald-600 mt-1.5 bg-emerald-50 inline-block px-2 py-0.5 rounded-md">Target: {t.productionData.batches} Batch {t.productionData.variantName}</p>}
+                  {t.productionData && <p className="text-xs font-bold text-emerald-600 mt-1.5 bg-emerald-50 inline-block px-2 py-0.5 rounded-md">Target: {t.productionData.batches} Adonan {t.productionData.variantName}</p>}
                 </div>
               </div>
 
