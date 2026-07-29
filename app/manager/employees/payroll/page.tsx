@@ -56,8 +56,19 @@ export default function PayrollPage() {
     let prevYear = year;
     if (prevMonth === 0) { prevMonth = 12; prevYear = year - 1; }
     
-    setStartDate(`${prevYear}-${String(prevMonth).padStart(2, "0")}-26`);
-    setEndDate(`${year}-${String(month).padStart(2, "0")}-25`);
+    // Perusahaan default cut-off: 29 (bulan lalu) sampai 28 (bulan ini)
+    const sd = new Date(prevYear, prevMonth - 1, 29);
+    const sYear = sd.getFullYear();
+    const sMonth = String(sd.getMonth() + 1).padStart(2, "0");
+    const sDate = String(sd.getDate()).padStart(2, "0");
+    
+    const ed = new Date(year, month - 1, 28);
+    const eYear = ed.getFullYear();
+    const eMonth = String(ed.getMonth() + 1).padStart(2, "0");
+    const eDate = String(ed.getDate()).padStart(2, "0");
+    
+    setStartDate(`${sYear}-${sMonth}-${sDate}`);
+    setEndDate(`${eYear}-${eMonth}-${eDate}`);
   }, [selectedMonth]);
 
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
@@ -217,7 +228,7 @@ export default function PayrollPage() {
       </div>
 
       <div style={{ background: "#F8FAFC", padding: "16px", borderRadius: "14px", border: "1px dashed #CBD5E1", marginBottom: "20px" }}>
-        <p style={{ fontSize: "11px", fontWeight: "800", color: "#64748B", marginBottom: "8px" }}>TENTUKAN RENTANG TANGGAL GAJI (DEFAULT 26 S/D 25)</p>
+        <p style={{ fontSize: "11px", fontWeight: "800", color: "#64748B", marginBottom: "8px" }}>TENTUKAN RENTANG TANGGAL GAJI (DEFAULT 29 S/D 28)</p>
         <div className="flex gap-3 items-center">
           <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ flex: 1, padding: "8px 12px", borderRadius: "8px", border: "1px solid #E2E8F0", fontSize: "13px" }} />
           <span className="font-bold text-slate-400">s/d</span>
