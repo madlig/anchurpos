@@ -1,37 +1,88 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 import { Input } from "@/components/ui/input";
-import { Loader2, PackageCheck, Check } from "lucide-react";
-import type { Variant } from "@/types";
+import { Loader2, PackageCheck, Check, Layers } from "lucide-react";
+import type { Variant, Product } from "@/types";
 
 interface Props {
   variants: Variant[];
   onSuccess: () => void;
 }
 
-const PRODUCTS = [
-  { id: "churros-frozen-regular", name: "Churros Frozen Regular (12 pcs)", ratio: 16 },
-  { id: "churros-frozen-full", name: "Churros Frozen Full (16 pcs)", ratio: 12 },
-  { id: "churros-frozen-tiktok", name: "Churros Frozen TikTok (6 pcs)", ratio: 11 },
-];
-
 export function ProductionPackingTab({ variants, onSuccess }: Props) {
   const { getToken } = useAuth();
   const { alert } = useAlertConfirm();
 
-  const [productId, setProductId] = useState(PRODUCTS[0].id);
-  const [variantId, setVariantId] = useState(variants[0]?.id || "");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productId, setProductId] = useState<string>("");
+  const [variantId, setVariantId] = useState<string>(variants[0]?.id || "");
   const [packQty, setPackQty] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Loyang Pool State
+  const [loyangAvailable, setLoyangAvailable] = useState<number>(0);
+  const [loadingPool, setLoadingPool] = useState<boolean>(false);
+
+  const fetchWithAuth = useCallback(
+    async (url: string, options?: RequestInit) => {
+      const token = await getToken();
+      return fetch(url, {
+        ...options,
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options?.headers },
+      });
+    },
+    [getToken]
+  );
+
+  // Load products from Master Data
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        const res = await fetchWithAuth("/api/products");
+        if (res.ok) {
+          const data: Product[] = await res.json();
+          const frozenProds = data.filter((p) => p.id.startsWith("churros-frozen"));
+          setProducts(frozenProds);
+          if (frozenProds.length > 0) setProductId(frozenProds[0].id);
+        }
+      } catch (err) {
+        console.error("Gagal mengambil master data produk:", err);
+      }
+    }
+    loadProducts();
+  }, [fetchWithAuth]);
 
   useEffect(() => {
     if (variants.length > 0 && !variantId) {
       setVariantId(variants[0].id);
     }
   }, [variants, variantId]);
+
+  // Fetch Loyang Pool whenever variantId changes
+  const fetchLoyangPool = useCallback(async (vId: string) => {
+    if (!vId) return;
+    setLoadingPool(true);
+    try {
+      const res = await fetchWithAuth(`/api/productions/loyang-pool?variantId=${vId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLoyangAvailable(data.totalAvailable || 0);
+      }
+    } catch (err) {
+      console.error("Gagal mengambil loyang pool:", err);
+    } finally {
+      setLoadingPool(false);
+    }
+  }, [fetchWithAuth]);
+
+  useEffect(() => {
+    if (variantId) {
+      fetchLoyangPool(variantId);
+    }
+  }, [variantId, fetchLoyangPool]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,13 +93,8 @@ export function ProductionPackingTab({ variants, onSuccess }: Props) {
 
     setSubmitting(true);
     try {
-      const token = await getToken();
-      const res = await fetch("/api/packing", {
+      const res = await fetchWithAuth("/api/packing", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           action: "pack_production",
           productId,
@@ -60,6 +106,7 @@ export function ProductionPackingTab({ variants, onSuccess }: Props) {
       if (res.ok) {
         alert("Laporan packing berhasil disimpan! Stok produk jadi di Gudang telah bertambah.", "Berhasil", "success");
         setPackQty("");
+        fetchLoyangPool(variantId);
         onSuccess();
       } else {
         const err = await res.json();
@@ -72,7 +119,7 @@ export function ProductionPackingTab({ variants, onSuccess }: Props) {
     }
   };
 
-  const selectedProd = PRODUCTS.find((p) => p.id === productId);
+  const selectedProd = products.find((p) => p.id === productId);
   const selectedVar = variants.find((v) => v.id === variantId);
 
   return (
@@ -83,18 +130,18 @@ export function ProductionPackingTab({ variants, onSuccess }: Props) {
         </div>
         <div>
           <h2 className="text-base font-extrabold text-slate-800 tracking-tight">Packing Hasil Produksi (Stok Produk Jadi)</h2>
-          <p className="text-xs font-semibold text-slate-500">Kemas adonan mentah jadi Pack Frozen untuk menambah stok Gudang secara langsung.</p>
+          <p className="text-xs font-semibold text-slate-500">Terhubung langsung ke Master Data Produk Jadi, Master Varian Rasa, dan Pool Adonan Produksi.</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Pilih Jenis Produk */}
+        {/* Pilih Jenis Produk (Dari Master Data) */}
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-            1. Pilih Jenis Produk Frozen
+            1. Pilih Jenis Produk Frozen (Master Data)
           </label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-            {PRODUCTS.map((p) => {
+            {products.map((p) => {
               const active = productId === p.id;
               return (
                 <button
@@ -107,17 +154,18 @@ export function ProductionPackingTab({ variants, onSuccess }: Props) {
                       : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 font-semibold"
                   }`}
                 >
-                  <div className="text-xs">{p.name}</div>
+                  <div className="text-xs font-bold">{p.name}</div>
+                  <div className="text-[10px] text-slate-400 font-medium mt-0.5">{p.description}</div>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Pilih Varian */}
+        {/* Pilih Varian Rasa (Dari Master Data Varian) */}
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-            2. Pilih Varian Rasa
+            2. Pilih Varian Rasa (Master Varian)
           </label>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {variants.map((v) => {
@@ -137,6 +185,17 @@ export function ProductionPackingTab({ variants, onSuccess }: Props) {
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* Status Pool Produksi Loyang */}
+        <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+            <Layers size={16} className="text-amber-600" />
+            <span>Sisa Loyang Adonan {selectedVar?.name || ""}:</span>
+          </div>
+          <div className="text-xs font-extrabold text-amber-900 bg-amber-200/60 px-3 py-1 rounded-full">
+            {loadingPool ? <Loader2 size={12} className="animate-spin" /> : `${loyangAvailable} Loyang Tersedia`}
           </div>
         </div>
 
