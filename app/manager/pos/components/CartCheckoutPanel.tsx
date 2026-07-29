@@ -50,6 +50,11 @@ export function CartCheckoutPanel({
   const [saveNewCustomer, setSaveNewCustomer] = useState(false);
   const [newCustomerType, setNewCustomerType] = useState<"reguler" | "b2b" | "reseller">("reguler");
   const [payMethod, setPayMethod] = useState<"cash" | "transfer" | "qris">(orderChannel === "walkin" ? "cash" : "transfer");
+
+  // Sync default payment method when orderChannel changes
+  useEffect(() => {
+    setPayMethod(orderChannel === "walkin" ? "cash" : "transfer");
+  }, [orderChannel]);
   const [isPaid, setIsPaid] = useState(true);
   const [orderNotes, setOrderNotes] = useState("");
   const [poNumber, setPoNumber] = useState("");

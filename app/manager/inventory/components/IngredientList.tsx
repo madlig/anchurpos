@@ -9,7 +9,7 @@ import type { Ingredient } from "@/types";
 interface IngredientListProps {
   ingredients: Ingredient[];
   searchQuery: string;
-  tab: "bahan" | "operasional" | "addon";
+  tab: "bahan" | "packaging" | "operasional" | "addon";
   fetchWithAuth: (url: string, opts?: RequestInit) => Promise<Response>;
   loadIngredients: () => Promise<void>;
   openMutasiModal: (id: string, name: string, unit: string, type: "variant" | "ingredient") => void;
@@ -53,9 +53,10 @@ export function IngredientList({
   };
 
   const getTargetCategory = () => {
+    if (tab === "packaging") return ["packaging"];
     if (tab === "operasional") return ["operasional"];
     if (tab === "addon") return ["add_on"];
-    return ["bahan_baku", "packaging"]; // bahan
+    return ["bahan_baku"]; // bahan
   };
 
   const targetCats = getTargetCategory();

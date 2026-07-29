@@ -11,7 +11,7 @@ import { ProductList } from "./components/ProductList";
 import { IngredientList } from "./components/IngredientList";
 import { OpnameReviewList } from "./components/OpnameReviewList";
 
-type Tab = "produk" | "bahan" | "operasional" | "addon" | "opname";
+type Tab = "produk" | "bahan" | "packaging" | "operasional" | "addon" | "opname";
 
 interface VariantStock {
   id: string; name: string; currentStock: number; minStock: number; sortOrder: number;
@@ -28,7 +28,7 @@ export default function InventoryPage() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const t = params.get("tab") as Tab;
-      if (t && ["produk", "bahan", "operasional", "addon", "opname"].includes(t)) {
+      if (t && ["produk", "bahan", "packaging", "operasional", "addon", "opname"].includes(t)) {
         return t;
       }
     }
@@ -136,6 +136,7 @@ export default function InventoryPage() {
   const TABS: { key: Tab; label: string }[] = [
     { key: "produk", label: "Produk Jadi" },
     { key: "bahan", label: "Bahan Baku" },
+    { key: "packaging", label: "Kemasan & Packaging" },
     { key: "operasional", label: "Operasional" },
     { key: "addon", label: "Add-On" },
     { key: "opname", label: `Review Opname${pendingOpnameCount > 0 ? ` (${pendingOpnameCount})` : ""}` },
@@ -214,7 +215,7 @@ export default function InventoryPage() {
             />
           )}
 
-          {(tab === "bahan" || tab === "operasional" || tab === "addon") && (
+          {(tab === "bahan" || tab === "packaging" || tab === "operasional" || tab === "addon") && (
             <IngredientList
               ingredients={ingredients}
               searchQuery={searchQuery}
