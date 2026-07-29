@@ -56,9 +56,9 @@ export const expenseCreateSchema = z.object({
   itemName: z.string().min(1, "Nama pengeluaran wajib diisi"),
   totalPrice: z.number().min(0, "Total tidak boleh negatif"),
   paymentMethod: z.string().min(1),
-  notes: z.string().optional().default(""),
+  notes: z.string().nullable().optional().default(""),
   supplier: z.string().nullable().optional(),
-  customDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal YYYY-MM-DD").optional(),
+  customDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal YYYY-MM-DD").nullable().optional(),
 });
 
 export const purchaseCreateSchema = z.object({
