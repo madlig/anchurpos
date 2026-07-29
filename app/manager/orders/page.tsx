@@ -2,30 +2,62 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, ClipboardList, Ban, Clock, CheckCircle2, RotateCw, FileText } from "lucide-react";
+import { 
+  Loader2, ClipboardList, Ban, Clock, CheckCircle2, RotateCw, FileText, 
+  Store, MessageCircle, Smartphone, ShoppingBag, Search, Filter, Download,
+  Printer, CreditCard, ChevronRight, CheckCircle, RefreshCw, X, ArrowLeft
+} from "lucide-react";
+import Link from "next/link";
 import { AdaptivePanel } from "@/components/shared/AdaptivePanel";
 import { OrderDetailView } from "./components/OrderDetailView";
-import { OrderFilters } from "./components/OrderFilters";
 
 interface OrderSummary {
-  id: string; orderNumber: string; customerName: string; customerType: string | null;
-  status: string; paymentStatus: string; source: string; orderChannel: string; createdAt: string;
-  voidReason: string | null; voidedAt: string | null;
+  id: string; 
+  orderNumber: string; 
+  customerName: string; 
+  customerType: string | null;
+  status: string; 
+  paymentStatus: string; 
+  source: string; 
+  orderChannel: string; 
+  createdAt: string;
+  totalOrderValue?: number;
+  voidReason: string | null; 
+  voidedAt: string | null;
 }
 
 const TABS = [
-  { key: "semua", label: "Semua" },
+  { key: "semua", label: "Semua Pesanan" },
   { key: "pending", label: "Pending" },
-  { key: "proses", label: "Proses" },
+  { key: "proses", label: "Diproses" },
   { key: "selesai", label: "Selesai" },
-  { key: "void", label: "Batal" },
+  { key: "void", label: "Dibatalkan" },
 ];
 
+function fmt(n: number) {
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+}
+
+function getChannelBadge(channel: string) {
+  switch (channel) {
+    case "walkin":
+      return { icon: Store, label: "Walk-in", color: "text-emerald-700 bg-emerald-50 border-emerald-200" };
+    case "whatsapp":
+      return { icon: MessageCircle, label: "WhatsApp", color: "text-emerald-700 bg-emerald-50 border-emerald-200" };
+    case "tiktok":
+      return { icon: Smartphone, label: "TikTok", color: "text-rose-700 bg-rose-50 border-rose-200" };
+    case "shopee":
+      return { icon: ShoppingBag, label: "Shopee", color: "text-orange-700 bg-orange-50 border-orange-200" };
+    default:
+      return { icon: Store, label: channel, color: "text-slate-700 bg-slate-100 border-slate-200" };
+  }
+}
+
 function getStatusStyle(status: string) {
-  if (status === "selesai") return { icon: <CheckCircle2 size={14} />, color: "#16A34A", bg: "#DCFCE7", text: "Selesai" };
-  if (status === "proses") return { icon: <RotateCw size={14} className="animate-spin-slow" />, color: "#D97706", bg: "#FEF3C7", text: "Proses" };
-  if (status === "void") return { icon: <Ban size={14} />, color: "#DC2626", bg: "#FEE2E2", text: "Batal" };
-  return { icon: <Clock size={14} />, color: "#64748B", bg: "#F1F5F9", text: "Pending" };
+  if (status === "selesai") return { icon: CheckCircle2, color: "text-emerald-700 bg-emerald-50 border-emerald-200", label: "Selesai" };
+  if (status === "proses") return { icon: RotateCw, color: "text-amber-700 bg-amber-50 border-amber-200", label: "Diproses" };
+  if (status === "void") return { icon: Ban, color: "text-red-700 bg-red-50 border-red-200", label: "Dibatalkan" };
+  return { icon: Clock, color: "text-slate-700 bg-slate-100 border-slate-200", label: "Pending" };
 }
 
 export default function OrdersListPage() {
@@ -41,13 +73,14 @@ export default function OrdersListPage() {
   const [channelFilter, setChannelFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
   // Selection
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
-  const fetchWithAuth = useCallback(async (url: string) => {
+  const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
-    return fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    return fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...opts?.headers } });
   }, [getToken]);
 
   const loadData = useCallback(async () => {
@@ -71,7 +104,7 @@ export default function OrdersListPage() {
   // Client-side filtering
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
-      const search = searchQuery.toLowerCase();
+      const search = searchQuery.toLowerCase().trim();
       const cName = order.customerName?.toLowerCase() || "";
       const oNum = order.orderNumber?.toLowerCase() || "";
       if (search && !cName.includes(search) && !oNum.includes(search)) {
@@ -111,8 +144,33 @@ export default function OrdersListPage() {
     });
   }, [orders, searchQuery, channelFilter, paymentFilter, dateFilter]);
 
+  // Calculations for Summary Bar
+  const totalGrossValue = useMemo(() => {
+    return filteredOrders.reduce((sum, o) => sum + (o.totalOrderValue ?? 0), 0);
+  }, [filteredOrders]);
+
+  const pendingCount = useMemo(() => {
+    return orders.filter(o => o.status === "pending" || o.paymentStatus === "belum_bayar").length;
+  }, [orders]);
+
+  async function handleQuickMarkAsPaid(orderId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setUpdatingOrderId(orderId);
+    try {
+      const res = await fetchWithAuth(`/api/orders/${orderId}/payment`, {
+        method: "PATCH",
+        body: JSON.stringify({ paymentStatus: "sudah_bayar" }),
+      });
+      if (res.ok) {
+        await loadData();
+      }
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  }
+
   const handleExport = () => {
-    const headers = ["Order ID", "Tanggal", "Pelanggan", "Tipe", "Channel", "Status", "Pembayaran"];
+    const headers = ["Order ID", "Tanggal", "Pelanggan", "Tipe", "Channel", "Status", "Pembayaran", "Total Value"];
     const rows = filteredOrders.map(o => [
       o.orderNumber,
       new Date(o.createdAt).toLocaleString("id-ID"),
@@ -120,7 +178,8 @@ export default function OrdersListPage() {
       o.customerType || "-",
       o.orderChannel,
       o.status,
-      o.paymentStatus
+      o.paymentStatus,
+      o.totalOrderValue ?? 0
     ]);
     
     let csvContent = "data:text/csv;charset=utf-8," 
@@ -130,7 +189,7 @@ export default function OrdersListPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Data_Transaksi_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `Data_Pesanan_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -140,208 +199,264 @@ export default function OrdersListPage() {
     return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
   }
   function formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+    return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
   }
 
-  const isVoidTab = tab === "void";
-
   return (
-    <div className="page-enter min-h-screen pb-24" style={{ background: "#FCABB4" }}>
+    <div className="min-h-screen bg-slate-50/70 pb-28">
       
-      {/* Floating Header */}
-      <div className="sticky top-0 z-30 pt-4 px-4 pb-2 bg-white/90 backdrop-blur-xl border-b border-pink-200 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 mt-2 gap-4">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center">
-              <ClipboardList size={22} className="text-primary" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-black text-slate-800 tracking-tight">Pesanan</h1>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
-                {filteredOrders.length} Transaksi Ditemukan
-              </p>
-            </div>
-          </div>
+      {/* ── Native App Sticky Header ── */}
+      <div className="bg-white sticky top-0 z-30 px-4 md:px-8 pt-4 pb-3 shadow-sm border-b border-slate-100">
+        <div className="max-w-5xl mx-auto space-y-3">
           
-          <div className="flex-1 max-w-2xl">
-            <OrderFilters 
-              searchQuery={searchQuery} setSearchQuery={setSearchQuery}
-              channel={channelFilter} setChannel={setChannelFilter}
-              paymentStatus={paymentFilter} setPaymentStatus={setPaymentFilter}
-              dateFilter={dateFilter} setDateFilter={setDateFilter}
-              onExport={handleExport}
-            />
-          </div>
-        </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Link href="/manager/dashboard" className="w-10 h-10 bg-slate-50 hover:bg-slate-100 rounded-2xl flex items-center justify-center border border-slate-200 text-slate-600 transition-colors">
+                <ArrowLeft size={18} />
+              </Link>
+              <div>
+                <h1 className="text-lg md:text-xl font-extrabold text-slate-800 tracking-tight leading-tight">
+                  Daftar Pesanan
+                </h1>
+                <p className="text-xs font-semibold text-slate-400">
+                  {filteredOrders.length} Pesanan Terfilter • Outlet Utama
+                </p>
+              </div>
+            </div>
 
-        {/* Dynamic Animated Tabs */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-          {TABS.map((t) => {
-            const active = tab === t.key;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-bold transition-all duration-300 tap-target ${
-                  active 
-                    ? t.key === "void" ? "bg-red-500 text-white shadow-md shadow-red-500/20" : "bg-primary text-white shadow-md shadow-primary/20"
-                    : "bg-white text-slate-500 border border-slate-200 hover:border-slate-300 hover:bg-brand-50"
-                }`}
+            <button
+              onClick={handleExport}
+              className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/60 text-emerald-700 font-bold text-xs transition-colors flex items-center gap-1.5"
+            >
+              <Download size={14} /> Export CSV
+            </button>
+          </div>
+
+          {/* ── KPI Summary Cards Bar ── */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Terfilter</span>
+              <p className="text-sm md:text-base font-black text-slate-800 tabular-nums mt-0.5">{fmt(totalGrossValue)}</p>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Butuh Tindakan</span>
+              <p className="text-sm md:text-base font-black text-amber-600 tabular-nums mt-0.5">{pendingCount} Pesanan</p>
+            </div>
+
+            <div className="hidden md:block p-3 bg-slate-50 rounded-2xl border border-slate-100">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Transaksi</span>
+              <p className="text-sm md:text-base font-black text-slate-800 tabular-nums mt-0.5">{orders.length} Pesanan</p>
+            </div>
+          </div>
+
+          {/* ── Search & Quick Filter Bar ── */}
+          <div className="flex flex-col md:flex-row gap-2 pt-1">
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari Nomor Pesanan / Nama Pelanggan..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-10 pl-9 pr-8 rounded-xl bg-slate-100/80 border border-slate-200 text-xs font-medium focus:outline-none focus:border-primary focus:bg-white transition-colors"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
+              <select
+                value={channelFilter}
+                onChange={(e) => setChannelFilter(e.target.value)}
+                className="h-10 px-3 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-700 outline-none cursor-pointer"
               >
-                {t.label}
-              </button>
-            );
-          })}
+                <option value="all">Semua Channel</option>
+                <option value="walkin">Walk-in</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="tiktok">TikTok</option>
+                <option value="shopee">Shopee</option>
+              </select>
+
+              <select
+                value={paymentFilter}
+                onChange={(e) => setPaymentFilter(e.target.value)}
+                className="h-10 px-3 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-700 outline-none cursor-pointer"
+              >
+                <option value="all">Semua Status Bayar</option>
+                <option value="sudah_bayar">Lunas</option>
+                <option value="belum_bayar">Belum Lunas</option>
+              </select>
+
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="h-10 px-3 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-700 outline-none cursor-pointer"
+              >
+                <option value="all">Semua Waktu</option>
+                <option value="today">Hari Ini</option>
+                <option value="yesterday">Kemarin</option>
+                <option value="7days">7 Hari Terakhir</option>
+                <option value="30days">30 Hari Terakhir</option>
+              </select>
+            </div>
+          </div>
+
+          {/* ── Status Pills Filter Tabs ── */}
+          <div className="flex gap-1.5 overflow-x-auto hide-scrollbar pt-1">
+            {TABS.map((t) => {
+              const isActive = tab === t.key;
+              const count = orders.filter(o => t.key === "semua" ? true : o.status === t.key).length;
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border ${
+                    isActive 
+                      ? 'bg-primary text-white border-primary shadow-sm' 
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>{t.label}</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="px-4 pt-4 md:px-8 max-w-7xl mx-auto">
+      {/* ── Main Content Area ── */}
+      <div className="px-4 md:px-8 max-w-5xl mx-auto space-y-3 pt-5">
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div className="mt-8 flex flex-col items-center justify-center p-10 bg-white/50 backdrop-blur-sm rounded-3xl border border-dashed border-white/60">
-            <div className="h-16 w-16 rounded-full bg-white flex items-center justify-center mb-4">
-              {isVoidTab
-                ? <Ban className="text-slate-300" size={32} />
-                : <ClipboardList className="text-slate-300" size={32} />
-              }
+          <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+              <ClipboardList size={24} />
             </div>
-            <p className="text-sm font-bold text-slate-600">Tidak ada pesanan yang sesuai filter</p>
+            <p className="text-sm font-bold text-slate-700">Tidak ada pesanan yang sesuai filter.</p>
             <button 
               onClick={() => {
-                setSearchQuery(""); setChannelFilter("all"); setPaymentFilter("all"); setDateFilter("all");
+                setSearchQuery(""); setChannelFilter("all"); setPaymentFilter("all"); setDateFilter("all"); setTab("semua");
               }}
-              className="mt-4 px-4 py-2 text-xs font-bold text-primary bg-white rounded-xl shadow-sm"
+              className="px-4 py-2 text-xs font-bold text-primary bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors"
             >
-              Reset Filter
+              Reset Semua Filter
             </button>
           </div>
         ) : (
-          <>
-            {/* Desktop Table View */}
-            <div className="hidden md:block bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">ID / Waktu</th>
-                    <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Pelanggan</th>
-                    <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Channel</th>
-                    <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Pembayaran</th>
-                    <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {filteredOrders.map((order) => {
-                    const statusStyle = getStatusStyle(order.status);
-                    const isVoidCard = order.status === "void";
-                    const isPaid = order.paymentStatus === "sudah_bayar";
+          <div className="space-y-3">
+            {filteredOrders.map((order) => {
+              const status = getStatusStyle(order.status);
+              const channelBadge = getChannelBadge(order.orderChannel);
+              const ChannelIcon = channelBadge.icon;
+              const StatusIcon = status.icon;
+              const isPaid = order.paymentStatus === "sudah_bayar";
+              const isVoidCard = order.status === "void";
+              const isUpdating = updatingOrderId === order.id;
 
-                    return (
-                      <tr 
-                        key={order.id} 
-                        onClick={() => setSelectedOrderId(order.id)}
-                        className={`group cursor-pointer transition-colors hover:bg-slate-50 ${isVoidCard ? 'opacity-60' : ''}`}
-                      >
-                        <td className="px-6 py-4">
-                          <p className="text-sm font-bold text-slate-700">#{(order.orderNumber || "??").split("-").pop()}</p>
-                          <p className="text-xs font-semibold text-slate-400 mt-1">{formatDate(order.createdAt)} • {formatTime(order.createdAt)}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center font-black text-primary text-xs">
-                              {(order.customerName || "?")[0].toUpperCase()}
-                            </div>
-                            <p className="text-sm font-bold text-slate-700">{order.customerName}</p>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-xs font-bold text-slate-500 uppercase">{order.orderChannel}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${isPaid ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {isPaid ? "Lunas" : "Belum Bayar"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span 
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm"
-                            style={{ color: statusStyle.color, background: statusStyle.bg, border: `1px solid ${statusStyle.color}20` }}
-                          >
-                            {statusStyle.icon}
-                            {statusStyle.text}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Cards View */}
-            <div className="flex flex-col gap-3 md:hidden">
-              {filteredOrders.map((order) => {
-                const isVoidCard = order.status === "void";
-                const statusStyle = getStatusStyle(order.status);
-                
-                return (
-                  <div
-                    key={order.id}
-                    onClick={() => setSelectedOrderId(order.id)}
-                    className="group relative bg-white rounded-3xl p-5 border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-xl active:scale-95 tap-target"
-                    style={{ opacity: isVoidCard ? 0.75 : 1 }}
-                  >
-                    {isVoidCard && (
-                      <div className="flex items-center gap-2 mb-4 pb-3 border-b border-dashed border-red-200">
-                        <div className="bg-red-100 p-1.5 rounded-lg">
-                          <Ban size={14} className="text-red-600" />
-                        </div>
-                        <span className="text-xs font-black text-red-600 uppercase tracking-widest">
-                          Dibatalkan {order.voidReason && <span className="text-red-400 font-bold ml-1">({order.voidReason})</span>}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-black shrink-0 bg-brand-50 text-primary">
-                          {(order.customerName || "?")[0].toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="text-base font-black text-slate-800 tracking-tight">
-                            {order.customerName}
-                          </p>
-                          <p className="text-xs font-bold text-slate-400 mt-0.5">#{(order.orderNumber || "??").split("-").pop()}</p>
-                        </div>
-                      </div>
-                      
-                      <span 
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm"
-                        style={{ color: statusStyle.color, background: statusStyle.bg, border: `1px solid ${statusStyle.color}20` }}
-                      >
-                        {statusStyle.icon}
-                        {statusStyle.text}
+              return (
+                <div
+                  key={order.id}
+                  onClick={() => setSelectedOrderId(order.id)}
+                  className={`bg-white rounded-2xl md:rounded-3xl p-4 md:p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all cursor-pointer group ${
+                    isVoidCard ? 'opacity-70 bg-slate-50/80' : ''
+                  }`}
+                >
+                  {/* Card Top Row */}
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-slate-800">
+                        #{order.orderNumber}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border flex items-center gap-1 ${channelBadge.color}`}>
+                        <ChannelIcon size={11} /> {channelBadge.label}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between pt-3 border-t border-slate-50">
-                      <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-                        <Clock size={14} className="text-slate-400" />
-                        <span>{formatTime(order.createdAt)}</span>
-                      </div>
-                      <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                        order.paymentStatus === "sudah_bayar" ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600"
-                      }`}>
-                        {order.paymentStatus === "sudah_bayar" ? "Lunas" : "Belum Bayar"}
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border flex items-center gap-1 ${status.color}`}>
+                        <StatusIcon size={11} /> {status.label}
                       </span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </>
+
+                  {/* Card Body */}
+                  <div className="py-3 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-800 group-hover:text-primary transition-colors">
+                        {order.customerName || "Walk-in Customer"}
+                      </h3>
+                      <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                        {formatDate(order.createdAt)} • {formatTime(order.createdAt)}
+                        {order.customerType ? ` • ${order.customerType.toUpperCase()}` : ""}
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-sm font-black text-slate-800 tabular-nums">
+                        {fmt(order.totalOrderValue ?? 0)}
+                      </div>
+                      <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-md mt-0.5 ${
+                        isPaid ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+                      }`}>
+                        {isPaid ? "LUNAS" : "BELUM BAYAR"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card 1-Tap Action Bar */}
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <Link
+                        href={`/manager/orders/${order.id}/invoice`}
+                        target="_blank"
+                        onClick={(e) => e.stopPropagation()}
+                        className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition-colors flex items-center gap-1"
+                      >
+                        <FileText size={12} /> Invoice
+                      </Link>
+
+                      <Link
+                        href={`/manager/orders/${order.id}/shipping-label`}
+                        target="_blank"
+                        onClick={(e) => e.stopPropagation()}
+                        className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition-colors flex items-center gap-1"
+                      >
+                        <Printer size={12} /> Resi
+                      </Link>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {!isPaid && !isVoidCard && (
+                        <button
+                          onClick={(e) => handleQuickMarkAsPaid(order.id, e)}
+                          disabled={isUpdating}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-colors flex items-center gap-1 shadow-sm"
+                        >
+                          {isUpdating ? <Loader2 size={12} className="animate-spin" /> : <CreditCard size={12} />}
+                          Tandai Lunas
+                        </button>
+                      )}
+
+                      <span className="text-slate-400 group-hover:text-primary group-hover:translate-x-0.5 transition-all">
+                        <ChevronRight size={16} />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
