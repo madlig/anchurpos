@@ -287,10 +287,10 @@ export default function ManagerDashboardPage() {
                 </Link>
 
                 <Link href="/manager/expenses" className="flex flex-col items-center group">
-                  <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 group-hover:scale-105 transition-transform shadow-sm">
+                  <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-transform shadow-sm">
                     <Banknote size={20} />
                   </div>
-                  <span className="text-[11px] font-bold text-slate-700 text-center mt-1.5">Pengeluaran</span>
+                  <span className="text-[11px] font-bold text-slate-700 text-center mt-1.5">Buku Kas</span>
                 </Link>
 
                 <Link href="/manager/purchases" className="flex flex-col items-center group">
