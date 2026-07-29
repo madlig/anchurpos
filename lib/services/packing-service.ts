@@ -593,10 +593,39 @@ export async function packProduction(
   const pkgRef = packagingIngId ? adminDb.collection("ingredients").doc(packagingIngId) : null;
   const stikerRef = adminDb.collection("ingredients").doc("stiker-label");
 
+  const prodDoc = await adminDb.collection("products").doc(productId).get();
+  const packPerBatch = prodDoc.exists ? (prodDoc.data()?.packPerBatch ?? 16) : 16;
+  const loyangToDeduct = packQty / packPerBatch;
+
+  const poolSnap = await adminDb
+    .collection("productions")
+    .where("variantId", "==", variantId)
+    .where("loyangRemaining", ">", 0)
+    .orderBy("loyangRemaining")
+    .orderBy("date", "asc")
+    .get();
+
+  let remainingToDeduct = loyangToDeduct;
+  const prodUpdates: { ref: FirebaseFirestore.DocumentReference; nextLoyang: number }[] = [];
+
+  for (const doc of poolSnap.docs) {
+    if (remainingToDeduct <= 0) break;
+    const cur = doc.data().loyangRemaining as number;
+    const deduct = Math.min(remainingToDeduct, cur);
+    const nextLoyang = Math.round((cur - deduct) * 1000) / 1000;
+    prodUpdates.push({ ref: doc.ref, nextLoyang });
+    remainingToDeduct -= deduct;
+  }
+
   await adminDb.runTransaction(async (tx) => {
     const stockSnap = await tx.get(stockRef);
     const currentProductStock = stockSnap.exists ? (stockSnap.data()?.currentStock ?? 0) : 0;
     const nextProductStock = currentProductStock + packQty;
+
+    // Deduct loyang pool
+    for (const pu of prodUpdates) {
+      tx.update(pu.ref, { loyangRemaining: pu.nextLoyang });
+    }
 
     tx.set(stockRef, {
       productId,
