@@ -262,7 +262,7 @@ export default function ManagerDashboardPage() {
                   <span className="text-[11px] font-bold text-slate-700 text-center mt-1.5">Pelanggan</span>
                 </Link>
 
-                <Link href="/manager/orders" className="flex flex-col items-center group">
+                <Link href="/manager/omzet" className="flex flex-col items-center group">
                   <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform shadow-sm">
                     <TrendingUp size={20} />
                   </div>
