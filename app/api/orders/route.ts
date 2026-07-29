@@ -269,14 +269,12 @@ export async function POST(req: NextRequest) {
 
       // 2. Read Product Stocks
       const stockSnaps: Record<string, FirebaseFirestore.DocumentSnapshot> = {};
-      if (isImmediate) {
-        for (const item of items) {
-          const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
-          if (!isRainbow) {
-            const stockId = `${item.productId}_${item.variantId}`;
-            if (!stockSnaps[stockId]) {
-              stockSnaps[stockId] = await tx.get(adminDb.collection("productStocks").doc(stockId));
-            }
+      for (const item of items) {
+        const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
+        if (!isRainbow) {
+          const stockId = `${item.productId}_${item.variantId}`;
+          if (!stockSnaps[stockId]) {
+            stockSnaps[stockId] = await tx.get(adminDb.collection("productStocks").doc(stockId));
           }
         }
       }
@@ -407,48 +405,45 @@ export async function POST(req: NextRequest) {
         tx.set(itemRef, itemData);
       }
 
-      // Kurangi stok produk jadi jika orderChannel langsung (walkin, tiktok, shopee)
-      if (isImmediate) {
-        // Since we might have multiple items pointing to the same stockId, we need to accumulate changes
-        const stockChanges: Record<string, number> = {};
-        for (const item of items) {
-          const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
-          if (!isRainbow) {
-            const stockId = `${item.productId}_${item.variantId}`;
-            stockChanges[stockId] = (stockChanges[stockId] ?? 0) + item.qty;
-          }
+      // Kurangi stok produk jadi untuk semua pesanan baru
+      const stockChanges: Record<string, number> = {};
+      for (const item of items) {
+        const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
+        if (!isRainbow) {
+          const stockId = `${item.productId}_${item.variantId}`;
+          stockChanges[stockId] = (stockChanges[stockId] ?? 0) + item.qty;
+        }
+      }
+
+      for (const [stockId, changeQty] of Object.entries(stockChanges)) {
+        const stockRef = adminDb.collection("productStocks").doc(stockId);
+        const stockSnap = stockSnaps[stockId];
+        const currStock = stockSnap && stockSnap.exists ? (stockSnap.data()?.currentStock ?? 0) : 0;
+        const nextStock = currStock - changeQty;
+
+        if (nextStock < 0) {
+          const [prodId, varId] = [stockId.split("_")[0], stockId.split("_").slice(1).join("_")];
+          throw new Error(`Stok ${prodId} varian ${varId} tidak mencukupi (tersedia: ${currStock}, diminta: ${changeQty})`);
         }
 
-        for (const [stockId, changeQty] of Object.entries(stockChanges)) {
-          const stockRef = adminDb.collection("productStocks").doc(stockId);
-          const stockSnap = stockSnaps[stockId];
-          const currStock = stockSnap && stockSnap.exists ? (stockSnap.data()?.currentStock ?? 0) : 0;
-          const nextStock = currStock - changeQty;
+        tx.set(stockRef, {
+          productId: stockId.split("_")[0],
+          variantId: stockId.split("_").slice(1).join("_"),
+          currentStock: nextStock,
+        }, { merge: true });
 
-          if (nextStock < 0) {
-            const [prodId, varId] = [stockId.split("_")[0], stockId.split("_").slice(1).join("_")];
-            throw new Error(`Stok ${prodId} varian ${varId} tidak mencukupi (tersedia: ${currStock}, diminta: ${changeQty})`);
-          }
-
-          tx.set(stockRef, {
-            productId: stockId.split("_")[0],
-            variantId: stockId.split("_").slice(1).join("_"),
-            currentStock: nextStock,
-          }, { merge: true });
-
-          // Log stock movement
-          const movementRef = adminDb.collection("stockMovements").doc();
-          tx.set(movementRef, {
-            ingredientId: `product:${stockId}`,
-            changeAmount: -changeQty,
-            newStockAfter: nextStock,
-            sourceType: "sale",
-            sourceId: orderRef.id,
-            note: `Penjualan ${finalOrderChannel} #${orderNumber}`,
-            createdBy: (user as AuthUser | null)?.uid ?? null,
-            createdAt: dateToUse,
-          });
-        }
+        // Log stock movement
+        const movementRef = adminDb.collection("stockMovements").doc();
+        tx.set(movementRef, {
+          ingredientId: `product:${stockId}`,
+          changeAmount: -changeQty,
+          newStockAfter: nextStock,
+          sourceType: "sale",
+          sourceId: orderRef.id,
+          note: `Penjualan ${finalOrderChannel} #${orderNumber}`,
+          createdBy: (user as AuthUser | null)?.uid ?? null,
+          createdAt: dateToUse,
+        });
       }
 
       if (hasRainbow) {
