@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +15,11 @@ interface AdaptivePanelProps {
 
 export function AdaptivePanel({ isOpen, onClose, title, children, icon }: AdaptivePanelProps) {
   const [render, setRender] = useState(isOpen);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -32,10 +38,10 @@ export function AdaptivePanel({ isOpen, onClose, title, children, icon }: Adapti
     if (!isOpen) setRender(false);
   };
 
-  if (!render) return null;
+  if (!render || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-start justify-end">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-end md:items-start justify-end">
       {/* Backdrop */}
       <div 
         className={cn(
@@ -84,6 +90,7 @@ export function AdaptivePanel({ isOpen, onClose, title, children, icon }: Adapti
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
