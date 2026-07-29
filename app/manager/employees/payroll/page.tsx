@@ -39,6 +39,7 @@ export default function PayrollPage() {
 
   // Edit states for Bottom Sheet
   const [editingPayrollId, setEditingPayrollId] = useState<string | null>(null);
+  const [editedPayrolls, setEditedPayrolls] = useState<Record<string, Partial<PayrollRecord>>>({});
   const [editWorkDays, setEditWorkDays] = useState("");
   const [editDailyWage, setEditDailyWage] = useState("");
   const [editPerformanceBonus, setEditPerformanceBonus] = useState("");
@@ -102,14 +103,15 @@ export default function PayrollPage() {
       const totalOvertimeBonus = empAtt.reduce((sum, a) => sum + (a.overtimeBonus || 0), 0);
       
       const pId = `${selectedMonth}_${emp.id}`;
+      const overrides = editedPayrolls[pId];
       const isEditing = editingPayrollId === pId;
       
-      const finalWorkDays = isEditing && editWorkDays !== "" ? Number(editWorkDays) : workDays;
-      const finalDailyWage = isEditing && editDailyWage !== "" ? Number(editDailyWage) : dailyWage;
+      const finalWorkDays = isEditing && editWorkDays !== "" ? Number(editWorkDays) : (overrides?.workDays ?? workDays);
+      const finalDailyWage = isEditing && editDailyWage !== "" ? Number(editDailyWage) : (overrides?.dailyWage ?? dailyWage);
       const finalRegularPay = finalWorkDays * finalDailyWage;
       
-      const finalBonus = isEditing && editPerformanceBonus !== "" ? Number(editPerformanceBonus) : (locked?.performanceBonus || 0);
-      const finalDeduction = isEditing && editDeductions !== "" ? Number(editDeductions) : (locked?.deductions || 0);
+      const finalBonus = isEditing && editPerformanceBonus !== "" ? Number(editPerformanceBonus) : (overrides?.performanceBonus ?? (locked?.performanceBonus || 0));
+      const finalDeduction = isEditing && editDeductions !== "" ? Number(editDeductions) : (overrides?.deductions ?? (locked?.deductions || 0));
       
       const totalPaid = finalRegularPay + totalOvertimeBonus + finalBonus - finalDeduction;
 
@@ -123,15 +125,15 @@ export default function PayrollPage() {
         totalRegularPay: finalRegularPay,
         totalOvertimeBonus,
         performanceBonus: finalBonus,
-        performanceBonusNote: isEditing ? editPerformanceBonusNote : (locked?.performanceBonusNote || ""),
+        performanceBonusNote: isEditing ? editPerformanceBonusNote : (overrides?.performanceBonusNote ?? (locked?.performanceBonusNote || "")),
         deductions: finalDeduction,
-        deductionNote: isEditing ? editDeductionNote : (locked?.deductionNote || ""),
+        deductionNote: isEditing ? editDeductionNote : (overrides?.deductionNote ?? (locked?.deductionNote || "")),
         totalPaid,
         isLocked: false,
         workPeriod: periodStr
       } as PayrollRecord;
     });
-  }, [employees, attendance, lockedPayrolls, selectedMonth, startDate, endDate, editingPayrollId, editWorkDays, editDailyWage, editPerformanceBonus, editPerformanceBonusNote, editDeductions, editDeductionNote]);
+  }, [employees, attendance, lockedPayrolls, selectedMonth, startDate, endDate, editingPayrollId, editedPayrolls, editWorkDays, editDailyWage, editPerformanceBonus, editPerformanceBonusNote, editDeductions, editDeductionNote]);
 
   const handleStartEdit = (p: PayrollRecord) => {
     setEditingPayrollId(p.id);
@@ -144,7 +146,19 @@ export default function PayrollPage() {
   };
 
   const handleSaveEdit = async () => {
-    // Just closes the modal, local state applies automatically via useMemo
+    if (editingPayrollId) {
+      setEditedPayrolls(prev => ({
+        ...prev,
+        [editingPayrollId]: {
+          workDays: Number(editWorkDays),
+          dailyWage: Number(editDailyWage),
+          performanceBonus: Number(editPerformanceBonus),
+          performanceBonusNote: editPerformanceBonusNote,
+          deductions: Number(editDeductions),
+          deductionNote: editDeductionNote,
+        }
+      }));
+    }
     setEditingPayrollId(null); 
   };
 
