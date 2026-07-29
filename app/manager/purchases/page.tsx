@@ -1,21 +1,15 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
-import { BottomSheet } from "@/components/shared/BottomSheet";
 import { 
-  Dialog, DialogContent, DialogHeader, DialogTitle
-} from "@/components/ui/dialog";
-import { 
-  Plus, Calendar, Search, CreditCard, Package, Loader2, X, ArrowUpRight, ArrowDownRight, Filter, User
+  Plus, Calendar, Search, CreditCard, Package, Loader2, X, Filter, User,
+  ChevronLeft, ChevronRight, ShoppingBag, Store, Trash2, ArrowDownRight,
+  Check, Building2, Tag, FileText, ShoppingCart
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
-// --- Types ---
-interface Purchase {
+interface PurchaseItem {
   id: string;
   date: string;
   category: string;
@@ -49,15 +43,8 @@ interface Ingredient {
   currentStock: number;
 }
 
-// --- Utils ---
-function fmt(n: number) {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
-}
-
-// --- Form Component ---
-// --- Form Component ---
 interface CartItem {
-  id: string; // temp id for UI
+  id: string;
   category: "bahan_baku" | "packaging";
   ingredientId: string;
   ingredientName: string;
@@ -66,584 +53,695 @@ interface CartItem {
   totalPrice: number;
 }
 
-function RestockForm({ 
-  onSuccess, onCancel, fetchWithAuth, suppliers, ingredients, configs
-}: { 
-  onSuccess: () => void; 
-  onCancel: () => void; 
-  fetchWithAuth: any;
-  suppliers: Supplier[];
-  ingredients: Ingredient[];
-  configs: { paymentMethods: string[], deliveryMethods: string[], shippingBorneBy: string[] } | null;
-}) {
-  // Global Note Data
-  const defaultPaymentMethod = configs?.paymentMethods?.[0] || "cash";
-  const [paymentMethod, setPaymentMethod] = useState<string>(defaultPaymentMethod);
+function fmt(n: number) {
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+}
+
+const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+
+function formatMonthLabel(m: string) {
+  const [y, mo] = m.split("-").map(Number);
+  return `${MONTH_NAMES[mo - 1]} ${y}`;
+}
+
+export default function PurchasesPage() {
+  const { getToken } = useAuth();
+  const { alert } = useAlertConfirm();
+
+  const [purchases, setPurchases] = useState<PurchaseItem[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Month selector state (YYYY-MM)
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+
+  // Filters & Search
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "bahan_baku" | "packaging">("all");
+  const [search, setSearch] = useState("");
+
+  // Modal State
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Form State
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [notes, setNotes] = useState("");
   const [customDate, setCustomDate] = useState(() => new Date().toISOString().split("T")[0]);
-  
+
   const [supplierSearch, setSupplierSearch] = useState("");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
-  const filteredSuppliers = suppliers.filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase()));
 
-  // Cart Data
+  // Cart Data inside Modal
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-
-  // Current Form Item
-  const [category, setCategory] = useState<"bahan_baku" | "packaging">("bahan_baku");
+  const [formCategory, setFormCategory] = useState<"bahan_baku" | "packaging">("bahan_baku");
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
   const [qtyPurchased, setQtyPurchased] = useState("");
   const [purchaseUnit, setPurchaseUnit] = useState("");
   const [totalCost, setTotalCost] = useState("");
-
   const [ingSearch, setIngSearch] = useState("");
   const [showIngDropdown, setShowIngDropdown] = useState(false);
-  const filteredIng = ingredients.filter(i => i.category === category && i.name.toLowerCase().includes(ingSearch.toLowerCase()));
-
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const availableUnits = selectedIngredient 
-    ? [selectedIngredient.baseUnit, ...selectedIngredient.unitAlternatives.map(u => u.unit)]
-    : [];
-
-  useEffect(() => {
-    if (selectedIngredient && availableUnits.length > 0 && !availableUnits.includes(purchaseUnit)) {
-      setPurchaseUnit(availableUnits[0]);
-    }
-  }, [selectedIngredient, availableUnits, purchaseUnit]);
-
-  function handleAddToCart() {
-    setError("");
-    if (!selectedIngredient) { setError("Pilih barang terlebih dahulu"); return; }
-    if (!qtyPurchased || parseFloat(qtyPurchased) <= 0) { setError("Kuantitas wajib diisi"); return; }
-    if (!purchaseUnit) { setError("Satuan wajib dipilih"); return; }
-    if (!totalCost || parseFloat(totalCost) <= 0) { setError("Total harga wajib diisi"); return; }
-
-    // Prevent duplicate ingredient
-    if (cartItems.some(i => i.ingredientId === selectedIngredient.id)) {
-      setError("Barang ini sudah ada di dalam keranjang nota. Silakan gabungkan jumlah/harganya terlebih dahulu jika ingin menambahkannya lagi.");
-      return;
-    }
-
-    const newItem: CartItem = {
-      id: Math.random().toString(36).substring(7),
-      category,
-      ingredientId: selectedIngredient.id,
-      ingredientName: selectedIngredient.name,
-      qtyPurchased: parseFloat(qtyPurchased),
-      purchaseUnit,
-      totalPrice: parseFloat(totalCost)
-    };
-
-    setCartItems([...cartItems, newItem]);
-    
-    // Reset Form Item
-    setSelectedIngredient(null);
-    setIngSearch("");
-    setQtyPurchased("");
-    setTotalCost("");
-  }
-
-  function handleRemoveFromCart(id: string) {
-    setCartItems(cartItems.filter(i => i.id !== id));
-  }
-
-  const grandTotal = cartItems.reduce((acc, curr) => acc + curr.totalPrice, 0);
-
-  async function handleSubmit() {
-    setError("");
-    if (cartItems.length === 0) {
-      setError("Keranjang belanja masih kosong");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const finalSupplierName = selectedSupplier ? selectedSupplier.name : supplierSearch.trim();
-      
-      const payload = {
-        items: cartItems.map(({ id, ingredientName, ...rest }) => rest), // Remove UI-only fields
-        paymentMethod,
-        supplier: finalSupplierName || null,
-        notes: notes.trim() || undefined,
-        customDate: customDate || undefined, // Zod optional requires undefined, not null
-      };
-
-      const res = await fetchWithAuth("/api/purchases", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const resData = await res.json();
-        console.error("API Error Details:", resData.details); // Log validation details
-        setError(resData.error ?? "Gagal menyimpan pembelian");
-        setSaving(false);
-        return;
-      }
-
-      onSuccess();
-    } catch (err) {
-      setError("Gagal menghubungi server");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="space-y-5">
-      {error && (
-        <div className="p-3 rounded-2xl bg-red-50 border border-red-100 text-xs font-bold text-red-600 shadow-sm animate-in fade-in">
-          ⚠ {error}
-        </div>
-      )}
-
-      {/* -- NOTA HEADER -- */}
-      <div className="p-4 bg-slate-50 border border-slate-100 rounded-3xl space-y-4">
-        <h3 className="text-sm font-extrabold text-slate-700 flex items-center gap-2 mb-2"><CreditCard size={16} className="text-slate-400" /> Informasi Nota</h3>
-        
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Tanggal Nota</label>
-            <Input type="date" value={customDate} onChange={(e) => setCustomDate(e.target.value)} className="h-10 rounded-xl text-xs bg-white border-slate-200" />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Toko / Supplier</label>
-            <div className="relative z-40">
-              {selectedSupplier ? (
-                <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
-                  <span className="text-xs font-bold text-slate-700 truncate">{selectedSupplier.name}</span>
-                  <button type="button" onClick={() => { setSelectedSupplier(null); setSupplierSearch(""); }} className="p-1 rounded bg-slate-100 text-slate-600"><X size={12} /></button>
-                </div>
-              ) : (
-                <>
-                  <Input type="text" placeholder="Nama toko..." value={supplierSearch} onChange={(e) => { setSupplierSearch(e.target.value); setShowSupplierDropdown(true); }} onFocus={() => setShowSupplierDropdown(true)} className="h-10 rounded-xl text-xs bg-white border-slate-200" />
-                  {showSupplierDropdown && filteredSuppliers.length > 0 && (
-                    <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-slate-100 rounded-xl shadow-xl" onMouseLeave={() => setShowSupplierDropdown(false)}>
-                      {filteredSuppliers.map((sup) => (
-                        <div key={sup.id} onClick={() => { setSelectedSupplier(sup); setSupplierSearch(sup.name); setShowSupplierDropdown(false); }} className="px-3 py-2 text-xs font-semibold hover:bg-brand-50 cursor-pointer">{sup.name}</div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* -- CART ITEMS -- */}
-      {cartItems.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-extrabold text-slate-700">Keranjang Belanja ({cartItems.length})</h3>
-          <div className="space-y-2 max-h-56 overflow-y-auto pr-1 no-scrollbar">
-            {cartItems.map((item, idx) => (
-              <div key={item.id} className="p-3 bg-white border border-slate-200 rounded-2xl flex items-center justify-between shadow-sm group">
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center text-[10px] font-bold shrink-0">
-                    {idx + 1}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800 leading-tight">{item.ingredientName}</p>
-                    <p className="text-xs font-medium text-slate-500">{item.qtyPurchased} {item.purchaseUnit}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <p className="text-sm font-extrabold text-slate-700">{fmt(item.totalPrice)}</p>
-                  <button onClick={() => handleRemoveFromCart(item.id)} className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                    <X size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
-            
-            <div className="p-4 bg-primary/5 border border-primary/20 rounded-2xl flex items-center justify-between mt-2">
-              <span className="text-sm font-bold text-primary uppercase tracking-wide">Total Nota</span>
-              <span className="text-lg font-black text-primary">{fmt(grandTotal)}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* -- INPUT BARU -- */}
-      <div className="p-4 border-2 border-dashed border-slate-200 rounded-3xl bg-white space-y-4">
-        <h3 className="text-sm font-extrabold text-slate-700">Tambah Barang ke Keranjang</h3>
-        
-        <div>
-          <div className="grid grid-cols-2 gap-1.5 mb-3">
-            {(["bahan_baku", "packaging"] as const).map((cat) => (
-              <button
-                key={cat} type="button" onClick={() => { setCategory(cat); setSelectedIngredient(null); setIngSearch(""); }}
-                className={`flex items-center justify-center p-2 rounded-xl text-xs font-bold transition-all ${category === cat ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500 shadow-sm'}`}
-              >
-                <Package size={14} className="mr-1.5" />
-                {cat === "bahan_baku" ? "Bahan Baku" : "Packaging"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="relative z-50">
-          {selectedIngredient ? (
-            <div className="flex items-center justify-between p-2 rounded-xl bg-primary/10 border border-primary/20">
-              <div>
-                <span className="text-xs font-bold text-primary block">{selectedIngredient.name}</span>
-                <span className="text-[10px] font-medium text-primary/70">Stok saat ini: {selectedIngredient.currentStock} {selectedIngredient.baseUnit}</span>
-              </div>
-              <button type="button" onClick={() => setSelectedIngredient(null)} className="p-1.5 rounded-lg bg-primary/20 text-primary"><X size={12} /></button>
-            </div>
-          ) : (
-            <>
-              <Input type="text" placeholder={`Cari nama ${category === 'bahan_baku' ? 'bahan' : 'packaging'}...`} value={ingSearch} onChange={(e) => { setIngSearch(e.target.value); setShowIngDropdown(true); }} onFocus={() => setShowIngDropdown(true)} className="h-10 rounded-xl text-xs bg-slate-50 border-slate-200" />
-              {showIngDropdown && (
-                <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-slate-100 rounded-xl shadow-xl" onMouseLeave={() => setShowIngDropdown(false)}>
-                  {filteredIng.length > 0 ? filteredIng.map((ing) => (
-                    <div key={ing.id} onClick={() => { setSelectedIngredient(ing); setShowIngDropdown(false); }} className="px-3 py-2 text-xs font-semibold hover:bg-brand-50 cursor-pointer flex justify-between">
-                      <span>{ing.name}</span>
-                      <span className="text-slate-400">{ing.baseUnit}</span>
-                    </div>
-                  )) : (
-                    <div className="p-3 text-xs text-slate-500 text-center bg-brand-50">
-                      Bahan tidak ditemukan. Daftarkan di Master Data.
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {selectedIngredient && (
-          <div className="grid grid-cols-2 gap-3 animate-in fade-in">
-            <div>
-              <Input type="number" placeholder="Kuantitas" value={qtyPurchased} onChange={(e) => setQtyPurchased(e.target.value)} className="h-10 rounded-xl font-bold bg-slate-50 text-xs" />
-            </div>
-            <div>
-              <select value={purchaseUnit} onChange={(e) => setPurchaseUnit(e.target.value)} className="w-full h-10 rounded-xl border border-slate-200 text-xs px-3 font-semibold bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary/100">
-                {availableUnits.map(u => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-            </div>
-            <div className="col-span-2">
-              <Input type="number" placeholder="Total Harga (Rp)" value={totalCost} onChange={(e) => setTotalCost(e.target.value)} className="h-10 rounded-xl font-bold text-primary bg-primary/5 border-primary/20 text-xs" />
-            </div>
-            <div className="col-span-2 mt-1">
-              <Button onClick={handleAddToCart} variant="outline" className="w-full h-10 rounded-xl text-xs font-bold border-slate-200 shadow-sm flex items-center justify-center gap-2 text-slate-600 hover:bg-slate-50">
-                <Plus size={14} /> Masukkan ke Keranjang
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-3 pt-2">
-        <div>
-          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Metode Pembayaran</label>
-          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-            {(configs?.paymentMethods || ["cash", "transfer", "qris"]).map(m => (
-              <button
-                key={m} type="button" onClick={() => setPaymentMethod(m)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${paymentMethod === m ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 shadow-sm'}`}
-              >
-                {m.charAt(0).toUpperCase() + m.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 block">Catatan Opsional</label>
-          <Input type="text" placeholder="Catatan pembelian..." value={notes} onChange={(e) => setNotes(e.target.value)} className="h-10 rounded-xl text-xs" />
-        </div>
-      </div>
-
-      <div className="pt-4 border-t border-slate-100 flex gap-3">
-        <Button onClick={onCancel} variant="ghost" className="h-12 px-6 rounded-2xl font-bold text-slate-500 hover:bg-slate-100">Batal</Button>
-        <Button onClick={handleSubmit} disabled={saving || cartItems.length === 0} className="flex-1 h-12 rounded-2xl bg-primary hover:bg-primary/90 text-white font-bold shadow-md shadow-primary/20 transition-all flex items-center justify-center gap-2">
-          {saving ? <Loader2 size={18} className="animate-spin" /> : <>Simpan {cartItems.length} Barang Nota</>}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// --- Main Page Component ---
-export default function PurchasesPage() {
-  const { getToken } = useAuth();
-  const { alert } = useAlertConfirm();
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  
-  // UX State
-  const [isDesktopDialog, setIsDesktopDialog] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-
-  // Data
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [configs, setConfigs] = useState<{ paymentMethods: string[], deliveryMethods: string[], shippingBorneBy: string[] } | null>(null);
-  const [prevMonthTotal, setPrevMonthTotal] = useState(0);
-
-  // Filters
-  const [filterMethod, setFilterMethod] = useState<string>("all");
-  const [filterCategory, setFilterCategory] = useState<string>("all");
-
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-  });
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
-
-  useEffect(() => {
-    const checkSize = () => setIsDesktopDialog(window.innerWidth >= 768);
-    checkSize();
-    window.addEventListener("resize", checkSize);
-    return () => window.removeEventListener("resize", checkSize);
-  }, []);
+  const [formError, setFormError] = useState("");
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
-    return fetch(url, { ...options, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options?.headers } });
+    return fetch(url, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    });
   }, [getToken]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [purRes, supRes, ingRes, confRes] = await Promise.all([
-        fetchWithAuth(`/api/purchases?startDate=${startDate}&endDate=${endDate}`),
+      const [y, m] = selectedMonth.split("-").map(Number);
+      const start = `${selectedMonth}-01`;
+      const lastDay = new Date(y, m, 0).getDate();
+      const end = `${selectedMonth}-${String(lastDay).padStart(2, "0")}`;
+
+      const [resP, resS, resI] = await Promise.all([
+        fetchWithAuth(`/api/purchases?startDate=${start}&endDate=${end}`),
         fetchWithAuth("/api/suppliers"),
         fetchWithAuth("/api/ingredients"),
-        fetchWithAuth("/api/configs/system")
       ]);
-      
-      if (purRes.ok) setPurchases(await purRes.json());
-      if (supRes.ok) setSuppliers(await supRes.json());
-      if (ingRes.ok) setIngredients(await ingRes.json());
-      if (confRes.ok) {
-        const cData = await confRes.json();
-        setConfigs(cData);
-      }
 
-      // Prev Month Trend
-      const date = new Date(startDate);
-      date.setMonth(date.getMonth() - 1);
-      const prevStart = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split("T")[0];
-      const prevEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split("T")[0];
-      const resPrev = await fetchWithAuth(`/api/purchases?startDate=${prevStart}&endDate=${prevEnd}`);
-      if (resPrev.ok) {
-        const prevData: Purchase[] = await resPrev.json();
-        const prevTot = prevData.reduce((acc, curr) => acc + curr.totalPrice, 0);
-        setPrevMonthTotal(prevTot);
-      }
-    } catch (err) { console.error(err); } finally { setLoading(false); }
-  }, [fetchWithAuth, startDate, endDate]);
+      if (resP.ok) setPurchases(await resP.json());
+      if (resS.ok) setSuppliers(await resS.json());
+      if (resI.ok) setIngredients(await resI.json());
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedMonth, fetchWithAuth]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const filtered = purchases.filter(p => {
-    if (searchQuery && !p.itemName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    if (filterMethod !== "all" && p.paymentMethod !== filterMethod) return false;
-    if (filterCategory !== "all" && p.category !== filterCategory) return false;
-    return true;
-  });
-
-  const totalPurchase = filtered.reduce((acc, curr) => acc + curr.totalPrice, 0);
-  const trendPercent = prevMonthTotal > 0 ? ((totalPurchase - prevMonthTotal) / prevMonthTotal) * 100 : 0;
-  const isTrendUp = trendPercent > 0;
-
-  if (loading && purchases.length === 0) {
-    return <div className="flex h-screen items-center justify-center bg-brand-50"><Loader2 className="animate-spin text-primary" size={32} /></div>;
+  function openCreateModal() {
+    setCartItems([]);
+    setSelectedSupplier(null);
+    setSupplierSearch("");
+    setPaymentMethod("cash");
+    setNotes("");
+    setCustomDate(new Date().toISOString().split("T")[0]);
+    resetFormItem();
+    setFormError("");
+    setShowModal(true);
   }
 
-  const renderForm = () => (
-    <RestockForm 
-      onSuccess={() => { setShowForm(false); loadData(); alert("Berhasil", "Stok ditambahkan", "success"); }} 
-      onCancel={() => setShowForm(false)} 
-      fetchWithAuth={fetchWithAuth} 
-      suppliers={suppliers} 
-      ingredients={ingredients} 
-      configs={configs}
-    />
+  function resetFormItem() {
+    setSelectedIngredient(null);
+    setIngSearch("");
+    setQtyPurchased("");
+    setPurchaseUnit("");
+    setTotalCost("");
+  }
+
+  function handleAddToCart() {
+    setFormError("");
+    const qty = parseFloat(qtyPurchased);
+    const cost = parseInt(totalCost);
+
+    if (!selectedIngredient) {
+      setFormError("Pilih bahan atau kemasan terlebih dahulu");
+      return;
+    }
+    if (!qty || qty <= 0) {
+      setFormError("Jumlah belanja harus lebih dari 0");
+      return;
+    }
+    if (!purchaseUnit.trim()) {
+      setFormError("Pilih satuan belanja");
+      return;
+    }
+    if (!cost || cost <= 0) {
+      setFormError("Total harga item harus lebih dari 0");
+      return;
+    }
+
+    const newItem: CartItem = {
+      id: "cart_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
+      category: formCategory,
+      ingredientId: selectedIngredient.id,
+      ingredientName: selectedIngredient.name,
+      qtyPurchased: qty,
+      purchaseUnit: purchaseUnit.trim(),
+      totalPrice: cost,
+    };
+
+    setCartItems(prev => [...prev, newItem]);
+    resetFormItem();
+  }
+
+  async function handleSaveAllPurchases() {
+    setFormError("");
+    if (cartItems.length === 0) {
+      setFormError("Tambahkan minimal 1 item belanja ke daftar");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const supplierName = selectedSupplier ? selectedSupplier.name : supplierSearch.trim();
+
+      for (const item of cartItems) {
+        await fetchWithAuth("/api/purchases", {
+          method: "POST",
+          body: JSON.stringify({
+            ingredientId: item.ingredientId,
+            category: item.category,
+            itemName: item.ingredientName,
+            qtyPurchased: item.qtyPurchased,
+            purchaseUnit: item.purchaseUnit,
+            totalPrice: item.totalPrice,
+            paymentMethod,
+            supplier: supplierName,
+            notes,
+            customDate,
+          }),
+        });
+      }
+
+      setShowModal(false);
+      await loadData();
+    } catch {
+      setFormError("Gagal menyimpan transaksi belanja");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    setDeletingId(id);
+    try {
+      const res = await fetchWithAuth(`/api/purchases?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        await loadData();
+      } else {
+        alert("Gagal menghapus data belanja.");
+      }
+    } catch {
+      alert("Terjadi kesalahan sistem.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function shiftMonth(delta: number) {
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+
+  // Filtered Purchases & Analytics
+  const filteredPurchases = useMemo(() => {
+    return purchases.filter((item) => {
+      const isCatMatch = categoryFilter === "all" || item.category === categoryFilter;
+      const isSearchMatch = !search || 
+        item.itemName.toLowerCase().includes(search.toLowerCase()) || 
+        (item.supplier ?? "").toLowerCase().includes(search.toLowerCase()) ||
+        (item.notes ?? "").toLowerCase().includes(search.toLowerCase());
+      return isCatMatch && isSearchMatch;
+    });
+  }, [purchases, categoryFilter, search]);
+
+  const totalSpent = useMemo(() => {
+    return purchases.reduce((sum, p) => sum + (p.totalPrice || 0), 0);
+  }, [purchases]);
+
+  const totalItemCount = purchases.length;
+
+  const availableUnits = useMemo(() => {
+    if (!selectedIngredient) return [];
+    const base = selectedIngredient.baseUnit;
+    const alts = (selectedIngredient.unitAlternatives || []).map(u => u.unit);
+    return Array.from(new Set([base, ...alts])).filter(Boolean);
+  }, [selectedIngredient]);
+
+  const filteredIngredients = ingredients.filter(ing => 
+    ing.category === formCategory && ing.name.toLowerCase().includes(ingSearch.toLowerCase())
   );
 
   return (
-    <div className="min-h-screen bg-brand-50 pb-20">
-      <div className="bg-white px-5 pt-12 pb-6 rounded-b-[2rem] shadow-sm relative z-10 border-b-4 border-primary/10">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">Pembelian & Restock</h1>
-            <p className="text-xs text-slate-500 font-medium mt-1">Catat belanja bahan baku dan tambah stok otomatis.</p>
-          </div>
-          <div className="p-3 bg-primary/10 rounded-2xl">
-            <Package className="text-primary" size={24} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <Card className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm flex flex-col justify-center">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Total Belanja HPP</p>
-            <p className="text-xl font-extrabold text-primary truncate">{fmt(totalPurchase)}</p>
-            <div className="mt-2 flex items-center gap-1 text-xs font-semibold">
-              {prevMonthTotal > 0 ? (
-                <>
-                  <span className={`flex items-center ${isTrendUp ? 'text-red-500' : 'text-emerald-500'}`}>
-                    {isTrendUp ? <ArrowUpRight size={12} className="mr-0.5" /> : <ArrowDownRight size={12} className="mr-0.5" />}
-                    {Math.abs(trendPercent).toFixed(1)}%
-                  </span>
-                  <span className="text-slate-400">vs bln lalu</span>
-                </>
-              ) : (
-                <span className="text-slate-400">Bulan lalu: {fmt(prevMonthTotal)}</span>
-              )}
+    <div className="min-h-screen bg-slate-50/70 pb-28">
+      {/* ── Native App Sticky Header ── */}
+      <div className="bg-white sticky top-0 z-30 px-4 md:px-8 pt-4 pb-3 shadow-sm border-b border-slate-100">
+        <div className="max-w-5xl mx-auto space-y-3">
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0 shadow-sm">
+                <ShoppingBag size={20} />
+              </div>
+              <div>
+                <h1 className="text-lg md:text-xl font-extrabold text-slate-800 tracking-tight leading-tight">
+                  Belanja
+                </h1>
+                <p className="text-xs font-semibold text-slate-400">
+                  Pembelian Bahan Baku & Kemasan Outlet
+                </p>
+              </div>
             </div>
-          </Card>
-          <div className="flex flex-col space-y-2 justify-center">
-            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 text-xs rounded-xl border-slate-200" />
-            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9 text-xs rounded-xl border-slate-200" />
-          </div>
-        </div>
 
-        <div className="flex gap-2">
-          <Button onClick={() => setShowForm(true)} className="flex-1 h-11 rounded-2xl bg-primary hover:bg-primary/90 text-white font-bold shadow-sm transition-all flex items-center justify-center gap-2">
-            <Plus size={16} /> Belanja Baru
-          </Button>
+            <button
+              onClick={openCreateModal}
+              className="px-3.5 md:px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+            >
+              <Plus size={16} /> Catat Belanja
+            </button>
+          </div>
+
+          {/* Month Selector Bar */}
+          <div className="flex items-center justify-between bg-slate-100/80 rounded-2xl p-1.5 border border-slate-200/80">
+            <button
+              onClick={() => shiftMonth(-1)}
+              className="h-9 w-9 rounded-xl bg-white flex items-center justify-center text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <span className="text-xs md:text-sm font-extrabold text-slate-800 tracking-tight">
+              {formatMonthLabel(selectedMonth)}
+            </span>
+            <button
+              onClick={() => shiftMonth(1)}
+              className="h-9 w-9 rounded-xl bg-white flex items-center justify-center text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+
         </div>
       </div>
 
-      <div className="px-4 -mt-2 relative z-20">
-        <div className="max-w-5xl mx-auto space-y-4">
+      {/* ── Main Content Area ── */}
+      <div className="px-4 md:px-8 max-w-5xl mx-auto space-y-5 pt-5">
+        
+        {/* ── Executive Summary Cards ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           
-          {/* Filters */}
-          <div className="mt-6 flex flex-col md:flex-row md:items-center gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <Input type="text" placeholder="Cari nama barang..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 h-10 bg-white border-slate-200 rounded-xl text-sm" />
+          <div className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-5 shadow-sm border border-slate-200/80 space-y-2">
+            <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider block flex items-center gap-1">
+              <ShoppingBag size={14} className="text-amber-500" /> Total Pengeluaran Belanja
+            </span>
+            <div className="text-2xl font-black text-slate-800 tabular-nums">
+              {fmt(totalSpent)}
             </div>
-            <div className="flex overflow-x-auto pb-2 md:pb-0 gap-2 shrink-0 no-scrollbar">
-              <div className="flex items-center gap-1.5 px-3 h-10 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600">
-                <Filter size={14} className="text-slate-400" />
-                <select value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)} className="bg-transparent focus:outline-none">
-                  <option value="all">Semua Bayar</option>
-                  <option value="cash">Tunai</option>
-                  <option value="transfer">Transfer</option>
-                  <option value="qris">QRIS</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-1.5 px-3 h-10 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600">
-                <Filter size={14} className="text-slate-400" />
-                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="bg-transparent focus:outline-none">
-                  <option value="all">Semua Kategori</option>
-                  <option value="bahan_baku">Bahan Baku</option>
-                  <option value="packaging">Packaging</option>
-                </select>
-              </div>
+            <p className="text-xs font-semibold text-slate-400">Total akumulasi nota belanja bulan ini</p>
+          </div>
+
+          <div className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-5 shadow-sm border border-slate-200/80 space-y-2">
+            <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider block flex items-center gap-1">
+              <Package size={14} className="text-emerald-500" /> Total Item Terbeli
+            </span>
+            <div className="text-2xl font-black text-slate-800 tabular-nums">
+              {totalItemCount} Transaksi
+            </div>
+            <p className="text-xs font-semibold text-slate-400">Restok bahan baku & kemasan terproses</p>
+          </div>
+
+        </div>
+
+        {/* ── Filter & Search Row ── */}
+        <div className="bg-white rounded-2xl md:rounded-3xl p-3 md:p-4 shadow-sm border border-slate-200/80 space-y-3">
+          
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            
+            {/* Category Filter Pills */}
+            <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+              {[
+                { id: "all", label: "Semua (" + purchases.length + ")" },
+                { id: "bahan_baku", label: "Bahan Baku (" + purchases.filter(p => p.category === "bahan_baku").length + ")" },
+                { id: "packaging", label: "Kemasan (" + purchases.filter(p => p.category === "packaging").length + ")" },
+              ].map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setCategoryFilter(t.id as any)}
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    categoryFilter === t.id ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-md">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari item / supplier / catatan..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full h-10 pl-9 pr-4 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+              />
             </div>
           </div>
 
-          {/* Desktop Table View */}
-          <div className="hidden md:block mt-4 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-600">
-                <thead className="bg-brand-50 border-b border-slate-200 text-xs uppercase font-bold text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3 whitespace-nowrap">Tanggal</th>
-                    <th className="px-4 py-3 min-w-[200px]">Nama Barang</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Kategori</th>
-                    <th className="px-4 py-3 whitespace-nowrap text-right">Kuantitas</th>
-                    <th className="px-4 py-3 whitespace-nowrap text-right">Total Harga</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Metode</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Toko/Supplier</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filtered.length === 0 ? (
-                    <tr><td colSpan={7} className="text-center py-10 font-semibold text-slate-400">Tidak ada riwayat belanja</td></tr>
-                  ) : (
-                    filtered.map(pur => (
-                      <tr key={pur.id} className="hover:bg-brand-50 transition-colors">
-                        <td className="px-4 py-3 whitespace-nowrap">{new Date(pur.date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</td>
-                        <td className="px-4 py-3 font-semibold text-slate-800">{pur.itemName}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-bold ${pur.category === 'bahan_baku' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-                            <Package size={12} /> {pur.category === 'bahan_baku' ? 'Bahan Baku' : 'Packaging'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">{pur.qtyPurchased} {pur.purchaseUnit}</td>
-                        <td className="px-4 py-3 text-right font-extrabold text-slate-700 whitespace-nowrap">{fmt(pur.totalPrice)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap capitalize">{pur.paymentMethod}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{pur.supplier || "-"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+        </div>
 
-          {/* Mobile List View */}
-          <div className="md:hidden space-y-3 pb-8 mt-4">
-            {filtered.length === 0 ? (
-              <div className="text-center py-10 bg-white rounded-3xl border border-slate-100 border-dashed">
-                <Package className="mx-auto text-slate-300 mb-2" size={32} />
-                <p className="text-sm font-semibold text-slate-600">Tidak ada riwayat belanja</p>
-                <p className="text-xs text-slate-400">Pilih rentang tanggal lain atau catat belanja baru.</p>
-              </div>
-            ) : (
-              filtered.map((pur) => (
-                <Card key={pur.id} className="p-3.5 rounded-2xl bg-white border border-slate-100 shadow-sm flex flex-col gap-2">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-start gap-2.5">
-                      <div className={`p-2 rounded-xl mt-0.5 shrink-0 ${pur.category === "bahan_baku" ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"}`}>
-                        <Package size={16} />
+        {/* ── Purchases Item List ── */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
+          </div>
+        ) : filteredPurchases.length === 0 ? (
+          <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm space-y-2">
+            <ShoppingBag size={32} className="text-slate-400 mx-auto" />
+            <p className="text-sm font-bold text-slate-700">Belum ada catatan Belanja untuk bulan ini.</p>
+            <p className="text-xs text-slate-400">Klik "+ Catat Belanja" untuk mencatat restok bahan baku atau kemasan baru.</p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {filteredPurchases.map(item => {
+              const formattedDate = new Date(item.date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+              const isPkg = item.category === "packaging";
+
+              return (
+                <div 
+                  key={item.id}
+                  className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:border-slate-200 transition-all flex items-center justify-between gap-3 animate-in fade-in"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-10 h-10 rounded-2xl border flex items-center justify-center shrink-0 ${
+                      isPkg ? "bg-cyan-50 border-cyan-100 text-cyan-600" : "bg-amber-50 border-amber-100 text-amber-600"
+                    }`}>
+                      {isPkg ? <Package size={18} /> : <ShoppingBag size={18} />}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-extrabold text-slate-800 truncate">{item.itemName}</h3>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 border ${
+                          isPkg ? "bg-cyan-50 text-cyan-700 border-cyan-200" : "bg-amber-50 text-amber-700 border-amber-200"
+                        }`}>
+                          {isPkg ? "Kemasan" : "Bahan Baku"}
+                        </span>
                       </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-800 line-clamp-1">{pur.itemName}</h3>
-                        <p className="text-xs font-semibold text-slate-600 mt-0.5">{pur.qtyPurchased} {pur.purchaseUnit}</p>
-                        <div className="flex items-center gap-1.5 mt-1 text-xs font-semibold text-slate-400">
-                          <span className="flex items-center gap-1"><Calendar size={10}/> {new Date(pur.date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" })}</span>
+
+                      <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400 mt-1">
+                        <span>{formattedDate}</span>
+                        <span>•</span>
+                        <span className="font-bold text-slate-700">{item.qtyPurchased} {item.purchaseUnit}</span>
+                        {item.supplier && (
+                          <>
+                            <span>•</span>
+                            <span className="text-slate-600 flex items-center gap-0.5">
+                              <Store size={10} /> {item.supplier}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="text-right">
+                      <span className="text-sm md:text-base font-black text-slate-800 tabular-nums block">
+                        {fmt(item.totalPrice)}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      disabled={deletingId === item.id}
+                      className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors"
+                    >
+                      {deletingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+      </div>
+
+      {/* ── Modal Batch Restok Belanja ── */}
+      {showModal && (
+        <div 
+          className="fixed inset-0 z-50 flex flex-col justify-end md:justify-center items-center p-0 md:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in"
+          onClick={e => { if (e.target === e.currentTarget) setShowModal(false); }}
+        >
+          <div className="w-full max-w-xl bg-white rounded-t-3xl md:rounded-3xl p-5 md:p-6 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
+            
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <ShoppingBag size={16} />
+                </div>
+                <h2 className="text-base font-extrabold text-slate-800">Catat Belanja Bahan & Kemasan</h2>
+              </div>
+
+              <button
+                onClick={() => setShowModal(false)}
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              
+              {/* Supplier & Tanggal Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <div className="relative">
+                  <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Supplier / Toko</label>
+                  <input
+                    type="text"
+                    placeholder="Pilih atau ketik nama toko/supplier..."
+                    value={supplierSearch}
+                    onChange={e => { setSupplierSearch(e.target.value); setSelectedSupplier(null); setShowSupplierDropdown(true); }}
+                    onFocus={() => setShowSupplierDropdown(true)}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                  />
+                  {showSupplierDropdown && suppliers.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white rounded-xl border border-slate-200 shadow-lg max-h-36 overflow-y-auto">
+                      {suppliers.filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase())).map(s => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => { setSelectedSupplier(s); setSupplierSearch(s.name); setShowSupplierDropdown(false); }}
+                          className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors border-b border-slate-50 last:border-0"
+                        >
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Tanggal Belanja</label>
+                  <input
+                    type="date"
+                    value={customDate}
+                    onChange={e => setCustomDate(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* Form Input Item */}
+              <div className="p-3.5 rounded-2xl bg-amber-50/50 border border-amber-200/60 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-slate-700 uppercase tracking-wider text-[11px] flex items-center gap-1">
+                    <Plus size={14} className="text-amber-600" /> Tambah Item Ke Daftar Nota
+                  </span>
+
+                  <div className="flex bg-white p-0.5 rounded-lg border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => { setFormCategory("bahan_baku"); resetFormItem(); }}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                        formCategory === "bahan_baku" ? "bg-amber-600 text-white" : "text-slate-500"
+                      }`}
+                    >
+                      Bahan Baku
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setFormCategory("packaging"); resetFormItem(); }}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                        formCategory === "packaging" ? "bg-cyan-600 text-white" : "text-slate-500"
+                      }`}
+                    >
+                      Kemasan
+                    </button>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Pilih Item ({formCategory === "packaging" ? "Kemasan" : "Bahan"}) *</label>
+                  <input
+                    type="text"
+                    placeholder={`Ketik nama ${formCategory === "packaging" ? "kemasan" : "bahan"}...`}
+                    value={ingSearch}
+                    onChange={e => { setIngSearch(e.target.value); setSelectedIngredient(null); setShowIngDropdown(true); }}
+                    onFocus={() => setShowIngDropdown(true)}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                  />
+
+                  {showIngDropdown && filteredIngredients.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white rounded-xl border border-slate-200 shadow-lg max-h-40 overflow-y-auto">
+                      {filteredIngredients.map(ing => (
+                        <button
+                          key={ing.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedIngredient(ing);
+                            setIngSearch(ing.name);
+                            setPurchaseUnit(ing.baseUnit);
+                            setShowIngDropdown(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors border-b border-slate-50 flex items-center justify-between"
+                        >
+                          <span>{ing.name}</span>
+                          <span className="text-[10px] text-slate-400">Stok: {ing.currentStock} {ing.baseUnit}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Jumlah</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={qtyPurchased}
+                      onChange={e => setQtyPurchased(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Satuan</label>
+                    <select
+                      value={purchaseUnit}
+                      onChange={e => setPurchaseUnit(e.target.value)}
+                      className="w-full h-10 px-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                    >
+                      {availableUnits.map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Total Biaya (Rp)</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={totalCost}
+                      onChange={e => setTotalCost(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-extrabold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  className="w-full h-10 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Plus size={14} /> Masukkan Ke Daftar Item Nota
+                </button>
+              </div>
+
+              {/* Cart Items List */}
+              {cartItems.length > 0 && (
+                <div className="space-y-2">
+                  <span className="font-extrabold text-slate-600 uppercase tracking-wider text-[11px] block">
+                    Daftar Item Belanja ({cartItems.length})
+                  </span>
+
+                  <div className="space-y-1.5">
+                    {cartItems.map((c, idx) => (
+                      <div key={c.id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                        <div>
+                          <p className="font-bold text-slate-800 text-xs">{c.ingredientName}</p>
+                          <p className="text-[11px] text-slate-500">{c.qtyPurchased} {c.purchaseUnit}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-black text-slate-800 text-xs">{fmt(c.totalPrice)}</span>
+                          <button
+                            onClick={() => setCartItems(prev => prev.filter((_, i) => i !== idx))}
+                            className="text-rose-500 hover:bg-rose-50 p-1 rounded-lg"
+                          >
+                            <X size={14} />
+                          </button>
                         </div>
                       </div>
-                    </div>
-                    <p className="text-sm font-extrabold text-primary shrink-0 ml-2">{fmt(pur.totalPrice)}</p>
+                    ))}
                   </div>
-                  
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-50 mt-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs px-2 py-0.5 rounded-md bg-white text-slate-500 shadow-sm font-bold uppercase tracking-wider">{pur.paymentMethod}</span>
-                      {pur.supplier && <span className="flex items-center gap-1 text-xs text-slate-400 line-clamp-1 break-all max-w-[120px]"><User size={10}/> {pur.supplier}</span>}
-                    </div>
+
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex justify-between items-center text-xs font-black text-slate-800">
+                    <span>TOTAL SELURUH ITEM:</span>
+                    <span className="text-amber-700 text-sm">{fmt(cartItems.reduce((s, i) => s + i.totalPrice, 0))}</span>
                   </div>
-                </Card>
-              ))
-            )}
+                </div>
+              )}
+
+              <div>
+                <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1.5">Metode Pembayaran</label>
+                <select
+                  value={paymentMethod}
+                  onChange={e => setPaymentMethod(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                >
+                  <option value="cash">Tunai / Cash Laci</option>
+                  <option value="transfer">Bank Transfer</option>
+                  <option value="qris">QRIS / E-Wallet</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1.5">Catatan Nota (Opsional)</label>
+                <input
+                  type="text"
+                  placeholder="Catatan nomor nota / toko / keterangan..."
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  className="w-full h-10 px-4 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                />
+              </div>
+
+              {formError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 font-bold text-center">
+                  {formError}
+                </div>
+              )}
+
+              <div className="pt-2">
+                <button
+                  onClick={handleSaveAllPurchases}
+                  disabled={saving || cartItems.length === 0}
+                  className="w-full h-12 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-extrabold text-sm transition-all shadow-md flex items-center justify-center gap-2"
+                >
+                  {saving ? <Loader2 size={18} className="animate-spin" /> : "Simpan Semua Nota Belanja"}
+                </button>
+              </div>
+
+            </div>
+
           </div>
         </div>
-      </div>
-
-      {/* Responsive Form Modal/Drawer */}
-      {isDesktopDialog ? (
-        <Dialog open={showForm} onOpenChange={setShowForm}>
-          <DialogContent className="sm:max-w-[450px] p-6 rounded-3xl border-0 shadow-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                <span className="text-2xl">📦</span> Catat Belanja
-              </DialogTitle>
-            </DialogHeader>
-            <div className="mt-4">
-              {renderForm()}
-            </div>
-          </DialogContent>
-        </Dialog>
-      ) : (
-        <BottomSheet isOpen={showForm} onClose={() => setShowForm(false)} title="Catat Belanja" icon="📦">
-          {renderForm()}
-        </BottomSheet>
       )}
+
     </div>
   );
 }

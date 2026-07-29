@@ -297,7 +297,7 @@ export default function ManagerDashboardPage() {
                   <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-transform shadow-sm">
                     <Package size={20} />
                   </div>
-                  <span className="text-[11px] font-bold text-slate-700 text-center mt-1.5">Belanja Bahan</span>
+                  <span className="text-[11px] font-bold text-slate-700 text-center mt-1.5">Belanja</span>
                 </Link>
 
                 <Link href="/manager/reports?tab=cashflow" className="flex flex-col items-center group">
