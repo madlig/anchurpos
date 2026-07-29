@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus, FileText, X } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus, FileText, X, Wallet, Building2, ArrowLeftRight } from "lucide-react";
 
 interface PnlData {
   month: string; pemasukan: number; hppProduk: number; labaKotor: number;
@@ -136,10 +136,10 @@ export default function OwnerReportsPage() {
             setTransferDate(new Date().toISOString().split("T")[0]);
             setShowTransferModal(true);
           }}
-          className="px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] tap-target"
+          className="px-3.5 py-2 rounded-xl text-xs font-bold text-white transition-all active:scale-[0.98] tap-target flex items-center gap-1.5"
           style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)", boxShadow: "0 4px 12px rgba(232,93,140,0.2)" }}
         >
-          💸 Catat Mutasi Kas
+          <ArrowLeftRight size={14} /> Catat Mutasi Kas
         </button>
       </div>
 
@@ -158,17 +158,17 @@ export default function OwnerReportsPage() {
       <div className="flex bg-slate-100 rounded-2xl p-1 gap-1 mb-5" style={{ border: "1px solid #E2E8F0" }}>
         <button
           onClick={() => setActiveSubTab("pnl")}
-          className="flex-1 py-2 rounded-xl text-xs font-bold transition-all tap-target"
+          className="flex-1 py-2 rounded-xl text-xs font-bold transition-all tap-target flex items-center justify-center gap-1.5"
           style={activeSubTab === "pnl" ? { background: "#fff", color: "#E85D8C", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" } : { color: "#64748B" }}
         >
-          📈 Laba Rugi
+          <TrendingUp size={14} /> Laba Rugi
         </button>
         <button
           onClick={() => setActiveSubTab("cashflow")}
-          className="flex-1 py-2 rounded-xl text-xs font-bold transition-all tap-target"
+          className="flex-1 py-2 rounded-xl text-xs font-bold transition-all tap-target flex items-center justify-center gap-1.5"
           style={activeSubTab === "cashflow" ? { background: "#fff", color: "#E85D8C", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" } : { color: "#64748B" }}
         >
-          💰 Arus Kas & Saldo
+          <Wallet size={14} /> Arus Kas & Saldo
         </button>
       </div>
 
@@ -222,7 +222,7 @@ export default function OwnerReportsPage() {
             {/* Cash vs Bank Cards */}
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl p-4" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 4px 12px rgba(0,0,0,0.02)" }}>
-                <p className="text-xs font-bold text-slate-400">💵 SALDO CASH (Buku)</p>
+                <p className="text-xs font-bold text-slate-400 flex items-center gap-1.5"><Wallet size={13} className="text-amber-500" /> SALDO CASH (Buku)</p>
                 <p className="text-lg font-extrabold mt-1 text-slate-800 tabular-nums">{fmt(data.saldoBukuCash ?? 0)}</p>
                 <div className="mt-3 space-y-1 text-xxs text-slate-400">
                   <div className="flex justify-between"><span>Uang Masuk:</span><span className="text-emerald-600 font-bold">+{fmt(data.totalCashIn ?? 0)}</span></div>
@@ -232,7 +232,7 @@ export default function OwnerReportsPage() {
               </div>
 
               <div className="rounded-2xl p-4" style={{ background: "#fff", border: "1px solid #F1F5F9", boxShadow: "0 4px 12px rgba(0,0,0,0.02)" }}>
-                <p className="text-xs font-bold text-slate-400">🏦 SALDO BANK (Buku)</p>
+                <p className="text-xs font-bold text-slate-400 flex items-center gap-1.5"><Building2 size={13} className="text-emerald-500" /> SALDO BANK (Buku)</p>
                 <p className="text-lg font-extrabold mt-1 text-slate-800 tabular-nums">{fmt(data.saldoBukuBank ?? 0)}</p>
                 <div className="mt-3 space-y-1 text-xxs text-slate-400">
                   <div className="flex justify-between"><span>Uang Masuk:</span><span className="text-emerald-600 font-bold">+{fmt(data.totalBankIn ?? 0)}</span></div>
