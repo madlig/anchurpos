@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
         status: d.status,
         paymentStatus: d.paymentStatus,
         paymentMethod: d.paymentMethod,
+        totalOrderValue: d.totalOrderValue ?? d.totalPrice ?? 0,
         platformFeePercent: d.platformFeePercent ?? 0,
         platformFee: d.platformFee ?? 0,
         netRevenue: d.netRevenue ?? null,

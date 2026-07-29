@@ -11,7 +11,7 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { label: "Beranda", href: "/manager/dashboard", icon: LayoutDashboard },
-  { label: "Transaksi", href: "/manager/orders", icon: ClipboardList },
+  { label: "Pesanan", href: "/manager/orders", icon: ClipboardList },
   { label: "Buku Kas", href: "/manager/expenses", icon: Banknote },
   { label: "Kasir", href: "/manager/pos", icon: ShoppingCart, isPosButton: true },
   { label: "Belanja", href: "/manager/purchases", icon: Package },
@@ -108,7 +108,7 @@ function DesktopSidebar() {
 
 const MOBILE_NAV_ITEMS = [
   { label: "Beranda", href: "/manager/dashboard", icon: LayoutDashboard },
-  { label: "Transaksi", href: "/manager/orders", icon: ClipboardList },
+  { label: "Pesanan", href: "/manager/orders", icon: ClipboardList },
   { label: "Kasir", href: "/manager/pos", icon: ShoppingCart, isPosButton: true },
   { label: "Buku Kas", href: "/manager/expenses", icon: Banknote },
   { label: "Profil", href: "/manager/profile", icon: User },
