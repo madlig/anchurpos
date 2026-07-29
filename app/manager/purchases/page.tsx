@@ -517,14 +517,15 @@ export default function PurchasesPage() {
               
               {/* Supplier & Tanggal Section */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                <div className="relative">
+                <div className="relative" onClick={e => e.stopPropagation()}>
                   <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Supplier / Toko</label>
                   <input
                     type="text"
                     placeholder="Pilih atau ketik nama toko/supplier..."
                     value={supplierSearch}
                     onChange={e => { setSupplierSearch(e.target.value); setSelectedSupplier(null); setShowSupplierDropdown(true); }}
-                    onFocus={() => setShowSupplierDropdown(true)}
+                    onFocus={() => { setShowSupplierDropdown(true); setShowIngDropdown(false); }}
+                    onBlur={() => setTimeout(() => setShowSupplierDropdown(false), 200)}
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                   />
                   {showSupplierDropdown && suppliers.length > 0 && (
@@ -533,7 +534,7 @@ export default function PurchasesPage() {
                         <button
                           key={s.id}
                           type="button"
-                          onClick={() => { setSelectedSupplier(s); setSupplierSearch(s.name); setShowSupplierDropdown(false); }}
+                          onMouseDown={() => { setSelectedSupplier(s); setSupplierSearch(s.name); setShowSupplierDropdown(false); }}
                           className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors border-b border-slate-50 last:border-0"
                         >
                           {s.name}
@@ -583,14 +584,15 @@ export default function PurchasesPage() {
                   </div>
                 </div>
 
-                <div className="relative">
+                <div className="relative" onClick={e => e.stopPropagation()}>
                   <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Pilih Item ({formCategory === "packaging" ? "Kemasan" : "Bahan"}) *</label>
                   <input
                     type="text"
                     placeholder={`Ketik nama ${formCategory === "packaging" ? "kemasan" : "bahan"}...`}
                     value={ingSearch}
                     onChange={e => { setIngSearch(e.target.value); setSelectedIngredient(null); setShowIngDropdown(true); }}
-                    onFocus={() => setShowIngDropdown(true)}
+                    onFocus={() => { setShowIngDropdown(true); setShowSupplierDropdown(false); }}
+                    onBlur={() => setTimeout(() => setShowIngDropdown(false), 200)}
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                   />
 
@@ -600,7 +602,7 @@ export default function PurchasesPage() {
                         <button
                           key={ing.id}
                           type="button"
-                          onClick={() => {
+                          onMouseDown={() => {
                             setSelectedIngredient(ing);
                             setIngSearch(ing.name);
                             setPurchaseUnit(ing.baseUnit);
