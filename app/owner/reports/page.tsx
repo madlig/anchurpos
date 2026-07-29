@@ -6,8 +6,19 @@ import { useSearchParams } from "next/navigation";
 import { 
   Loader2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus, 
   FileText, X, Wallet, Building2, ArrowLeftRight, CheckCircle2, AlertCircle,
-  PieChart, ArrowUpRight, ArrowDownRight, Scale
+  PieChart, ArrowUpRight, ArrowDownRight, Scale, ShoppingBag, Search, Filter,
+  ArrowDownLeft, RefreshCw, Banknote, ShieldCheck
 } from "lucide-react";
+
+interface CashJournalEntry {
+  id: string;
+  date: string;
+  type: "pos_sales" | "purchases" | "expense" | "non_sales_income" | "payroll" | "transfer";
+  description: string;
+  account: "cash" | "bank";
+  amount: number;
+  notes?: string;
+}
 
 interface PnlData {
   month: string; 
@@ -18,6 +29,8 @@ interface PnlData {
   biayaPromosi: number; 
   gajiBonus: number; 
   labaBersih: number;
+  totalBelanjaBahan?: number;
+  totalNonSalesIncome?: number;
   totalCashIn?: number; 
   totalCashOut?: number;
   totalBankIn?: number; 
@@ -26,6 +39,7 @@ interface PnlData {
   mutasiBankToCash?: number;
   saldoBukuCash?: number; 
   saldoBukuBank?: number;
+  cashJournal?: CashJournalEntry[];
 }
 
 function fmt(n: number) {
@@ -61,6 +75,11 @@ function OwnerReportsContent() {
       setActiveSubTab("pnl");
     }
   }, [searchParams]);
+
+  // Cash Journal Filters
+  const [accountFilter, setAccountFilter] = useState<"all" | "cash" | "bank">("all");
+  const [journalTypeFilter, setJournalTypeFilter] = useState<string>("all");
+  const [journalSearch, setJournalSearch] = useState("");
 
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferAmount, setTransferAmount] = useState("");
@@ -152,6 +171,37 @@ function OwnerReportsContent() {
     if (!data || !data.pemasukan) return 0;
     return ((data.labaBersih / data.pemasukan) * 100).toFixed(1);
   }, [data]);
+
+  // Cash Flow Calculations
+  const posSalesIn = useMemo(() => {
+    if (!data) return 0;
+    return ((data.totalCashIn ?? 0) + (data.totalBankIn ?? 0)) - (data.totalNonSalesIncome ?? 0);
+  }, [data]);
+
+  const netOperatingCashFlow = useMemo(() => {
+    if (!data) return 0;
+    return posSalesIn - (data.totalBelanjaBahan ?? 0) - (data.biayaOperasional ?? 0) - (data.gajiBonus ?? 0);
+  }, [data, posSalesIn]);
+
+  const netFinancingCashFlow = useMemo(() => {
+    if (!data) return 0;
+    return data.totalNonSalesIncome ?? 0;
+  }, [data]);
+
+  const netTotalCashFlow = netOperatingCashFlow + netFinancingCashFlow;
+
+  // Filtered Cash Journal Entries
+  const filteredJournal = useMemo(() => {
+    if (!data || !data.cashJournal) return [];
+    return data.cashJournal.filter(item => {
+      const isAccountMatch = accountFilter === "all" || item.account === accountFilter;
+      const isTypeMatch = journalTypeFilter === "all" || item.type === journalTypeFilter;
+      const isSearchMatch = !journalSearch || 
+        item.description.toLowerCase().includes(journalSearch.toLowerCase()) || 
+        (item.notes ?? "").toLowerCase().includes(journalSearch.toLowerCase());
+      return isAccountMatch && isTypeMatch && isSearchMatch;
+    });
+  }, [data, accountFilter, journalTypeFilter, journalSearch]);
 
   return (
     <div className="min-h-screen bg-slate-50/70 pb-28">
@@ -328,96 +378,264 @@ function OwnerReportsContent() {
 
           </div>
         ) : (
-          /* ── SUB TAB: ARUS KAS & SALDO BUKU ── */
-          <div className="space-y-4">
+          /* ── SUB TAB: ARUS KAS & SALDO BUKU (FORMAL ERP STATEMENT + CHRONOLOGICAL LEDGER) ── */
+          <div className="space-y-5">
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Cash Balance Card */}
-              <div className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-5 shadow-sm border border-slate-200/80 space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <span className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <Wallet size={14} className="text-amber-500" /> Saldo Cash (Laci Tunai)
+            {/* ── Section 1: Executive 3-Card Balance Summary ── */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Cash Balance */}
+              <div className="bg-white rounded-2xl md:rounded-3xl p-4 shadow-sm border border-slate-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
+                    <Wallet size={14} className="text-amber-500" /> Saldo Cash (Laci)
                   </span>
-                  <span className="text-xs font-black text-slate-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
-                    Laci Kasir
+                  <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">
+                    Kas Fisik
                   </span>
                 </div>
-
-                <div className="text-xl font-black text-slate-800 tabular-nums">
+                <div className="text-xl md:text-2xl font-black text-slate-800 tabular-nums">
                   {fmt(data.saldoBukuCash ?? 0)}
                 </div>
-
-                <div className="pt-2 border-t border-slate-100 space-y-1.5 text-xs text-slate-500">
-                  <div className="flex justify-between">
-                    <span>Uang Masuk (Cash In):</span>
-                    <span className="font-bold text-emerald-600">+{fmt(data.totalCashIn ?? 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Uang Keluar (Cash Out):</span>
-                    <span className="font-bold text-rose-500">-{fmt(data.totalCashOut ?? 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Net Transfer Internal:</span>
-                    <span className="font-bold text-slate-700">
-                      {(data.mutasiBankToCash ?? 0) - (data.mutasiCashToBank ?? 0) >= 0 ? "+" : ""}
-                      {fmt((data.mutasiBankToCash ?? 0) - (data.mutasiCashToBank ?? 0))}
-                    </span>
-                  </div>
-                </div>
+                <p className="text-[11px] font-semibold text-slate-400">Total uang tunai fisik laci kasir</p>
               </div>
 
-              {/* Bank Balance Card */}
-              <div className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-5 shadow-sm border border-slate-200/80 space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <span className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <Building2 size={14} className="text-emerald-500" /> Saldo Bank (Transfer / QRIS)
+              {/* Bank Balance */}
+              <div className="bg-white rounded-2xl md:rounded-3xl p-4 shadow-sm border border-slate-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
+                    <Building2 size={14} className="text-emerald-500" /> Saldo Bank (Digital)
                   </span>
-                  <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
-                    Rekening Outlet
+                  <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Rekening
                   </span>
                 </div>
-
-                <div className="text-xl font-black text-slate-800 tabular-nums">
+                <div className="text-xl md:text-2xl font-black text-slate-800 tabular-nums">
                   {fmt(data.saldoBukuBank ?? 0)}
                 </div>
+                <p className="text-[11px] font-semibold text-slate-400">Transfer & QRIS settlement bank</p>
+              </div>
 
-                <div className="pt-2 border-t border-slate-100 space-y-1.5 text-xs text-slate-500">
-                  <div className="flex justify-between">
-                    <span>Uang Masuk (Bank In):</span>
-                    <span className="font-bold text-emerald-600">+{fmt(data.totalBankIn ?? 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Uang Keluar (Bank Out):</span>
-                    <span className="font-bold text-rose-500">-{fmt(data.totalBankOut ?? 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Net Transfer Internal:</span>
-                    <span className="font-bold text-slate-700">
-                      {(data.mutasiCashToBank ?? 0) - (data.mutasiBankToCash ?? 0) >= 0 ? "+" : ""}
-                      {fmt((data.mutasiCashToBank ?? 0) - (data.mutasiBankToCash ?? 0))}
-                    </span>
-                  </div>
+              {/* Net Cash Flow */}
+              <div className="bg-white rounded-2xl md:rounded-3xl p-4 shadow-sm border border-slate-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 text-slate-700">
+                    <Scale size={14} className="text-primary" /> Net Cash Flow
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    netTotalCashFlow >= 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200"
+                  }`}>
+                    {netTotalCashFlow >= 0 ? "+Surplus" : "-Defisit"}
+                  </span>
                 </div>
+                <div className={`text-xl md:text-2xl font-black tabular-nums ${netTotalCashFlow >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                  {fmt(netTotalCashFlow)}
+                </div>
+                <p className="text-[11px] font-semibold text-slate-400">Kas Masuk minus Kas Keluar</p>
               </div>
             </div>
 
-            {/* Internal Mutation Detail Card */}
-            <div className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-5 shadow-sm border border-slate-200/80 space-y-3">
-              <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
-                <ArrowLeftRight size={14} className="text-primary" /> Rincian Transfer & Mutasi Kas Internal
-              </h2>
-
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                  <span className="font-semibold text-slate-600">Setoran Tunai Ke Bank (Cash → Bank)</span>
-                  <span className="font-extrabold text-slate-800 tabular-nums">{fmt(data.mutasiCashToBank ?? 0)}</span>
+            {/* ── Section 2: Formal Statement of Cash Flows (Accurate / Odoo ERP Style) ── */}
+            <div className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-6 shadow-sm border border-slate-200/80 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <FileText size={18} className="text-primary" />
+                  <h2 className="text-sm font-black uppercase tracking-wider text-slate-800">
+                    Laporan Arus Kas Formal (Statement of Cash Flows)
+                  </h2>
                 </div>
-
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                  <span className="font-semibold text-slate-600">Penarikan Tunai Dari Bank (Bank → Cash)</span>
-                  <span className="font-extrabold text-slate-800 tabular-nums">{fmt(data.mutasiBankToCash ?? 0)}</span>
-                </div>
+                <span className="text-xs font-bold text-slate-400">Standar ERP</span>
               </div>
+
+              <div className="space-y-4 text-xs">
+                
+                {/* 1. Operating Cash Flow */}
+                <div className="space-y-2">
+                  <h3 className="font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 text-xs text-emerald-700">
+                    <ArrowUpRight size={15} /> 1. Arus Kas Dari Aktivitas Operasional
+                  </h3>
+
+                  <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 space-y-1.5">
+                    <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+                      <span className="text-slate-600 font-medium">Penerimaan Uang Kas dari Penjualan POS (Kas & Bank)</span>
+                      <span className="font-extrabold text-emerald-600 tabular-nums">+{fmt(posSalesIn)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+                      <span className="text-slate-600 font-medium">Pembayaran Kas untuk Belanja Bahan Baku & Kemasan</span>
+                      <span className="font-extrabold text-rose-600 tabular-nums">-{fmt(data.totalBelanjaBahan ?? 0)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+                      <span className="text-slate-600 font-medium">Pembayaran Kas untuk Beban Operasional Outlet</span>
+                      <span className="font-extrabold text-rose-600 tabular-nums">-{fmt(data.biayaOperasional ?? 0)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-slate-600 font-medium">Pembayaran Kas untuk Gaji & Bonus Karyawan</span>
+                      <span className="font-extrabold text-rose-600 tabular-nums">-{fmt(data.gajiBonus ?? 0)}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-emerald-50/70 border border-emerald-200/70 font-extrabold text-emerald-900">
+                    <span>Arus Kas Bersih Dari Operasional</span>
+                    <span className="tabular-nums">{fmt(netOperatingCashFlow)}</span>
+                  </div>
+                </div>
+
+                {/* 2. Financing / Non Sales Cash Flow */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <h3 className="font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 text-xs text-primary">
+                    <Building2 size={15} /> 2. Arus Kas Dari Pendanaan & Pemasukan Non-POS
+                  </h3>
+
+                  <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 space-y-1.5">
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-slate-600 font-medium">Suntikan Modal Owner, Refund Supplier, Cashback & Aset</span>
+                      <span className="font-extrabold text-emerald-600 tabular-nums">+{fmt(netFinancingCashFlow)}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-rose-50/70 border border-rose-200/70 font-extrabold text-rose-900">
+                    <span>Arus Kas Bersih Dari Pendanaan / Non-POS</span>
+                    <span className="tabular-nums">{fmt(netFinancingCashFlow)}</span>
+                  </div>
+                </div>
+
+                {/* 3. Net Cash Flow Reconciliation */}
+                <div className="pt-2 border-t border-slate-100 flex justify-between items-center p-3 rounded-2xl bg-slate-900 text-white font-black text-xs md:text-sm">
+                  <span>TOTAL KENAIKAN / PENURUNAN KAS BERSIH</span>
+                  <span className="tabular-nums text-emerald-400">{fmt(netTotalCashFlow)}</span>
+                </div>
+
+              </div>
+            </div>
+
+            {/* ── Section 3: Jurnal Mutasi Kas Kronologis Lengkap ── */}
+            <div className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-6 shadow-sm border border-slate-200/80 space-y-4">
+              
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Banknote size={18} className="text-emerald-600" />
+                  <h2 className="text-sm font-black uppercase tracking-wider text-slate-800">
+                    Jurnal Mutasi Kas Kronologis (Cash Journal Ledger)
+                  </h2>
+                </div>
+
+                <span className="text-xs font-bold text-slate-400">
+                  {filteredJournal.length} Transaksi Terhitung
+                </span>
+              </div>
+
+              {/* Filters & Search Row */}
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                
+                {/* Account Filter Pills */}
+                <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+                  {[
+                    { id: "all", label: "Semua Akun" },
+                    { id: "cash", label: "Laci Cash" },
+                    { id: "bank", label: "Rekening Bank" },
+                  ].map(a => (
+                    <button
+                      key={a.id}
+                      onClick={() => setAccountFilter(a.id as any)}
+                      className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        accountFilter === a.id ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Type Filter Select & Search */}
+                <div className="flex items-center gap-2 flex-1 max-w-md">
+                  <select
+                    value={journalTypeFilter}
+                    onChange={e => setJournalTypeFilter(e.target.value)}
+                    className="h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    <option value="all">Semua Tipe Aktivitas</option>
+                    <option value="pos_sales">Penjualan POS</option>
+                    <option value="purchases">Belanja Bahan</option>
+                    <option value="expense">Operasional</option>
+                    <option value="non_sales_income">Pemasukan Non-POS</option>
+                    <option value="payroll">Gaji & Payroll</option>
+                    <option value="transfer">Mutasi Internal</option>
+                  </select>
+
+                  <div className="relative flex-1">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Cari jurnal kas..."
+                      value={journalSearch}
+                      onChange={e => setJournalSearch(e.target.value)}
+                      className="w-full h-10 pl-8 pr-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Journal Table List */}
+              {filteredJournal.length === 0 ? (
+                <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-2xl space-y-1">
+                  <p className="text-xs font-bold text-slate-600">Tidak ada jurnal mutasi kas ditemukan.</p>
+                  <p className="text-[11px] text-slate-400">Coba ubah kata kunci atau filter akun di atas.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredJournal.map(item => {
+                    const isIn = item.amount > 0;
+                    const dateObj = new Date(item.date);
+                    const formattedDate = dateObj.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+                    return (
+                      <div 
+                        key={item.id}
+                        className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-all flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${
+                            isIn ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-rose-50 border-rose-200 text-rose-600"
+                          }`}>
+                            {isIn ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-extrabold text-slate-800 truncate">{item.description}</h4>
+                              <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider shrink-0 border ${
+                                item.account === "cash" ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              }`}>
+                                {item.account === "cash" ? "Cash Laci" : "Bank"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-400 mt-0.5">
+                              <span>{formattedDate}</span>
+                              {item.notes && (
+                                <>
+                                  <span>•</span>
+                                  <span className="italic truncate">{item.notes}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className={`font-black tabular-nums text-xs md:text-sm block ${isIn ? "text-emerald-600" : "text-rose-600"}`}>
+                            {isIn ? "+" : ""}{fmt(item.amount)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
             </div>
 
           </div>
