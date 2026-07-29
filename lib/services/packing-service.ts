@@ -571,3 +571,92 @@ export async function manualUsage(updates: { id: string; qtyUsed: number }[], no
     }
   });
 }
+
+export async function packProduction(
+  productId: string,
+  variantId: string,
+  packQty: number,
+  userId: string
+) {
+  if (!productId || !variantId || !packQty || packQty <= 0) {
+    throw new Error("Parameter pack production tidak valid");
+  }
+
+  const stockId = `${productId}_${variantId}`;
+  const stockRef = adminDb.collection("productStocks").doc(stockId);
+
+  let packagingIngId = "";
+  if (productId === "churros-frozen-regular") packagingIngId = "plastik-regular";
+  else if (productId === "churros-frozen-full") packagingIngId = "plastik-full";
+  else if (productId === "churros-frozen-tiktok") packagingIngId = "plastik-regular";
+
+  const pkgRef = packagingIngId ? adminDb.collection("ingredients").doc(packagingIngId) : null;
+  const stikerRef = adminDb.collection("ingredients").doc("stiker-label");
+
+  await adminDb.runTransaction(async (tx) => {
+    const stockSnap = await tx.get(stockRef);
+    const currentProductStock = stockSnap.exists ? (stockSnap.data()?.currentStock ?? 0) : 0;
+    const nextProductStock = currentProductStock + packQty;
+
+    tx.set(stockRef, {
+      productId,
+      variantId,
+      currentStock: nextProductStock,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    const mProd = adminDb.collection("stockMovements").doc();
+    tx.set(mProd, {
+      ingredientId: `product:${stockId}`,
+      changeAmount: packQty,
+      newStockAfter: nextProductStock,
+      sourceType: "production",
+      sourceId: null,
+      note: `Hasil packing produksi baru (${packQty} pack)`,
+      createdBy: userId,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    if (pkgRef) {
+      const pkgSnap = await tx.get(pkgRef);
+      if (pkgSnap.exists) {
+        const curPkg = pkgSnap.data()?.currentStock ?? 0;
+        const nextPkg = curPkg - packQty;
+        tx.update(pkgRef, { currentStock: nextPkg });
+
+        const mPkg = adminDb.collection("stockMovements").doc();
+        tx.set(mPkg, {
+          ingredientId: packagingIngId,
+          changeAmount: -packQty,
+          newStockAfter: nextPkg,
+          sourceType: "production",
+          sourceId: null,
+          note: `Pemakaian plastik kemasan untuk ${packQty} pack ${stockId}`,
+          createdBy: userId,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
+    }
+
+    const stikerSnap = await tx.get(stikerRef);
+    if (stikerSnap.exists) {
+      const curStiker = stikerSnap.data()?.currentStock ?? 0;
+      const nextStiker = curStiker - packQty;
+      tx.update(stikerRef, { currentStock: nextStiker });
+
+      const mStiker = adminDb.collection("stockMovements").doc();
+      tx.set(mStiker, {
+        ingredientId: "stiker-label",
+        changeAmount: -packQty,
+        newStockAfter: nextStiker,
+        sourceType: "production",
+        sourceId: null,
+        note: `Pemakaian stiker label untuk ${packQty} pack ${stockId}`,
+        createdBy: userId,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    }
+  });
+
+  return { success: true, nextProductStock: packQty };
+}

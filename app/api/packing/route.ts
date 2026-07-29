@@ -10,6 +10,7 @@ import {
   repackRegToFull,
   packOrder,
   manualUsage,
+  packProduction,
 } from "@/lib/services/packing-service";
 
 export async function GET(req: NextRequest) {
@@ -58,6 +59,15 @@ export async function POST(req: NextRequest) {
 
     if (!action) {
       return NextResponse.json({ error: "Action wajib diisi" }, { status: 400 });
+    }
+
+    if (action === "pack_production") {
+      const { productId, variantId, packQty } = body;
+      if (!productId || !variantId || !packQty || packQty <= 0) {
+        return NextResponse.json({ error: "Parameter pack_production tidak valid" }, { status: 400 });
+      }
+      const result = await packProduction(productId, variantId, packQty, user.uid);
+      return NextResponse.json(result);
     }
 
     if (action === "repack_glaze") {

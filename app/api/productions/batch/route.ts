@@ -56,9 +56,12 @@ export async function POST(req: NextRequest) {
     }>;
 
     for (const entry of entries) {
-      const applicableRecipes = recipes.filter(
-        (r) => r.variantId === "all" || r.variantId === entry.variantId
+      const specificRecipes = recipes.filter((r) => r.variantId === entry.variantId);
+      const specificIngIds = new Set(specificRecipes.map((r) => r.ingredientId));
+      const generalRecipes = recipes.filter(
+        (r) => r.variantId === "all" && !specificIngIds.has(r.ingredientId)
       );
+      const applicableRecipes = [...specificRecipes, ...generalRecipes];
 
       for (const recipe of applicableRecipes) {
         const qtyUsed = entry.batches * recipe.qtyPerBatch;

@@ -6,6 +6,7 @@ import { ClipboardList } from "lucide-react";
 import type { Ingredient, Variant } from "@/types";
 
 // Import Components
+import { ProductionPackingTab } from "./components/ProductionPackingTab";
 import { OrderFulfillmentTab } from "./components/OrderFulfillmentTab";
 import { GlazeRepackTab } from "./components/GlazeRepackTab";
 import { CinnamonBlenderTab } from "./components/CinnamonBlenderTab";
@@ -14,7 +15,7 @@ import { ManualUsageTab } from "./components/ManualUsageTab";
 
 export default function CrewPackingPage() {
   const { getToken } = useAuth();
-  const [activeTab, setActiveTab] = useState<"pack_order" | "repack_glaze" | "repack_cinnamon" | "repack_reg_to_full" | "manual_usage">("pack_order");
+  const [activeTab, setActiveTab] = useState<"pack_production" | "pack_order" | "repack_glaze" | "repack_cinnamon" | "repack_reg_to_full" | "manual_usage">("pack_production");
   
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
@@ -74,6 +75,7 @@ export default function CrewPackingPage() {
         {/* Navigation Tabs */}
         <div className="flex flex-wrap bg-white rounded-2xl p-1.5 gap-1 mb-6 shadow-sm border border-slate-200">
           {[
+            { key: "pack_production", label: "Packing Hasil Produksi" },
             { key: "pack_order", label: "Pack Pesanan" },
             { key: "repack_glaze", label: "Repack Saos" },
             { key: "repack_cinnamon", label: "Repack Gula Cinnamon" },
@@ -94,6 +96,10 @@ export default function CrewPackingPage() {
         </div>
 
         {/* Tab Content */}
+        {activeTab === "pack_production" && (
+          <ProductionPackingTab variants={variants} onSuccess={loadInitialData} />
+        )}
+
         {activeTab === "pack_order" && (
           <OrderFulfillmentTab ingredients={ingredients} onSuccess={loadInitialData} />
         )}
