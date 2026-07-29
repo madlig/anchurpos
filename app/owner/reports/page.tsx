@@ -27,7 +27,13 @@ export default function OwnerReportsPage() {
   });
 
   // Cash Flow & Transfer States
-  const [activeSubTab, setActiveSubTab] = useState<"pnl" | "cashflow">("pnl");
+  const [activeSubTab, setActiveSubTab] = useState<"pnl" | "cashflow">(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "cashflow") return "cashflow";
+    }
+    return "pnl";
+  });
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferAmount, setTransferAmount] = useState("");
   const [transferFrom, setTransferFrom] = useState<"cash" | "bank">("cash");

@@ -3,25 +3,33 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { 
-  Loader2, Bell, AlertTriangle, ChevronRight, 
-  ShoppingCart, ClipboardList, Banknote, FileText, 
-  Settings, Users, Package, Database, BookOpen, ChefHat
+  Loader2, Bell, ShoppingCart, ClipboardList, Banknote, FileText, 
+  Users, Package, Database, BookOpen, ChefHat, ArrowUpRight, 
+  TrendingUp, AlertTriangle, ChevronRight, Layers, ArrowLeftRight, CheckCircle2
 } from "lucide-react";
 import Link from "next/link";
 
 interface DashboardData {
-  omzet: number; hpp: number; operationalExpenses: number; totalPengeluaran: number; profit: number; orderCount: number;
+  omzet: number; 
+  hpp: number; 
+  operationalExpenses: number; 
+  totalPengeluaran: number; 
+  profit: number; 
+  orderCount: number;
   productionToday: { variantId: string; variantName: string; batches: number; loyangCount: number }[];
   lowStockItems: { id: string; name: string; currentStock: number; minStock: number; baseUnit: string }[];
 }
+
 interface AlertItem {
   id: string; type: string; severity: string;
   title: string; message: string; isRead: boolean; createdAt: string;
 }
+
 interface OrderSummary {
   id: string; orderNumber: string; customerName: string;
-  status: string; paymentStatus: string; createdAt: string;
+  status: string; paymentStatus: string; createdAt: string; totalOrderValue?: number;
 }
+
 interface PnlSummary {
   saldoBukuCash: number;
   saldoBukuBank: number;
@@ -32,21 +40,11 @@ const DAILY_TARGET = 2_000_000;
 function fmt(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 }
+
 function fmtShort(n: number) {
   if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}jt`;
   if (n >= 1_000) return `Rp ${Math.round(n / 1_000)}k`;
   return fmt(n);
-}
-
-function getStatusStyle(status: string) {
-  if (status === "selesai") return { color: "#16A34A", background: "#DCFCE7" };
-  if (status === "proses") return { color: "#D97706", background: "#FEF3C7" };
-  return { color: "#64748B", background: "#F1F5F9" };
-}
-function getStatusLabel(status: string) {
-  if (status === "selesai") return "Selesai";
-  if (status === "proses") return "Proses";
-  return "Pending";
 }
 
 export default function ManagerDashboardPage() {
@@ -56,6 +54,7 @@ export default function ManagerDashboardPage() {
   const [recentOrders, setRecentOrders] = useState<OrderSummary[]>([]);
   const [pnlSummary, setPnlSummary] = useState<PnlSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeSector, setActiveSector] = useState<"all" | "penjualan" | "keuangan" | "produksi" | "sdm">("all");
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
@@ -63,7 +62,7 @@ export default function ManagerDashboardPage() {
   }, [getToken]);
 
   useEffect(() => {
-    const currentMonth = new Date().toISOString().substring(0, 7); // e.g. "2026-07"
+    const currentMonth = new Date().toISOString().substring(0, 7);
     Promise.all([
       fetchWithAuth("/api/dashboard/today").then((r) => r.json()),
       fetchWithAuth("/api/alerts?unread=true").then((r) => r.json()),
@@ -98,334 +97,363 @@ export default function ManagerDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center" style={{ background: "#FCABB4" }}>
-        <Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} />
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  const omzetPct = data ? Math.min(100, Math.round((data.omzet / DAILY_TARGET) * 100)) : 0;
+  const omzet = data?.omzet ?? 0;
+  const omzetPct = Math.min(100, Math.round((omzet / DAILY_TARGET) * 100));
 
   return (
-    <div className="page-enter min-h-screen pb-20" style={{ background: "#FCABB4" }}>
-
-      {/* ── Greeting Header (Glassmorphism) ── */}
-      <div className="px-5 pt-5 pb-5 sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200 rounded-b-[24px]">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-xs" style={{ color: "#94A3B8" }}>{greeting}</p>
-            <h1 className="text-xl font-extrabold mt-0.5" style={{ color: "#1C1C1E" }}>
-              {user?.displayName ?? "Manager"}
-            </h1>
-            <p className="text-xs text-slate-400 mt-1">{todayLabel} — Outlet Utama</p>
+    <div className="min-h-screen bg-slate-50/60 pb-28">
+      {/* ── Native App Header (Gojek / Grab Style) ── */}
+      <div className="bg-white sticky top-0 z-30 px-5 pt-4 pb-4 shadow-sm border-b border-slate-100">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-primary to-rose-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-primary/20">
+              {user?.displayName ? user.displayName.charAt(0).toUpperCase() : "M"}
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-400">{greeting} 👋</p>
+              <h1 className="text-lg font-extrabold text-slate-800 tracking-tight leading-tight">
+                {user?.displayName ?? "Manager Outlet"}
+              </h1>
+              <p className="text-[11px] font-semibold text-slate-400">{todayLabel} • Outlet Utama</p>
+            </div>
           </div>
+
           <button
             onClick={alerts.length > 0 ? markAllRead : undefined}
-            className="relative p-2.5 rounded-2xl tap-target"
-            style={{ background: "#FEF1F5" }}
-            data-testid="alerts-bell-button"
+            className="relative w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors"
           >
-            <Bell size={18} style={{ color: "#E85D8C" }} />
+            <Bell size={18} />
             {alerts.length > 0 && (
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full" style={{ background: "#DC2626", border: "2px solid #FEF1F5" }} />
+              <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
             )}
           </button>
         </div>
 
-        {/* ── Balance Box (Gopay-style) ── */}
-        <div 
-          className="rounded-3xl p-4 flex justify-between items-center text-white" 
-          style={{ background: "linear-gradient(135deg, #E85D8C 0%, #C94A73 100%)", boxShadow: "0 8px 24px rgba(232,93,140,0.3)" }}
-        >
-          <div className="flex-1 border-r border-white/20 pr-4">
-            <span className="text-xs font-bold text-white/70 block uppercase tracking-wider">💵 Laci Tunai</span>
-            <span className="text-sm font-extrabold block mt-0.5 tabular-nums">{fmt(pnlSummary?.saldoBukuCash ?? 0)}</span>
-          </div>
-          <div className="flex-1 pl-4">
-            <span className="text-xs font-bold text-white/70 block uppercase tracking-wider">🏦 Bank Transfer</span>
-            <span className="text-sm font-extrabold block mt-0.5 tabular-nums">{fmt(pnlSummary?.saldoBukuBank ?? 0)}</span>
-          </div>
-        </div>
-
-        {/* ── Grid Fitur Utama (2x4 ala Gojek) ── */}
-        <div className="grid grid-cols-4 gap-x-2 gap-y-4 mt-6">
-          <Link href="/manager/pos" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#FEF1F5" }}>
-              <ShoppingCart size={20} style={{ color: "#E85D8C" }} />
+        {/* ── GoPay-Style Saldo Card (Physical Cash & Bank Balance) ── */}
+        <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 text-white shadow-xl shadow-slate-900/10 border border-slate-800">
+          <div className="grid grid-cols-2 gap-4 pb-3.5 border-b border-slate-700/60">
+            <div>
+              <div className="flex items-center gap-1.5 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                <span>💵 Laci Tunai</span>
+              </div>
+              <div className="text-base font-black text-white mt-1 tabular-nums">
+                {fmt(pnlSummary?.saldoBukuCash ?? 0)}
+              </div>
             </div>
-            <span className="text-xs font-bold text-slate-700 text-center mt-1.5">Kasir POS</span>
-          </Link>
 
-          <Link href="/manager/orders" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#EFF6FF" }}>
-              <ClipboardList size={20} style={{ color: "#2563EB" }} />
-            </div>
-            <span className="text-xs font-bold text-slate-700 text-center mt-1.5">Pesanan</span>
-          </Link>
-
-          <Link href="/manager/expenses" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#FEF2F2" }}>
-              <Banknote size={20} style={{ color: "#DC2626" }} />
-            </div>
-            <span className="text-xs font-bold text-slate-700 text-center mt-1.5">Pengeluaran</span>
-          </Link>
-
-          <Link href="/manager/reports" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#F0FDF4" }}>
-              <FileText size={20} style={{ color: "#16A34A" }} />
-            </div>
-            <span className="text-xs font-bold text-slate-700 text-center mt-1.5">Laporan P&L</span>
-          </Link>
-
-          <Link href="/manager/tasks" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#FFFBEB" }}>
-              <ClipboardList size={20} style={{ color: "#D97706" }} />
-            </div>
-            <span className="text-xs font-bold text-slate-700 text-center mt-1.5">Beri Tugas</span>
-          </Link>
-
-          <Link href="/manager/employees" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#F5F3FF" }}>
-              <Users size={20} style={{ color: "#7C3AED" }} />
-            </div>
-            <span className="text-xs font-bold text-slate-700 text-center mt-1.5">Karyawan</span>
-          </Link>
-
-          <Link href="/manager/inventory" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#F0FDFA" }}>
-              <Package size={20} style={{ color: "#0D9488" }} />
-            </div>
-            <span className="text-xs font-bold text-slate-700 text-center mt-1.5">Inventori</span>
-          </Link>
-
-          <Link href="/manager/master-data" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: "#F8FAFC" }}>
-              <Database size={20} style={{ color: "#64748B" }} />
-            </div>
-            <span className="text-xs font-bold text-slate-700 text-center mt-1.5">Master Data</span>
-          </Link>
-
-          {/* Extra Operational Menus */}
-          <Link href="/manager/purchases" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-emerald-50">
-              <Package size={20} className="text-emerald-500" />
-            </div>
-            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">Belanja<br/>Bahan</span>
-          </Link>
-
-          <Link href="/manager/inventory/stock-opname" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-amber-50">
-              <ClipboardList size={20} className="text-amber-500" />
-            </div>
-            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">Stock<br/>Opname</span>
-          </Link>
-
-          <Link href="/manager/bom" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-rose-50">
-              <BookOpen size={20} className="text-rose-500" />
-            </div>
-            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">BOM &<br/>Resep</span>
-          </Link>
-
-          <Link href="/manager/productions" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-orange-50">
-              <ChefHat size={20} className="text-orange-500" />
-            </div>
-            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">Laporan<br/>Produksi</span>
-          </Link>
-
-          <Link href="/manager/pre-packing" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-indigo-50">
-              <ClipboardList size={20} className="text-indigo-500" />
-            </div>
-            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">Pre<br/>Packing</span>
-          </Link>
-
-          <Link href="/manager/packing" className="flex flex-col items-center tap-target">
-            <div className="h-11 w-11 rounded-2xl flex items-center justify-center bg-cyan-50">
-              <Package size={20} className="text-cyan-500" />
-            </div>
-            <span className="text-[11px] leading-tight font-bold text-slate-700 text-center mt-1.5">Packing<br/>Kirim</span>
-          </Link>
-        </div>
-
-      </div>
-
-      {/* ── Stats Section ── */}
-      <div className="px-4 pt-4 flex flex-col gap-2.5 md:px-8 md:max-w-5xl">
-
-        {/* Omzet Card */}
-        <div
-          data-testid="omzet-card"
-          style={{ background: "#fff", borderRadius: "14px", padding: "14px 16px", border: "1px solid #F1F5F9" }}
-        >
-          <div className="flex justify-between items-center" style={{ marginBottom: "8px" }}>
-            <span style={{ fontSize: "12px", fontWeight: "500", color: "#64748B" }}>Omzet Hari Ini</span>
-            <span style={{ fontSize: "11px", fontWeight: "500", color: "#16A34A" }}>↑ {omzetPct}%</span>
-          </div>
-          <p data-testid="omzet-value" style={{ fontSize: "22px", fontWeight: "700", color: "#1C1C1E", marginBottom: "10px" }}>
-            {data ? fmt(data.omzet) : "Rp 0"}
-          </p>
-          <div style={{ height: "6px", borderRadius: "3px", background: "#F1F5F9" }}>
-            <div style={{ height: "6px", borderRadius: "3px", background: "linear-gradient(90deg,#E85D8C,#F2A0B7)", width: `${omzetPct}%`, transition: "width 0.6s ease" }} />
-          </div>
-          <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "6px" }}>Target: {fmt(DAILY_TARGET)}</p>
-        </div>
-
-        {/* 2-col stats */}
-        <div className="flex gap-2.5">
-          <div
-            data-testid="orders-count-card"
-            className="flex-1"
-            style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }}
-          >
-            <p style={{ fontSize: "11px", fontWeight: "500", color: "#64748B", marginBottom: "6px" }}>Pesanan</p>
-            <p style={{ fontSize: "20px", fontWeight: "700", color: "#1C1C1E" }}>{data?.orderCount ?? 0}</p>
-            <div style={{ height: "4px", borderRadius: "2px", background: "#F1F5F9", marginTop: "8px" }}>
-              <div style={{ height: "4px", borderRadius: "2px", background: "#16A34A", width: "72%" }} />
+            <div>
+              <div className="flex items-center gap-1.5 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                <span>🏦 Bank Transfer</span>
+              </div>
+              <div className="text-base font-black text-emerald-400 mt-1 tabular-nums">
+                {fmt(pnlSummary?.saldoBukuBank ?? 0)}
+              </div>
             </div>
           </div>
-          <div
-            data-testid="expenses-card"
-            className="flex-1"
-            style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }}
-          >
-            <p style={{ fontSize: "11px", fontWeight: "500", color: "#64748B", marginBottom: "6px" }}>Pengeluaran Hari Ini</p>
-            <p style={{ fontSize: "20px", fontWeight: "700", color: "#1C1C1E" }}>{data ? fmtShort(data.totalPengeluaran) : "Rp 0"}</p>
-            <div style={{ height: "4px", borderRadius: "2px", background: "#F1F5F9", marginTop: "8px" }}>
-              <div style={{ height: "4px", borderRadius: "2px", background: "#D97706", width: "45%" }} />
-            </div>
-          </div>
-        </div>
 
-        {/* Profit Card */}
-        <div
-          data-testid="profit-card"
-          style={{ background: "#fff", borderRadius: "14px", padding: "14px 16px", border: "1px solid #F1F5F9" }}
-        >
-          <div className="flex justify-between items-center" style={{ marginBottom: "8px" }}>
-            <span style={{ fontSize: "12px", fontWeight: "500", color: "#64748B" }}>Pemasukan Bersih</span>
-          </div>
-          <p data-testid="profit-value" style={{ fontSize: "22px", fontWeight: "700", color: "#16A34A", marginBottom: "4px" }}>
-            {data ? fmt(data.profit) : "Rp 0"}
-          </p>
-        </div>
-      </div>
-
-      {/* ── Low Stock Alert ── */}
-      {data && data.lowStockItems.length > 0 && (
-        <div className="px-4 pt-3 md:px-8 md:max-w-5xl">
-          <div style={{ padding: "10px 14px", borderRadius: "12px", background: "#FEF2F2", border: "1px solid #FECACA", display: "flex", alignItems: "center", gap: "8px" }}>
-            <AlertTriangle size={16} style={{ color: "#DC2626", flexShrink: 0 }} />
-            <span style={{ fontSize: "12px", fontWeight: "500", color: "#DC2626" }}>
-              {data.lowStockItems.length} bahan baku stok rendah
+          <div className="pt-3 flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
+              <CheckCircle2 size={13} className="text-emerald-400" /> Mutasi Real-time
             </span>
+
+            <Link
+              href="/manager/reports?tab=cashflow"
+              className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all flex items-center gap-1"
+            >
+              <ArrowLeftRight size={13} /> Setor / Mutasi Kas
+            </Link>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* ── Recent Orders ── */}
-      <div className="px-4 pt-5 pb-2 md:px-8 md:max-w-5xl">
-        <div className="flex items-center justify-between mb-3">
-          <h2 style={{ fontSize: "14px", fontWeight: "600", color: "#1C1C1E" }}>Pesanan Terbaru</h2>
-          <Link href="/manager/orders" className="text-xs font-semibold tap-target" style={{ color: "#E85D8C" }}>
-            Lihat semua
-          </Link>
-        </div>
-        <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden", border: "1px solid #F1F5F9" }} data-testid="recent-orders-card">
-          {recentOrders.length === 0 ? (
-            <div className="py-8 text-center" style={{ color: "#94A3B8", fontSize: "13px" }}>
-              Belum ada pesanan hari ini
+      <div className="px-4 md:px-8 max-w-5xl mx-auto space-y-6 pt-5">
+        
+        {/* ── Performance & Target Omzet Progress Bar ── */}
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider block">Target Omzet Penjualan Hari Ini</span>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-xl font-black text-slate-800 tabular-nums">{fmt(omzet)}</span>
+                <span className="text-xs font-bold text-slate-400">/ {fmt(DAILY_TARGET)}</span>
+              </div>
             </div>
-          ) : (
-            recentOrders.map((o, i) => (
-              <Link key={o.id} href={`/manager/orders/${o.id}`} data-testid={`recent-order-${i}`}>
-                <div
-                  className="flex items-start justify-between tap-target"
-                  style={{
-                    padding: "12px 14px",
-                    borderBottom: i < recentOrders.length - 1 ? "1px solid #F8FAFC" : "none",
-                  }}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div style={{
-                      width: "32px", height: "32px", borderRadius: "10px",
-                      background: "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "12px", fontWeight: "600", color: "#E85D8C", flexShrink: 0
-                    }}>
-                      {(o.customerName || "?")[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{o.customerName}</span>
-                        <span style={{ fontSize: "11px", color: "#94A3B8" }}>{o.orderNumber}</span>
-                      </div>
-                      <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>
-                        {new Date(o.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
-                      </p>
-                    </div>
+            <div className="text-right">
+              <span className={`text-sm font-black px-3 py-1 rounded-full ${omzetPct >= 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-primary/10 text-primary'}`}>
+                {omzetPct}%
+              </span>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden p-0.5">
+            <div 
+              className="h-full rounded-full bg-gradient-to-r from-primary via-rose-500 to-emerald-500 transition-all duration-700"
+              style={{ width: `${omzetPct}%` }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
+            <span>{data?.orderCount ?? 0} Transaksi Terproses</span>
+            <span>{omzet >= DAILY_TARGET ? "🎉 Target Tercapai!" : `Sisa Target: ${fmt(DAILY_TARGET - omzet)}`}</span>
+          </div>
+        </div>
+
+        {/* ── 4 Sektor ERP Quick Filter Tabs ── */}
+        <div className="flex bg-slate-200/60 p-1.5 rounded-2xl gap-1 overflow-x-auto hide-scrollbar">
+          {[
+            { id: "all", label: "Semua Fitur" },
+            { id: "penjualan", label: "🛒 Penjualan" },
+            { id: "keuangan", label: "💰 Keuangan" },
+            { id: "produksi", label: "📦 Stok & Produksi" },
+            { id: "sdm", label: "👥 SDM" },
+          ].map((sec) => (
+            <button
+              key={sec.id}
+              onClick={() => setActiveSector(sec.id as any)}
+              className={`flex-1 min-w-[90px] py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                activeSector === sec.id ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              {sec.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── ERP Apps Grid (Accurate / Odoo ERP Style) ── */}
+        <div className="space-y-5">
+          {/* SEKTOR 1: PENJUALAN */}
+          {(activeSector === "all" || activeSector === "penjualan") && (
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 space-y-3">
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <ShoppingCart size={14} className="text-primary" /> Sektor Penjualan & Kasir
+              </h2>
+              <div className="grid grid-cols-4 gap-3">
+                <Link href="/manager/pos" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-primary group-hover:scale-105 transition-transform shadow-sm">
+                    <ShoppingCart size={22} />
                   </div>
-                  <span
-                    style={{ padding: "3px 10px", borderRadius: "100px", fontSize: "10px", fontWeight: "500", ...getStatusStyle(o.status) }}
-                  >
-                    {getStatusLabel(o.status)}
-                  </span>
-                </div>
-              </Link>
-            ))
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Kasir POS</span>
+                </Link>
+
+                <Link href="/manager/orders" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <ClipboardList size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Pesanan</span>
+                </Link>
+
+                <Link href="/manager/master-data" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <Users size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Pelanggan</span>
+                </Link>
+
+                <Link href="/manager/orders" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <TrendingUp size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Omzet</span>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* SEKTOR 2: KEUANGAN & P&L */}
+          {(activeSector === "all" || activeSector === "keuangan") && (
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 space-y-3">
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Banknote size={14} className="text-emerald-600" /> Sektor Keuangan & P&L
+              </h2>
+              <div className="grid grid-cols-4 gap-3">
+                <Link href="/manager/reports" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <FileText size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Laporan P&L</span>
+                </Link>
+
+                <Link href="/manager/expenses" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <Banknote size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Pengeluaran</span>
+                </Link>
+
+                <Link href="/manager/purchases" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <Package size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Belanja Bahan</span>
+                </Link>
+
+                <Link href="/manager/reports?tab=cashflow" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-cyan-50 border border-cyan-100 flex items-center justify-center text-cyan-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <ArrowLeftRight size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Arus Kas</span>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* SEKTOR 3: PRODUKSI, BOM & STOK */}
+          {(activeSector === "all" || activeSector === "produksi") && (
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 space-y-3">
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Package size={14} className="text-teal-600" /> Sektor Produksi, BOM & Gudang
+              </h2>
+              <div className="grid grid-cols-4 gap-3">
+                <Link href="/manager/inventory" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <Package size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Inventori</span>
+                </Link>
+
+                <Link href="/manager/inventory/stock-opname" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <ClipboardList size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Stock Opname</span>
+                </Link>
+
+                <Link href="/manager/bom" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500 group-hover:scale-105 transition-transform shadow-sm">
+                    <BookOpen size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">BOM & Resep</span>
+                </Link>
+
+                <Link href="/manager/productions" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <ChefHat size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Produksi</span>
+                </Link>
+
+                <Link href="/manager/pre-packing" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <Layers size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Pre-Packing</span>
+                </Link>
+
+                <Link href="/manager/packing" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-cyan-50 border border-cyan-100 flex items-center justify-center text-cyan-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <Package size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Packing Kirim</span>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* SEKTOR 4: SDM & KARYAWAN */}
+          {(activeSector === "all" || activeSector === "sdm") && (
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 space-y-3">
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Users size={14} className="text-purple-600" /> Sektor SDM & Operasional
+              </h2>
+              <div className="grid grid-cols-4 gap-3">
+                <Link href="/manager/employees" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <Users size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Karyawan</span>
+                </Link>
+
+                <Link href="/manager/tasks" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <ClipboardList size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Beri Tugas</span>
+                </Link>
+
+                <Link href="/manager/master-data" className="flex flex-col items-center group">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 group-hover:scale-105 transition-transform shadow-sm">
+                    <Database size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 text-center mt-2">Master Data</span>
+                </Link>
+              </div>
+            </div>
           )}
         </div>
+
+        {/* ── Executive ERP KPI Widgets ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          {/* Executive Widget: Ringkasan Hari Ini */}
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Ringkasan Finansial Hari Ini</h3>
+              <Link href="/manager/reports" className="text-xs font-bold text-primary flex items-center gap-0.5 hover:underline">
+                P&L Detail <ChevronRight size={14} />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                <span className="text-[11px] font-bold text-slate-400 uppercase">Omzet Kotor</span>
+                <p className="text-base font-extrabold text-slate-800 mt-0.5">{fmt(data?.omzet ?? 0)}</p>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                <span className="text-[11px] font-bold text-slate-400 uppercase">Estimasi HPP</span>
+                <p className="text-base font-extrabold text-rose-600 mt-0.5">{fmt(data?.hpp ?? 0)}</p>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                <span className="text-[11px] font-bold text-slate-400 uppercase">Biaya Operasional</span>
+                <p className="text-base font-extrabold text-amber-600 mt-0.5">{fmt(data?.operationalExpenses ?? 0)}</p>
+              </div>
+
+              <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100">
+                <span className="text-[11px] font-bold text-emerald-700 uppercase">Estimasi Laba Bersih</span>
+                <p className="text-base font-extrabold text-emerald-700 mt-0.5">{fmt(data?.profit ?? 0)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Executive Widget: Low Stock Warnings */}
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-rose-500 flex items-center gap-1">
+                <AlertTriangle size={14} /> Peringatan Stok Menipis ({data?.lowStockItems?.length ?? 0})
+              </h3>
+              <Link href="/manager/inventory" className="text-xs font-bold text-primary flex items-center gap-0.5 hover:underline">
+                Cek Gudang <ChevronRight size={14} />
+              </Link>
+            </div>
+
+            {!data?.lowStockItems?.length ? (
+              <div className="py-6 text-center text-xs text-slate-400 font-semibold">
+                ✅ Semua stok bahan baku & kemasan dalam batas aman.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {data.lowStockItems.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between p-2.5 rounded-2xl bg-rose-50/60 border border-rose-100 text-xs">
+                    <span className="font-bold text-slate-800 truncate">{item.name}</span>
+                    <span className="font-black text-rose-600 bg-white px-2 py-0.5 rounded-lg border border-rose-200">
+                      {item.currentStock} / {item.minStock} {item.baseUnit}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
-
-      {/* ── Low Stock Detail ── */}
-      {data && data.lowStockItems.length > 0 && (
-        <div className="px-4 pt-3 pb-4 md:px-8 md:max-w-5xl">
-          <h2 className="mb-3" style={{ fontSize: "14px", fontWeight: "600", color: "#1C1C1E" }}>Bahan Menipis</h2>
-          <div style={{ background: "#FEF2F2", borderRadius: "14px", overflow: "hidden", border: "1px solid #FECACA" }} data-testid="low-stock-card">
-            {data.lowStockItems.map((item, i) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between"
-                style={{
-                  padding: "11px 14px",
-                  borderBottom: i < data.lowStockItems.length - 1 ? "1px solid #FECACA" : "none",
-                }}
-                data-testid={`low-stock-item-${i}`}
-              >
-                <span style={{ fontSize: "13px", fontWeight: "500", color: "#991B1B" }}>{item.name}</span>
-                <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 8px", borderRadius: "100px", color: "#DC2626", background: "#FEE2E2" }}>
-                  {item.currentStock}/{item.minStock} {item.baseUnit}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Produksi Hari Ini ── */}
-      {data && data.productionToday.length > 0 && (
-        <div className="px-4 pb-4 md:px-8 md:max-w-5xl">
-          <h2 className="mb-3" style={{ fontSize: "14px", fontWeight: "600", color: "#1C1C1E" }}>Produksi Hari Ini</h2>
-          <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden", border: "1px solid #F1F5F9" }} data-testid="production-today-card">
-            {data.productionToday.map((p, i) => (
-              <div
-                key={p.variantId}
-                className="flex items-center justify-between"
-                style={{
-                  padding: "11px 14px",
-                  borderBottom: i < data.productionToday.length - 1 ? "1px solid #F8FAFC" : "none",
-                }}
-              >
-                <span style={{ fontSize: "13px", fontWeight: "500", color: "#334155" }}>{p.variantName}</span>
-                <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 8px", borderRadius: "100px", color: "#E85D8C", background: "#FEF1F5" }}>
-                  {p.batches} batch · {p.loyangCount} loyang
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
