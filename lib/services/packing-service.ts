@@ -585,13 +585,16 @@ export async function packProduction(
   const stockId = `${productId}_${variantId}`;
   const stockRef = adminDb.collection("productStocks").doc(stockId);
 
-  let packagingIngId = "";
-  if (productId === "churros-frozen-regular") packagingIngId = "plastik-regular";
-  else if (productId === "churros-frozen-full") packagingIngId = "plastik-full";
-  else if (productId === "churros-frozen-tiktok") packagingIngId = "plastik-regular";
+  // Fetch packaging recipes dynamically from Firestore
+  const pkgRecipesSnap = await adminDb
+    .collection("packagingRecipes")
+    .where("productId", "==", productId)
+    .get();
 
-  const pkgRef = packagingIngId ? adminDb.collection("ingredients").doc(packagingIngId) : null;
-  const stikerRef = adminDb.collection("ingredients").doc("stiker-label");
+  const packagingItems = pkgRecipesSnap.docs.map((doc) => ({
+    ingredientId: doc.data().ingredientId as string,
+    qtyPerPack: (doc.data().qtyPerPack as number) || 1,
+  }));
 
   const prodDoc = await adminDb.collection("products").doc(productId).get();
   const packPerBatch = prodDoc.exists ? (prodDoc.data()?.packPerBatch ?? 16) : 16;
@@ -646,44 +649,28 @@ export async function packProduction(
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    if (pkgRef) {
-      const pkgSnap = await tx.get(pkgRef);
-      if (pkgSnap.exists) {
-        const curPkg = pkgSnap.data()?.currentStock ?? 0;
-        const nextPkg = curPkg - packQty;
-        tx.update(pkgRef, { currentStock: nextPkg });
+    // Deduct packaging materials dynamically
+    for (const pkgItem of packagingItems) {
+      const ingRef = adminDb.collection("ingredients").doc(pkgItem.ingredientId);
+      const ingSnap = await tx.get(ingRef);
+      if (ingSnap.exists) {
+        const totalUsed = pkgItem.qtyPerPack * packQty;
+        const curStock = ingSnap.data()?.currentStock ?? 0;
+        const nextStock = curStock - totalUsed;
+        tx.update(ingRef, { currentStock: nextStock });
 
         const mPkg = adminDb.collection("stockMovements").doc();
         tx.set(mPkg, {
-          ingredientId: packagingIngId,
-          changeAmount: -packQty,
-          newStockAfter: nextPkg,
+          ingredientId: pkgItem.ingredientId,
+          changeAmount: -totalUsed,
+          newStockAfter: nextStock,
           sourceType: "production",
           sourceId: null,
-          note: `Pemakaian plastik kemasan untuk ${packQty} pack ${stockId}`,
+          note: `Pemakaian kemasan (${ingSnap.data()?.name || pkgItem.ingredientId}) untuk ${packQty} pack ${stockId}`,
           createdBy: userId,
           createdAt: FieldValue.serverTimestamp(),
         });
       }
-    }
-
-    const stikerSnap = await tx.get(stikerRef);
-    if (stikerSnap.exists) {
-      const curStiker = stikerSnap.data()?.currentStock ?? 0;
-      const nextStiker = curStiker - packQty;
-      tx.update(stikerRef, { currentStock: nextStiker });
-
-      const mStiker = adminDb.collection("stockMovements").doc();
-      tx.set(mStiker, {
-        ingredientId: "stiker-label",
-        changeAmount: -packQty,
-        newStockAfter: nextStiker,
-        sourceType: "production",
-        sourceId: null,
-        note: `Pemakaian stiker label untuk ${packQty} pack ${stockId}`,
-        createdBy: userId,
-        createdAt: FieldValue.serverTimestamp(),
-      });
     }
   });
 

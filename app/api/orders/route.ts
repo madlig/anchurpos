@@ -281,6 +281,13 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // 3. Read Secondary Packaging Ingredient
+      const secondaryPackagingIngId = body.secondaryPackagingIngId;
+      let secPkgSnap: FirebaseFirestore.DocumentSnapshot | null = null;
+      if (secondaryPackagingIngId && secondaryPackagingIngId !== "none") {
+        secPkgSnap = await tx.get(adminDb.collection("ingredients").doc(secondaryPackagingIngId));
+      }
+
       // --- WRITES ---
 
       // Calculate platform fee & net revenue
@@ -354,6 +361,24 @@ export async function POST(req: NextRequest) {
             }
           }
         }
+      }
+
+      // Deduct secondary packaging (bag/box)
+      if (secPkgSnap && secPkgSnap.exists) {
+        const curSecStock = secPkgSnap.data()?.currentStock ?? 0;
+        const nextSecStock = curSecStock - 1;
+        tx.update(secPkgSnap.ref, { currentStock: nextSecStock });
+
+        const mSec = adminDb.collection("stockMovements").doc();
+        tx.set(mSec, {
+          ingredientId: secondaryPackagingIngId,
+          changeAmount: -1,
+          newStockAfter: nextSecStock,
+          sourceType: "sale",
+          sourceId: orderRef.id,
+          note: `Pemakaian kantong/kemasan pengiriman untuk order #${orderNumber}`,
+          createdAt: dateToUse,
+        });
       }
 
       // Jika ongkir ditanggung penjual, otomatis catat sebagai pengeluaran (expense)

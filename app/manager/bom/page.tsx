@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Plus, Trash2, Save, BookOpen, AlertCircle } from "lucide-react";
+import { Loader2, Plus, Trash2, Save, BookOpen, Package, Layers } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 interface Product {
@@ -22,6 +22,7 @@ interface Ingredient {
   name: string;
   baseUnit: string;
   defaultCostPerBaseUnit: number;
+  category?: string;
 }
 
 interface RecipeItem {
@@ -31,72 +32,122 @@ interface RecipeItem {
   unit: string;
 }
 
+interface PackagingRecipeItem {
+  id?: string;
+  ingredientId: string;
+  qtyPerPack: number;
+  unit: string;
+}
+
 export default function BomPage() {
   const { getToken } = useAuth();
+  const [activeTab, setActiveTab] = useState<"food" | "packaging">("food");
+
   const [products, setProducts] = useState<Product[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  
+
+  // Food Recipe States
   const [selectedProductId, setSelectedProductId] = useState("");
   const [selectedVariantId, setSelectedVariantId] = useState("");
   const [recipes, setRecipes] = useState<RecipeItem[]>([]);
-  
+
+  // Packaging Recipe States
+  const [selectedPkgProductId, setSelectedPkgProductId] = useState("");
+  const [pkgRecipes, setPkgRecipes] = useState<PackagingRecipeItem[]>([]);
+
   const [loadingData, setLoadingData] = useState(true);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
-  const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
-    const token = await getToken();
-    return fetch(url, { ...options, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options?.headers } });
-  }, [getToken]);
+  const fetchWithAuth = useCallback(
+    async (url: string, options?: RequestInit) => {
+      const token = await getToken();
+      return fetch(url, {
+        ...options,
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options?.headers },
+      });
+    },
+    [getToken]
+  );
 
   useEffect(() => {
     Promise.all([
-      fetchWithAuth("/api/products").then(r => r.ok ? r.json() : []),
-      fetchWithAuth("/api/variants").then(r => r.ok ? r.json() : []),
-      fetchWithAuth("/api/ingredients").then(r => r.ok ? r.json() : [])
-    ]).then(([p, v, i]) => {
-      setProducts(Array.isArray(p) ? p : []);
-      setVariants(Array.isArray(v) ? v : []);
-      setIngredients(Array.isArray(i) ? i : []);
-    }).finally(() => setLoadingData(false));
+      fetchWithAuth("/api/products").then((r) => (r.ok ? r.json() : [])),
+      fetchWithAuth("/api/variants").then((r) => (r.ok ? r.json() : [])),
+      fetchWithAuth("/api/ingredients").then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([p, v, i]) => {
+        const prodList = Array.isArray(p) ? p : [];
+        setProducts(prodList);
+        setVariants(Array.isArray(v) ? v : []);
+        setIngredients(Array.isArray(i) ? i : []);
+
+        if (prodList.length > 0) {
+          setSelectedPkgProductId(prodList[0].id);
+        }
+      })
+      .finally(() => setLoadingData(false));
   }, [fetchWithAuth]);
 
+  // Fetch Food Recipe
   useEffect(() => {
     if (!selectedVariantId) {
       setRecipes([]);
       return;
     }
-    
+
     setLoadingRecipes(true);
     fetchWithAuth(`/api/recipes?variantId=${selectedVariantId}`)
-      .then(res => res.ok ? res.json() : [])
-      .then(data => {
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
         setRecipes(Array.isArray(data) ? data : []);
       })
       .finally(() => setLoadingRecipes(false));
   }, [selectedVariantId, fetchWithAuth]);
 
-  const filteredVariants = useMemo(() => {
-    // Varian bersifat global, jadi tampilkan semua varian (atau bisa filter yang isProductionVariant jika perlu)
-    return variants;
-  }, [variants]);
+  // Fetch Packaging Recipe
+  useEffect(() => {
+    if (!selectedPkgProductId) {
+      setPkgRecipes([]);
+      return;
+    }
 
-  const selectedProduct = products.find(p => p.id === selectedProductId);
+    setLoadingRecipes(true);
+    fetchWithAuth(`/api/recipes/packaging?productId=${selectedPkgProductId}`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        setPkgRecipes(Array.isArray(data) ? data : []);
+      })
+      .finally(() => setLoadingRecipes(false));
+  }, [selectedPkgProductId, fetchWithAuth]);
+
+  // Cost calculations
+  const selectedProduct = products.find((p) => p.id === selectedProductId);
   const packPerBatch = selectedProduct?.packPerBatch || 1;
 
-  const totalCostPerBatch = useMemo(() => {
+  const totalFoodCostPerBatch = useMemo(() => {
     return recipes.reduce((sum, item) => {
-      const ing = ingredients.find(i => i.id === item.ingredientId);
+      const ing = ingredients.find((i) => i.id === item.ingredientId);
       if (!ing) return sum;
-      return sum + (ing.defaultCostPerBaseUnit * item.qtyPerBatch);
+      return sum + ing.defaultCostPerBaseUnit * item.qtyPerBatch;
     }, 0);
   }, [recipes, ingredients]);
 
-  const costPerPack = totalCostPerBatch / packPerBatch;
+  const foodCostPerPack = totalFoodCostPerBatch / packPerBatch;
 
+  const selectedPkgProduct = products.find((p) => p.id === selectedPkgProductId);
+  const totalPackagingCostPerPack = useMemo(() => {
+    return pkgRecipes.reduce((sum, item) => {
+      const ing = ingredients.find((i) => i.id === item.ingredientId);
+      if (!ing) return sum;
+      return sum + ing.defaultCostPerBaseUnit * item.qtyPerPack;
+    }, 0);
+  }, [pkgRecipes, ingredients]);
+
+  // Food Recipe Handlers
   const handleAddIngredient = () => {
     setRecipes([...recipes, { ingredientId: "", qtyPerBatch: 0, unit: "" }]);
   };
@@ -110,25 +161,20 @@ export default function BomPage() {
   const handleChange = (index: number, field: keyof RecipeItem, value: any) => {
     const newR = [...recipes];
     newR[index] = { ...newR[index], [field]: value };
-    
-    // Auto-fill unit based on ingredient
     if (field === "ingredientId") {
-      const ing = ingredients.find(i => i.id === value);
-      if (ing) {
-        newR[index].unit = ing.baseUnit;
-      }
+      const ing = ingredients.find((i) => i.id === value);
+      if (ing) newR[index].unit = ing.baseUnit;
     }
     setRecipes(newR);
   };
 
-  const handleSave = async () => {
+  const handleSaveFoodRecipe = async () => {
     if (!selectedProductId || !selectedVariantId) {
       setError("Pilih Produk dan Varian terlebih dahulu");
       return;
     }
-    
-    // Validasi input
-    if (recipes.some(r => !r.ingredientId || r.qtyPerBatch <= 0)) {
+
+    if (recipes.some((r) => !r.ingredientId || r.qtyPerBatch <= 0)) {
       setError("Pastikan semua bahan telah dipilih dan kuantitas > 0");
       return;
     }
@@ -143,200 +189,387 @@ export default function BomPage() {
         body: JSON.stringify({
           productId: selectedProductId,
           variantId: selectedVariantId,
-          recipes
-        })
+          recipes,
+        }),
       });
 
       if (!res.ok) {
         const d = await res.json();
-        setError(d.error || "Gagal menyimpan resep");
-      } else {
-        setSuccess("Resep berhasil disimpan dan diperbarui!");
-        setTimeout(() => setSuccess(""), 4000);
+        throw new Error(d.error || "Gagal menyimpan resep");
       }
-    } catch(err) {
-      setError("Kesalahan jaringan");
+
+      setSuccess("Resep adonan makanan berhasil disimpan!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err: any) {
+      setError(err.message || "Gagal menyimpan resep");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Packaging Recipe Handlers
+  const handleAddPkgIngredient = () => {
+    setPkgRecipes([...pkgRecipes, { ingredientId: "", qtyPerPack: 1, unit: "pcs" }]);
+  };
+
+  const handleRemovePkgIngredient = (index: number) => {
+    const newP = [...pkgRecipes];
+    newP.splice(index, 1);
+    setPkgRecipes(newP);
+  };
+
+  const handlePkgChange = (index: number, field: keyof PackagingRecipeItem, value: any) => {
+    const newP = [...pkgRecipes];
+    newP[index] = { ...newP[index], [field]: value };
+    if (field === "ingredientId") {
+      const ing = ingredients.find((i) => i.id === value);
+      if (ing) newP[index].unit = ing.baseUnit;
+    }
+    setPkgRecipes(newP);
+  };
+
+  const handleSavePkgRecipe = async () => {
+    if (!selectedPkgProductId) {
+      setError("Pilih Produk Jadi terlebih dahulu");
+      return;
+    }
+
+    if (pkgRecipes.some((r) => !r.ingredientId || r.qtyPerPack <= 0)) {
+      setError("Pastikan semua kemasan telah dipilih dan kuantitas > 0");
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetchWithAuth("/api/recipes/packaging", {
+        method: "POST",
+        body: JSON.stringify({
+          productId: selectedPkgProductId,
+          items: pkgRecipes,
+        }),
+      });
+
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || "Gagal menyimpan resep kemasan");
+      }
+
+      setSuccess("Resep kemasan (Packaging BOM) berhasil disimpan!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err: any) {
+      setError(err.message || "Gagal menyimpan resep kemasan");
     } finally {
       setSubmitting(false);
     }
   };
 
   if (loadingData) {
-    return <div className="flex justify-center p-12"><Loader2 size={32} className="animate-spin text-slate-400" /></div>;
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="animate-spin text-slate-400" size={32} />
+      </div>
+    );
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-6 max-w-5xl mx-auto pb-32">
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100 text-primary">
-          <BookOpen size={24} />
-        </div>
+    <div className="max-w-4xl mx-auto space-y-6 pb-20">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
         <div>
-          <h1 className="text-xl md:text-2xl font-extrabold text-slate-800">BOM & Resep</h1>
-          <p className="text-xs md:text-sm text-slate-500 font-medium">Bill of Materials & Estimasi HPP</p>
+          <h1 className="text-xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
+            <BookOpen className="text-primary" size={24} />
+            Master BOM & Resep Produksi
+          </h1>
+          <p className="text-xs font-semibold text-slate-500 mt-1">
+            Kelola resep adonan makanan (BOM Bahan Baku) dan resep kemasan (BOM Packaging) untuk perhitungan HPP presisi.
+          </p>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
+          <button
+            onClick={() => setActiveTab("food")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              activeTab === "food" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <Layers size={14} />
+            Resep Adonan
+          </button>
+          <button
+            onClick={() => setActiveTab("packaging")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              activeTab === "packaging" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <Package size={14} />
+            Resep Kemasan (BOM)
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 space-y-2">
-          <label className="text-xs font-bold text-slate-700">1. Pilih Produk</label>
-          <select 
-            className="w-full text-sm font-medium border-slate-200 rounded-xl h-12 bg-slate-50 text-slate-800 pl-4 pr-10 appearance-none focus:border-primary/50 outline-none"
-            value={selectedProductId} 
-            onChange={e => {
-              setSelectedProductId(e.target.value);
-              setSelectedVariantId("");
-            }}
-          >
-            <option value="">-- Produk --</option>
-            {products.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+      {error && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">
+          {error}
         </div>
-
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 space-y-2">
-          <label className="text-xs font-bold text-slate-700">2. Pilih Varian</label>
-          <select 
-            className="w-full text-sm font-medium border-slate-200 rounded-xl h-12 bg-slate-50 text-slate-800 pl-4 pr-10 appearance-none focus:border-primary/50 outline-none"
-            value={selectedVariantId} 
-            onChange={e => setSelectedVariantId(e.target.value)}
-            disabled={!selectedProductId}
-          >
-            <option value="">-- Varian --</option>
-            {filteredVariants.map(v => (
-              <option key={v.id} value={v.id}>{v.name}</option>
-            ))}
-          </select>
+      )}
+      {success && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+          {success}
         </div>
-      </div>
+      )}
 
-      {selectedVariantId && (
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 animate-fade-in">
-          <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
+      {/* TAB 1: RESEP ADONAN MAKANAN */}
+      {activeTab === "food" && (
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h2 className="text-base font-extrabold text-slate-800">Komposisi Resep (1 Batch)</h2>
-              <p className="text-xs text-slate-500 mt-1">Sistem akan memotong stok bahan ini setiap kali Anda memproduksi 1 batch ({packPerBatch} pack) {selectedProduct?.name}.</p>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                1. Pilih Produk
+              </label>
+              <select
+                value={selectedProductId}
+                onChange={(e) => {
+                  setSelectedProductId(e.target.value);
+                  setSelectedVariantId("");
+                }}
+                className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white"
+              >
+                <option value="">-- Pilih Produk --</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                2. Pilih Varian Rasa
+              </label>
+              <select
+                value={selectedVariantId}
+                onChange={(e) => setSelectedVariantId(e.target.value)}
+                disabled={!selectedProductId}
+                className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white disabled:opacity-50"
+              >
+                <option value="">-- Pilih Varian --</option>
+                {variants.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {loadingRecipes ? (
-            <div className="flex justify-center p-8"><Loader2 size={24} className="animate-spin text-slate-400" /></div>
-          ) : (
-            <div className="space-y-4">
-              {recipes.length === 0 && (
-                <div className="p-8 text-center text-slate-400 text-sm font-medium border-2 border-dashed border-slate-200 rounded-2xl">
-                  Belum ada bahan untuk resep ini.
-                </div>
-              )}
-
-              {recipes.map((item, index) => {
-                const ing = ingredients.find(i => i.id === item.ingredientId);
-                const cost = ing ? ing.defaultCostPerBaseUnit * item.qtyPerBatch : 0;
-                
-                return (
-                  <div key={index} className="flex flex-col md:flex-row gap-3 p-4 bg-slate-50 rounded-2xl items-end relative group">
-                    <div className="flex-1 w-full space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Bahan Baku</label>
-                      <select 
-                        className="w-full text-sm font-medium border-slate-200 rounded-xl h-11 bg-white text-slate-800 pl-3 pr-8 appearance-none focus:border-primary/50 outline-none"
-                        value={item.ingredientId} 
-                        onChange={e => handleChange(index, "ingredientId", e.target.value)}
-                      >
-                        <option value="">Pilih Bahan...</option>
-                        {ingredients.map(i => (
-                          <option key={i.id} value={i.id}>{i.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div className="w-full md:w-32 space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Kuantitas</label>
-                      <Input 
-                        type="number" step="0.01"
-                        value={item.qtyPerBatch || ""}
-                        onChange={e => handleChange(index, "qtyPerBatch", parseFloat(e.target.value))}
-                        className="h-11 rounded-xl text-sm font-bold bg-white"
-                        placeholder="0"
-                      />
-                    </div>
-
-                    <div className="w-full md:w-24 space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Satuan</label>
-                      <Input 
-                        value={item.unit}
-                        disabled
-                        className="h-11 rounded-xl text-sm font-medium bg-slate-100 text-slate-500"
-                      />
-                    </div>
-                    
-                    <div className="w-full md:w-32 space-y-1 text-right">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase">Estimasi Biaya</label>
-                      <div className="h-11 flex flex-col justify-center px-3 bg-white rounded-xl text-sm font-bold text-slate-700 border border-slate-200">
-                        <span>Rp {cost.toLocaleString("id-ID")}</span>
-                      </div>
-                      {ing && ing.defaultCostPerBaseUnit === 0 && (
-                        <p className="text-[9px] text-red-400 leading-tight mt-0.5 text-left">
-                          *HPP Dasar di Master Data belum diisi
-                        </p>
-                      )}
-                    </div>
-
-                    <button 
-                      onClick={() => handleRemoveIngredient(index)}
-                      className="absolute -top-2 -right-2 md:static md:top-auto md:right-auto h-8 w-8 md:h-11 md:w-11 bg-white md:bg-transparent rounded-full md:rounded-xl text-red-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors shadow-sm md:shadow-none border border-slate-200 md:border-none"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+          {selectedVariantId && (
+            <>
+              {/* Cost Summary */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-[11px] font-bold text-slate-400 uppercase">HPP Adonan / Batch</div>
+                  <div className="text-base font-extrabold text-slate-800">
+                    Rp {totalFoodCostPerBatch.toLocaleString("id-ID")}
                   </div>
-                );
-              })}
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold text-slate-400 uppercase">Estimasi HPP Bahan / Pack</div>
+                  <div className="text-base font-extrabold text-emerald-600">
+                    Rp {Math.round(foodCostPerPack).toLocaleString("id-ID")}
+                  </div>
+                </div>
+              </div>
 
-              <button 
-                onClick={handleAddIngredient}
-                className="w-full py-4 border-2 border-dashed border-primary/30 rounded-2xl text-sm font-bold text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
+              {/* Recipe List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+                    Daftar Bahan Baku Makanan Per Adonan (Batch)
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleAddIngredient}
+                    className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+                  >
+                    <Plus size={14} /> Tambah Bahan
+                  </button>
+                </div>
+
+                {loadingRecipes ? (
+                  <div className="py-8 text-center text-slate-400">
+                    <Loader2 className="animate-spin inline" size={20} />
+                  </div>
+                ) : recipes.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-slate-400 font-semibold border-2 border-dashed border-slate-200 rounded-2xl">
+                    Belum ada bahan makanan yang didaftarkan. Klik Tambah Bahan.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {recipes.map((item, idx) => (
+                      <div key={idx} className="flex gap-2 items-center">
+                        <select
+                          value={item.ingredientId}
+                          onChange={(e) => handleChange(idx, "ingredientId", e.target.value)}
+                          className="flex-1 h-10 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white"
+                        >
+                          <option value="">-- Pilih Bahan Baku --</option>
+                          {ingredients.map((ing) => (
+                            <option key={ing.id} value={ing.id}>
+                              {ing.name} ({ing.baseUnit})
+                            </option>
+                          ))}
+                        </select>
+
+                        <Input
+                          type="number"
+                          step="any"
+                          placeholder="Jumlah"
+                          value={item.qtyPerBatch || ""}
+                          onChange={(e) => handleChange(idx, "qtyPerBatch", parseFloat(e.target.value) || 0)}
+                          className="w-28 h-10 text-xs font-bold"
+                        />
+
+                        <span className="w-12 text-xs font-bold text-slate-500">{item.unit || "-"}</span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveIngredient(idx)}
+                          className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveFoodRecipe}
+                disabled={submitting}
+                className="w-full h-12 rounded-2xl bg-primary text-white font-extrabold text-sm shadow-md shadow-primary/20 hover:bg-primary/90 flex items-center justify-center gap-2"
               >
-                <Plus size={18} /> Tambah Bahan Baku
+                {submitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                Simpan Resep Adonan
               </button>
-            </div>
+            </>
           )}
         </div>
       )}
 
-      {selectedVariantId && !loadingRecipes && (
-        <div className="bg-brand-50 border border-brand-200 rounded-3xl p-5 shadow-sm animate-fade-in flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-start gap-3">
-            <div className="mt-1 text-brand-600"><AlertCircle size={20} /></div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Estimasi HPP (Harga Pokok Penjualan)</p>
-              <div className="flex gap-6 mt-1">
-                <div>
-                  <p className="text-xl font-black text-brand-700">Rp {costPerPack.toLocaleString("id-ID")}</p>
-                  <p className="text-[10px] text-brand-600 font-medium">Per Pack/Porsi</p>
-                </div>
-                <div>
-                  <p className="text-xl font-black text-slate-800">Rp {totalCostPerBatch.toLocaleString("id-ID")}</p>
-                  <p className="text-[10px] text-slate-500 font-medium">Total 1 Batch ({packPerBatch} pack)</p>
+      {/* TAB 2: RESEP KEMASAN (PACKAGING BOM) */}
+      {activeTab === "packaging" && (
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-6">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+              Pilih Produk Jadi (Yang Dipacking)
+            </label>
+            <select
+              value={selectedPkgProductId}
+              onChange={(e) => setSelectedPkgProductId(e.target.value)}
+              className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white"
+            >
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedPkgProductId && (
+            <>
+              {/* Cost Summary Packaging */}
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200">
+                <div className="text-[11px] font-bold text-amber-800 uppercase">HPP Kemasan Per 1 Pack</div>
+                <div className="text-base font-extrabold text-amber-900 mt-0.5">
+                  Rp {Math.round(totalPackagingCostPerPack).toLocaleString("id-ID")}
                 </div>
               </div>
-            </div>
-          </div>
-          
-          <div className="w-full md:w-auto flex flex-col items-end">
-             {error && <p className="text-xs text-red-600 font-bold mb-2">{error}</p>}
-             {success && <p className="text-xs text-green-600 font-bold mb-2">{success}</p>}
-             <button
-               onClick={handleSave}
-               disabled={submitting}
-               className="w-full md:w-auto h-12 px-8 rounded-xl text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-               style={{ background: "linear-gradient(135deg, #E85D8C 0%, #D84275 100%)", boxShadow: "0 4px 12px rgba(232,93,140,0.2)" }}
-             >
-               {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save size={18} /> Simpan Resep</>}
-             </button>
-          </div>
+
+              {/* Packaging Recipe List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+                    Daftar Kemasan per 1 Pack ({selectedPkgProduct?.name})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleAddPkgIngredient}
+                    className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+                  >
+                    <Plus size={14} /> Tambah Kemasan
+                  </button>
+                </div>
+
+                {loadingRecipes ? (
+                  <div className="py-8 text-center text-slate-400">
+                    <Loader2 className="animate-spin inline" size={20} />
+                  </div>
+                ) : pkgRecipes.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-slate-400 font-semibold border-2 border-dashed border-slate-200 rounded-2xl">
+                    Belum ada bahan kemasan terdaftar. Klik Tambah Kemasan.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {pkgRecipes.map((item, idx) => (
+                      <div key={idx} className="flex gap-2 items-center">
+                        <select
+                          value={item.ingredientId}
+                          onChange={(e) => handlePkgChange(idx, "ingredientId", e.target.value)}
+                          className="flex-1 h-10 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white"
+                        >
+                          <option value="">-- Pilih Bahan Kemasan / Operasional --</option>
+                          {ingredients.map((ing) => (
+                            <option key={ing.id} value={ing.id}>
+                              {ing.name} ({ing.baseUnit})
+                            </option>
+                          ))}
+                        </select>
+
+                        <Input
+                          type="number"
+                          step="any"
+                          placeholder="Qty"
+                          value={item.qtyPerPack || ""}
+                          onChange={(e) => handlePkgChange(idx, "qtyPerPack", parseFloat(e.target.value) || 0)}
+                          className="w-28 h-10 text-xs font-bold"
+                        />
+
+                        <span className="w-12 text-xs font-bold text-slate-500">{item.unit || "pcs"}</span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePkgIngredient(idx)}
+                          className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSavePkgRecipe}
+                disabled={submitting}
+                className="w-full h-12 rounded-2xl bg-primary text-white font-extrabold text-sm shadow-md shadow-primary/20 hover:bg-primary/90 flex items-center justify-center gap-2"
+              >
+                {submitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                Simpan Resep Kemasan (Packaging BOM)
+              </button>
+            </>
+          )}
         </div>
       )}
-
     </div>
   );
 }

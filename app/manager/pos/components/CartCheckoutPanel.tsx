@@ -64,6 +64,32 @@ export function CartCheckoutPanel({
   const [shippingCost, setShippingCost] = useState("");
   const [shippingBorneBy, setShippingBorneBy] = useState<"seller" | "customer">("customer");
 
+  // Secondary Packaging state
+  const [posRules, setPosRules] = useState<Array<{ minQty: number; maxQty: number; ingredientId: string }>>([]);
+  const [packagingIngredients, setPackagingIngredients] = useState<Array<{ id: string; name: string }>>([]);
+  const [secondaryPackagingIngId, setSecondaryPackagingIngId] = useState<string>("none");
+
+  const totalPacksInCart = useMemo(() => cart.reduce((sum, item) => sum + item.qty, 0), [cart]);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/settings/pos-packaging").then(r => r.ok ? r.json() : { rules: [] }),
+      fetch("/api/ingredients").then(r => r.ok ? r.json() : [])
+    ]).then(([pRulesData, ingsData]) => {
+      const rules = Array.isArray(pRulesData.rules) ? pRulesData.rules : [];
+      setPosRules(rules);
+      setPackagingIngredients(Array.isArray(ingsData) ? ingsData : []);
+
+      // Smart Auto-Select for non-walkin or when items in cart
+      if (orderChannel !== "walkin") {
+        const matchedRule = rules.find((r: any) => totalPacksInCart >= r.minQty && totalPacksInCart <= r.maxQty);
+        if (matchedRule?.ingredientId) {
+          setSecondaryPackagingIngId(matchedRule.ingredientId);
+        }
+      }
+    });
+  }, [orderChannel, totalPacksInCart]);
+
   const [sauceDist, setSauceDist] = useState<Record<string, number>>({});
   
   const computedSauceDist = useMemo(() => {
@@ -175,6 +201,7 @@ export function CartCheckoutPanel({
           })),
           orderNotes: orderNotes.trim() || null, paymentMethod: isPaid ? payMethod : null, paymentStatus: isPaid ? "sudah_bayar" : "belum_bayar",
           poNumber: showPoNumber && poNumber.trim() ? poNumber.trim() : null,
+          secondaryPackagingIngId,
           customDate: enableCustomDate && customOrderDate ? customOrderDate : undefined,
           shippingCost: orderChannel === "whatsapp" && deliveryMethod !== "pickup" ? (parseInt(shippingCost) || 0) : null,
           shippingBorneBy: orderChannel === "whatsapp" && deliveryMethod !== "pickup" ? shippingBorneBy : null,
@@ -337,6 +364,26 @@ export function CartCheckoutPanel({
             )}
           </div>
         )}
+
+        {/* Secondary Packaging (Kantong / Kardus Pengiriman) */}
+        <div className="mb-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Kemasan Pengiriman / Kantong</label>
+            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">Smart Auto-Select</span>
+          </div>
+          <select
+            value={secondaryPackagingIngId}
+            onChange={(e) => setSecondaryPackagingIngId(e.target.value)}
+            className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white"
+          >
+            <option value="none">-- Tanpa Kantong / Kemasan Tambahan --</option>
+            {packagingIngredients.map((ing) => (
+              <option key={ing.id} value={ing.id}>
+                🛍️ {ing.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* Back-dated Order */}
         {role && (role === "owner" || role === "manager") && (

@@ -48,6 +48,12 @@ export default function ManagerSettingsPage() {
   const [savingInventory, setSavingInventory] = useState(false);
   const [inventorySaved, setInventorySaved] = useState("");
 
+  // POS Packaging Rules state
+  const [posRules, setPosRules] = useState<Array<{ id: string; minQty: number; maxQty: number; ingredientId: string; isActive: boolean }>>([]);
+  const [allIngredients, setAllIngredients] = useState<Array<{ id: string; name: string; baseUnit: string }>>([]);
+  const [savingPosRules, setSavingPosRules] = useState(false);
+  const [posRulesSaved, setPosRulesSaved] = useState("");
+
   function handleAddKeyword() {
     const val = newKeyword.trim().toLowerCase();
     if (val && !inventoryKeywords.includes(val)) {
@@ -73,11 +79,13 @@ export default function ManagerSettingsPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const [res, targetRes, feeRes, invRes] = await Promise.all([
+      const [res, targetRes, feeRes, invRes, posRulesRes, ingRes] = await Promise.all([
         fetchWithAuth("/api/settings/attendance"),
         fetchWithAuth("/api/settings/production"),
         fetchWithAuth("/api/settings/marketplace-fee"),
         fetchWithAuth("/api/settings/inventory"),
+        fetchWithAuth("/api/settings/pos-packaging"),
+        fetchWithAuth("/api/ingredients"),
       ]);
       if (res.ok) {
         const c = await res.json();
@@ -97,6 +105,16 @@ export default function ManagerSettingsPage() {
       if (invRes.ok) {
         const i = await invRes.json();
         setInventoryKeywords(i.glazeKeywords || []);
+      }
+
+      if (posRulesRes.ok) {
+        const pRules = await posRulesRes.json();
+        setPosRules(Array.isArray(pRules.rules) ? pRules.rules : []);
+      }
+
+      if (ingRes.ok) {
+        const ings = await ingRes.json();
+        setAllIngredients(Array.isArray(ings) ? ings : []);
       }
     } catch (err) {
       console.error(err);
@@ -482,6 +500,100 @@ export default function ManagerSettingsPage() {
           Simpan Kata Kunci
         </Button>
         {inventorySaved && <p style={{ fontSize: "12px", color: "#16A34A", fontWeight: "600" }}>✓ {inventorySaved}</p>}
+      </Card>
+
+      {/* ── POS Packaging Rules Card ── */}
+      <Card className="p-5 space-y-4 mb-8">
+        <div className="flex items-center gap-2">
+          <div style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Package size={16} className="text-primary" />
+          </div>
+          <div>
+            <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>Aturan Kemasan Sekunder POS (Smart Auto-Select)</p>
+            <p style={{ fontSize: "11px", color: "#94A3B8" }}>Tentukan otomatisasi pemilihan kantong/kardus di Kasir berdasarkan rentang Qty order.</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {posRules.map((rule, idx) => (
+            <div key={rule.id || idx} className="flex flex-wrap md:flex-nowrap gap-2 items-center bg-slate-50 p-3 rounded-2xl border border-slate-200">
+              <span className="text-xs font-bold text-slate-500 min-w-[70px]">Rentang Pack:</span>
+              <Input
+                type="number"
+                placeholder="Min Qty"
+                value={rule.minQty}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 1;
+                  setPosRules(prev => prev.map((r, i) => i === idx ? { ...r, minQty: val } : r));
+                }}
+                className="w-20 h-9 text-xs font-bold bg-white"
+              />
+              <span className="text-xs font-bold text-slate-400">s/d</span>
+              <Input
+                type="number"
+                placeholder="Max Qty"
+                value={rule.maxQty}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 1;
+                  setPosRules(prev => prev.map((r, i) => i === idx ? { ...r, maxQty: val } : r));
+                }}
+                className="w-20 h-9 text-xs font-bold bg-white"
+              />
+              <span className="text-xs font-bold text-slate-400">➜</span>
+              <select
+                value={rule.ingredientId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPosRules(prev => prev.map((r, i) => i === idx ? { ...r, ingredientId: val } : r));
+                }}
+                className="flex-1 h-9 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white"
+              >
+                <option value="">-- Pilih Kantong / Kemasan --</option>
+                {allIngredients.map((ing) => (
+                  <option key={ing.id} value={ing.id}>
+                    {ing.name} ({ing.baseUnit})
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setPosRules(prev => prev.filter((_, i) => i !== idx))}
+                className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => setPosRules(prev => [...prev, { id: `rule-${Date.now()}`, minQty: 1, maxQty: 5, ingredientId: allIngredients[0]?.id || "", isActive: true }])}
+            className="flex items-center gap-1 text-xs font-bold text-primary hover:underline pt-1"
+          >
+            <Plus size={14} /> Tambah Aturan Kemasan POS
+          </button>
+        </div>
+
+        <Button
+          onClick={async () => {
+            setSavingPosRules(true);
+            setPosRulesSaved("");
+            try {
+              const res = await fetchWithAuth("/api/settings/pos-packaging", {
+                method: "POST",
+                body: JSON.stringify({ rules: posRules })
+              });
+              if (res.ok) setPosRulesSaved("Aturan kemasan POS berhasil disimpan!");
+            } finally { setSavingPosRules(false); }
+          }}
+          disabled={savingPosRules}
+          className="w-full h-11 rounded-xl text-sm font-bold"
+          style={{ background: "#E85D8C", color: "#fff" }}
+        >
+          {savingPosRules ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
+          Simpan Aturan Kemasan POS
+        </Button>
+        {posRulesSaved && <p style={{ fontSize: "12px", color: "#16A34A", fontWeight: "600" }}>✓ {posRulesSaved}</p>}
       </Card>
     </div>
   );
