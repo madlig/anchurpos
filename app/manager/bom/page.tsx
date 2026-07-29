@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Loader2, Plus, Trash2, Save, BookOpen, Package, Layers } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect, SearchableOption } from "@/components/shared/SearchableSelect";
 
 interface Product {
   id: string;
@@ -266,6 +267,10 @@ export default function BomPage() {
     }
   };
 
+  const productOptions: SearchableOption[] = useMemo(() => products.map(p => ({ id: p.id, name: p.name })), [products]);
+  const variantOptions: SearchableOption[] = useMemo(() => variants.map(v => ({ id: v.id, name: v.name })), [variants]);
+  const ingredientOptions: SearchableOption[] = useMemo(() => ingredients.map(i => ({ id: i.id, name: i.name, subtext: i.baseUnit })), [ingredients]);
+
   if (loadingData) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -330,40 +335,28 @@ export default function BomPage() {
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                 1. Pilih Produk
               </label>
-              <select
+              <SearchableSelect
+                options={productOptions}
                 value={selectedProductId}
-                onChange={(e) => {
-                  setSelectedProductId(e.target.value);
+                onChange={(val) => {
+                  setSelectedProductId(val);
                   setSelectedVariantId("");
                 }}
-                className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white"
-              >
-                <option value="">-- Pilih Produk --</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="🔍 Ketik atau pilih produk..."
+              />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                 2. Pilih Varian Rasa
               </label>
-              <select
+              <SearchableSelect
+                options={variantOptions}
                 value={selectedVariantId}
-                onChange={(e) => setSelectedVariantId(e.target.value)}
+                onChange={(val) => setSelectedVariantId(val)}
                 disabled={!selectedProductId}
-                className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white disabled:opacity-50"
-              >
-                <option value="">-- Pilih Varian --</option>
-                {variants.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="🔍 Ketik atau pilih varian..."
+              />
             </div>
           </div>
 
@@ -412,18 +405,13 @@ export default function BomPage() {
                   <div className="space-y-2">
                     {recipes.map((item, idx) => (
                       <div key={idx} className="flex gap-2 items-center">
-                        <select
+                        <SearchableSelect
+                          options={ingredientOptions}
                           value={item.ingredientId}
-                          onChange={(e) => handleChange(idx, "ingredientId", e.target.value)}
-                          className="flex-1 h-10 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white"
-                        >
-                          <option value="">-- Pilih Bahan Baku --</option>
-                          {ingredients.map((ing) => (
-                            <option key={ing.id} value={ing.id}>
-                              {ing.name} ({ing.baseUnit})
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(val) => handleChange(idx, "ingredientId", val)}
+                          placeholder="🔍 Cari bahan baku..."
+                          className="flex-1"
+                        />
 
                         <Input
                           type="number"
@@ -431,7 +419,7 @@ export default function BomPage() {
                           placeholder="Jumlah"
                           value={item.qtyPerBatch || ""}
                           onChange={(e) => handleChange(idx, "qtyPerBatch", parseFloat(e.target.value) || 0)}
-                          className="w-28 h-10 text-xs font-bold"
+                          className="w-28 h-11 text-xs font-bold"
                         />
 
                         <span className="w-12 text-xs font-bold text-slate-500">{item.unit || "-"}</span>
@@ -470,17 +458,12 @@ export default function BomPage() {
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
               Pilih Produk Jadi (Yang Dipacking)
             </label>
-            <select
+            <SearchableSelect
+              options={productOptions}
               value={selectedPkgProductId}
-              onChange={(e) => setSelectedPkgProductId(e.target.value)}
-              className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white"
-            >
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedPkgProductId(val)}
+              placeholder="🔍 Ketik atau pilih produk..."
+            />
           </div>
 
           {selectedPkgProductId && (
@@ -520,18 +503,13 @@ export default function BomPage() {
                   <div className="space-y-2">
                     {pkgRecipes.map((item, idx) => (
                       <div key={idx} className="flex gap-2 items-center">
-                        <select
+                        <SearchableSelect
+                          options={ingredientOptions}
                           value={item.ingredientId}
-                          onChange={(e) => handlePkgChange(idx, "ingredientId", e.target.value)}
-                          className="flex-1 h-10 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white"
-                        >
-                          <option value="">-- Pilih Bahan Kemasan / Operasional --</option>
-                          {ingredients.map((ing) => (
-                            <option key={ing.id} value={ing.id}>
-                              {ing.name} ({ing.baseUnit})
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(val) => handlePkgChange(idx, "ingredientId", val)}
+                          placeholder="🔍 Cari kemasan/bahan..."
+                          className="flex-1"
+                        />
 
                         <Input
                           type="number"
