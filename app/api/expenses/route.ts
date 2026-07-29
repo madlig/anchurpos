@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
         id: doc.id,
         date: d.date?.toDate?.().toISOString() ?? "",
         category: d.category,
+        type: d.type ?? "expense",
         itemName: d.itemName,
         totalPrice: d.totalPrice,
         paymentMethod: d.paymentMethod,
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   
-  // Zod validation using the strict create schema (only operasional and lain_lain)
+  // Zod validation using the strict create schema
   const parseResult = expenseCreateSchema.safeParse(body);
   if (!parseResult.success) {
     return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
     paymentMethod,
     supplier,
     notes,
+    type,
     customDate
   } = parseResult.data;
   
@@ -87,6 +89,7 @@ export async function POST(req: NextRequest) {
     await expenseRef.set({
       date: dateToUse,
       category,
+      type: type ?? "expense",
       itemName: itemName.trim(),
       totalPrice,
       paymentMethod,

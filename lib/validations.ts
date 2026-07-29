@@ -53,11 +53,12 @@ export const publicOrderSchema = z.object({
 
 export const expenseCreateSchema = z.object({
   category: z.string().min(1),
-  itemName: z.string().min(1, "Nama pengeluaran wajib diisi"),
+  itemName: z.string().min(1, "Nama pengeluaran / pemasukan wajib diisi"),
   totalPrice: z.number().min(0, "Total tidak boleh negatif"),
   paymentMethod: z.string().min(1),
   notes: z.string().nullable().optional().default(""),
   supplier: z.string().nullable().optional(),
+  type: z.enum(["expense", "income"]).optional().default("expense"),
   customDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal YYYY-MM-DD").nullable().optional(),
 });
 
