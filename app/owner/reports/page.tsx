@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useSearchParams } from "next/navigation";
 import { 
   Loader2, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus, 
   FileText, X, Wallet, Building2, ArrowLeftRight, CheckCircle2, AlertCircle,
@@ -38,23 +39,28 @@ function formatMonthLabel(m: string) {
   return `${MONTH_NAMES[mo - 1]} ${y}`;
 }
 
-export default function OwnerReportsPage() {
+function OwnerReportsContent() {
   const { getToken } = useAuth();
+  const searchParams = useSearchParams();
   const [data, setData] = useState<PnlData | null>(null);
   const [loading, setLoading] = useState(true);
+  
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
 
   // Cash Flow & Transfer States
-  const [activeSubTab, setActiveSubTab] = useState<"pnl" | "cashflow">(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("tab") === "cashflow") return "cashflow";
+  const [activeSubTab, setActiveSubTab] = useState<"pnl" | "cashflow">("pnl");
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "cashflow") {
+      setActiveSubTab("cashflow");
+    } else if (tab === "pnl") {
+      setActiveSubTab("pnl");
     }
-    return "pnl";
-  });
+  }, [searchParams]);
 
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferAmount, setTransferAmount] = useState("");
@@ -160,7 +166,7 @@ export default function OwnerReportsPage() {
               </div>
               <div>
                 <h1 className="text-lg md:text-xl font-extrabold text-slate-800 tracking-tight leading-tight">
-                  Laporan Keuangan & P&L
+                  Laporan Keuangan & Arus Kas
                 </h1>
                 <p className="text-xs font-semibold text-slate-400">
                   {formatMonthLabel(month)} • Outlet Utama
@@ -523,5 +529,17 @@ export default function OwnerReportsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function OwnerReportsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <OwnerReportsContent />
+    </Suspense>
   );
 }
