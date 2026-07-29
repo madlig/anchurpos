@@ -44,9 +44,9 @@ export function ProductionPackingTab({ variants, onSuccess }: Props) {
         const res = await fetchWithAuth("/api/products");
         if (res.ok) {
           const data: Product[] = await res.json();
-          const frozenProds = data.filter((p) => p.id.startsWith("churros-frozen"));
-          setProducts(frozenProds);
-          if (frozenProds.length > 0) setProductId(frozenProds[0].id);
+          const activeProds = data.filter((p) => p.isActive !== false);
+          setProducts(activeProds);
+          if (activeProds.length > 0) setProductId(activeProds[0].id);
         }
       } catch (err) {
         console.error("Gagal mengambil master data produk:", err);
@@ -138,7 +138,7 @@ export function ProductionPackingTab({ variants, onSuccess }: Props) {
         {/* Pilih Jenis Produk (Dari Master Data) */}
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-            1. Pilih Jenis Produk Frozen (Master Data)
+            1. Pilih Jenis Produk Yang Mau Dipacking
           </label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             {products.map((p) => {

@@ -76,7 +76,6 @@ export default function CrewPackingPage() {
         <div className="flex flex-wrap bg-white rounded-2xl p-1.5 gap-1 mb-6 shadow-sm border border-slate-200">
           {[
             { key: "pack_production", label: "Packing Hasil Produksi" },
-            { key: "pack_order", label: "Pack Pesanan" },
             { key: "repack_glaze", label: "Repack Saos" },
             { key: "repack_cinnamon", label: "Repack Gula Cinnamon" },
             { key: "repack_reg_to_full", label: "Repack Regular -> Full" },
@@ -98,10 +97,6 @@ export default function CrewPackingPage() {
         {/* Tab Content */}
         {activeTab === "pack_production" && (
           <ProductionPackingTab variants={variants} onSuccess={loadInitialData} />
-        )}
-
-        {activeTab === "pack_order" && (
-          <OrderFulfillmentTab ingredients={ingredients} onSuccess={loadInitialData} />
         )}
         
         {activeTab === "repack_glaze" && (
