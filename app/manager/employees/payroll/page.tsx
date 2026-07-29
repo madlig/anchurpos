@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Loader2, CalendarDays, Check, Search, Lock, Edit3, Save, X, FileText, LayoutList, Wallet, Settings2, ChevronDown, CheckCircle2 } from "lucide-react";
 import { AttendanceRecord, Employee, PayrollRecord } from "../types";
 import { AdaptivePanel } from "@/components/shared/AdaptivePanel";
+import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 
 const fmtDateFull = (dStr: string) => {
   const [y, m, d] = dStr.split("-");
@@ -18,6 +19,7 @@ const fmtRupiah = (num: number) => {
 
 export default function PayrollPage() {
   const { getToken } = useAuth();
+  const { alert, confirm } = useAlertConfirm();
   
   // Date states (Default: 26th of prev month to 25th of current month)
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -147,7 +149,7 @@ export default function PayrollPage() {
   };
 
   const handlePay = async (p: PayrollRecord) => {
-    if (!confirm(`Tandai gaji ${p.employeeName} sudah dibayar? Data ini akan dikunci.`)) return;
+    if (!(await confirm("Kunci Data?", `Tandai gaji ${p.employeeName} sudah dibayar? Data ini akan dikunci.`))) return;
     setPayingId(p.id);
     try {
       const res = await fetchWithAuth(`/api/payroll/${p.id}`, {
@@ -167,7 +169,7 @@ export default function PayrollPage() {
     const unlocked = livePayrolls.filter(p => !p.isLocked);
     if (unlocked.length === 0) return;
     
-    if (!confirm(`Terdapat ${unlocked.length} gaji karyawan yang belum dikunci.\n\nApakah Anda yakin sudah mengecek semua bonus dan potongan? Tindakan ini akan mengunci seluruh gaji secara bersamaan.`)) return;
+    if (!(await confirm("Kunci Semua?", `Terdapat ${unlocked.length} gaji karyawan yang belum dikunci.\n\nApakah Anda yakin sudah mengecek semua bonus dan potongan? Tindakan ini akan mengunci seluruh gaji secara bersamaan.`))) return;
     
     setIsPayingAll(true);
     try {
