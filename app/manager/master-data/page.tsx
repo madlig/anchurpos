@@ -1052,10 +1052,17 @@ function MasterDataContent() {
                     <div className="col-span-full max-w-3xl bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-4 animate-in fade-in slide-in-from-top-2">
                       <div className="flex items-center justify-between mb-5 border-b border-slate-100 pb-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
-                            <Users size={16} />
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${editingCustomer ? 'bg-amber-50 text-amber-600' : 'bg-violet-50 text-violet-600'}`}>
+                            {editingCustomer ? <Pencil size={16} /> : <Users size={16} />}
                           </div>
-                          <p className="text-base font-extrabold text-slate-800">{editingCustomer ? "Edit Data Pelanggan" : "Tambah Pelanggan Baru"}</p>
+                          <div>
+                            <p className="text-base font-extrabold text-slate-800">
+                              {editingCustomer ? `Edit Data Pelanggan: ${editingCustomer.name}` : "Tambah Pelanggan Baru"}
+                            </p>
+                            {editingCustomer && (
+                              <p className="text-xs font-semibold text-slate-400">Perbarui informasi kontak, tipe, atau diskon otomatis pelanggan ini</p>
+                            )}
+                          </div>
                         </div>
                         <button onClick={() => { setShowAddForm(false); setEditingCustomer(null); }} className="text-slate-400 hover:text-slate-600">
                           <X size={18} />
@@ -1063,7 +1070,10 @@ function MasterDataContent() {
                       </div>
 
                       <div className="flex flex-col gap-4">
-                        <Input placeholder="Nama Lengkap / Nama Toko *" value={customerForm.name} onChange={e => setCustomerForm(p => ({ ...p, name: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-primary" />
+                        <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block ml-1">Nama Pelanggan / Toko *</label>
+                          <Input placeholder="Nama Lengkap / Nama Toko *" value={customerForm.name} onChange={e => setCustomerForm(p => ({ ...p, name: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-primary" />
+                        </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
@@ -1111,7 +1121,7 @@ function MasterDataContent() {
 
                         <div className="flex gap-3 mt-4 pt-5 border-t border-slate-100">
                           <button onClick={handleSaveCustomer} disabled={savingCustomer} className="flex-1 flex justify-center items-center h-12 rounded-xl bg-primary text-white text-sm font-bold shadow-md hover:bg-rose-600 transition-colors">
-                            {savingCustomer ? <Loader2 size={18} className="animate-spin" /> : "Simpan Pelanggan"}
+                            {savingCustomer ? <Loader2 size={18} className="animate-spin" /> : (editingCustomer ? "Update Data Pelanggan" : "Simpan Pelanggan")}
                           </button>
                           <button onClick={() => { setShowAddForm(false); setEditingCustomer(null); }} className="px-8 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200 transition-colors">Batal</button>
                         </div>
@@ -1147,7 +1157,7 @@ function MasterDataContent() {
                               </div>
 
                               <div className="flex items-center gap-1">
-                                <ActionBtn icon={<Pencil size={13} />} color="#64748B" bg="#F1F5F9" hoverBg="#E2E8F0" onClick={() => { setEditingCustomer(c); setCustomerForm({ name: c.name, customerType: c.customerType, channel: c.channel, phoneNumber: c.phoneNumber ?? "", address: c.address ?? "", notes: c.notes ?? "", discountPerUnit: String(c.discountPerUnit || 0) }); setShowAddForm(false); setCustomerDeleteTarget(null); }} />
+                                <ActionBtn icon={<Pencil size={13} />} color="#64748B" bg="#F1F5F9" hoverBg="#E2E8F0" onClick={() => { setEditingCustomer(c); setCustomerForm({ name: c.name, customerType: c.customerType, channel: c.channel, phoneNumber: c.phoneNumber ?? "", address: c.address ?? "", notes: c.notes ?? "", discountPerUnit: String(c.discountPerUnit || 0) }); setShowAddForm(false); setCustomerDeleteTarget(null); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
                                 <ActionBtn icon={<Trash2 size={13} />} color="#DC2626" bg="#FEF2F2" hoverBg="#FEE2E2" onClick={() => { setCustomerDeleteTarget({ id: c.id, name: c.name }); setEditingCustomer(null); }} />
                               </div>
                             </div>
