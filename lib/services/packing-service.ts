@@ -621,7 +621,17 @@ export async function packProduction(
   }
 
   await adminDb.runTransaction(async (tx) => {
+    // --- 1. ALL READS FIRST ---
     const stockSnap = await tx.get(stockRef);
+
+    const pkgSnaps = [];
+    for (const pkgItem of packagingItems) {
+      const ingRef = adminDb.collection("ingredients").doc(pkgItem.ingredientId);
+      const ingSnap = await tx.get(ingRef);
+      pkgSnaps.push({ pkgItem, ingRef, ingSnap });
+    }
+
+    // --- 2. ALL WRITES SECOND ---
     const currentProductStock = stockSnap.exists ? (stockSnap.data()?.currentStock ?? 0) : 0;
     const nextProductStock = currentProductStock + packQty;
 
@@ -650,9 +660,7 @@ export async function packProduction(
     });
 
     // Deduct packaging materials dynamically
-    for (const pkgItem of packagingItems) {
-      const ingRef = adminDb.collection("ingredients").doc(pkgItem.ingredientId);
-      const ingSnap = await tx.get(ingRef);
+    for (const { pkgItem, ingRef, ingSnap } of pkgSnaps) {
       if (ingSnap.exists) {
         const totalUsed = pkgItem.qtyPerPack * packQty;
         const curStock = ingSnap.data()?.currentStock ?? 0;
