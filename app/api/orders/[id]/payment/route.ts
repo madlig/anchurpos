@@ -22,10 +22,15 @@ export async function PATCH(
   try {
     const doc = await adminDb.doc(`orders/${id}`).get();
     if (!doc.exists) return NextResponse.json({ error: "Order tidak ditemukan" }, { status: 404 });
-    const data = doc.data() as { status: string };
+    const data = doc.data() as { status: string; orderChannel?: string; channel?: string; paymentMethod?: string };
 
     const updates: Record<string, unknown> = { paymentStatus };
-    if (paymentMethod) updates.paymentMethod = paymentMethod;
+    if (paymentMethod) {
+      updates.paymentMethod = paymentMethod;
+    } else if (!data.paymentMethod) {
+      const ch = data.orderChannel || data.channel || "";
+      updates.paymentMethod = (ch === "whatsapp" || ch === "wa_form") ? "transfer" : "cash";
+    }
 
     if (paymentStatus === "sudah_bayar" && data.status === "pending") {
       updates.status = "proses";

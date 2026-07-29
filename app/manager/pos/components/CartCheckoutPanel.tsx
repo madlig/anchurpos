@@ -204,7 +204,9 @@ export function CartCheckoutPanel({
             sauceId: c.sauceId, 
             sauceName: c.sauceName 
           })),
-          orderNotes: orderNotes.trim() || null, paymentMethod: isPaid ? payMethod : null, paymentStatus: isPaid ? "sudah_bayar" : "belum_bayar",
+          orderNotes: orderNotes.trim() || null, 
+          paymentMethod: payMethod, 
+          paymentStatus: isPaid ? "sudah_bayar" : "belum_bayar",
           poNumber: showPoNumber && poNumber.trim() ? poNumber.trim() : null,
           secondaryPackagingIngId,
           customDate: enableCustomDate && customOrderDate ? customOrderDate : undefined,

@@ -307,7 +307,7 @@ export async function POST(req: NextRequest) {
         customerPhone: resolvedCustomerPhone,
         status: isImmediate ? "selesai" : (inputPaymentStatus === "sudah_bayar" ? "proses" : "pending"),
         paymentStatus: inputPaymentStatus ?? "sudah_bayar",
-        paymentMethod: paymentMethod ?? null,
+        paymentMethod: paymentMethod || (finalOrderChannel === "whatsapp" ? "transfer" : "cash"),
         platformFeePercent: finalFeePercent,
         platformFee: finalFeeAmount,
         totalOrderValue,

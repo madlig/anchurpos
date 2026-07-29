@@ -142,7 +142,8 @@ export default function EditOrderPage() {
         }
 
         setIsPaid(o.paymentStatus === "sudah_bayar");
-        setPayMethod(o.paymentMethod || "cash");
+        const ch = o.orderChannel || o.channel || "";
+        setPayMethod(o.paymentMethod || ((ch === "whatsapp" || ch === "wa_form") ? "transfer" : "cash"));
         setOrderNotes(o.orderNotes || "");
         setShippingAddress(o.shippingAddress || "");
         setShippingCost(o.shippingCost ? String(o.shippingCost) : "");

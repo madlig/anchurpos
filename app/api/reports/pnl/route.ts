@@ -62,7 +62,9 @@ export async function GET(req: NextRequest) {
 
       // Classify payment method for cash flow (use netOrderPemasukan to accurately reflect money received)
       if (data.paymentStatus === "sudah_bayar") {
-        const method = data.paymentMethod ?? "cash";
+        const ch = data.orderChannel || data.channel || "";
+        const defaultMethod = (ch === "whatsapp" || ch === "wa_form") ? "transfer" : "cash";
+        const method = data.paymentMethod || defaultMethod;
         if (method === "cash") {
           totalCashIn += netOrderPemasukan;
         } else if (method === "transfer" || method === "qris") {
