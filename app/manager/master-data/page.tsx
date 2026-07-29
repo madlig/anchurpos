@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Plus, X, Check, Package, Layers, Beaker, Pencil, Trash2, Users, Search, Store } from "lucide-react";
+import { Loader2, Plus, X, Check, Package, Layers, Beaker, Pencil, Trash2, Users, Search, Store, Phone, MapPin, MessageCircle, Building2, UserCheck, Tag, CreditCard } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatNumber } from "@/lib/formatters";
@@ -420,9 +421,23 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
 }
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
-export default function MasterDataPage() {
+function MasterDataContent() {
   const { getToken } = useAuth();
-  const [tab, setTab] = useState<Tab>("produk");
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab") as Tab | null;
+  const [tab, setTab] = useState<Tab>(() => {
+    if (tabParam && ["produk", "varian", "bahan", "pelanggan", "addons", "suppliers", "configs"].includes(tabParam)) {
+      return tabParam;
+    }
+    return "produk";
+  });
+
+  useEffect(() => {
+    if (tabParam && ["produk", "varian", "bahan", "pelanggan", "addons", "suppliers", "configs"].includes(tabParam)) {
+      setTab(tabParam);
+    }
+  }, [tabParam]);
+
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   
@@ -1035,25 +1050,36 @@ export default function MasterDataPage() {
                 <>
                   {(showAddForm || editingCustomer) && (
                     <div className="col-span-full max-w-3xl bg-white rounded-3xl p-6 border border-slate-200 shadow-sm mb-4 animate-in fade-in slide-in-from-top-2">
-                      <p className="text-[16px] font-extrabold text-slate-800 mb-5">{editingCustomer ? "Edit Pelanggan" : "Tambah Pelanggan Baru"}</p>
+                      <div className="flex items-center justify-between mb-5 border-b border-slate-100 pb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
+                            <Users size={16} />
+                          </div>
+                          <p className="text-base font-extrabold text-slate-800">{editingCustomer ? "Edit Data Pelanggan" : "Tambah Pelanggan Baru"}</p>
+                        </div>
+                        <button onClick={() => { setShowAddForm(false); setEditingCustomer(null); }} className="text-slate-400 hover:text-slate-600">
+                          <X size={18} />
+                        </button>
+                      </div>
+
                       <div className="flex flex-col gap-4">
-                        <Input placeholder="Nama Lengkap / Panggilan *" value={customerForm.name} onChange={e => setCustomerForm(p => ({ ...p, name: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-[#E85D8C]" />
+                        <Input placeholder="Nama Lengkap / Nama Toko *" value={customerForm.name} onChange={e => setCustomerForm(p => ({ ...p, name: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-primary" />
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Tipe Pelanggan</label>
                             <select value={customerForm.customerType} onChange={e => setCustomerForm(p => ({ ...p, customerType: e.target.value }))}
-                              className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-brand-50 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-[#E85D8C]/20 focus:border-[#E85D8C] transition-all">
+                              className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                               <option value="reguler">Reguler</option>
                               <option value="reseller">Reseller</option>
-                              <option value="b2b">B2B (Bisnis)</option>
+                              <option value="b2b">B2B (Bisnis / Mitra)</option>
                             </select>
                           </div>
                           <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Sumber Order</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Sumber Channel Utama</label>
                             <select value={customerForm.channel} onChange={e => setCustomerForm(p => ({ ...p, channel: e.target.value }))}
-                              className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-brand-50 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-[#E85D8C]/20 focus:border-[#E85D8C] transition-all">
-                              <option value="walk_in">Walk-in</option>
+                              className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                              <option value="walk_in">Walk-in Outlet</option>
                               <option value="whatsapp">WhatsApp</option>
                               <option value="shopee">Shopee</option>
                               <option value="tiktok">TikTok</option>
@@ -1065,71 +1091,110 @@ export default function MasterDataPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">No. WhatsApp / HP</label>
-                            <Input placeholder="Contoh: 08123456789" value={customerForm.phoneNumber} onChange={e => setCustomerForm(p => ({ ...p, phoneNumber: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-[#E85D8C]" />
+                            <Input placeholder="Contoh: 08123456789" value={customerForm.phoneNumber} onChange={e => setCustomerForm(p => ({ ...p, phoneNumber: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-primary" />
                           </div>
                           <div>
-                            <label className="text-xs font-bold text-[#E85D8C] uppercase tracking-wider mb-2 block ml-1">Diskon Otomatis / Unit</label>
-                            <Input type="number" placeholder="Rp 0" value={customerForm.discountPerUnit} onChange={e => setCustomerForm(p => ({ ...p, discountPerUnit: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-[#E85D8C] border-pink-200 bg-primary/10/30" />
+                            <label className="text-xs font-bold text-primary uppercase tracking-wider mb-2 block ml-1">Diskon Otomatis (Rp / Unit)</label>
+                            <Input type="number" placeholder="0" value={customerForm.discountPerUnit} onChange={e => setCustomerForm(p => ({ ...p, discountPerUnit: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-primary border-rose-200 bg-rose-50/30" />
                           </div>
                         </div>
 
                         <div>
                           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Alamat Pengiriman</label>
-                          <Input placeholder="Alamat lengkap (opsional)" value={customerForm.address} onChange={e => setCustomerForm(p => ({ ...p, address: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-[#E85D8C]" />
+                          <Input placeholder="Alamat lengkap lokasi pelanggan" value={customerForm.address} onChange={e => setCustomerForm(p => ({ ...p, address: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-primary" />
                         </div>
                         
                         <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Catatan</label>
-                          <Input placeholder="Preferensi atau info lainnya" value={customerForm.notes} onChange={e => setCustomerForm(p => ({ ...p, notes: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-[#E85D8C]" />
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block ml-1">Catatan Tambahan</label>
+                          <Input placeholder="Catatan preferensi pesanan atau info mitra" value={customerForm.notes} onChange={e => setCustomerForm(p => ({ ...p, notes: e.target.value }))} className="h-12 rounded-xl text-sm focus-visible:ring-primary" />
                         </div>
 
                         <div className="flex gap-3 mt-4 pt-5 border-t border-slate-100">
-                          <button onClick={handleSaveCustomer} disabled={savingCustomer} className="flex-1 flex justify-center items-center h-12 rounded-xl bg-[#E85D8C] text-white text-[15px] font-bold shadow-[0_4px_14px_rgba(232,93,140,0.3)] hover:bg-[#D94E7A] transition-colors">
+                          <button onClick={handleSaveCustomer} disabled={savingCustomer} className="flex-1 flex justify-center items-center h-12 rounded-xl bg-primary text-white text-sm font-bold shadow-md hover:bg-rose-600 transition-colors">
                             {savingCustomer ? <Loader2 size={18} className="animate-spin" /> : "Simpan Pelanggan"}
                           </button>
-                          <button onClick={() => { setShowAddForm(false); setEditingCustomer(null); }} className="px-8 rounded-xl bg-slate-100 text-slate-600 text-[15px] font-bold hover:bg-slate-200 transition-colors">Batal</button>
+                          <button onClick={() => { setShowAddForm(false); setEditingCustomer(null); }} className="px-8 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200 transition-colors">Batal</button>
                         </div>
                       </div>
                     </div>
                   )}
                   
                   {filteredCustomers.length === 0 && !showAddForm ? (
-                    <div className="col-span-full"><EmptyState label={search ? "Tidak ada hasil pencarian" : "Belum ada data pelanggan"} sub={search ? "Coba kata kunci lain" : "Klik tombol Tambah Data di atas"} /></div>
+                    <div className="col-span-full"><EmptyState label={search ? "Tidak ada pelanggan ditemukan" : "Belum ada data pelanggan"} sub={search ? "Coba kata kunci pencarian lain" : "Klik tombol Tambah Data di atas untuk menambahkan pelanggan"} /></div>
                   ) : filteredCustomers.map(c => {
                     if (editingCustomer?.id === c.id) return null;
                     const st = CTYPE_COLOR[c.customerType] || CTYPE_COLOR.reguler;
+                    const cleanPhone = c.phoneNumber ? c.phoneNumber.replace(/[^0-9]/g, "") : "";
+                    const waFormatted = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
+
                     return (
                       <div key={c.id} className="animate-in fade-in zoom-in-95 duration-300">
                         <PremiumCard>
-                          <div className="flex flex-col h-full relative overflow-hidden">
-                            {/* Decorative stripe */}
-                            <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: st.color }}></div>
+                          <div className="flex flex-col h-full relative overflow-hidden space-y-3">
                             
-                            <div className="flex justify-between items-start mt-2 mb-2">
-                              <Badge label={CTYPE_LABEL[c.customerType] || c.customerType} bg={st.bg} color={st.color} border={st.border} />
-                              <div className="flex gap-1">
-                                <ActionBtn icon={<Pencil size={12} />} color="#E85D8C" bg="#FEF1F5" hoverBg="#FCE7F3" onClick={() => { setEditingCustomer(c); setCustomerForm({ name: c.name, customerType: c.customerType, channel: c.channel, phoneNumber: c.phoneNumber ?? "", address: c.address ?? "", notes: c.notes ?? "", discountPerUnit: String(c.discountPerUnit || 0) }); setShowAddForm(false); setCustomerDeleteTarget(null); }} />
-                                <ActionBtn icon={<Trash2 size={12} />} color="#DC2626" bg="#FEF2F2" hoverBg="#FEE2E2" onClick={() => { setCustomerDeleteTarget({ id: c.id, name: c.name }); setEditingCustomer(null); }} />
+                            {/* Card Header Row */}
+                            <div className="flex justify-between items-start">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-10 h-10 rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center font-black text-violet-700 text-sm shrink-0 shadow-sm">
+                                  {(c.name || "?")[0].toUpperCase()}
+                                </div>
+                                <div>
+                                  <h3 className="text-base font-extrabold text-slate-800 leading-tight">{c.name}</h3>
+                                  <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider mt-0.5 border ${st.border}`} style={{ backgroundColor: st.bg, color: st.color }}>
+                                    {CTYPE_LABEL[c.customerType] || c.customerType}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                <ActionBtn icon={<Pencil size={13} />} color="#64748B" bg="#F1F5F9" hoverBg="#E2E8F0" onClick={() => { setEditingCustomer(c); setCustomerForm({ name: c.name, customerType: c.customerType, channel: c.channel, phoneNumber: c.phoneNumber ?? "", address: c.address ?? "", notes: c.notes ?? "", discountPerUnit: String(c.discountPerUnit || 0) }); setShowAddForm(false); setCustomerDeleteTarget(null); }} />
+                                <ActionBtn icon={<Trash2 size={13} />} color="#DC2626" bg="#FEF2F2" hoverBg="#FEE2E2" onClick={() => { setCustomerDeleteTarget({ id: c.id, name: c.name }); setEditingCustomer(null); }} />
                               </div>
                             </div>
                             
-                            <h3 className="text-[17px] font-black text-slate-800 mb-4">{c.name}</h3>
-                            
-                            <div className="mt-auto flex flex-col gap-2 pt-3 border-t border-slate-100">
+                            {/* Details List */}
+                            <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs text-slate-600">
                               <div className="flex items-center justify-between">
-                                <p className="text-xs font-bold text-slate-400 uppercase">Kontak</p>
-                                <p className="text-[12px] font-bold text-slate-700">{c.phoneNumber || "-"}</p>
+                                <span className="font-semibold text-slate-400 flex items-center gap-1">
+                                  <Phone size={12} /> Kontak HP
+                                </span>
+                                {c.phoneNumber ? (
+                                  <a 
+                                    href={`https://wa.me/${waFormatted}`} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className="font-bold text-emerald-600 hover:underline flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/50"
+                                  >
+                                    <MessageCircle size={11} /> {c.phoneNumber}
+                                  </a>
+                                ) : (
+                                  <span className="text-slate-400 italic">Tidak ada nomor</span>
+                                )}
                               </div>
+
                               <div className="flex items-center justify-between">
-                                <p className="text-xs font-bold text-slate-400 uppercase">Asal Order</p>
-                                <p className="text-[12px] font-bold text-slate-700 capitalize">{c.channel?.replace("_", " ") || "-"}</p>
+                                <span className="font-semibold text-slate-400 flex items-center gap-1">
+                                  <Store size={12} /> Asal Channel
+                                </span>
+                                <span className="font-bold text-slate-700 capitalize">
+                                  {c.channel?.replace("_", " ") || "Walk-in"}
+                                </span>
                               </div>
+
+                              {c.address && (
+                                <div className="flex items-start gap-1 pt-1 text-slate-600">
+                                  <MapPin size={12} className="text-slate-400 shrink-0 mt-0.5" />
+                                  <span className="text-[11px] font-medium leading-snug line-clamp-2">{c.address}</span>
+                                </div>
+                              )}
                             </div>
                             
                             {c.discountPerUnit > 0 && (
-                              <div className="mt-3 bg-primary/10 border border-primary/20 rounded-lg p-2 text-center">
-                                <p className="text-xs font-bold text-[#E85D8C] uppercase tracking-wider mb-0.5">Diskon Spesial</p>
-                                <p className="text-[14px] font-black text-[#D94E7A]">-{fmt(c.discountPerUnit)} <span className="text-xs">/ pcs</span></p>
+                              <div className="mt-auto bg-rose-50 border border-rose-100 rounded-xl p-2 flex items-center justify-between text-xs">
+                                <span className="font-bold text-primary flex items-center gap-1">
+                                  <Tag size={12} /> Diskon Otomatis
+                                </span>
+                                <span className="font-black text-rose-600">-{fmt(c.discountPerUnit)} / unit</span>
                               </div>
                             )}
                           </div>
@@ -1277,5 +1342,17 @@ function ActionBtn({ icon, color, bg, hoverBg, onClick }: {
     >
       {icon}
     </button>
+  );
+}
+
+export default function MasterDataPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <MasterDataContent />
+    </Suspense>
   );
 }

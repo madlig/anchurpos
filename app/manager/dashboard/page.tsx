@@ -255,7 +255,7 @@ export default function ManagerDashboardPage() {
                   <span className="text-[11px] font-bold text-slate-700 text-center mt-1.5">Pesanan</span>
                 </Link>
 
-                <Link href="/manager/master-data" className="flex flex-col items-center group">
+                <Link href="/manager/master-data?tab=pelanggan" className="flex flex-col items-center group">
                   <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-600 group-hover:scale-105 transition-transform shadow-sm">
                     <Users size={20} />
                   </div>
