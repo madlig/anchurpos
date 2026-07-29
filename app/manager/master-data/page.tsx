@@ -22,19 +22,32 @@ interface AddonItem { id: string; name: string; price: number; currentStock: num
 interface SupplierItem { id: string; name: string; contactPerson?: string; phoneNumber?: string; }
 interface CustomerItem { id: string; name: string; customerType: string; channel: string; phoneNumber: string | null; address: string | null; notes: string; discountPerUnit: number; }
 
-// ─── Reusable Confirm Delete Dialog ───────────────────────────────────────────
+// ─── Reusable Confirm Delete Overlay ───────────────────────────────────────────
 function ConfirmDelete({ label, onConfirm, onCancel, loading }: {
   label: string; onConfirm: () => void; onCancel: () => void; loading: boolean;
 }) {
   return (
-    <div style={{ background: "#FEF2F2", borderRadius: "12px", padding: "16px", border: "1px solid #FECACA", marginTop: "16px" }}>
-      <p style={{ fontSize: "13px", fontWeight: "700", color: "#DC2626", marginBottom: "12px", textAlign: "center" }}>Hapus "{label}" secara permanen?</p>
-      <div className="flex gap-2">
-        <button onClick={onConfirm} disabled={loading} data-testid="confirm-delete-btn"
-          style={{ flex: 1, padding: "10px", borderRadius: "10px", background: "#DC2626", color: "#fff", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", transition: "all 0.2s" }}>
+    <div className="absolute inset-0 bg-red-50/95 backdrop-blur-sm rounded-[20px] p-4 flex flex-col justify-center items-center z-20 text-center animate-in fade-in zoom-in-95 border-2 border-red-200 shadow-md">
+      <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mb-2 shadow-sm">
+        <Trash2 size={20} />
+      </div>
+      <p className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1">Hapus Data</p>
+      <p className="text-xs font-bold text-red-600 mb-3 px-2 line-clamp-2">
+        Hapus "{label}" secara permanen?
+      </p>
+      <div className="flex gap-2 w-full max-w-xs">
+        <button
+          onClick={onConfirm}
+          disabled={loading}
+          data-testid="confirm-delete-btn"
+          className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+        >
           {loading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Hapus
         </button>
-        <button onClick={onCancel} style={{ flex: 1, padding: "10px", borderRadius: "10px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", transition: "all 0.2s" }}>
+        <button
+          onClick={onCancel}
+          className="flex-1 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors"
+        >
           Batal
         </button>
       </div>
@@ -1312,7 +1325,7 @@ function MasterDataContent() {
 
 function PremiumCard({ children, danger = false }: { children: React.ReactNode; danger?: boolean }) {
   return (
-    <div className={`bg-white rounded-[20px] p-5 shadow-sm border transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full ${danger ? "border-red-200 bg-red-50/20" : "border-slate-100 hover:border-pink-200"}`}>
+    <div className={`relative overflow-hidden bg-white rounded-[20px] p-5 shadow-sm border transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full ${danger ? "border-red-200 bg-red-50/20" : "border-slate-100 hover:border-pink-200"}`}>
       {children}
     </div>
   );
