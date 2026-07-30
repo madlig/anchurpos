@@ -21,13 +21,19 @@ export async function PATCH(
       return NextResponse.json({ error: "Supplier tidak ditemukan" }, { status: 404 });
     }
 
-    const updates: any = {};
-    if (name !== undefined) updates.name = name.trim();
-    if (contactPerson !== undefined) updates.contactPerson = contactPerson.trim();
-    if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber.trim();
+    const updates: Record<string, unknown> = {};
+    if (body.name !== undefined) updates.name = String(body.name).trim();
+    if (body.code !== undefined) updates.code = String(body.code).trim();
+    if (body.category !== undefined) updates.category = body.category;
+    if (body.contactPerson !== undefined) updates.contactPerson = body.contactPerson ? String(body.contactPerson).trim() : null;
+    if (body.phoneNumber !== undefined) updates.phoneNumber = body.phoneNumber ? String(body.phoneNumber).trim() : null;
+    if (body.email !== undefined) updates.email = body.email ? String(body.email).trim() : null;
+    if (body.address !== undefined) updates.address = body.address ? String(body.address).trim() : null;
+    if (body.notes !== undefined) updates.notes = body.notes ? String(body.notes).trim() : "";
+    if (body.paymentTerms !== undefined) updates.paymentTerms = body.paymentTerms;
 
     await supplierRef.update(updates);
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ id, ...updates });
   } catch (err) {
     console.error("PATCH /api/suppliers/[id] error:", err);
     return NextResponse.json({ error: "Gagal memperbarui supplier" }, { status: 500 });

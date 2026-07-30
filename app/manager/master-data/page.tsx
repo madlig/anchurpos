@@ -23,7 +23,7 @@ interface ProductItem { id: string; name: string; code: string; category?: strin
 interface VariantItem { id: string; productId: string; name: string; sortOrder: number; currentStock: number; minStock: number; freeSauceAllowance?: number; }
 interface IngredientItem { id: string; name: string; category: string; baseUnit: string; currentStock: number; minStock: number; channels?: string[]; unitAlternatives?: { unit: string; conversionToBase: number }[]; defaultCostPerBaseUnit?: number; price?: number; }
 interface CustomerItem { id: string; code?: string; name: string; customerType: string; channel: string; phoneNumber: string | null; email?: string | null; address: string | null; notes: string; discountPerUnit: number; creditLimit?: number; }
-interface SupplierItem { id: string; name: string; category?: string; phoneNumber?: string | null; address?: string | null; contactPerson?: string | null; notes?: string; }
+interface SupplierItem { id: string; code?: string; name: string; category?: string; phoneNumber?: string | null; email?: string | null; address?: string | null; contactPerson?: string | null; paymentTerms?: string; notes?: string; }
 
 const PRODUCT_CATEGORIES = [
   { id: "frozen", label: "Frozen Food" },
@@ -437,8 +437,21 @@ function MasterDataContent() {
   const [customerDeleteTarget, setCustomerDeleteTarget] = useState<CustomerItem | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState(false);
 
-  // Supplier Edit/Delete States
-  const [supplierForm, setSupplierForm] = useState({ name: "", category: "Bahan Baku", phoneNumber: "", address: "", contactPerson: "", notes: "" });
+  // Supplier Edit/Delete/View States (ERP Vendor Master Standard)
+  const [supplierForm, setSupplierForm] = useState({ 
+    code: "", 
+    name: "", 
+    category: "Bahan Baku", 
+    phoneNumber: "", 
+    email: "", 
+    address: "", 
+    contactPerson: "", 
+    paymentTerms: "Cash",
+    notes: "" 
+  });
+  const [supplierCategoryFilter, setSupplierCategoryFilter] = useState<string>("semua");
+  const [editSupplierItem, setEditSupplierItem] = useState<SupplierItem | null>(null);
+  const [viewSupplierItem, setViewSupplierItem] = useState<SupplierItem | null>(null);
   const [savingSupplier, setSavingSupplier] = useState(false);
   const [supplierDeleteTarget, setSupplierDeleteTarget] = useState<SupplierItem | null>(null);
   const [deletingSupplier, setDeletingSupplier] = useState(false);
@@ -475,9 +488,11 @@ function MasterDataContent() {
     setEditVariantItem(null);
     setAddVariantForProductId(null);
     setEditCustomerItem(null);
+    setEditSupplierItem(null);
     setDeleteTarget(null);
     setSearch("");
     setCustomerDeleteTarget(null);
+    setSupplierDeleteTarget(null);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       url.searchParams.set("tab", t);
@@ -540,20 +555,28 @@ function MasterDataContent() {
     if (!supplierForm.name.trim()) return;
     setSavingSupplier(true);
     try {
-      const res = await fetchWithAuth("/api/suppliers", {
-        method: "POST",
+      const isEdit = !!editSupplierItem;
+      const url = isEdit ? `/api/suppliers/${editSupplierItem.id}` : "/api/suppliers";
+      const method = isEdit ? "PATCH" : "POST";
+
+      const res = await fetchWithAuth(url, {
+        method,
         body: JSON.stringify({
           name: supplierForm.name.trim(),
+          code: supplierForm.code.trim() || undefined,
           category: supplierForm.category,
           phoneNumber: supplierForm.phoneNumber || null,
+          email: supplierForm.email || null,
           address: supplierForm.address || null,
           contactPerson: supplierForm.contactPerson || null,
+          paymentTerms: supplierForm.paymentTerms,
           notes: supplierForm.notes || ""
         })
       });
       if (res.ok) {
         setShowAddForm(false);
-        setSupplierForm({ name: "", category: "Bahan Baku", phoneNumber: "", address: "", contactPerson: "", notes: "" });
+        setEditSupplierItem(null);
+        setSupplierForm({ code: "", name: "", category: "Bahan Baku", phoneNumber: "", email: "", address: "", contactPerson: "", paymentTerms: "Cash", notes: "" });
         await loadAll();
       }
     } finally { setSavingSupplier(false); }
@@ -593,7 +616,13 @@ function MasterDataContent() {
       return matchSearch && matchType;
     });
   }, [customers, q, customerTypeFilter]);
-  const filteredSuppliers = suppliers.filter(s => !q || s.name.toLowerCase().includes(q) || (s.category ?? "").toLowerCase().includes(q));
+  const filteredSuppliers = useMemo(() => {
+    return suppliers.filter(s => {
+      const matchSearch = !q || s.name.toLowerCase().includes(q) || (s.code ?? "").toLowerCase().includes(q) || (s.contactPerson ?? "").toLowerCase().includes(q);
+      const matchCat = supplierCategoryFilter === "semua" || (s.category || "Bahan Baku") === supplierCategoryFilter;
+      return matchSearch && matchCat;
+    });
+  }, [suppliers, q, supplierCategoryFilter]);
 
   const onSuccess = () => { 
     setShowAddForm(false); 
@@ -1511,38 +1540,116 @@ function MasterDataContent() {
               </div>
             )}
 
-            {/* ── TAB: PEMASOK / SUPPLIER (VENDOR MASTER DATA) ── */}
+            {/* ── TAB: PEMASOK / SUPPLIER (VENDOR MASTER DATA ERP) ── */}
             {tab === "pemasok" && (
               <div className="space-y-4">
-                {showAddForm && (
-                  <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4 animate-in fade-in zoom-in-95">
+                {/* Executive Vendor Banner Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center font-black shrink-0">
+                      <Store size={20} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Pemasok</span>
+                      <p className="text-xl font-black text-slate-800 tabular-nums">{suppliers.length} Vendor</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black shrink-0">
+                      <Beaker size={20} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Pemasok Bahan Baku</span>
+                      <p className="text-xl font-black text-slate-800 tabular-nums">
+                        {suppliers.filter(s => (s.category || "Bahan Baku") === "Bahan Baku").length} Toko
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center font-black shrink-0">
+                      <Package size={20} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Kemasan & Operasional</span>
+                      <p className="text-xl font-black text-slate-800 tabular-nums">
+                        {suppliers.filter(s => s.category === "Packaging" || s.category === "Operasional").length} Toko
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Horizontal Filter Pills for Vendors */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
+                  {[
+                    { key: "semua", label: "Semua Pemasok" },
+                    { key: "Bahan Baku", label: "Bahan Baku" },
+                    { key: "Packaging", label: "Kemasan / Packaging" },
+                    { key: "Operasional", label: "Operasional" },
+                    { key: "Lainnya", label: "Lain-lain" },
+                  ].map(f => (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => setSupplierCategoryFilter(f.key)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all border shrink-0 ${
+                        supplierCategoryFilter === f.key
+                          ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Add / Edit Vendor Form Drawer Card */}
+                {(showAddForm || editSupplierItem) && (
+                  <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xl space-y-4 animate-in fade-in zoom-in-95 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 via-indigo-500 to-emerald-500" />
+
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-                        <Store size={18} className="text-amber-600" /> Tambah Pemasok / Supplier Baru
-                      </h3>
-                      <button type="button" onClick={() => setShowAddForm(false)} className="text-slate-400 hover:text-slate-600">
-                        <X size={18} />
+                      <div>
+                        <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+                          <Store size={20} className="text-amber-600" />
+                          {editSupplierItem ? `Edit Master Data Pemasok: ${editSupplierItem.name}` : "Registrasi Master Data Pemasok / Supplier Baru (ERP Standard)"}
+                        </h3>
+                        <p className="text-xs font-semibold text-slate-400 mt-0.5">Kelola toko langganan belanja bahan baku, packaging, dan syarat pembayaran</p>
+                      </div>
+                      <button type="button" onClick={() => { setShowAddForm(false); setEditSupplierItem(null); }} className="text-slate-400 hover:text-slate-600 p-1">
+                        <X size={20} />
                       </button>
                     </div>
 
-                    <div className="space-y-3 text-xs">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-4 text-xs">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                         <div>
-                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Toko / Supplier *</label>
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Kode Pemasok (Vendor ID)</label>
+                          <Input
+                            placeholder="Otomatis (e.g. VEND-104)"
+                            value={supplierForm.code}
+                            onChange={(e) => setSupplierForm(p => ({ ...p, code: e.target.value }))}
+                            className="h-10 text-xs font-mono font-bold bg-slate-50"
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Nama Toko / Supplier / PT *</label>
                           <Input
                             placeholder="Contoh: Toko Bahan Kue Harapan / PT Packaging Jaya"
                             value={supplierForm.name}
                             onChange={(e) => setSupplierForm(p => ({ ...p, name: e.target.value }))}
-                            className="h-10 text-xs font-semibold"
+                            className="h-10 text-xs font-bold"
                           />
                         </div>
 
                         <div>
-                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Kategori Pemasok</label>
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Kategori Pemasok</label>
                           <select
                             value={supplierForm.category}
                             onChange={(e) => setSupplierForm(p => ({ ...p, category: e.target.value }))}
-                            className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-xs"
+                            className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-extrabold text-xs text-slate-800"
                           >
                             <option value="Bahan Baku">Bahan Baku (Ingredients)</option>
                             <option value="Packaging">Kemasan / Packaging</option>
@@ -1552,51 +1659,77 @@ function MasterDataContent() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                         <div>
-                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">No. WhatsApp / Telepon</label>
-                          <Input
-                            placeholder="Contoh: 08123456789"
-                            value={supplierForm.phoneNumber}
-                            onChange={(e) => setSupplierForm(p => ({ ...p, phoneNumber: e.target.value }))}
-                            className="h-10 text-xs font-semibold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Contact Person (Sales / Admin)</label>
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Contact Person (Sales / Admin)</label>
                           <Input
                             placeholder="Contoh: Pak Budi Sales"
                             value={supplierForm.contactPerson}
                             onChange={(e) => setSupplierForm(p => ({ ...p, contactPerson: e.target.value }))}
-                            className="h-10 text-xs font-semibold"
+                            className="h-10 text-xs font-bold"
                           />
+                        </div>
+
+                        <div>
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">No. WhatsApp / Telepon</label>
+                          <Input
+                            placeholder="Contoh: 08123456789"
+                            value={supplierForm.phoneNumber}
+                            onChange={(e) => setSupplierForm(p => ({ ...p, phoneNumber: e.target.value }))}
+                            className="h-10 text-xs font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Email Pemasok (Opsional)</label>
+                          <Input
+                            type="email"
+                            placeholder="Contoh: sales@packagingjaya.com"
+                            value={supplierForm.email}
+                            onChange={(e) => setSupplierForm(p => ({ ...p, email: e.target.value }))}
+                            className="h-10 text-xs font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Syarat Pembayaran (Payment Terms)</label>
+                          <select
+                            value={supplierForm.paymentTerms}
+                            onChange={(e) => setSupplierForm(p => ({ ...p, paymentTerms: e.target.value }))}
+                            className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-extrabold text-xs text-slate-800"
+                          >
+                            <option value="Cash">Cash (Tunai Langsung)</option>
+                            <option value="TOP 7 Hari">TOP 7 Hari</option>
+                            <option value="TOP 14 Hari">TOP 14 Hari</option>
+                            <option value="TOP 30 Hari">TOP 30 Hari</option>
+                          </select>
                         </div>
                       </div>
 
                       <div>
-                        <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Alamat Pemasok</label>
+                        <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Alamat Gudang / Toko Supplier</label>
                         <Input
                           placeholder="Alamat lengkap toko / gudang supplier..."
                           value={supplierForm.address}
                           onChange={(e) => setSupplierForm(p => ({ ...p, address: e.target.value }))}
-                          className="h-10 text-xs font-semibold"
+                          className="h-10 text-xs font-bold"
                         />
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                      <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                         <button
                           type="button"
                           onClick={handleSaveSupplier}
                           disabled={savingSupplier}
-                          className="px-5 h-10 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm"
+                          className="px-6 h-11 rounded-2xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
                         >
-                          {savingSupplier ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Simpan Supplier
+                          {savingSupplier ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                          {editSupplierItem ? "Simpan Perubahan Supplier" : "Simpan Master Data Supplier"}
                         </button>
                         <button
                           type="button"
-                          onClick={() => setShowAddForm(false)}
-                          className="px-5 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600 text-xs"
+                          onClick={() => { setShowAddForm(false); setEditSupplierItem(null); }}
+                          className="px-5 h-11 rounded-2xl bg-slate-100 hover:bg-slate-200 font-extrabold text-slate-600 text-xs"
                         >
                           Batal
                         </button>
@@ -1605,51 +1738,317 @@ function MasterDataContent() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {filteredSuppliers.map(s => (
-                    <div key={s.id} className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm relative overflow-hidden space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 text-amber-700 flex items-center justify-center font-extrabold text-sm">
-                          <Store size={18} />
+                {/* Enterprise ERP Data Table View for Vendors (SAP & Odoo Standard) */}
+                {viewMode === "table" ? (
+                  <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden animate-in fade-in">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-900 text-white uppercase text-[10px] tracking-wider font-extrabold">
+                            <th className="py-3.5 px-4 font-extrabold">Kode ID</th>
+                            <th className="py-3.5 px-4 font-extrabold">Nama Toko / Supplier</th>
+                            <th className="py-3.5 px-4 font-extrabold">Kategori</th>
+                            <th className="py-3.5 px-4 font-extrabold">Contact Person</th>
+                            <th className="py-3.5 px-4 font-extrabold">Kontak WA</th>
+                            <th className="py-3.5 px-4 font-extrabold">Terms Bayar</th>
+                            <th className="py-3.5 px-4 font-extrabold">Alamat Toko / Gudang</th>
+                            <th className="py-3.5 px-4 font-extrabold text-center">Aksi ERP</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                          {filteredSuppliers.map((s) => {
+                            const cleanPhone = (s.phoneNumber || "").replace(/[^0-9]/g, "");
+                            const formattedWa = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
+                            const suppCode = s.code || `VEND-${s.id.slice(0, 4).toUpperCase()}`;
+
+                            return (
+                              <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
+                                <td className="py-3.5 px-4 font-mono font-extrabold text-slate-500 whitespace-nowrap">
+                                  {suppCode}
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  <div className="font-extrabold text-slate-800 group-hover:text-amber-600 transition-colors">
+                                    {s.name}
+                                  </div>
+                                  {s.email && <div className="text-[10px] text-slate-400 font-medium">{s.email}</div>}
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  <span className="font-extrabold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 text-[10px] uppercase">
+                                    {s.category || "Bahan Baku"}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap font-bold text-slate-700">
+                                  {s.contactPerson || "-"}
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  {formattedWa ? (
+                                    <a
+                                      href={`https://wa.me/${formattedWa}?text=Halo%20${encodeURIComponent(s.name)},%20salam%20dari%20AnchurPOS!`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-emerald-700 font-extrabold hover:underline flex items-center gap-1"
+                                    >
+                                      <MessageCircle size={14} className="text-emerald-600 shrink-0" />
+                                      {s.phoneNumber}
+                                    </a>
+                                  ) : (
+                                    <span className="text-slate-400 font-medium">-</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/60 uppercase">
+                                    {s.paymentTerms || "Cash"}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 truncate max-w-xs">
+                                  {s.address || "-"}
+                                </td>
+                                <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewSupplierItem(s)}
+                                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                                      title="Detail Rekam ERP"
+                                    >
+                                      <Building2 size={14} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditSupplierItem(s);
+                                        setSupplierForm({
+                                          code: s.code || "",
+                                          name: s.name,
+                                          category: s.category || "Bahan Baku",
+                                          phoneNumber: s.phoneNumber || "",
+                                          email: s.email || "",
+                                          address: s.address || "",
+                                          contactPerson: s.contactPerson || "",
+                                          paymentTerms: s.paymentTerms || "Cash",
+                                          notes: s.notes || ""
+                                        });
+                                        setShowAddForm(false);
+                                      }}
+                                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                                      title="Edit"
+                                    >
+                                      <Pencil size={14} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSupplierDeleteTarget(s)}
+                                      className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors"
+                                      title="Hapus"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+
+                          {filteredSuppliers.length === 0 && (
+                            <tr>
+                              <td colSpan={8} className="py-12 text-center text-slate-400 font-bold">
+                                Belum ada Pemasok / Supplier terdaftar.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  /* Clean Grid View for Suppliers */
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {filteredSuppliers.map(s => {
+                      const cleanPhone = (s.phoneNumber || "").replace(/[^0-9]/g, "");
+                      const formattedWa = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
+                      const suppCode = s.code || `VEND-${s.id.slice(0, 4).toUpperCase()}`;
+
+                      return (
+                        <div key={s.id} className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between space-y-4 hover:shadow-md hover:border-slate-300 transition-all group">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono font-extrabold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-md border border-slate-200/60">
+                                {suppCode}
+                              </span>
+                              <span className="font-extrabold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 text-[10px] uppercase">
+                                {s.category || "Bahan Baku"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-3 pt-1">
+                              <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center font-black text-sm shrink-0">
+                                <Store size={20} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h3 className="text-base font-black text-slate-800 group-hover:text-amber-600 transition-colors truncate">
+                                  {s.name}
+                                </h3>
+                                <p className="text-xs font-semibold text-slate-400 flex items-center gap-1 truncate">
+                                  <Phone size={12} className="text-slate-400 shrink-0" />
+                                  {s.phoneNumber || "-"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs">
+                              {s.contactPerson && (
+                                <div className="text-slate-500 font-bold">
+                                  Contact: <strong className="text-slate-800">{s.contactPerson}</strong>
+                                </div>
+                              )}
+                              {s.address && (
+                                <div className="flex items-start gap-1.5 text-slate-500 font-semibold line-clamp-1">
+                                  <MapPin size={13} className="text-slate-400 shrink-0 mt-0.5" />
+                                  <span className="truncate">{s.address}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setViewSupplierItem(s)}
+                              className="flex-1 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 transition-colors"
+                            >
+                              <Building2 size={13} /> Detail
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditSupplierItem(s);
+                                setSupplierForm({
+                                  code: s.code || "",
+                                  name: s.name,
+                                  category: s.category || "Bahan Baku",
+                                  phoneNumber: s.phoneNumber || "",
+                                  email: s.email || "",
+                                  address: s.address || "",
+                                  contactPerson: s.contactPerson || "",
+                                  paymentTerms: s.paymentTerms || "Cash",
+                                  notes: s.notes || ""
+                                });
+                                setShowAddForm(false);
+                              }}
+                              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors shrink-0"
+                              title="Edit"
+                            >
+                              <Pencil size={14} />
+                            </button>
+
+                            {formattedWa && (
+                              <a
+                                href={`https://wa.me/${formattedWa}?text=Halo%20${encodeURIComponent(s.name)},%20salam%20dari%20AnchurPOS!`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 flex items-center justify-center border border-emerald-200 transition-colors shrink-0"
+                                title="WhatsApp"
+                              >
+                                <MessageCircle size={14} />
+                              </a>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => setSupplierDeleteTarget(s)}
+                              className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center border border-rose-200 transition-colors shrink-0"
+                              title="Hapus"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+
+                          {supplierDeleteTarget?.id === s.id && (
+                            <ConfirmDelete label={s.name} onConfirm={handleDeleteSupplier} onCancel={() => setSupplierDeleteTarget(null)} loading={deletingSupplier} />
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {filteredSuppliers.length === 0 && (
+                      <div className="col-span-full bg-white rounded-3xl p-10 text-center border border-slate-200/80 space-y-2">
+                        <Store size={32} className="text-slate-400 mx-auto" />
+                        <p className="text-sm font-bold text-slate-700">Belum ada Pemasok / Supplier terdaftar.</p>
+                        <p className="text-xs text-slate-400">Klik "+ Tambah Item Baru" untuk mendaftarkan toko langganan belanja Anda.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Modal Profile Record View Vendor ERP (SAP & Odoo Standard) */}
+                {viewSupplierItem && (
+                  <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+                    <div className="bg-white rounded-3xl max-w-lg w-full p-6 border border-slate-200 shadow-2xl space-y-5 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-500 via-indigo-500 to-emerald-500" />
+
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-700 border border-amber-100 flex items-center justify-center font-black">
+                            <Store size={20} />
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-mono font-extrabold text-slate-400 block">
+                              {viewSupplierItem.code || `VEND-${viewSupplierItem.id.slice(0, 4).toUpperCase()}`}
+                            </span>
+                            <h3 className="text-base font-extrabold text-slate-800">{viewSupplierItem.name}</h3>
+                          </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => setSupplierDeleteTarget(s)}
-                          className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
-                        >
-                          <Trash2 size={14} />
+                        <button type="button" onClick={() => setViewSupplierItem(null)} className="text-slate-400 hover:text-slate-600">
+                          <X size={20} />
                         </button>
                       </div>
 
-                      <div>
-                        <h3 className="text-base font-extrabold text-slate-800">{s.name}</h3>
-                        <p className="text-xs font-semibold text-slate-400 mt-0.5">{s.phoneNumber || "No Telp -"}</p>
+                      <div className="space-y-3 text-xs">
+                        <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Kategori Pemasok</span>
+                            <span className="font-extrabold text-slate-800 uppercase">{viewSupplierItem.category || "Bahan Baku"}</span>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Terms Pembayaran</span>
+                            <span className="font-extrabold text-slate-800 uppercase">{viewSupplierItem.paymentTerms || "Cash"}</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 pt-1">
+                          <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+                            <span className="font-bold text-slate-500 flex items-center gap-1.5"><Users size={14} /> Contact Person (Sales)</span>
+                            <span className="font-extrabold text-slate-800">{viewSupplierItem.contactPerson || "-"}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+                            <span className="font-bold text-slate-500 flex items-center gap-1.5"><Phone size={14} /> No. Telepon / WA</span>
+                            <span className="font-extrabold text-slate-800">{viewSupplierItem.phoneNumber || "-"}</span>
+                          </div>
+
+                          <div className="py-1.5">
+                            <span className="font-bold text-slate-500 block mb-1 flex items-center gap-1.5"><MapPin size={14} /> Alamat Toko / Gudang Supplier</span>
+                            <p className="font-semibold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                              {viewSupplierItem.address || "Belum ada alamat toko terdaftar."}
+                            </p>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                        <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 uppercase">
-                          {s.category || "Bahan Baku"}
-                        </span>
-                        {s.contactPerson && (
-                          <span className="font-semibold text-slate-500">Contact: {s.contactPerson}</span>
-                        )}
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setViewSupplierItem(null)}
+                          className="px-5 h-10 rounded-xl bg-slate-900 text-white font-extrabold text-xs shadow-sm"
+                        >
+                          Tutup Record
+                        </button>
                       </div>
-
-                      {supplierDeleteTarget?.id === s.id && (
-                        <ConfirmDelete label={s.name} onConfirm={handleDeleteSupplier} onCancel={() => setSupplierDeleteTarget(null)} loading={deletingSupplier} />
-                      )}
                     </div>
-                  ))}
-
-                  {filteredSuppliers.length === 0 && (
-                    <div className="col-span-full bg-white rounded-3xl p-10 text-center border border-slate-200/80 space-y-2">
-                      <Store size={32} className="text-slate-400 mx-auto" />
-                      <p className="text-sm font-bold text-slate-700">Belum ada Pemasok / Supplier terdaftar.</p>
-                      <p className="text-xs text-slate-400">Klik "+ Tambah Item Baru" untuk mendaftarkan toko langganan belanja Anda.</p>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )}
 

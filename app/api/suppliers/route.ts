@@ -14,9 +14,15 @@ export async function GET(req: NextRequest) {
       const d = doc.data();
       return {
         id: doc.id,
+        code: d.code ?? `VEND-${doc.id.slice(0, 4).toUpperCase()}`,
         name: d.name,
+        category: d.category ?? "Bahan Baku",
         contactPerson: d.contactPerson ?? "",
         phoneNumber: d.phoneNumber ?? "",
+        email: d.email ?? "",
+        address: d.address ?? "",
+        notes: d.notes ?? "",
+        paymentTerms: d.paymentTerms ?? "Cash",
         createdAt: d.createdAt?.toDate?.().toISOString() ?? "",
       };
     });
@@ -63,16 +69,23 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const supplierCode = body.code || `VEND-${Math.floor(1000 + Math.random() * 9000)}`;
     const supplierRef = adminDb.collection("suppliers").doc();
     await supplierRef.set({
+      code: supplierCode,
       name: trimmedName,
+      category: body.category || "Bahan Baku",
       contactPerson: contactPerson?.trim() || null,
       phoneNumber: phoneNumber?.trim() || null,
+      email: body.email?.trim() || null,
+      address: body.address?.trim() || null,
+      notes: body.notes?.trim() || "",
+      paymentTerms: body.paymentTerms || "Cash",
       createdBy: user.uid,
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    return NextResponse.json({ success: true, id: supplierRef.id, name: trimmedName });
+    return NextResponse.json({ success: true, id: supplierRef.id, code: supplierCode, name: trimmedName });
   } catch (err) {
     console.error("POST /api/suppliers error:", err);
     return NextResponse.json({ error: "Gagal menyimpan supplier" }, { status: 500 });
