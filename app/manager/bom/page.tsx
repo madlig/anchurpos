@@ -658,7 +658,7 @@ export default function BomPage() {
                             {/* Subtotal HPP */}
                             <div className="text-right min-w-[110px]">
                               <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Subtotal HPP</span>
-                              <span className="text-xs font-black text-slate-800">Rp {formatNumber(rowSubtotal)}</span>
+                              <span className="text-xs font-black text-slate-800">Rp {formatNumber(Math.round(rowSubtotal))}</span>
                             </div>
 
                             {/* Delete Trash Button */}
@@ -797,7 +797,7 @@ export default function BomPage() {
                             {/* Subtotal HPP */}
                             <div className="text-right min-w-[110px]">
                               <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Subtotal HPP</span>
-                              <span className="text-xs font-black text-slate-800">Rp {formatNumber(rowSubtotal)}</span>
+                              <span className="text-xs font-black text-slate-800">Rp {formatNumber(Math.round(rowSubtotal))}</span>
                             </div>
 
                             {/* Delete Trash Button */}
@@ -933,7 +933,7 @@ export default function BomPage() {
                             {/* Subtotal HPP */}
                             <div className="text-right min-w-[110px]">
                               <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Subtotal HPP</span>
-                              <span className="text-xs font-black text-slate-800">Rp {formatNumber(rowSubtotal)}</span>
+                              <span className="text-xs font-black text-slate-800">Rp {formatNumber(Math.round(rowSubtotal))}</span>
                             </div>
 
                             {/* Delete Trash Button */}
