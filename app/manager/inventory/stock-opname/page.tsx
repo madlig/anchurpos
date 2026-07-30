@@ -2,8 +2,11 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Search, Save, AlertTriangle, ArrowLeft } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
+import { 
+  Loader2, Search, Save, AlertTriangle, ArrowLeft, ClipboardList, 
+  CheckCircle2, Package, Check, Layers, AlertCircle, FileText
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -16,25 +19,40 @@ interface OpnameItemUI {
   itemType: "ingredient" | "variant";
 }
 
+const CATEGORY_TABS: { key: "barang_jadi" | "bahan_baku" | "packaging" | "operasional" | "add_on"; label: string }[] = [
+  { key: "barang_jadi", label: "Barang Jadi (Frozen)" },
+  { key: "bahan_baku", label: "Bahan Baku" },
+  { key: "packaging", label: "Kemasan & Packaging" },
+  { key: "operasional", label: "Operasional" },
+  { key: "add_on", label: "Add-On" },
+];
+
 export default function StockOpnamePage() {
   const { getToken } = useAuth();
   const router = useRouter();
+  const { alert } = useAlertConfirm();
   
   const [items, setItems] = useState<OpnameItemUI[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"bahan_baku" | "packaging" | "operasional" | "add_on" | "barang_jadi">("barang_jadi");
+  const [activeTab, setActiveTab] = useState<"barang_jadi" | "bahan_baku" | "packaging" | "operasional" | "add_on">("barang_jadi");
   
   const [opnameData, setOpnameData] = useState<Record<string, string>>({});
   const [notesData, setNotesData] = useState<Record<string, string>>({});
   
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
-    return fetch(url, { ...options, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options?.headers } });
+    return fetch(url, { 
+      ...options, 
+      headers: { 
+        Authorization: `Bearer ${token}`, 
+        "Content-Type": "application/json", 
+        ...options?.headers 
+      } 
+    });
   }, [getToken]);
 
   const loadData = useCallback(async () => {
@@ -61,7 +79,7 @@ export default function StockOpnamePage() {
         }))];
       }
       setItems(allItems);
-    } catch(err) {
+    } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
@@ -80,6 +98,14 @@ export default function StockOpnamePage() {
     });
   }, [items, activeTab, search]);
 
+  // Completion Stats
+  const filledCount = useMemo(() => {
+    return Object.keys(opnameData).filter(k => opnameData[k] !== "").length;
+  }, [opnameData]);
+
+  const totalCount = items.length;
+  const progressPercent = totalCount > 0 ? Math.round((filledCount / totalCount) * 100) : 0;
+
   const handleStockChange = (id: string, value: string) => {
     setOpnameData(prev => ({ ...prev, [id]: value }));
   };
@@ -90,7 +116,6 @@ export default function StockOpnamePage() {
 
   const handleSubmit = async () => {
     setError("");
-    setSuccess("");
     
     const itemsToUpdate = items.map(i => {
       const actualStr = opnameData[i.id];
@@ -99,169 +124,226 @@ export default function StockOpnamePage() {
       const actualStock = parseFloat(actualStr);
       if (isNaN(actualStock)) return null;
       
-      if (actualStock === i.currentStock) return null;
-      
       return {
-        itemId: i.id,
+        ingredientId: i.id,
         itemType: i.itemType,
-        actualStock,
+        inputMethod: "manual",
+        physicalStock: actualStock,
+        physicalStockConverted: actualStock,
         systemStock: i.currentStock,
-        notes: notesData[i.id] || ""
+        difference: actualStock - i.currentStock,
+        note: notesData[i.id] || null
       };
     }).filter(Boolean);
 
     if (itemsToUpdate.length === 0) {
-      setError("Tidak ada perubahan stok yang perlu disimpan.");
+      setError("Isi minimal 1 stok fisik barang sebelum menyimpan");
       return;
     }
 
-    if (!confirm(`Terdapat ${itemsToUpdate.length} item yang akan disesuaikan stoknya. Lanjutkan?`)) return;
-
     setSubmitting(true);
     try {
-      const res = await fetchWithAuth("/api/inventory/stock-opname", {
+      const res = await fetchWithAuth("/api/stock-opname", {
         method: "POST",
         body: JSON.stringify({ items: itemsToUpdate })
       });
-      if (!res.ok) {
+
+      if (res.ok) {
+        await alert("Stock Opname berhasil disimpan dan dikirim untuk direview Manager!", "Berhasil Ditambahkan", "success");
+        router.push("/manager/inventory?tab=opname");
+      } else {
         const d = await res.json();
         setError(d.error || "Gagal menyimpan stock opname");
-      } else {
-        setSuccess("Stock Opname berhasil disimpan! Data stok telah diperbarui.");
-        setOpnameData({});
-        setNotesData({});
-        loadData(); // reload
-        setTimeout(() => setSuccess(""), 5000);
       }
-    } catch (err) {
-      setError("Terjadi kesalahan jaringan.");
+    } catch {
+      setError("Terjadi kesalahan jaringan");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const TABS = [
-    { id: "barang_jadi", label: "Produk Jadi (Varian)" },
-    { id: "bahan_baku", label: "Bahan Baku" },
-    { id: "packaging", label: "Kemasan (Packaging)" },
-    { id: "add_on", label: "Add-on / Saus" },
-    { id: "operasional", label: "Operasional" },
-  ] as const;
-
-  if (loading) {
-    return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="animate-spin text-slate-400" size={32} /></div>;
-  }
-
   return (
-    <div className="p-4 md:p-8 space-y-6 max-w-5xl mx-auto pb-32">
-      <div className="flex items-center gap-3">
-        <Link href="/manager/inventory" className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100 text-slate-500 hover:text-slate-800 transition-colors">
-          <ArrowLeft size={18} />
-        </Link>
-        <div>
-          <h1 className="text-xl md:text-2xl font-extrabold text-slate-800">Stock Opname</h1>
-          <p className="text-xs md:text-sm text-slate-500 font-medium">Penyesuaian stok fisik dan sistem</p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-slate-100">
-        
-        {/* Header Tools */}
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-center mb-6">
-          <div className="flex overflow-x-auto w-full md:w-auto pb-2 md:pb-0 hide-scrollbar gap-2">
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === tab.id ? 'bg-primary text-white shadow-md shadow-primary/20' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+    <div className="min-h-screen bg-slate-50/70 pb-32">
+      
+      {/* ── Native App Sticky Header ── */}
+      <div className="bg-white sticky top-0 z-30 px-4 md:px-8 pt-4 pb-3 shadow-sm border-b border-slate-100">
+        <div className="max-w-4xl mx-auto space-y-3">
           
-          <div className="relative w-full md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <Input 
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Cari barang..." 
-              className="pl-9 h-11 bg-slate-50 border-none rounded-xl font-medium"
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Link
+                href="/manager/inventory"
+                className="w-10 h-10 rounded-2xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors shrink-0"
+              >
+                <ArrowLeft size={18} />
+              </Link>
+              <div>
+                <h1 className="text-lg md:text-xl font-extrabold text-slate-800 tracking-tight leading-tight">
+                  Input Stock Opname
+                </h1>
+                <p className="text-xs font-semibold text-slate-400">
+                  Formulir Cek Fisik Barang Outlet
+                </p>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <span className="text-xs font-bold text-slate-400 block">Progres Cek</span>
+              <span className="text-xs font-black text-slate-800 tabular-nums">{filledCount} / {totalCount} Item ({progressPercent}%)</span>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+            <div 
+              className="bg-indigo-600 h-full transition-all duration-300 rounded-full"
+              style={{ width: `${progressPercent}%` }}
             />
           </div>
+
+          {/* Horizontal Scroll Tabs */}
+          <div className="overflow-x-auto hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0 pt-1">
+            <div className="flex items-center gap-1.5 min-w-max">
+              {CATEGORY_TABS.map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setActiveTab(t.key)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap border ${
+                    activeTab === t.key 
+                      ? "bg-slate-900 text-white border-slate-900 shadow-sm" 
+                      : "bg-slate-100/80 text-slate-600 border-slate-200/80 hover:bg-slate-200/60"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* ── Main Content Area ── */}
+      <div className="px-4 md:px-8 max-w-4xl mx-auto space-y-4 pt-4">
+        
+        {/* Search Bar */}
+        <div className="relative">
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder={`Cari item ${activeTab.replace('_', ' ')}...`}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full h-10 pl-9 pr-4 rounded-2xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
+          />
         </div>
 
-        {error && <div className="p-4 mb-4 bg-red-50 text-red-600 rounded-xl text-sm font-bold border border-red-100 flex items-center gap-2"><AlertTriangle size={16}/> {error}</div>}
-        {success && <div className="p-4 mb-4 bg-green-50 text-green-700 rounded-xl text-sm font-bold border border-green-100">{success}</div>}
+        {error && (
+          <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 font-bold text-xs flex items-center gap-2">
+            <AlertCircle size={16} /> {error}
+          </div>
+        )}
 
-        {/* List */}
-        <div className="space-y-3">
-          {filteredItems.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 font-medium">
-              Tidak ada barang yang cocok.
-            </div>
-          ) : (
-            filteredItems.map(item => {
-              const actualStr = opnameData[item.id] ?? "";
-              const hasChange = actualStr !== "" && parseFloat(actualStr) !== item.currentStock && !isNaN(parseFloat(actualStr));
-              
+        {/* Item Cards List */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-slate-800" />
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm space-y-2">
+            <Package size={32} className="text-slate-400 mx-auto" />
+            <p className="text-sm font-bold text-slate-700">Tidak ada item ditemukan di kategori ini.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredItems.map(item => {
+              const inputVal = opnameData[item.id] || "";
+              const noteVal = notesData[item.id] || "";
+              const actualNum = parseFloat(inputVal);
+              const isFilled = inputVal !== "" && !isNaN(actualNum);
+              const diff = isFilled ? actualNum - item.currentStock : 0;
+              const hasDiff = isFilled && diff !== 0;
+
               return (
-                <div key={item.id} className={`flex flex-col md:flex-row gap-4 p-4 rounded-2xl border transition-all ${hasChange ? 'border-primary/40 bg-primary/5' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
-                  
-                  <div className="flex-1">
-                    <p className="font-bold text-slate-800">{item.name}</p>
-                    <p className="text-xs text-slate-500 mt-1 font-mono">
-                      Sistem: <span className={item.currentStock < 0 ? 'text-red-500 font-bold' : ''}>{item.currentStock}</span> {item.baseUnit}
-                    </p>
-                  </div>
-                  
-                  <div className="flex gap-2 items-center w-full md:w-auto">
-                    <div className="flex-1 md:w-32">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">Fisik Aktual</label>
-                      <Input 
-                        type="number" 
-                        step="0.01"
-                        placeholder="0"
-                        value={actualStr}
-                        onChange={(e) => handleStockChange(item.id, e.target.value)}
-                        className={`h-11 rounded-xl text-sm font-bold ${hasChange ? 'bg-white border-primary/40 focus-visible:ring-primary/20' : 'bg-slate-50 border-none'}`}
-                      />
+                <div 
+                  key={item.id}
+                  className={`bg-white rounded-2xl p-4 border transition-all space-y-3 shadow-sm ${
+                    hasDiff ? "border-amber-300 bg-amber-50/20" : isFilled ? "border-emerald-200" : "border-slate-200/80"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-800">{item.name}</h3>
+                      <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                        Stok Sistem: <span className="font-bold text-slate-700">{item.currentStock} {item.baseUnit}</span>
+                      </p>
                     </div>
-                    {hasChange && (
-                      <div className="flex-1 md:w-48 animate-fade-in">
-                        <label className="text-[10px] font-bold text-primary/70 uppercase ml-1 block mb-1">Keterangan (Opsional)</label>
-                        <Input 
-                          type="text" 
-                          placeholder="Cth: Basi, Tumpah..."
-                          value={notesData[item.id] ?? ""}
-                          onChange={(e) => handleNotesChange(item.id, e.target.value)}
-                          className="h-11 rounded-xl text-xs bg-white border-primary/40 focus-visible:ring-primary/20"
-                        />
-                      </div>
+
+                    {isFilled && (
+                      <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border uppercase tracking-wider shrink-0 ${
+                        hasDiff 
+                          ? diff > 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200"
+                          : "bg-slate-100 text-slate-700 border-slate-200"
+                      }`}>
+                        {hasDiff ? `Selisih: ${diff > 0 ? "+" : ""}${diff} ${item.baseUnit}` : "Cocok"}
+                      </span>
                     )}
                   </div>
-                  
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1">
+                        Hasil Cek Fisik Nyata ({item.baseUnit}) *
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={inputVal}
+                        onChange={e => handleStockChange(item.id, e.target.value)}
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-black text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-slate-900/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1">
+                        Catatan Selisih (Opsional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: 1 botol pecah di rak bawah"
+                        value={noteVal}
+                        onChange={e => handleNotesChange(item.id, e.target.value)}
+                        className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-slate-900/20"
+                      />
+                    </div>
+                  </div>
                 </div>
               );
-            })
-          )}
+            })}
+          </div>
+        )}
+
+      </div>
+
+      {/* ── Sticky Bottom Action Bar ── */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 p-4 shadow-xl">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+          <div>
+            <span className="text-xs font-bold text-slate-400 block">Total Terisi</span>
+            <span className="text-sm font-black text-slate-800 tabular-nums">{filledCount} dari {totalCount} Item</span>
+          </div>
+
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || filledCount === 0}
+            className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-xs transition-all shadow-md flex items-center gap-2"
+          >
+            {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            Simpan & Kirim Stock Opname
+          </button>
         </div>
       </div>
 
-      {/* Floating Save Button */}
-      <div className="fixed bottom-16 md:bottom-6 left-0 right-0 md:left-[17rem] p-4 bg-gradient-to-t from-white via-white to-transparent md:bg-none z-20 pointer-events-none">
-        <div className="max-w-5xl mx-auto flex justify-end pointer-events-auto">
-           <button
-             onClick={handleSubmit}
-             disabled={submitting || Object.keys(opnameData).length === 0}
-             className="h-14 px-8 rounded-2xl text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-0 disabled:translate-y-4 flex items-center justify-center gap-2 shadow-xl shadow-primary/30 w-full md:w-auto"
-             style={{ background: "linear-gradient(135deg, #E85D8C 0%, #D84275 100%)" }}
-           >
-             {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save size={18} /> Terapkan Penyesuaian</>}
-           </button>
-        </div>
-      </div>
-      
     </div>
   );
 }

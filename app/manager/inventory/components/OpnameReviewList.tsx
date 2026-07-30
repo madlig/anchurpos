@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { formatNumber, formatDateTime } from "@/lib/formatters";
 import { Input } from "@/components/ui/input";
-import { Loader2, Check, AlertTriangle, ChevronDown, ChevronUp, ClipboardList } from "lucide-react";
+import { 
+  Loader2, Check, AlertTriangle, ChevronDown, ChevronUp, ClipboardList, 
+  CheckCircle2, AlertCircle, FileText, User, ArrowLeftRight, CheckSquare, Square
+} from "lucide-react";
 import type { Ingredient } from "@/types";
 
 interface OpnameItem {
@@ -91,7 +94,7 @@ export function OpnameReviewList({
 
       if (!res.ok) {
         const d = await res.json();
-        setOpnameError(d.error ?? "Gagal mereview");
+        setOpnameError(d.error ?? "Gagal mereview opname");
         return;
       }
 
@@ -106,29 +109,34 @@ export function OpnameReviewList({
   }
 
   return (
-    <div className="space-y-6 mt-6 max-w-3xl mx-auto">
-      {/* Menunggu Review */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <AlertTriangle size={18} className="text-orange-500" />
-          <h2 className="text-lg font-bold text-slate-800">Menunggu Review</h2>
+    <div className="space-y-6 max-w-4xl mx-auto">
+      
+      {/* ── Section 1: Menunggu Review Manager ── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <AlertTriangle size={16} className="text-amber-500" /> Menunggu Review Manager ({pendingOpnames.length})
+          </h2>
         </div>
 
         {pendingOpnames.length === 0 ? (
-          <div className="bg-white rounded-2xl p-10 text-center border border-slate-100 shadow-sm flex flex-col items-center">
-            <ClipboardList size={32} className="text-slate-300 mb-3" />
-            <p className="text-slate-500 text-sm font-medium">Yeay! Semua opname sudah direview.</p>
+          <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm flex flex-col items-center space-y-2">
+            <CheckCircle2 size={32} className="text-emerald-500" />
+            <p className="text-sm font-bold text-slate-700">Semua laporan opname telah selesai direview!</p>
+            <p className="text-xs text-slate-400">Tidak ada pending audit stock opname yang perlu tindakan.</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {pendingOpnames.map((opname) => {
               const isExpanded = expandedOpnameId === opname.id;
-              const discrepancyCount = opname.items.filter(i => i.difference !== 0).length;
+              const discrepancyItems = opname.items.filter(i => i.difference !== 0);
+              const opnameAdj = adjustments.get(opname.id) ?? new Map();
 
               return (
-                <div key={opname.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all">
+                <div key={opname.id} className="bg-white rounded-2xl md:rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden transition-all">
+                  
                   <div
-                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/80 transition-colors"
                     onClick={() => {
                       if (isExpanded) {
                         setExpandedOpnameId(null);
@@ -136,7 +144,7 @@ export function OpnameReviewList({
                         setExpandedOpnameId(opname.id);
                         if (!adjustments.has(opname.id)) {
                           const initialAdj = new Map();
-                          opname.items.filter(i => i.difference !== 0).forEach(i => {
+                          discrepancyItems.forEach(i => {
                             initialAdj.set(i.ingredientId, true); // Auto check by default
                           });
                           setAdjustments(prev => new Map(prev).set(opname.id, initialAdj));
@@ -144,117 +152,122 @@ export function OpnameReviewList({
                       }
                     }}
                   >
-                    <div>
+                    <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-slate-800">{formatDateTime(opname.date)}</p>
-                        {opname.hasDiscrepancy && (
-                          <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
-                            Ada Selisih
+                        <span className="text-xs md:text-sm font-black text-slate-800">{formatDateTime(opname.date)}</span>
+                        {opname.hasDiscrepancy ? (
+                          <span className="text-[10px] font-black bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md border border-amber-200 uppercase tracking-wider">
+                            {discrepancyItems.length} Item Selisih
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-200 uppercase tracking-wider">
+                            Stok 100% Cocok
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-500 mt-1 font-medium">
-                        Oleh: {opname.crewId} • Dicek: {opname.totalIngredientsChecked}/{opname.totalIngredientsAll}
+
+                      <p className="text-xs text-slate-500 font-semibold flex items-center gap-1.5">
+                        <User size={12} /> Staf / Crew ID: {opname.crewId} • Dicek: {opname.totalIngredientsChecked}/{opname.totalIngredientsAll} Item
                       </p>
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+
+                    <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
                       {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </div>
                   </div>
 
                   {isExpanded && (
-                    <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+                    <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-4">
                       {opnameError && (
-                        <div className="bg-red-50 text-red-600 p-3 rounded-xl text-xs font-semibold mb-4 border border-red-100 flex items-center gap-2">
-                          <AlertTriangle size={14} />
-                          {opnameError}
+                        <div className="bg-rose-50 text-rose-600 p-3 rounded-xl text-xs font-bold border border-rose-200 flex items-center gap-2">
+                          <AlertCircle size={15} /> {opnameError}
                         </div>
                       )}
 
                       {!opname.hasDiscrepancy ? (
-                        <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl text-sm font-medium border border-emerald-100 flex items-center gap-3 mb-4">
-                          <div className="bg-emerald-100 p-2 rounded-full">
-                            <Check size={18} className="text-emerald-600" />
-                          </div>
+                        <div className="bg-emerald-50/80 text-emerald-900 p-4 rounded-2xl text-xs font-semibold border border-emerald-200 flex items-center gap-3">
+                          <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
                           <div>
-                            <p className="font-bold">Stok Aman & Cocok!</p>
-                            <p className="text-xs text-emerald-600/80">Tidak ada selisih antara sistem dan fisik.</p>
+                            <p className="font-extrabold text-sm">Stok Fisik & Sistem 100% Sesuai!</p>
+                            <p className="text-emerald-700 text-[11px] mt-0.5">Tidak ada selisih barang yang perlu di-adjust.</p>
                           </div>
                         </div>
                       ) : (
-                        <div className="space-y-3 mb-4">
-                          <p className="text-xs font-bold text-slate-700 uppercase tracking-wide px-1">
-                            Daftar Selisih ({discrepancyCount} Item)
-                          </p>
-                          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                            <table className="w-full text-left text-xs">
-                              <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                                <tr>
-                                  <th className="px-4 py-2 font-semibold">Bahan</th>
-                                  <th className="px-4 py-2 font-semibold whitespace-nowrap">Stok Sistem</th>
-                                  <th className="px-4 py-2 font-semibold whitespace-nowrap">Stok Fisik</th>
-                                  <th className="px-4 py-2 font-semibold text-right">Selisih</th>
-                                  <th className="px-4 py-2 font-semibold text-center">Sesuaikan?</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                {opname.items.filter(item => item.difference !== 0).map((item) => {
-                                  const ing = ingredients.find(i => i.id === item.ingredientId);
-                                  const unit = ing?.baseUnit ?? "";
-                                  const physical = item.inputMethod === "packaged" ? item.physicalStockConverted ?? 0 : item.physicalStock ?? 0;
-                                  const isChecked = adjustments.get(opname.id)?.get(item.ingredientId) ?? false;
-                                  const isMinus = item.difference < 0;
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-700">
+                              Daftar Item Selisih Fisik vs Sistem ({discrepancyItems.length})
+                            </span>
+                            <span className="text-[11px] font-bold text-slate-400">
+                              Centang untuk perbarui stok Firestore
+                            </span>
+                          </div>
 
-                                  return (
-                                    <tr key={item.ingredientId} className="hover:bg-slate-50 transition-colors">
-                                      <td className="px-4 py-3 font-semibold text-slate-800">
-                                        {ing?.name ?? item.ingredientId}
-                                      </td>
-                                      <td className="px-4 py-3 text-slate-500">{fmtStock(item.systemStock, unit)}</td>
-                                      <td className="px-4 py-3 font-bold text-slate-700">{fmtStock(physical, unit)}</td>
-                                      <td className={`px-4 py-3 font-bold text-right ${isMinus ? 'text-red-500' : 'text-emerald-500'}`}>
-                                        {isMinus ? "" : "+"}{fmtStock(item.difference, unit)}
-                                      </td>
-                                      <td className="px-4 py-3 text-center">
-                                        <input
-                                          type="checkbox"
-                                          checked={isChecked}
-                                          onChange={() => toggleAdjustment(opname.id, item.ingredientId)}
-                                          className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
-                                        />
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
+                          <div className="space-y-2 text-xs">
+                            {discrepancyItems.map((item) => {
+                              const ingredient = ingredients.find(i => i.id === item.ingredientId);
+                              const name = ingredient?.name ?? item.ingredientId;
+                              const unit = ingredient?.baseUnit ?? "";
+                              const isChecked = opnameAdj.get(item.ingredientId) ?? false;
+                              const physicalVal = item.inputMethod === "packaged" ? item.physicalStockConverted : item.physicalStock;
+
+                              return (
+                                <div
+                                  key={item.ingredientId}
+                                  onClick={() => toggleAdjustment(opname.id, item.ingredientId)}
+                                  className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                                    isChecked ? "bg-white border-indigo-300 shadow-sm" : "bg-slate-100/60 border-slate-200 text-slate-400"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <button type="button" className="text-indigo-600 shrink-0">
+                                      {isChecked ? <CheckSquare size={18} /> : <Square size={18} className="text-slate-400" />}
+                                    </button>
+
+                                    <div className="min-w-0">
+                                      <p className="font-extrabold text-slate-800 truncate">{name}</p>
+                                      <p className="text-[11px] font-semibold text-slate-500">
+                                        Sistem: {fmtStock(item.systemStock, unit)} • Fisik: <span className="font-bold text-slate-800">{fmtStock(physicalVal, unit)}</span>
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="text-right shrink-0">
+                                    <span className={`font-black text-xs md:text-sm tabular-nums block ${item.difference > 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                                      {item.difference > 0 ? "+" : ""}{fmtStock(item.difference, unit)}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
 
-                      <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm mt-4">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Catatan Review (Opsional)</label>
-                        <Input
-                          placeholder="Contoh: Stok beras wajar menyusut 2kg"
-                          value={reviewNote}
-                          onChange={(e) => setReviewNote(e.target.value)}
-                          className="h-11 rounded-lg border-slate-200 text-sm bg-slate-50"
-                        />
+                      <div className="pt-2 space-y-3">
+                        <div>
+                          <label className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider block mb-1">Catatan Manager Review (Opsional)</label>
+                          <Input
+                            type="text"
+                            placeholder="Tulis instruksi atau catatan review..."
+                            value={reviewNote}
+                            onChange={(e) => setReviewNote(e.target.value)}
+                            className="h-10 text-xs bg-white rounded-xl border-slate-200"
+                          />
+                        </div>
+
                         <button
                           onClick={() => handleReview(opname.id)}
                           disabled={opnameSubmittingId === opname.id}
-                          className="w-full h-11 bg-primary text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-md shadow-primary/20 active:scale-[0.98]"
+                          className="w-full h-11 bg-slate-900 hover:bg-black text-white font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
                         >
-                          {opnameSubmittingId === opname.id ? (
-                            <Loader2 size={16} className="animate-spin" />
-                          ) : (
-                            <Check size={16} />
-                          )}
-                          Selesaikan Review
+                          {opnameSubmittingId === opname.id ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                          Approve & Simpan Review Opname
                         </button>
                       </div>
                     </div>
                   )}
+
                 </div>
               );
             })}
@@ -262,41 +275,32 @@ export function OpnameReviewList({
         )}
       </div>
 
-      {/* Sudah Direview */}
-      <div className="pt-6">
-        <h2 className="text-lg font-bold text-slate-800 mb-4">Riwayat Review</h2>
-        {reviewedOpnames.length === 0 ? (
-          <div className="bg-white rounded-2xl p-6 text-center border border-slate-100 shadow-sm">
-            <p className="text-slate-500 text-sm font-medium">Belum ada riwayat opname</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {reviewedOpnames.map((opname) => {
-              const isAdjusted = opname.reviewAction === "adjusted";
-              return (
-                <div
-                  key={opname.id}
-                  className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm flex items-center justify-between"
-                >
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">{formatDateTime(opname.date)}</p>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">
-                      Reviewer: <span className="text-slate-700">{opname.reviewedBy}</span>
-                    </p>
-                  </div>
-                  <span
-                    className={`text-[10px] font-bold px-3 py-1 rounded-full ${
-                      isAdjusted ? "bg-blue-50 text-blue-600 border border-blue-100" : "bg-slate-100 text-slate-500"
-                    }`}
-                  >
-                    {isAdjusted ? "Stok Disesuaikan" : "Tanpa Koreksi"}
-                  </span>
+      {/* ── Section 2: Riwayat Opname Ter-Review ── */}
+      {reviewedOpnames.length > 0 && (
+        <div className="space-y-3 pt-4 border-t border-slate-200">
+          <h2 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <CheckCircle2 size={15} className="text-emerald-500" /> Riwayat Audit Opname Selesai ({reviewedOpnames.length})
+          </h2>
+
+          <div className="space-y-2">
+            {reviewedOpnames.slice(0, 10).map((opname) => (
+              <div key={opname.id} className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-between text-xs">
+                <div>
+                  <p className="font-extrabold text-slate-800">{formatDateTime(opname.date)}</p>
+                  <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                    Oleh: {opname.crewId} • Ter-review oleh Manager
+                  </p>
                 </div>
-              );
-            })}
+
+                <span className="text-[10px] font-black px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wider">
+                  Approved
+                </span>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
     </div>
   );
 }
