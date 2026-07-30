@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { formatNumber } from "@/lib/formatters";
 import { Input } from "@/components/ui/input";
-import { Loader2, Plus, X, Check, MoreHorizontal } from "lucide-react";
+import { Loader2, Plus, X, Check, MoreHorizontal, Trash2, History, Pencil } from "lucide-react";
 
 interface VariantStock {
   id: string;
@@ -91,44 +91,60 @@ export function ProductList({
                   <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mt-0.5">Varian Frozen</p>
                 </div>
                 
-                {/* 3 Dots Menu */}
-                <button
-                  onClick={() => setOpenMenuId(isMenuOpen ? null : v.id)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 transition-colors"
-                >
-                  <MoreHorizontal size={18} />
-                </button>
+                {/* Header Action Buttons */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (confirm(`Hapus "${v.name}" secara permanen dari inventori?`)) {
+                        const targetId = v.id.includes("_") ? v.id.split("_")[1] : v.id;
+                        const res = await fetchWithAuth(`/api/variants/${targetId}`, { method: "DELETE" });
+                        if (res.ok) await loadVariants();
+                      }
+                    }}
+                    className="w-8 h-8 flex items-center justify-center rounded-xl text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors"
+                    title="Hapus Item"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+
+                  <button
+                    onClick={() => setOpenMenuId(isMenuOpen ? null : v.id)}
+                    className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 transition-colors"
+                  >
+                    <MoreHorizontal size={18} />
+                  </button>
+                </div>
                 
                 {/* Dropdown Menu */}
                 {isMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)}></div>
-                    <div className="absolute right-0 top-9 w-44 bg-white rounded-xl shadow-lg border border-slate-100 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                    <div className="absolute right-0 top-9 w-48 bg-white rounded-xl shadow-lg border border-slate-100 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
                       <button
                         onClick={() => { setEditingVariantId(v.id); setOpenMenuId(null); setOpnameValue(v.currentStock.toString()); setOpnameNote(""); }}
-                        className="w-full text-left px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 border-b border-slate-50 transition-colors"
+                        className="w-full text-left px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 border-b border-slate-50 transition-colors flex items-center gap-2"
                       >
-                        Edit / Koreksi Stok
+                        <Pencil size={14} className="text-slate-400" /> Edit / Koreksi Stok
                       </button>
                       <button
                         onClick={() => { openMutasiModal(v.id, v.name, "Pack", "variant"); setOpenMenuId(null); }}
-                        className="w-full text-left px-4 py-2.5 text-xs font-semibold text-primary hover:bg-slate-50 border-b border-slate-50 transition-colors"
+                        className="w-full text-left px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 border-b border-slate-50 transition-colors flex items-center gap-2"
                       >
-                        Lihat Riwayat Mutasi
+                        <History size={14} className="text-slate-400" /> Lihat Riwayat Mutasi
                       </button>
                       <button
                         onClick={async () => {
                           setOpenMenuId(null);
-                          if (confirm(`Hapus "${v.name}" dari inventori?`)) {
-                            // Extract variantId if stockId format "productId_variantId"
+                          if (confirm(`Hapus "${v.name}" secara permanen dari inventori?`)) {
                             const targetId = v.id.includes("_") ? v.id.split("_")[1] : v.id;
                             const res = await fetchWithAuth(`/api/variants/${targetId}`, { method: "DELETE" });
                             if (res.ok) await loadVariants();
                           }
                         }}
-                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-1.5"
+                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-2"
                       >
-                        Hapus Item
+                        <Trash2 size={14} /> Hapus Item
                       </button>
                     </div>
                   </>
