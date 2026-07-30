@@ -13,10 +13,11 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
-  const { name, baseUnit, category, minStock, channels, unitAlternatives, defaultCostPerBaseUnit } = body as {
+  const { name, baseUnit, category, minStock, channels, unitAlternatives, defaultCostPerBaseUnit, price } = body as {
     name?: string; baseUnit?: string; category?: string; minStock?: number; channels?: string[];
     unitAlternatives?: { unit: string; conversionToBase: number }[];
     defaultCostPerBaseUnit?: number;
+    price?: number;
   };
 
   if (!name?.trim() || !baseUnit?.trim()) {
@@ -39,6 +40,7 @@ export async function PATCH(
         defaultCostPerBaseUnit,
         lastHppUpdateDate: new Date().toISOString()
       } : {}),
+      ...(typeof price === "number" ? { price } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     });
 

@@ -6,13 +6,12 @@ import { useAuth } from "@/lib/auth-context";
 import { 
   Loader2, Plus, X, Check, Package, Layers, Beaker, Pencil, Trash2, Users, Search, 
   Store, Phone, MapPin, MessageCircle, Building2, UserCheck, Tag, CreditCard,
-  SlidersHorizontal, ChevronRight, CheckCircle2, ShieldCheck, Sparkles, Filter,
-  ArrowLeft
+  SlidersHorizontal, ChevronRight, CheckCircle2, ShieldCheck, Sparkles, Filter
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatNumber } from "@/lib/formatters";
 
-type Tab = "produk" | "varian" | "bahan" | "pelanggan" | "addons" | "suppliers";
+type Tab = "produk" | "varian" | "bahan" | "pelanggan";
 
 function fmt(n: number) {
   return formatNumber(n);
@@ -21,9 +20,7 @@ function fmt(n: number) {
 interface PriceTier { minQty: number; maxQty: number | null; price: number; }
 interface ProductItem { id: string; name: string; code: string; description: string; packPerBatch: number; priceTiers: PriceTier[]; channels?: string[]; freeSauceAllowance?: number; }
 interface VariantItem { id: string; name: string; sortOrder: number; currentStock: number; minStock: number; freeSauceAllowance?: number; }
-interface IngredientItem { id: string; name: string; category: string; baseUnit: string; currentStock: number; minStock: number; channels?: string[]; unitAlternatives?: { unit: string; conversionToBase: number }[]; defaultCostPerBaseUnit?: number; }
-interface AddonItem { id: string; name: string; price: number; currentStock: number; minStock: number; channels?: string[]; }
-interface SupplierItem { id: string; name: string; contactPerson?: string; phoneNumber?: string; }
+interface IngredientItem { id: string; name: string; category: string; baseUnit: string; currentStock: number; minStock: number; channels?: string[]; unitAlternatives?: { unit: string; conversionToBase: number }[]; defaultCostPerBaseUnit?: number; price?: number; }
 interface CustomerItem { id: string; name: string; customerType: string; channel: string; phoneNumber: string | null; address: string | null; notes: string; discountPerUnit: number; }
 
 // ─── Reusable Confirm Delete Overlay ───────────────────────────────────────────
@@ -60,7 +57,7 @@ function ConfirmDelete({ label, onConfirm, onCancel, loading }: {
   );
 }
 
-// ─── Product Form (Add & Edit) ─────────────────────────────────────────────────
+// ─── Product Form ──────────────────────────────────────────────────────────────
 function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   initial?: ProductItem;
   fetchWithAuth: (url: string, opts?: RequestInit) => Promise<Response>;
@@ -191,7 +188,7 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   );
 }
 
-// ─── Variant Form (Flavor Master Data) ─────────────────────────────────────────
+// ─── Variant Form ──────────────────────────────────────────────────────────────
 function VariantForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   initial?: VariantItem;
   fetchWithAuth: (url: string, opts?: RequestInit) => Promise<Response>;
@@ -249,7 +246,7 @@ function VariantForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   );
 }
 
-// ─── Ingredient Form ───────────────────────────────────────────────────────────
+// ─── Unified Ingredient / Material / Addon Form ───────────────────────────────
 function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   initial?: IngredientItem;
   fetchWithAuth: (url: string, opts?: RequestInit) => Promise<Response>;
@@ -258,10 +255,11 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   const isEdit = !!initial;
   const [form, setForm] = useState({
     name: initial?.name ?? "",
-    baseUnit: initial?.baseUnit ?? "",
+    baseUnit: initial?.baseUnit ?? "pcs",
     minStock: String(initial?.minStock ?? "10"),
     category: initial?.category ?? "bahan_baku",
     defaultCostPerBaseUnit: String(initial?.defaultCostPerBaseUnit ?? "0"),
+    price: String(initial?.price ?? "0"),
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -279,7 +277,8 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
           baseUnit: form.baseUnit.trim(),
           category: form.category,
           minStock: parseFloat(form.minStock) || 0,
-          defaultCostPerBaseUnit: parseFloat(form.defaultCostPerBaseUnit) || 0
+          defaultCostPerBaseUnit: parseFloat(form.defaultCostPerBaseUnit) || 0,
+          price: parseFloat(form.price) || 0
         })
       });
       if (!res.ok) { setErr((await res.json()).error ?? "Gagal"); return; }
@@ -288,9 +287,9 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   }
 
   return (
-    <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4 mb-4">
+    <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4 mb-4 animate-in fade-in zoom-in-95">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <h3 className="text-sm font-extrabold text-slate-800">{isEdit ? "Edit Bahan Baku / Packaging" : "Tambah Bahan Baku Baru"}</h3>
+        <h3 className="text-sm font-extrabold text-slate-800">{isEdit ? `Edit Item: ${initial?.name}` : "Tambah Bahan Baku / Packaging / Add-On Baru"}</h3>
         <button type="button" onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
       </div>
 
@@ -298,21 +297,22 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label htmlFor="ing-name" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Item *</label>
-            <Input id="ing-name" name="ing-name" placeholder="Contoh: Tepung Terigu / Pouch 250gr" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="h-10 text-xs font-semibold" />
+            <Input id="ing-name" name="ing-name" placeholder="Contoh: Gula Bubuk YOA / Pouch 250gr" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="h-10 text-xs font-semibold" />
           </div>
           <div>
-            <label htmlFor="ing-unit" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Satuan Dasar (kg, gr, pcs) *</label>
-            <Input id="ing-unit" name="ing-unit" placeholder="Contoh: kg / pcs" value={form.baseUnit} onChange={e => setForm(p => ({ ...p, baseUnit: e.target.value }))} className="h-10 text-xs font-semibold" />
+            <label htmlFor="ing-unit" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Satuan Dasar (kg, gr, pcs, pouch) *</label>
+            <Input id="ing-unit" name="ing-unit" placeholder="Contoh: kg / pcs / gr" value={form.baseUnit} onChange={e => setForm(p => ({ ...p, baseUnit: e.target.value }))} className="h-10 text-xs font-semibold" />
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <label htmlFor="ing-cat" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Kategori Item</label>
-            <select id="ing-cat" name="ing-cat" value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className="h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-xs">
-              <option value="bahan_baku">Bahan Baku</option>
-              <option value="packaging">Kemasan / Packaging</option>
-              <option value="operasional">Operasional</option>
+            <label htmlFor="ing-cat" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Kategori Master Data *</label>
+            <select id="ing-cat" name="ing-cat" value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-xs">
+              <option value="bahan_baku">🥘 Bahan Baku</option>
+              <option value="packaging">📦 Kemasan / Packaging</option>
+              <option value="operasional">⚙️ Operasional Outlet</option>
+              <option value="add_on">➕ Add-On / Extra POS</option>
             </select>
           </div>
           <div>
@@ -325,11 +325,18 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
           </div>
         </div>
 
+        {form.category === "add_on" && (
+          <div className="p-3 rounded-2xl bg-indigo-50/60 border border-indigo-100">
+            <label htmlFor="ing-price" className="font-bold text-indigo-900 uppercase tracking-wider block mb-1">Harga Jual Add-On POS (Rp) *</label>
+            <Input id="ing-price" name="ing-price" type="number" placeholder="Contoh: 3000" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} className="h-10 text-xs font-black text-indigo-900 bg-white" />
+          </div>
+        )}
+
         {err && <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 font-bold text-center">{err}</div>}
 
         <div className="flex gap-2 pt-2">
           <button type="button" onClick={handleSave} disabled={saving} className="flex-1 h-11 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm">
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Simpan Bahan Baku
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Simpan Item
           </button>
           <button type="button" onClick={onCancel} className="px-5 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600">Batal</button>
         </div>
@@ -345,9 +352,10 @@ function MasterDataContent() {
   const tabParam = searchParams.get("tab") as Tab | null;
 
   const [tab, setTab] = useState<Tab>("produk");
+  const [subCategoryFilter, setSubCategoryFilter] = useState<string>("semua");
 
   useEffect(() => {
-    if (tabParam && ["produk", "varian", "bahan", "pelanggan", "addons", "suppliers"].includes(tabParam)) {
+    if (tabParam && ["produk", "varian", "bahan", "pelanggan"].includes(tabParam)) {
       setTab(tabParam);
     }
   }, [tabParam]);
@@ -453,14 +461,22 @@ function MasterDataContent() {
   const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "produk", label: "Produk", icon: Package },
     { key: "varian", label: "Varian Perisa", icon: Layers },
-    { key: "bahan", label: "Bahan & Packaging", icon: Beaker },
+    { key: "bahan", label: "Bahan, Packaging & Add-On", icon: Beaker },
     { key: "pelanggan", label: "Pelanggan", icon: Users },
   ];
 
   const q = search.toLowerCase();
   const filteredProducts = products.filter(p => !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q));
   const filteredVariants = variants.filter(v => !q || v.name.toLowerCase().includes(q));
-  const filteredIngredients = ingredients.filter(i => !q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q));
+
+  const filteredIngredients = useMemo(() => {
+    return ingredients.filter(i => {
+      const matchSearch = !q || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q);
+      const matchSubCat = subCategoryFilter === "semua" || i.category === subCategoryFilter;
+      return matchSearch && matchSubCat;
+    });
+  }, [ingredients, q, subCategoryFilter]);
+
   const filteredCustomers = customers.filter(c => !q || c.name.toLowerCase().includes(q) || (c.customerType ?? "").toLowerCase().includes(q));
 
   const onSuccess = () => { setShowAddForm(false); setEditItem(null); loadAll(); };
@@ -482,7 +498,7 @@ function MasterDataContent() {
                   Master Data Outlet
                 </h1>
                 <p className="text-xs font-semibold text-slate-400">
-                  Manajemen Data Produk, Varian Rasa, Bahan Baku & Pelanggan
+                  Katalog Resmi Produk, Perisa, Bahan Baku, Packaging & Pelanggan
                 </p>
               </div>
             </div>
@@ -665,9 +681,34 @@ function MasterDataContent() {
               </div>
             )}
 
-            {/* ── TAB: BAHAN BAKU & PACKAGING ── */}
+            {/* ── TAB: BAHAN BAKU, PACKAGING & ADD-ON ── */}
             {tab === "bahan" && (
               <div className="space-y-4">
+                
+                {/* Sub Filter Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                  {[
+                    { key: "semua", label: "Semua Items" },
+                    { key: "bahan_baku", label: "Bahan Baku" },
+                    { key: "packaging", label: "Packaging" },
+                    { key: "operasional", label: "Operasional" },
+                    { key: "add_on", label: "Add-On POS" },
+                  ].map(f => (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => setSubCategoryFilter(f.key)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                        subCategoryFilter === f.key
+                          ? "bg-slate-900 text-white border-slate-900"
+                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
                 {(showAddForm || editItem) && (
                   <IngredientForm 
                     initial={editItem || undefined} 
@@ -681,7 +722,11 @@ function MasterDataContent() {
                   {filteredIngredients.map(ing => (
                     <div key={ing.id} className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm relative overflow-hidden space-y-3">
                       <div className="flex justify-between items-start">
-                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
+                          ing.category === "add_on" 
+                            ? "bg-indigo-50 text-indigo-700 border-indigo-200" 
+                            : "bg-slate-100 text-slate-700 border-slate-200"
+                        }`}>
                           {ing.category.replace('_', ' ')}
                         </span>
 
@@ -712,7 +757,9 @@ function MasterDataContent() {
 
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-400">
                         <span>Min Stok: {ing.minStock} {ing.baseUnit}</span>
-                        {ing.defaultCostPerBaseUnit ? (
+                        {ing.category === "add_on" && ing.price ? (
+                          <span className="text-indigo-600 font-black">Harga Jual: Rp {fmt(ing.price)}</span>
+                        ) : ing.defaultCostPerBaseUnit ? (
                           <span className="text-slate-700 font-bold">HPP: Rp {fmt(ing.defaultCostPerBaseUnit)}/{ing.baseUnit}</span>
                         ) : null}
                       </div>

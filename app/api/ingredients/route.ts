@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
         packagedConfig: data.packagedConfig ?? null,
         channels: data.channels ?? [],
         defaultCostPerBaseUnit: data.defaultCostPerBaseUnit ?? 0,
+        price: data.price ?? 0,
       };
     });
 
