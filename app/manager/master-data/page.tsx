@@ -649,7 +649,7 @@ function MasterDataContent() {
                   Master Data Outlet
                 </h1>
                 <p className="text-xs font-semibold text-slate-400">
-                  Katalog Resmi Produk, Varian Rasa, Bahan Baku & Pelanggan (ERP Standard)
+                  Katalog Resmi Produk, Varian Rasa, Bahan Baku & Pelanggan
                 </p>
               </div>
             </div>
@@ -694,7 +694,7 @@ function MasterDataContent() {
       {/* Main Content Area */}
       <div className="px-4 md:px-8 max-w-6xl mx-auto space-y-4 pt-5">
         
-        {/* Search Bar & ERP View Switcher */}
+        {/* Search Bar & View Switcher */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -709,7 +709,7 @@ function MasterDataContent() {
             />
           </div>
 
-          {/* ERP View Switcher Toggle (Table ERP vs Kartu) */}
+          {/* View Switcher Toggle (Tabel vs Kartu) */}
           <div className="bg-white p-1 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-1 shrink-0">
             <button
               type="button"
@@ -717,9 +717,9 @@ function MasterDataContent() {
               className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all ${
                 viewMode === "table" ? "bg-slate-900 text-white shadow-2xs" : "text-slate-500 hover:bg-slate-100"
               }`}
-              title="Tampilan Tabel ERP (List View)"
+              title="Tampilan Tabel (List View)"
             >
-              <Table size={14} /> <span className="hidden md:inline">Tabel ERP</span>
+              <Table size={14} /> <span className="hidden md:inline">Tabel</span>
             </button>
             <button
               type="button"
@@ -884,9 +884,45 @@ function MasterDataContent() {
             {/* ── TAB: BAHAN BAKU, PACKAGING & ADD-ON ── */}
             {tab === "bahan" && (
               <div className="space-y-4">
-                
+                {/* Executive Ingredient Banner Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center font-black shrink-0">
+                      <Beaker size={20} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Item Terdaftar</span>
+                      <p className="text-xl font-black text-slate-800 tabular-nums">{ingredients.length} Item</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black shrink-0">
+                      <Package size={20} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Item Bahan Baku</span>
+                      <p className="text-xl font-black text-slate-800 tabular-nums">
+                        {ingredients.filter(i => i.category === "bahan_baku").length} Bahan
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center font-black shrink-0">
+                      <Layers size={20} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Kemasan & Operasional</span>
+                      <p className="text-xl font-black text-slate-800 tabular-nums">
+                        {ingredients.filter(i => i.category === "packaging" || i.category === "operasional").length} Item
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Sub Filter Pills */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
                   {[
                     { key: "semua", label: "Semua Items" },
                     { key: "bahan_baku", label: "Bahan Baku" },
@@ -898,9 +934,9 @@ function MasterDataContent() {
                       key={f.key}
                       type="button"
                       onClick={() => setSubCategoryFilter(f.key)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all border shrink-0 ${
                         subCategoryFilter === f.key
-                          ? "bg-slate-900 text-white border-slate-900"
+                          ? "bg-slate-900 text-white border-slate-900 shadow-sm"
                           : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                       }`}
                     >
@@ -917,59 +953,162 @@ function MasterDataContent() {
                     onCancel={() => { setShowAddForm(false); setEditItem(null); }} 
                   />
                 )}
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {filteredIngredients.map(ing => (
-                    <div key={ing.id} className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm relative overflow-hidden space-y-3">
-                      <div className="flex justify-between items-start">
-                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
-                          ing.category === "add_on" 
-                            ? "bg-indigo-50 text-indigo-700 border-indigo-200" 
-                            : "bg-slate-100 text-slate-700 border-slate-200"
-                        }`}>
-                          {ing.category.replace('_', ' ')}
-                        </span>
 
-                        <div className="flex items-center gap-1">
-                          <button 
+                {/* Data Table View */}
+                {viewMode === "table" ? (
+                  <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden animate-in fade-in">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-900 text-white uppercase text-[10px] tracking-wider font-extrabold">
+                            <th className="py-3.5 px-4 font-extrabold">Nama Item / Bahan</th>
+                            <th className="py-3.5 px-4 font-extrabold">Kategori</th>
+                            <th className="py-3.5 px-4 font-extrabold">Satuan Utama</th>
+                            <th className="py-3.5 px-4 font-extrabold text-right">Stok Gudang</th>
+                            <th className="py-3.5 px-4 font-extrabold text-right">Min. Stok</th>
+                            <th className="py-3.5 px-4 font-extrabold text-right">Est. Harga / HPP</th>
+                            <th className="py-3.5 px-4 font-extrabold text-center">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                          {filteredIngredients.map((ing) => (
+                            <tr key={ing.id} className="hover:bg-slate-50/80 transition-colors group">
+                              <td className="py-3.5 px-4 font-extrabold text-slate-800 group-hover:text-indigo-600 transition-colors whitespace-nowrap">
+                                {ing.name}
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                                  ing.category === "add_on" 
+                                    ? "bg-indigo-50 text-indigo-700 border-indigo-200" 
+                                    : ing.category === "packaging"
+                                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                                    : "bg-slate-100 text-slate-700 border-slate-200"
+                                }`}>
+                                  {ing.category.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap font-bold text-slate-600">
+                                {ing.baseUnit}
+                              </td>
+                              <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                <span className={`font-black ${ing.currentStock <= ing.minStock ? 'text-rose-600' : 'text-slate-800'}`}>
+                                  {ing.currentStock} {ing.baseUnit}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-right whitespace-nowrap text-slate-400 font-semibold">
+                                {ing.minStock} {ing.baseUnit}
+                              </td>
+                              <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                {ing.category === "add_on" && ing.price ? (
+                                  <span className="text-indigo-600 font-black">Rp {fmt(ing.price)}</span>
+                                ) : ing.defaultCostPerBaseUnit ? (
+                                  <span className="text-slate-700 font-bold">Rp {fmt(ing.defaultCostPerBaseUnit)}/{ing.baseUnit}</span>
+                                ) : (
+                                  <span className="text-slate-400 font-medium">-</span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => { setEditItem(ing); setShowAddForm(false); }}
+                                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                                    title="Edit"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeleteTarget({ id: ing.id, name: ing.name, type: "ingredient" })}
+                                    className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors"
+                                    title="Hapus"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+
+                          {filteredIngredients.length === 0 && (
+                            <tr>
+                              <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
+                                Tidak ada item bahan baku / packaging ditemukan.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  /* Clean Grid View for Ingredients */
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {filteredIngredients.map(ing => (
+                      <div key={ing.id} className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between space-y-4 hover:shadow-md hover:border-slate-300 transition-all group">
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-start">
+                            <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                              ing.category === "add_on" 
+                                ? "bg-indigo-50 text-indigo-700 border-indigo-200" 
+                                : ing.category === "packaging"
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : "bg-slate-100 text-slate-700 border-slate-200"
+                            }`}>
+                              {ing.category.replace('_', ' ')}
+                            </span>
+                          </div>
+
+                          <div>
+                            <h3 className="text-base font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{ing.name}</h3>
+                            <p className="text-xs font-bold text-slate-500 mt-0.5">
+                              Stok Gudang: <span className="text-slate-800 font-black">{ing.currentStock} {ing.baseUnit}</span>
+                            </p>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-400">
+                            <span>Min Stok: {ing.minStock} {ing.baseUnit}</span>
+                            {ing.category === "add_on" && ing.price ? (
+                              <span className="text-indigo-600 font-black">Harga Jual: Rp {fmt(ing.price)}</span>
+                            ) : ing.defaultCostPerBaseUnit ? (
+                              <span className="text-slate-700 font-bold">HPP: Rp {fmt(ing.defaultCostPerBaseUnit)}/{ing.baseUnit}</span>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5 justify-end">
+                          <button
                             type="button"
-                            onClick={() => { setEditItem(ing); setShowAddForm(false); }} 
-                            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                            onClick={() => { setEditItem(ing); setShowAddForm(false); }}
+                            className="px-3 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 transition-colors"
                           >
-                            <Pencil size={14} />
+                            <Pencil size={13} /> Edit
                           </button>
-                          <button 
+                          <button
                             type="button"
-                            onClick={() => setDeleteTarget({ id: ing.id, name: ing.name, type: "ingredient" })} 
-                            className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
+                            onClick={() => setDeleteTarget({ id: ing.id, name: ing.name, type: "ingredient" })}
+                            className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center border border-rose-200 transition-colors"
+                            title="Hapus"
                           >
                             <Trash2 size={14} />
                           </button>
                         </div>
-                      </div>
 
-                      <div>
-                        <h3 className="text-base font-extrabold text-slate-800">{ing.name}</h3>
-                        <p className="text-xs font-bold text-slate-500 mt-0.5">
-                          Stok Gudang: <span className="text-slate-800 font-black">{ing.currentStock} {ing.baseUnit}</span>
-                        </p>
+                        {deleteTarget?.id === ing.id && (
+                          <ConfirmDelete label={ing.name} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} loading={deleting} />
+                        )}
                       </div>
+                    ))}
 
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-400">
-                        <span>Min Stok: {ing.minStock} {ing.baseUnit}</span>
-                        {ing.category === "add_on" && ing.price ? (
-                          <span className="text-indigo-600 font-black">Harga Jual: Rp {fmt(ing.price)}</span>
-                        ) : ing.defaultCostPerBaseUnit ? (
-                          <span className="text-slate-700 font-bold">HPP: Rp {fmt(ing.defaultCostPerBaseUnit)}/{ing.baseUnit}</span>
-                        ) : null}
+                    {filteredIngredients.length === 0 && (
+                      <div className="col-span-full bg-white rounded-3xl p-10 text-center border border-slate-200/80 space-y-2">
+                        <Beaker size={32} className="text-slate-300 mx-auto" />
+                        <p className="text-sm font-bold text-slate-700">Tidak ada item bahan baku / packaging ditemukan.</p>
+                        <p className="text-xs text-slate-400">Klik "+ Tambah Data" untuk mendaftarkan bahan baku baru.</p>
                       </div>
-
-                      {deleteTarget?.id === ing.id && (
-                        <ConfirmDelete label={ing.name} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} loading={deleting} />
-                      )}
-                    </div>
-                  ))}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
