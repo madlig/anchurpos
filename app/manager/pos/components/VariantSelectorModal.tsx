@@ -83,6 +83,10 @@ export function VariantSelectorModal({
     onAddToCart(newItems);
   }
 
+  const productVariants = useMemo(() => {
+    return variants.filter(v => v.productId === selectedProduct.id || !v.productId);
+  }, [variants, selectedProduct]);
+
   return (
     <BottomSheet 
       isOpen={true} 
@@ -90,7 +94,12 @@ export function VariantSelectorModal({
       title={selectedProduct.name}
     >
       <div className="flex flex-col gap-3">
-        {variants.map(v => {
+        {productVariants.length === 0 ? (
+          <div className="p-6 text-center text-xs font-bold text-slate-400">
+            Belum ada varian rasa yang terikat pada produk ini.
+          </div>
+        ) : (
+          productVariants.map(v => {
           const qty = variantSelections[v.id] ?? 0;
           const stockId = `${selectedProduct.id}_${v.id}`;
           const stockItem = productStocks.find(s => s.id === stockId);
@@ -123,7 +132,7 @@ export function VariantSelectorModal({
               </div>
             </div>
           );
-        })}
+        }))}
       </div>
 
       {totalVariantSelected > 0 ? (
