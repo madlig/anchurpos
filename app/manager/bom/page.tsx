@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Plus, Trash2, Save, BookOpen, Package, Layers } from "lucide-react";
+import { Loader2, Plus, Trash2, Save, BookOpen, Package, Layers, RefreshCw, Box } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect, SearchableOption } from "@/components/shared/SearchableSelect";
 
@@ -40,9 +40,16 @@ interface PackagingRecipeItem {
   unit: string;
 }
 
+interface PrepackRecipeItem {
+  id?: string;
+  ingredientId: string;
+  qtyPerPack: number;
+  unit: string;
+}
+
 export default function BomPage() {
   const { getToken } = useAuth();
-  const [activeTab, setActiveTab] = useState<"food" | "packaging">("food");
+  const [activeTab, setActiveTab] = useState<"food" | "packaging" | "prepack">("food");
 
   const [products, setProducts] = useState<Product[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
@@ -56,6 +63,10 @@ export default function BomPage() {
   // Packaging Recipe States
   const [selectedPkgProductId, setSelectedPkgProductId] = useState("");
   const [pkgRecipes, setPkgRecipes] = useState<PackagingRecipeItem[]>([]);
+
+  // Pre-Packing Sub-Assembly Recipe States
+  const [selectedPrepackItemId, setSelectedPrepackItemId] = useState("");
+  const [prepackRecipes, setPrepackRecipes] = useState<PrepackRecipeItem[]>([]);
 
   const [loadingData, setLoadingData] = useState(true);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
@@ -82,12 +93,17 @@ export default function BomPage() {
     ])
       .then(([p, v, i]) => {
         const prodList = Array.isArray(p) ? p : [];
+        const ingList = Array.isArray(i) ? i : [];
         setProducts(prodList);
         setVariants(Array.isArray(v) ? v : []);
-        setIngredients(Array.isArray(i) ? i : []);
+        setIngredients(ingList);
 
         if (prodList.length > 0) {
           setSelectedPkgProductId(prodList[0].id);
+        }
+        if (ingList.length > 0) {
+          const defaultPrepack = ingList.find(item => item.category === "add_on" || item.category === "packaging") || ingList[0];
+          setSelectedPrepackItemId(defaultPrepack.id);
         }
       })
       .finally(() => setLoadingData(false));
@@ -125,6 +141,22 @@ export default function BomPage() {
       .finally(() => setLoadingRecipes(false));
   }, [selectedPkgProductId, fetchWithAuth]);
 
+  // Fetch Pre-packing Recipe
+  useEffect(() => {
+    if (!selectedPrepackItemId) {
+      setPrepackRecipes([]);
+      return;
+    }
+
+    setLoadingRecipes(true);
+    fetchWithAuth(`/api/recipes/prepack?targetItemId=${selectedPrepackItemId}`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        setPrepackRecipes(Array.isArray(data) ? data : []);
+      })
+      .finally(() => setLoadingRecipes(false));
+  }, [selectedPrepackItemId, fetchWithAuth]);
+
   // Cost calculations
   const selectedProduct = products.find((p) => p.id === selectedProductId);
   const packPerBatch = selectedProduct?.packPerBatch || 1;
@@ -148,6 +180,15 @@ export default function BomPage() {
     }, 0);
   }, [pkgRecipes, ingredients]);
 
+  const selectedPrepackItem = ingredients.find((i) => i.id === selectedPrepackItemId);
+  const totalPrepackCostPerPack = useMemo(() => {
+    return prepackRecipes.reduce((sum, item) => {
+      const ing = ingredients.find((i) => i.id === item.ingredientId);
+      if (!ing) return sum;
+      return sum + ing.defaultCostPerBaseUnit * item.qtyPerPack;
+    }, 0);
+  }, [prepackRecipes, ingredients]);
+
   // Food Recipe Handlers
   const handleAddIngredient = () => {
     setRecipes([...recipes, { ingredientId: "", qtyPerBatch: 0, unit: "" }]);
@@ -159,7 +200,7 @@ export default function BomPage() {
     setRecipes(newR);
   };
 
-  const handleChange = (index: number, field: keyof RecipeItem, value: any) => {
+  const handleIngredientChange = (index: number, field: keyof RecipeItem, value: any) => {
     const newR = [...recipes];
     newR[index] = { ...newR[index], [field]: value };
     if (field === "ingredientId") {
@@ -170,7 +211,7 @@ export default function BomPage() {
   };
 
   const handleSaveFoodRecipe = async () => {
-    if (!selectedProductId || !selectedVariantId) {
+    if (!selectedVariantId || !selectedProductId) {
       setError("Pilih Produk dan Varian terlebih dahulu");
       return;
     }
@@ -267,13 +308,76 @@ export default function BomPage() {
     }
   };
 
+  // Prepack Recipe Handlers
+  const handleAddPrepackIngredient = () => {
+    setPrepackRecipes([...prepackRecipes, { ingredientId: "", qtyPerPack: 1, unit: "pcs" }]);
+  };
+
+  const handleRemovePrepackIngredient = (index: number) => {
+    const newP = [...prepackRecipes];
+    newP.splice(index, 1);
+    setPrepackRecipes(newP);
+  };
+
+  const handlePrepackChange = (index: number, field: keyof PrepackRecipeItem, value: any) => {
+    const newP = [...prepackRecipes];
+    newP[index] = { ...newP[index], [field]: value };
+    if (field === "ingredientId") {
+      const ing = ingredients.find((i) => i.id === value);
+      if (ing) newP[index].unit = ing.baseUnit;
+    }
+    setPrepackRecipes(newP);
+  };
+
+  const handleSavePrepackRecipe = async () => {
+    if (!selectedPrepackItemId) {
+      setError("Pilih Target Item Pre-Pack terlebih dahulu");
+      return;
+    }
+
+    if (prepackRecipes.some((r) => !r.ingredientId || r.qtyPerPack <= 0)) {
+      setError("Pastikan semua komponen bahan & kemasan telah dipilih dan kuantitas > 0");
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetchWithAuth("/api/recipes/prepack", {
+        method: "POST",
+        body: JSON.stringify({
+          targetItemId: selectedPrepackItemId,
+          items: prepackRecipes,
+        }),
+      });
+
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || "Gagal menyimpan resep pre-pack");
+      }
+
+      setSuccess("Resep Pre-Packing & Repack (Sub-Assembly BOM) berhasil disimpan!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err: any) {
+      setError(err.message || "Gagal menyimpan resep pre-pack");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const productOptions: SearchableOption[] = useMemo(() => products.map(p => ({ id: p.id, name: p.name })), [products]);
   const variantOptions: SearchableOption[] = useMemo(() => {
     if (!selectedProductId) return variants.map(v => ({ id: v.id, name: v.name }));
     const filtered = variants.filter(v => v.productId === selectedProductId || !v.productId);
     return filtered.map(v => ({ id: v.id, name: v.name }));
   }, [variants, selectedProductId]);
-  const ingredientOptions: SearchableOption[] = useMemo(() => ingredients.map(i => ({ id: i.id, name: i.name, subtext: i.baseUnit })), [ingredients]);
+  const ingredientOptions: SearchableOption[] = useMemo(() => ingredients.map(i => ({ id: i.id, name: i.name, subtext: `${i.category?.replace('_', ' ') || 'bahan'} • ${i.baseUnit}` })), [ingredients]);
+  
+  const prepackTargetOptions: SearchableOption[] = useMemo(() => {
+    return ingredients.map(i => ({ id: i.id, name: i.name, subtext: `${i.category?.replace('_', ' ') || 'item'} (${i.baseUnit})` }));
+  }, [ingredients]);
 
   if (loadingData) {
     return (
@@ -284,271 +388,361 @@ export default function BomPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-20">
+    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6 pb-24">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
-            <BookOpen className="text-primary" size={24} />
-            Master BOM & Resep Produksi
+          <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+            <BookOpen className="text-slate-800" size={24} /> Bill of Materials (BOM) & Resep ERP
           </h1>
-          <p className="text-xs font-semibold text-slate-500 mt-1">
-            Kelola resep adonan makanan (BOM Bahan Baku) dan resep kemasan (BOM Packaging) untuk perhitungan HPP presisi.
+          <p className="text-xs font-semibold text-slate-400 mt-1">
+            Kelola Komposisi Adonan Makanan, Resep Kemasan Produk, dan Sub-Assembly Pre-Packing
           </p>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
-          <button
-            onClick={() => setActiveTab("food")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-              activeTab === "food" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <Layers size={14} />
-            Resep Adonan
-          </button>
-          <button
-            onClick={() => setActiveTab("packaging")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-              activeTab === "packaging" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <Package size={14} />
-            Resep Kemasan (BOM)
-          </button>
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-slate-200 pb-2">
+        <button
+          onClick={() => { setActiveTab("food"); setError(""); setSuccess(""); }}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === "food"
+              ? "bg-slate-900 text-white shadow-sm"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <Layers size={14} /> Resep Adonan Makanan
+        </button>
+        <button
+          onClick={() => { setActiveTab("packaging"); setError(""); setSuccess(""); }}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === "packaging"
+              ? "bg-slate-900 text-white shadow-sm"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <Package size={14} /> Resep Kemasan Produk
+        </button>
+        <button
+          onClick={() => { setActiveTab("prepack"); setError(""); setSuccess(""); }}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === "prepack"
+              ? "bg-slate-900 text-white shadow-sm"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <RefreshCw size={14} /> Resep Pre-Packing & Repack (Sub-Assembly)
+        </button>
+      </div>
+
+      {/* Status Messages */}
       {error && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 font-bold text-xs">
           {error}
         </div>
       )}
       {success && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-xs">
           {success}
         </div>
       )}
 
-      {/* TAB 1: RESEP ADONAN MAKANAN */}
+      {/* TAB 1: FOOD RECIPE */}
       {activeTab === "food" && (
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                1. Pilih Produk
-              </label>
-              <SearchableSelect
-                options={productOptions}
-                value={selectedProductId}
-                onChange={(val) => {
-                  setSelectedProductId(val);
-                  setSelectedVariantId("");
-                }}
-                placeholder="🔍 Ketik atau pilih produk..."
-              />
-            </div>
+        <div className="space-y-6">
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">Pilih Produk & Varian Perisa</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-600 mb-1 block">Produk Induk</label>
+                <SearchableSelect
+                  options={productOptions}
+                  value={selectedProductId}
+                  onChange={(val) => {
+                    setSelectedProductId(val);
+                    setSelectedVariantId("");
+                  }}
+                  placeholder="Pilih Produk Induk..."
+                />
+              </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                2. Pilih Varian Rasa
-              </label>
-              <SearchableSelect
-                options={variantOptions}
-                value={selectedVariantId}
-                onChange={(val) => setSelectedVariantId(val)}
-                disabled={!selectedProductId}
-                placeholder="🔍 Ketik atau pilih varian..."
-              />
+              <div>
+                <label className="text-xs font-bold text-slate-600 mb-1 block">Varian Rasa / Perisa</label>
+                <SearchableSelect
+                  options={variantOptions}
+                  value={selectedVariantId}
+                  onChange={(val) => setSelectedVariantId(val)}
+                  placeholder="Pilih Varian Rasa..."
+                />
+              </div>
             </div>
           </div>
 
           {selectedVariantId && (
-            <>
-              {/* Cost Summary */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 grid grid-cols-2 gap-4">
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
-                  <div className="text-[11px] font-bold text-slate-400 uppercase">HPP Adonan / Batch</div>
-                  <div className="text-base font-extrabold text-slate-800">
-                    Rp {totalFoodCostPerBatch.toLocaleString("id-ID")}
-                  </div>
+                  <h3 className="text-sm font-black text-slate-800">Komposisi Bahan Adonan (Per 1 Batch Output)</h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">Output Standard: {packPerBatch} Pack/Batch</p>
                 </div>
-                <div>
-                  <div className="text-[11px] font-bold text-slate-400 uppercase">Estimasi HPP Bahan / Pack</div>
-                  <div className="text-base font-extrabold text-emerald-600">
-                    Rp {Math.round(foodCostPerPack).toLocaleString("id-ID")}
-                  </div>
-                </div>
+                <button
+                  onClick={handleAddIngredient}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-xs flex items-center gap-1"
+                >
+                  <Plus size={14} /> Tambah Bahan
+                </button>
               </div>
 
-              {/* Recipe List */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                    Daftar Bahan Baku Makanan Per Adonan (Batch)
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={handleAddIngredient}
-                    className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"
-                  >
-                    <Plus size={14} /> Tambah Bahan
-                  </button>
+              {loadingRecipes ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="animate-spin text-slate-400" size={24} />
                 </div>
-
-                {loadingRecipes ? (
-                  <div className="py-8 text-center text-slate-400">
-                    <Loader2 className="animate-spin inline" size={20} />
-                  </div>
-                ) : recipes.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-slate-400 font-semibold border-2 border-dashed border-slate-200 rounded-2xl">
-                    Belum ada bahan makanan yang didaftarkan. Klik Tambah Bahan.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {recipes.map((item, idx) => (
-                      <div key={idx} className="flex gap-2 items-center">
+              ) : (
+                <div className="space-y-3">
+                  {recipes.map((item, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <div className="flex-1">
                         <SearchableSelect
                           options={ingredientOptions}
                           value={item.ingredientId}
-                          onChange={(val) => handleChange(idx, "ingredientId", val)}
-                          placeholder="🔍 Cari bahan baku..."
-                          className="flex-1"
+                          onChange={(val) => handleIngredientChange(idx, "ingredientId", val)}
+                          placeholder="Pilih Bahan Baku..."
                         />
-
+                      </div>
+                      <div className="w-28">
                         <Input
                           type="number"
                           step="any"
-                          placeholder="Jumlah"
+                          placeholder="Takaran"
                           value={item.qtyPerBatch || ""}
-                          onChange={(e) => handleChange(idx, "qtyPerBatch", parseFloat(e.target.value) || 0)}
-                          className="w-28 h-11 text-xs font-bold"
+                          onChange={(e) => handleIngredientChange(idx, "qtyPerBatch", parseFloat(e.target.value) || 0)}
+                          className="h-10 text-xs font-bold"
                         />
-
-                        <span className="w-12 text-xs font-bold text-slate-500">{item.unit || "-"}</span>
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveIngredient(idx)}
-                          className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <div className="w-16 text-xs font-bold text-slate-500 flex items-center px-2">
+                        {item.unit || "unit"}
+                      </div>
+                      <button
+                        onClick={() => handleRemoveIngredient(idx)}
+                        className="w-10 h-10 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {recipes.length === 0 && (
+                    <p className="text-center py-6 text-xs text-slate-400 font-semibold">Belum ada bahan dalam resep ini. Klik 'Tambah Bahan'.</p>
+                  )}
+                </div>
+              )}
+
+              {/* HPP Cost Summary */}
+              <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-xs font-bold">
+                <span className="text-slate-600">Estimasi HPP Bahan Adonan:</span>
+                <span className="text-slate-800">
+                  Rp {totalFoodCostPerBatch.toLocaleString("id-ID")} / Batch (Rp {foodCostPerPack.toLocaleString("id-ID", { maximumFractionDigits: 0 })} / Pack)
+                </span>
               </div>
 
               <button
-                type="button"
                 onClick={handleSaveFoodRecipe}
                 disabled={submitting}
-                className="w-full h-12 rounded-2xl bg-primary text-white font-extrabold text-sm shadow-md shadow-primary/20 hover:bg-primary/90 flex items-center justify-center gap-2"
+                className="w-full h-11 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm"
               >
-                {submitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                Simpan Resep Adonan
+                {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Simpan Resep Adonan
               </button>
-            </>
+            </div>
           )}
         </div>
       )}
 
-      {/* TAB 2: RESEP KEMASAN (PACKAGING BOM) */}
+      {/* TAB 2: PACKAGING RECIPE */}
       {activeTab === "packaging" && (
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-6">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-              Pilih Produk Jadi (Yang Dipacking)
-            </label>
-            <SearchableSelect
-              options={productOptions}
-              value={selectedPkgProductId}
-              onChange={(val) => setSelectedPkgProductId(val)}
-              placeholder="🔍 Ketik atau pilih produk..."
-            />
+        <div className="space-y-6">
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">Pilih Produk Jadi Target</h2>
+            <div>
+              <label className="text-xs font-bold text-slate-600 mb-1 block">Produk Jadi</label>
+              <SearchableSelect
+                options={productOptions}
+                value={selectedPkgProductId}
+                onChange={(val) => setSelectedPkgProductId(val)}
+                placeholder="Pilih Produk Jadi..."
+              />
+            </div>
           </div>
 
           {selectedPkgProductId && (
-            <>
-              {/* Cost Summary Packaging */}
-              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200">
-                <div className="text-[11px] font-bold text-amber-800 uppercase">HPP Kemasan Per 1 Pack</div>
-                <div className="text-base font-extrabold text-amber-900 mt-0.5">
-                  Rp {Math.round(totalPackagingCostPerPack).toLocaleString("id-ID")}
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-sm font-black text-slate-800">Komposisi Kemasan / Packaging (Per 1 Pack Hasil Jual)</h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">Dipotong saat packing produk atau penjualan POS</p>
                 </div>
+                <button
+                  onClick={handleAddPkgIngredient}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-xs flex items-center gap-1"
+                >
+                  <Plus size={14} /> Tambah Kemasan
+                </button>
               </div>
 
-              {/* Packaging Recipe List */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                    Daftar Kemasan per 1 Pack ({selectedPkgProduct?.name})
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={handleAddPkgIngredient}
-                    className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"
-                  >
-                    <Plus size={14} /> Tambah Kemasan
-                  </button>
+              {loadingRecipes ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="animate-spin text-slate-400" size={24} />
                 </div>
-
-                {loadingRecipes ? (
-                  <div className="py-8 text-center text-slate-400">
-                    <Loader2 className="animate-spin inline" size={20} />
-                  </div>
-                ) : pkgRecipes.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-slate-400 font-semibold border-2 border-dashed border-slate-200 rounded-2xl">
-                    Belum ada bahan kemasan terdaftar. Klik Tambah Kemasan.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {pkgRecipes.map((item, idx) => (
-                      <div key={idx} className="flex gap-2 items-center">
+              ) : (
+                <div className="space-y-3">
+                  {pkgRecipes.map((item, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <div className="flex-1">
                         <SearchableSelect
                           options={ingredientOptions}
                           value={item.ingredientId}
                           onChange={(val) => handlePkgChange(idx, "ingredientId", val)}
-                          placeholder="🔍 Cari kemasan/bahan..."
-                          className="flex-1"
+                          placeholder="Pilih Kemasan..."
                         />
-
+                      </div>
+                      <div className="w-28">
                         <Input
                           type="number"
                           step="any"
-                          placeholder="Qty"
+                          placeholder="Qty / Pack"
                           value={item.qtyPerPack || ""}
                           onChange={(e) => handlePkgChange(idx, "qtyPerPack", parseFloat(e.target.value) || 0)}
-                          className="w-28 h-10 text-xs font-bold"
+                          className="h-10 text-xs font-bold"
                         />
-
-                        <span className="w-12 text-xs font-bold text-slate-500">{item.unit || "pcs"}</span>
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemovePkgIngredient(idx)}
-                          className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <div className="w-16 text-xs font-bold text-slate-500 flex items-center px-2">
+                        {item.unit || "pcs"}
+                      </div>
+                      <button
+                        onClick={() => handleRemovePkgIngredient(idx)}
+                        className="w-10 h-10 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {pkgRecipes.length === 0 && (
+                    <p className="text-center py-6 text-xs text-slate-400 font-semibold">Belum ada kemasan dalam resep ini. Klik 'Tambah Kemasan'.</p>
+                  )}
+                </div>
+              )}
+
+              {/* HPP Cost Summary */}
+              <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-xs font-bold">
+                <span className="text-slate-600">Estimasi HPP Kemasan:</span>
+                <span className="text-slate-800">
+                  Rp {totalPackagingCostPerPack.toLocaleString("id-ID", { maximumFractionDigits: 0 })} / Pack
+                </span>
               </div>
 
               <button
-                type="button"
                 onClick={handleSavePkgRecipe}
                 disabled={submitting}
-                className="w-full h-12 rounded-2xl bg-primary text-white font-extrabold text-sm shadow-md shadow-primary/20 hover:bg-primary/90 flex items-center justify-center gap-2"
+                className="w-full h-11 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm"
               >
-                {submitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                Simpan Resep Kemasan (Packaging BOM)
+                {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Simpan Resep Kemasan
               </button>
-            </>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: PRE-PACKING & REPACK SUB-ASSEMBLY BOM */}
+      {activeTab === "prepack" && (
+        <div className="space-y-6">
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">Pilih Item Target Hasil Kemas (Sub-Assembly Item)</h2>
+            <div>
+              <label className="text-xs font-bold text-slate-600 mb-1 block">Item Target Hasil Kemas (misal: Pouch Gula Tabur Clip 4x6 / Cup Saos Glaze 25ml)</label>
+              <SearchableSelect
+                options={prepackTargetOptions}
+                value={selectedPrepackItemId}
+                onChange={(val) => setSelectedPrepackItemId(val)}
+                placeholder="Pilih Item Target Hasil Kemas..."
+              />
+            </div>
+          </div>
+
+          {selectedPrepackItemId && (
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-sm font-black text-slate-800">Komposisi Racikan & Kemasan (Per 1 {selectedPrepackItem?.baseUnit || 'Pack'} Hasil Kemas)</h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">Dipotong dari stok bahan baku & kemasan saat crew melakukan Work Order Pre-Packing</p>
+                </div>
+                <button
+                  onClick={handleAddPrepackIngredient}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-xs flex items-center gap-1"
+                >
+                  <Plus size={14} /> Tambah Komponen
+                </button>
+              </div>
+
+              {loadingRecipes ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="animate-spin text-slate-400" size={24} />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {prepackRecipes.map((item, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <div className="flex-1">
+                        <SearchableSelect
+                          options={ingredientOptions}
+                          value={item.ingredientId}
+                          onChange={(val) => handlePrepackChange(idx, "ingredientId", val)}
+                          placeholder="Pilih Bahan / Kemasan..."
+                        />
+                      </div>
+                      <div className="w-28">
+                        <Input
+                          type="number"
+                          step="any"
+                          placeholder="Takaran"
+                          value={item.qtyPerPack || ""}
+                          onChange={(e) => handlePrepackChange(idx, "qtyPerPack", parseFloat(e.target.value) || 0)}
+                          className="h-10 text-xs font-bold"
+                        />
+                      </div>
+                      <div className="w-16 text-xs font-bold text-slate-500 flex items-center px-2">
+                        {item.unit || "unit"}
+                      </div>
+                      <button
+                        onClick={() => handleRemovePrepackIngredient(idx)}
+                        className="w-10 h-10 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {prepackRecipes.length === 0 && (
+                    <p className="text-center py-6 text-xs text-slate-400 font-semibold">Belum ada komponen dalam resep pre-pack ini. Klik 'Tambah Komponen'.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Cost Summary */}
+              <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-xs font-bold">
+                <span className="text-slate-600">Estimasi HPP Komponen Pre-Pack:</span>
+                <span className="text-slate-800">
+                  Rp {totalPrepackCostPerPack.toLocaleString("id-ID", { maximumFractionDigits: 0 })} / {selectedPrepackItem?.baseUnit || 'Pack'}
+                </span>
+              </div>
+
+              <button
+                onClick={handleSavePrepackRecipe}
+                disabled={submitting}
+                className="w-full h-11 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm"
+              >
+                {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Simpan Resep Pre-Packing (Sub-Assembly BOM)
+              </button>
+            </div>
           )}
         </div>
       )}
