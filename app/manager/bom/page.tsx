@@ -616,7 +616,7 @@ export default function BomPage() {
                       const rowSubtotal = (ing?.defaultCostPerBaseUnit || 0) * (item.qtyPerBatch || 0);
 
                       return (
-                        <div key={idx} className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative overflow-hidden">
+                        <div key={idx} style={{ zIndex: 100 - idx }} className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative">
                           {/* Left: SearchableSelect */}
                           <div className="flex-1 min-w-0">
                             <SearchableSelect
@@ -755,7 +755,7 @@ export default function BomPage() {
                       const rowSubtotal = (ing?.defaultCostPerBaseUnit || 0) * (item.qtyPerPack || 0);
 
                       return (
-                        <div key={idx} className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative overflow-hidden">
+                        <div key={idx} style={{ zIndex: 100 - idx }} className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative">
                           {/* Left: SearchableSelect */}
                           <div className="flex-1 min-w-0">
                             <SearchableSelect
@@ -891,7 +891,7 @@ export default function BomPage() {
                       const rowSubtotal = (ing?.defaultCostPerBaseUnit || 0) * (item.qtyPerPack || 0);
 
                       return (
-                        <div key={idx} className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative overflow-hidden">
+                        <div key={idx} style={{ zIndex: 100 - idx }} className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative">
                           {/* Left: SearchableSelect */}
                           <div className="flex-1 min-w-0">
                             <SearchableSelect
