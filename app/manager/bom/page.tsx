@@ -268,7 +268,11 @@ export default function BomPage() {
   };
 
   const productOptions: SearchableOption[] = useMemo(() => products.map(p => ({ id: p.id, name: p.name })), [products]);
-  const variantOptions: SearchableOption[] = useMemo(() => variants.map(v => ({ id: v.id, name: v.name })), [variants]);
+  const variantOptions: SearchableOption[] = useMemo(() => {
+    if (!selectedProductId) return variants.map(v => ({ id: v.id, name: v.name }));
+    const filtered = variants.filter(v => v.productId === selectedProductId || !v.productId);
+    return filtered.map(v => ({ id: v.id, name: v.name }));
+  }, [variants, selectedProductId]);
   const ingredientOptions: SearchableOption[] = useMemo(() => ingredients.map(i => ({ id: i.id, name: i.name, subtext: i.baseUnit })), [ingredients]);
 
   if (loadingData) {
