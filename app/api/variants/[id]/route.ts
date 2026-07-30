@@ -13,8 +13,8 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
-  const { name, sortOrder, minStock, freeSauceAllowance, currentStock, adjustment, note } = body as {
-    name?: string; sortOrder?: number; minStock?: number; freeSauceAllowance?: number; // edit info
+  const { name, productId, sortOrder, minStock, freeSauceAllowance, currentStock, adjustment, note } = body as {
+    name?: string; productId?: string; sortOrder?: number; minStock?: number; freeSauceAllowance?: number; // edit info
     currentStock?: number; adjustment?: number; note?: string;  // stock opname
   };
 
@@ -23,11 +23,12 @@ export async function PATCH(
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Varian tidak ditemukan" }, { status: 404 });
 
-    // Edit info (name/sortOrder/minStock)
+    // Edit info (name/productId/sortOrder/minStock)
     if (name !== undefined) {
       if (!name.trim()) return NextResponse.json({ error: "Nama varian wajib diisi" }, { status: 400 });
       await ref.update({
         name: name.trim(),
+        ...(productId !== undefined ? { productId: productId.trim() } : {}),
         ...(sortOrder !== undefined ? { sortOrder } : {}),
         ...(minStock !== undefined ? { minStock } : {}),
         ...(freeSauceAllowance !== undefined ? { freeSauceAllowance } : { freeSauceAllowance: FieldValue.delete() }),

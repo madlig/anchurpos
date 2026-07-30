@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const { name, sortOrder = 99, minStock = 10, freeSauceAllowance } = body as {
-    name: string; sortOrder?: number; minStock?: number; freeSauceAllowance?: number;
+  const { name, productId = "", sortOrder = 99, minStock = 10, freeSauceAllowance } = body as {
+    name: string; productId?: string; sortOrder?: number; minStock?: number; freeSauceAllowance?: number;
   };
   if (!name?.trim()) {
     return NextResponse.json({ error: "Nama varian wajib diisi" }, { status: 400 });
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
     const ref = adminDb.collection("variants").doc();
     await ref.set({
       name: name.trim(),
+      productId: productId.trim(),
       isProductionVariant: true,
       sortOrder,
       currentStock: 0,

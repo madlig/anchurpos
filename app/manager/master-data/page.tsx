@@ -6,22 +6,31 @@ import { useAuth } from "@/lib/auth-context";
 import { 
   Loader2, Plus, X, Check, Package, Layers, Beaker, Pencil, Trash2, Users, Search, 
   Store, Phone, MapPin, MessageCircle, Building2, UserCheck, Tag, CreditCard,
-  SlidersHorizontal, ChevronRight, CheckCircle2, ShieldCheck, Sparkles, Filter
+  SlidersHorizontal, ChevronRight, CheckCircle2, ShieldCheck, Sparkles, Filter,
+  ChevronDown, ChevronUp
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatNumber } from "@/lib/formatters";
 
-type Tab = "produk" | "varian" | "bahan" | "pelanggan";
+type Tab = "produk" | "bahan" | "pelanggan";
 
 function fmt(n: number) {
   return formatNumber(n);
 }
 
 interface PriceTier { minQty: number; maxQty: number | null; price: number; }
-interface ProductItem { id: string; name: string; code: string; description: string; packPerBatch: number; priceTiers: PriceTier[]; channels?: string[]; freeSauceAllowance?: number; }
-interface VariantItem { id: string; name: string; sortOrder: number; currentStock: number; minStock: number; freeSauceAllowance?: number; }
+interface ProductItem { id: string; name: string; code: string; category?: string; description: string; packPerBatch: number; priceTiers: PriceTier[]; channels?: string[]; freeSauceAllowance?: number; }
+interface VariantItem { id: string; productId: string; name: string; sortOrder: number; currentStock: number; minStock: number; freeSauceAllowance?: number; }
 interface IngredientItem { id: string; name: string; category: string; baseUnit: string; currentStock: number; minStock: number; channels?: string[]; unitAlternatives?: { unit: string; conversionToBase: number }[]; defaultCostPerBaseUnit?: number; price?: number; }
 interface CustomerItem { id: string; name: string; customerType: string; channel: string; phoneNumber: string | null; address: string | null; notes: string; discountPerUnit: number; }
+
+const PRODUCT_CATEGORIES = [
+  { id: "frozen", label: "Frozen Food" },
+  { id: "ready_to_eat", label: "Ready to Eat (Siap Saji)" },
+  { id: "beverage", label: "Beverage (Minuman)" },
+  { id: "bakery", label: "Pastry / Roti" },
+  { id: "other", label: "Lain-lain" },
+];
 
 // ─── Reusable Confirm Delete Overlay ───────────────────────────────────────────
 function ConfirmDelete({ label, onConfirm, onCancel, loading }: {
@@ -57,7 +66,7 @@ function ConfirmDelete({ label, onConfirm, onCancel, loading }: {
   );
 }
 
-// ─── Product Form ──────────────────────────────────────────────────────────────
+// ─── Product Form (Parent Product Template) ──────────────────────────────────
 function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   initial?: ProductItem;
   fetchWithAuth: (url: string, opts?: RequestInit) => Promise<Response>;
@@ -65,14 +74,16 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
 }) {
   const isEdit = !!initial;
   const [form, setForm] = useState<{
-    name: string; code: string; description: string; packPerBatch: string; channels: string[];
+    name: string; code: string; category: string; description: string; packPerBatch: string; channels: string[];
     freeSauceAllowance: string;
   }>({
     name: initial?.name ?? "", code: initial?.code ?? "",
+    category: initial?.category ?? "frozen",
     description: initial?.description ?? "", packPerBatch: String(initial?.packPerBatch ?? "1"),
     channels: initial?.channels ?? [],
     freeSauceAllowance: String(initial?.freeSauceAllowance ?? "0"),
   });
+
   const hasMultipleTiers = initial?.priceTiers && (initial.priceTiers.length > 1 || initial.priceTiers.some(t => t.minQty > 1 || t.maxQty !== null));
   const [hasTiering, setHasTiering] = useState<boolean>(hasMultipleTiers || false);
   const [singlePrice, setSinglePrice] = useState<string>(
@@ -105,8 +116,11 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
       const res = await fetchWithAuth(url, {
         method,
         body: JSON.stringify({
-          name: form.name.trim(), code: form.code.trim().toUpperCase(),
-          description: form.description.trim(), packPerBatch: parseInt(form.packPerBatch) || 1,
+          name: form.name.trim(), 
+          code: form.code.trim().toUpperCase(),
+          category: form.category,
+          description: form.description.trim(), 
+          packPerBatch: parseInt(form.packPerBatch) || 1,
           priceTiers, channels: form.channels, freeSauceAllowance: parseInt(form.freeSauceAllowance) || 0
         })
       });
@@ -116,17 +130,17 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   }
 
   return (
-    <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4 mb-4">
+    <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4 mb-4 animate-in fade-in zoom-in-95">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <h3 className="text-sm font-extrabold text-slate-800">{isEdit ? "Edit Produk Jualan" : "Tambah Produk Jualan Baru"}</h3>
+        <h3 className="text-sm font-extrabold text-slate-800">{isEdit ? `Edit Produk Induk: ${initial.name}` : "Tambah Produk Induk Baru (Product Template)"}</h3>
         <button type="button" onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
       </div>
 
       <div className="space-y-3 text-xs">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="product-name" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Produk *</label>
-            <Input id="product-name" name="product-name" placeholder="Contoh: Mozzarella Stick" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="h-10 text-xs font-semibold" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="md:col-span-2">
+            <label htmlFor="product-name" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Produk Induk *</label>
+            <Input id="product-name" name="product-name" placeholder="Contoh: Mozzarella Stick / Kopi Susu Espresso" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="h-10 text-xs font-semibold" />
           </div>
           <div>
             <label htmlFor="product-code" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Kode Produk *</label>
@@ -134,9 +148,20 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
           </div>
         </div>
 
-        <div>
-          <label htmlFor="product-desc" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Deskripsi Produk</label>
-          <Input id="product-desc" name="product-desc" placeholder="Keterangan rincian produk..." value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} className="h-10 text-xs" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="product-category" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Kategori Produk</label>
+            <select id="product-category" name="product-category" value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-xs">
+              {PRODUCT_CATEGORIES.map(c => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="product-desc" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Deskripsi Produk</label>
+            <Input id="product-desc" name="product-desc" placeholder="Keterangan rincian produk..." value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} className="h-10 text-xs" />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -179,7 +204,7 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
 
         <div className="flex gap-2 pt-2">
           <button type="button" onClick={handleSave} disabled={saving} className="flex-1 h-11 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm">
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Simpan Produk
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Simpan Produk Induk
           </button>
           <button type="button" onClick={onCancel} className="px-5 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600">Batal</button>
         </div>
@@ -188,13 +213,16 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   );
 }
 
-// ─── Variant Form ──────────────────────────────────────────────────────────────
-function VariantForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
+// ─── Variant Form (Child Variant Attached to Product) ─────────────────────────
+function VariantForm({ products, defaultProductId, initial, fetchWithAuth, onSuccess, onCancel }: {
+  products: ProductItem[];
+  defaultProductId?: string;
   initial?: VariantItem;
   fetchWithAuth: (url: string, opts?: RequestInit) => Promise<Response>;
   onSuccess: () => void; onCancel: () => void;
 }) {
   const isEdit = !!initial;
+  const [productId, setProductId] = useState(initial?.productId || defaultProductId || (products[0]?.id ?? ""));
   const [name, setName] = useState(initial?.name ?? "");
   const [sortOrder, setSortOrder] = useState(String(initial?.sortOrder ?? "99"));
   const [saving, setSaving] = useState(false);
@@ -202,13 +230,14 @@ function VariantForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
 
   async function handleSave() {
     if (!name.trim()) { setErr("Nama varian perisa wajib diisi"); return; }
+    if (!productId) { setErr("Pilih Produk Induk wajib diisi"); return; }
     setSaving(true); setErr("");
     try {
       const url = isEdit ? `/api/variants/${initial!.id}` : "/api/variants";
       const method = isEdit ? "PATCH" : "POST";
       const res = await fetchWithAuth(url, {
         method,
-        body: JSON.stringify({ name: name.trim(), sortOrder: parseInt(sortOrder) || 99 })
+        body: JSON.stringify({ name: name.trim(), productId, sortOrder: parseInt(sortOrder) || 99 })
       });
       if (!res.ok) { setErr((await res.json()).error ?? "Gagal"); return; }
       onSuccess();
@@ -218,13 +247,23 @@ function VariantForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   return (
     <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4 mb-4 animate-in fade-in zoom-in-95">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <h3 className="text-sm font-extrabold text-slate-800">{isEdit ? `Edit Varian: ${initial.name}` : "Tambah Varian Perisa Baru"}</h3>
+        <h3 className="text-sm font-extrabold text-slate-800">{isEdit ? `Edit Varian Rasa: ${initial.name}` : "Tambah Varian Rasa Produk Baru"}</h3>
         <button type="button" onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
       </div>
 
       <div className="space-y-3 text-xs">
         <div>
-          <label htmlFor="variant-name" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Varian Perisa *</label>
+          <label htmlFor="variant-product-id" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Produk Induk (Parent Product) *</label>
+          <select id="variant-product-id" name="variant-product-id" value={productId} onChange={e => setProductId(e.target.value)} className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-xs">
+            <option value="">-- Pilih Produk Induk --</option>
+            {products.map(p => (
+              <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="variant-name" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Varian Rasa / Perisa *</label>
           <Input id="variant-name" name="variant-name" placeholder="Contoh: Original, Keju Lumer, Cokelat Melt" value={name} onChange={e => setName(e.target.value)} className="h-10 text-xs font-semibold" />
         </div>
 
@@ -237,7 +276,7 @@ function VariantForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
 
         <div className="flex gap-2 pt-2">
           <button type="button" onClick={handleSave} disabled={saving} className="flex-1 h-11 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm">
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Simpan Varian Perisa
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Simpan Varian Rasa
           </button>
           <button type="button" onClick={onCancel} className="px-5 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600">Batal</button>
         </div>
@@ -246,7 +285,7 @@ function VariantForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   );
 }
 
-// ─── Unified Ingredient / Material / Addon Form ───────────────────────────────
+// ─── Ingredient Form ───────────────────────────────────────────────────────────
 function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   initial?: IngredientItem;
   fetchWithAuth: (url: string, opts?: RequestInit) => Promise<Response>;
@@ -355,7 +394,7 @@ function MasterDataContent() {
   const [subCategoryFilter, setSubCategoryFilter] = useState<string>("semua");
 
   useEffect(() => {
-    if (tabParam && ["produk", "varian", "bahan", "pelanggan"].includes(tabParam)) {
+    if (tabParam && ["produk", "bahan", "pelanggan"].includes(tabParam)) {
       setTab(tabParam);
     }
   }, [tabParam]);
@@ -364,7 +403,10 @@ function MasterDataContent() {
   const [search, setSearch] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [editVariantItem, setEditVariantItem] = useState<VariantItem | null>(null);
+  const [addVariantForProductId, setAddVariantForProductId] = useState<string | null>(null);
+  
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; type: "product" | "variant" | "ingredient" } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const [products, setProducts] = useState<ProductItem[]>([]);
@@ -405,6 +447,8 @@ function MasterDataContent() {
     setTab(t);
     setShowAddForm(false);
     setEditItem(null);
+    setEditVariantItem(null);
+    setAddVariantForProductId(null);
     setDeleteTarget(null);
     setSearch("");
     setCustomerDeleteTarget(null);
@@ -419,8 +463,8 @@ function MasterDataContent() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const urlMap: Record<string, string> = { produk: "products", varian: "variants", bahan: "ingredients" };
-      const res = await fetchWithAuth(`/api/${urlMap[tab]}/${deleteTarget.id}`, { method: "DELETE" });
+      const endpoint = deleteTarget.type === "variant" ? "variants" : deleteTarget.type === "ingredient" ? "ingredients" : "products";
+      const res = await fetchWithAuth(`/api/${endpoint}/${deleteTarget.id}`, { method: "DELETE" });
       if (res.ok) { setDeleteTarget(null); await loadAll(); }
     } finally { setDeleting(false); }
   }
@@ -459,15 +503,13 @@ function MasterDataContent() {
   }
 
   const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-    { key: "produk", label: "Produk", icon: Package },
-    { key: "varian", label: "Varian Perisa", icon: Layers },
+    { key: "produk", label: "Produk & Varian Rasa", icon: Package },
     { key: "bahan", label: "Bahan, Packaging & Add-On", icon: Beaker },
     { key: "pelanggan", label: "Pelanggan", icon: Users },
   ];
 
   const q = search.toLowerCase();
   const filteredProducts = products.filter(p => !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q));
-  const filteredVariants = variants.filter(v => !q || v.name.toLowerCase().includes(q));
 
   const filteredIngredients = useMemo(() => {
     return ingredients.filter(i => {
@@ -479,7 +521,13 @@ function MasterDataContent() {
 
   const filteredCustomers = customers.filter(c => !q || c.name.toLowerCase().includes(q) || (c.customerType ?? "").toLowerCase().includes(q));
 
-  const onSuccess = () => { setShowAddForm(false); setEditItem(null); loadAll(); };
+  const onSuccess = () => { 
+    setShowAddForm(false); 
+    setEditItem(null); 
+    setEditVariantItem(null); 
+    setAddVariantForProductId(null);
+    loadAll(); 
+  };
 
   return (
     <div className="min-h-screen bg-slate-50/70 pb-28">
@@ -498,21 +546,21 @@ function MasterDataContent() {
                   Master Data Outlet
                 </h1>
                 <p className="text-xs font-semibold text-slate-400">
-                  Katalog Resmi Produk, Perisa, Bahan Baku, Packaging & Pelanggan
+                  Katalog Resmi Produk, Varian Rasa, Bahan Baku & Pelanggan (ERP Standard)
                 </p>
               </div>
             </div>
 
             <button
               type="button"
-              onClick={() => { setShowAddForm(prev => !prev); setEditItem(null); }}
+              onClick={() => { setShowAddForm(prev => !prev); setEditItem(null); setEditVariantItem(null); }}
               className="px-3.5 md:px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
             >
               <Plus size={16} /> Tambah Data
             </button>
           </div>
 
-          {/* Horizontal Scroll Tabs (Gojek / Grab Style) */}
+          {/* Horizontal Scroll Tabs */}
           <div className="overflow-x-auto hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0 pt-1">
             <div className="flex items-center gap-1.5 min-w-max">
               {TABS.map((t) => {
@@ -565,7 +613,7 @@ function MasterDataContent() {
         ) : (
           <div>
             
-            {/* ── TAB: PRODUK ── */}
+            {/* ── TAB: PRODUK & VARIAN RASA (NESTED PARENT-CHILD VIEW) ── */}
             {tab === "produk" && (
               <div className="space-y-4">
                 {(showAddForm || editItem) && (
@@ -576,107 +624,128 @@ function MasterDataContent() {
                     onCancel={() => { setShowAddForm(false); setEditItem(null); }} 
                   />
                 )}
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {filteredProducts.map(p => (
-                    <div key={p.id} className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm hover:border-slate-300 transition-all relative overflow-hidden space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 uppercase tracking-wider">
-                            {p.code}
-                          </span>
-                          <h3 className="text-base font-extrabold text-slate-800 mt-1">{p.name}</h3>
-                        </div>
 
-                        <div className="flex items-center gap-1">
-                          <button 
-                            type="button"
-                            onClick={() => { setEditItem(p); setShowAddForm(false); }} 
-                            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => setDeleteTarget({ id: p.id, name: p.name })} 
-                            className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {p.description && <p className="text-xs text-slate-500 font-medium line-clamp-2">{p.description}</p>}
-
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-700">
-                        <span>Output: {p.packPerBatch} Pack/Batch</span>
-                        <span className="text-indigo-600">{p.priceTiers.length} Tiering Harga</span>
-                      </div>
-
-                      {deleteTarget?.id === p.id && (
-                        <ConfirmDelete label={p.name} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} loading={deleting} />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ── TAB: VARIAN PERISA (RASA) ── */}
-            {tab === "varian" && (
-              <div className="space-y-4">
-                {(showAddForm || editItem) && (
-                  <VariantForm 
-                    initial={editItem || undefined} 
-                    fetchWithAuth={fetchWithAuth} 
-                    onSuccess={onSuccess} 
-                    onCancel={() => { setShowAddForm(false); setEditItem(null); }} 
+                {(editVariantItem || addVariantForProductId) && (
+                  <VariantForm
+                    products={products}
+                    defaultProductId={addVariantForProductId || undefined}
+                    initial={editVariantItem || undefined}
+                    fetchWithAuth={fetchWithAuth}
+                    onSuccess={onSuccess}
+                    onCancel={() => { setEditVariantItem(null); setAddVariantForProductId(null); }}
                   />
                 )}
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {filteredVariants.map(v => (
-                    <div key={v.id} className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm relative overflow-hidden space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center font-black text-sm shadow-sm">
-                          {v.name[0]}
+                <div className="space-y-4">
+                  {filteredProducts.map(p => {
+                    const productVariants = variants.filter(v => v.productId === p.id || !v.productId); // attach linked or unassigned
+
+                    return (
+                      <div key={p.id} className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm relative space-y-4">
+                        
+                        {/* Parent Product Header */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-100 uppercase tracking-wider">
+                                {p.code}
+                              </span>
+                              <span className="text-[10px] font-black text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-lg uppercase tracking-wider">
+                                {PRODUCT_CATEGORIES.find(c => c.id === (p.category || "frozen"))?.label || "Frozen Food"}
+                              </span>
+                            </div>
+
+                            <h2 className="text-lg font-black text-slate-800 tracking-tight mt-1.5">{p.name}</h2>
+                            {p.description && <p className="text-xs text-slate-500 font-medium mt-0.5">{p.description}</p>}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button 
+                              type="button"
+                              onClick={() => { setEditItem(p); setShowAddForm(false); setEditVariantItem(null); }} 
+                              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs flex items-center gap-1 transition-colors"
+                            >
+                              <Pencil size={13} /> Edit Produk
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => setDeleteTarget({ id: p.id, name: p.name, type: "product" })} 
+                              className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600 transition-colors"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-1">
-                          <button 
-                            type="button"
-                            onClick={() => { setEditItem(v); setShowAddForm(false); }} 
-                            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => setDeleteTarget({ id: v.id, name: v.name })} 
-                            className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                        {/* Product Specs Bar */}
+                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-600">
+                          <span>Output: <strong className="text-slate-800">{p.packPerBatch} Pack/Batch</strong></span>
+                          <span>Jatah Saos: <strong className="text-slate-800">{p.freeSauceAllowance || 0} Pouch</strong></span>
+                          <span className="text-indigo-600 font-extrabold">{p.priceTiers.length} Tiering Harga Grosir</span>
                         </div>
-                      </div>
 
-                      <div>
-                        <h3 className="text-base font-extrabold text-slate-800">{v.name}</h3>
-                        <p className="text-xs font-semibold text-slate-400 mt-0.5">Varian Perisa / Rasa Produk</p>
-                      </div>
+                        {/* Child Variants List Attached to Product */}
+                        <div className="pt-2 border-t border-slate-100 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                              <Layers size={14} className="text-amber-500" /> Varian Rasa / Option ({productVariants.length})
+                            </span>
+                            
+                            <button
+                              type="button"
+                              onClick={() => { setAddVariantForProductId(p.id); setEditVariantItem(null); setShowAddForm(false); }}
+                              className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                            >
+                              <Plus size={14} /> Tambah Varian Rasa
+                            </button>
+                          </div>
 
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                        <span className="font-bold text-slate-500">Urutan Tampil: #{v.sortOrder}</span>
-                        <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                          Aktif POS
-                        </span>
-                      </div>
+                          {productVariants.length === 0 ? (
+                            <div className="p-4 rounded-2xl bg-slate-50 text-center border border-dashed border-slate-200">
+                              <p className="text-xs font-bold text-slate-400">Belum ada varian rasa yang terikat pada produk ini.</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                              {productVariants.map(v => (
+                                <div key={v.id} className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between gap-2 hover:border-slate-300 transition-colors">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center font-black text-xs shrink-0">
+                                      {v.name[0]}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="font-extrabold text-xs text-slate-800 truncate">{v.name}</p>
+                                      <p className="text-[10px] font-semibold text-slate-400">Urutan: #{v.sortOrder}</p>
+                                    </div>
+                                  </div>
 
-                      {deleteTarget?.id === v.id && (
-                        <ConfirmDelete label={v.name} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} loading={deleting} />
-                      )}
-                    </div>
-                  ))}
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => { setEditVariantItem(v); setAddVariantForProductId(null); setShowAddForm(false); }}
+                                      className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                                    >
+                                      <Pencil size={12} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setDeleteTarget({ id: v.id, name: v.name, type: "variant" })}
+                                      className="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {deleteTarget?.id === p.id && (
+                          <ConfirmDelete label={p.name} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} loading={deleting} />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -740,7 +809,7 @@ function MasterDataContent() {
                           </button>
                           <button 
                             type="button"
-                            onClick={() => setDeleteTarget({ id: ing.id, name: ing.name })} 
+                            onClick={() => setDeleteTarget({ id: ing.id, name: ing.name, type: "ingredient" })} 
                             className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
                           >
                             <Trash2 size={14} />
