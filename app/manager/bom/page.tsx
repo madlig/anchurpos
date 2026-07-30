@@ -533,8 +533,9 @@ export default function BomPage() {
                       const rowSubtotal = (ing?.defaultCostPerBaseUnit || 0) * (item.qtyPerBatch || 0);
 
                       return (
-                        <div key={idx} className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-                          <div className="flex-1">
+                        <div key={idx} className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative overflow-hidden">
+                          {/* Left: SearchableSelect */}
+                          <div className="flex-1 min-w-0">
                             <SearchableSelect
                               options={ingredientOptions}
                               value={item.ingredientId}
@@ -543,31 +544,35 @@ export default function BomPage() {
                             />
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <div className="w-28">
+                          {/* Right Controls */}
+                          <div className="flex items-center justify-between md:justify-end gap-3 shrink-0">
+                            {/* Takaran Input Badge Pill */}
+                            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs">
                               <Input
                                 type="number"
                                 step="any"
                                 placeholder="Takaran"
                                 value={item.qtyPerBatch || ""}
                                 onChange={(e) => handleIngredientChange(idx, "qtyPerBatch", parseFloat(e.target.value) || 0)}
-                                className="h-10 text-xs font-black text-slate-800 bg-white"
+                                className="h-8 w-20 text-xs font-black text-slate-800 border-none bg-transparent px-1 focus-visible:ring-0 shadow-none text-right"
                               />
-                            </div>
-                            
-                            <span className="text-xs font-bold text-slate-500 w-14">
-                              {item.unit || "unit"}
-                            </span>
-
-                            <div className="w-28 text-right pr-1 hidden md:block">
-                              <span className="text-[10px] font-bold text-slate-400 block uppercase">Subtotal HPP</span>
-                              <span className="text-xs font-extrabold text-slate-800">Rp {formatNumber(rowSubtotal)}</span>
+                              <span className="text-[11px] font-extrabold text-slate-500 shrink-0">
+                                {item.unit || "unit"}
+                              </span>
                             </div>
 
+                            {/* Subtotal HPP */}
+                            <div className="text-right min-w-[110px]">
+                              <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Subtotal HPP</span>
+                              <span className="text-xs font-black text-slate-800">Rp {formatNumber(rowSubtotal)}</span>
+                            </div>
+
+                            {/* Delete Trash Button */}
                             <button
                               type="button"
                               onClick={() => handleRemoveIngredient(idx)}
-                              className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-colors shrink-0"
+                              className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-colors shrink-0 border border-rose-100/60 active:scale-95"
+                              title="Hapus Bahan"
                             >
                               <Trash2 size={15} />
                             </button>
@@ -667,8 +672,9 @@ export default function BomPage() {
                       const rowSubtotal = (ing?.defaultCostPerBaseUnit || 0) * (item.qtyPerPack || 0);
 
                       return (
-                        <div key={idx} className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-                          <div className="flex-1">
+                        <div key={idx} className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative overflow-hidden">
+                          {/* Left: SearchableSelect */}
+                          <div className="flex-1 min-w-0">
                             <SearchableSelect
                               options={ingredientOptions}
                               value={item.ingredientId}
@@ -677,31 +683,35 @@ export default function BomPage() {
                             />
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <div className="w-28">
+                          {/* Right Controls */}
+                          <div className="flex items-center justify-between md:justify-end gap-3 shrink-0">
+                            {/* Takaran Input Badge Pill */}
+                            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs">
                               <Input
                                 type="number"
                                 step="any"
                                 placeholder="Qty / Pack"
                                 value={item.qtyPerPack || ""}
                                 onChange={(e) => handlePkgChange(idx, "qtyPerPack", parseFloat(e.target.value) || 0)}
-                                className="h-10 text-xs font-black text-slate-800 bg-white"
+                                className="h-8 w-20 text-xs font-black text-slate-800 border-none bg-transparent px-1 focus-visible:ring-0 shadow-none text-right"
                               />
-                            </div>
-                            
-                            <span className="text-xs font-bold text-slate-500 w-14">
-                              {item.unit || "pcs"}
-                            </span>
-
-                            <div className="w-28 text-right pr-1 hidden md:block">
-                              <span className="text-[10px] font-bold text-slate-400 block uppercase">Subtotal HPP</span>
-                              <span className="text-xs font-extrabold text-slate-800">Rp {formatNumber(rowSubtotal)}</span>
+                              <span className="text-[11px] font-extrabold text-slate-500 shrink-0">
+                                {item.unit || "pcs"}
+                              </span>
                             </div>
 
+                            {/* Subtotal HPP */}
+                            <div className="text-right min-w-[110px]">
+                              <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Subtotal HPP</span>
+                              <span className="text-xs font-black text-slate-800">Rp {formatNumber(rowSubtotal)}</span>
+                            </div>
+
+                            {/* Delete Trash Button */}
                             <button
                               type="button"
                               onClick={() => handleRemovePkgIngredient(idx)}
-                              className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-colors shrink-0"
+                              className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-colors shrink-0 border border-rose-100/60 active:scale-95"
+                              title="Hapus Kemasan"
                             >
                               <Trash2 size={15} />
                             </button>
@@ -798,8 +808,9 @@ export default function BomPage() {
                       const rowSubtotal = (ing?.defaultCostPerBaseUnit || 0) * (item.qtyPerPack || 0);
 
                       return (
-                        <div key={idx} className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-                          <div className="flex-1">
+                        <div key={idx} className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative overflow-hidden">
+                          {/* Left: SearchableSelect */}
+                          <div className="flex-1 min-w-0">
                             <SearchableSelect
                               options={ingredientOptions}
                               value={item.ingredientId}
@@ -808,31 +819,35 @@ export default function BomPage() {
                             />
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <div className="w-28">
+                          {/* Right Controls */}
+                          <div className="flex items-center justify-between md:justify-end gap-3 shrink-0">
+                            {/* Takaran Input Badge Pill */}
+                            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs">
                               <Input
                                 type="number"
                                 step="any"
                                 placeholder="Takaran"
                                 value={item.qtyPerPack || ""}
                                 onChange={(e) => handlePrepackChange(idx, "qtyPerPack", parseFloat(e.target.value) || 0)}
-                                className="h-10 text-xs font-black text-slate-800 bg-white"
+                                className="h-8 w-20 text-xs font-black text-slate-800 border-none bg-transparent px-1 focus-visible:ring-0 shadow-none text-right"
                               />
-                            </div>
-                            
-                            <span className="text-xs font-bold text-slate-500 w-14">
-                              {item.unit || "unit"}
-                            </span>
-
-                            <div className="w-28 text-right pr-1 hidden md:block">
-                              <span className="text-[10px] font-bold text-slate-400 block uppercase">Subtotal HPP</span>
-                              <span className="text-xs font-extrabold text-slate-800">Rp {formatNumber(rowSubtotal)}</span>
+                              <span className="text-[11px] font-extrabold text-slate-500 shrink-0">
+                                {item.unit || "unit"}
+                              </span>
                             </div>
 
+                            {/* Subtotal HPP */}
+                            <div className="text-right min-w-[110px]">
+                              <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Subtotal HPP</span>
+                              <span className="text-xs font-black text-slate-800">Rp {formatNumber(rowSubtotal)}</span>
+                            </div>
+
+                            {/* Delete Trash Button */}
                             <button
                               type="button"
                               onClick={() => handleRemovePrepackIngredient(idx)}
-                              className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-colors shrink-0"
+                              className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-colors shrink-0 border border-rose-100/60 active:scale-95"
+                              title="Hapus Komponen"
                             >
                               <Trash2 size={15} />
                             </button>
