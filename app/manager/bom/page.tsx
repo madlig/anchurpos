@@ -485,20 +485,72 @@ export default function BomPage() {
 
   const totalFinishedGoodsHpp = breakdownFoodCostPerPack + breakdownPkgTotalCost;
 
-  if (loadingData) {
-    return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-800" />
-      </div>
-    );
-  }
-
   const TABS = [
     { key: "food", label: "Resep Adonan Makanan", icon: Layers, desc: "Resep Komposisi Adonan Makanan per Batch" },
     { key: "packaging", label: "Resep Kemasan Produk", icon: Package, desc: "BOM Kemasan per Pack Produk Jadi" },
     { key: "prepack", label: "Resep Pre-Packing & Repack", icon: RefreshCw, desc: "Sub-Assembly BOM Repack Gula & Saos" },
     { key: "breakdown", label: "Ringkasan Isian Produk (Assembly Tree)", icon: GitFork, desc: "Struktur Pohon Isian & HPP Terpadu" },
   ];
+
+  if (loadingData) {
+    return (
+      <div className="min-h-screen bg-slate-50/70 pb-28">
+        {/* Native App Header Skeleton */}
+        <div className="bg-white sticky top-0 z-30 px-4 md:px-8 pt-4 pb-3 shadow-sm border-b border-slate-100">
+          <div className="max-w-5xl mx-auto space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-sm">
+                <BookOpen size={20} />
+              </div>
+              <div>
+                <h1 className="text-lg md:text-xl font-extrabold text-slate-800 tracking-tight">
+                  Bill of Materials (BOM) & Resep
+                </h1>
+                <p className="text-xs font-semibold text-slate-400">
+                  Master Takaran Adonan, Kemasan & Sub-Assembly (ERP Standard)
+                </p>
+              </div>
+            </div>
+            
+            {/* Horizontal Tabs Skeleton */}
+            <div className="flex items-center gap-2 overflow-x-auto pt-1">
+              <div className="w-36 h-9 rounded-xl bg-slate-200 animate-pulse shrink-0" />
+              <div className="w-36 h-9 rounded-xl bg-slate-100 animate-pulse shrink-0" />
+              <div className="w-40 h-9 rounded-xl bg-slate-100 animate-pulse shrink-0" />
+              <div className="w-48 h-9 rounded-xl bg-slate-100 animate-pulse shrink-0" />
+            </div>
+          </div>
+        </div>
+
+        {/* Content Skeleton */}
+        <div className="px-4 md:px-8 max-w-5xl mx-auto space-y-4 pt-5 animate-pulse">
+          {/* Top Selector Card Skeleton */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-3">
+            <div className="h-3 w-48 bg-slate-200 rounded-md" />
+            <div className="h-11 bg-slate-100 rounded-xl" />
+          </div>
+
+          {/* Component Section Skeleton */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div className="space-y-1.5">
+                <div className="h-4 w-44 bg-slate-200 rounded-md" />
+                <div className="h-3 w-64 bg-slate-100 rounded-md" />
+              </div>
+              <div className="h-9 w-28 bg-slate-200 rounded-xl" />
+            </div>
+
+            <div className="space-y-3">
+              <div className="h-16 bg-slate-100 rounded-2xl border border-slate-200/60" />
+              <div className="h-16 bg-slate-100 rounded-2xl border border-slate-200/60" />
+            </div>
+
+            <div className="h-16 bg-slate-900/80 rounded-2xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50/70 pb-28">
@@ -617,8 +669,9 @@ export default function BomPage() {
                 </div>
 
                 {loadingRecipes ? (
-                  <div className="flex justify-center py-10">
-                    <Loader2 className="animate-spin text-slate-400" size={24} />
+                  <div className="space-y-3 animate-pulse py-2">
+                    <div className="h-16 bg-slate-100/90 rounded-2xl border border-slate-200/60" />
+                    <div className="h-16 bg-slate-100/90 rounded-2xl border border-slate-200/60" />
                   </div>
                 ) : (
                   <div className="space-y-2.5">
@@ -756,8 +809,9 @@ export default function BomPage() {
                 </div>
 
                 {loadingRecipes ? (
-                  <div className="flex justify-center py-10">
-                    <Loader2 className="animate-spin text-slate-400" size={24} />
+                  <div className="space-y-3 animate-pulse py-2">
+                    <div className="h-16 bg-slate-100/90 rounded-2xl border border-slate-200/60" />
+                    <div className="h-16 bg-slate-100/90 rounded-2xl border border-slate-200/60" />
                   </div>
                 ) : (
                   <div className="space-y-2.5">
@@ -892,8 +946,9 @@ export default function BomPage() {
                 </div>
 
                 {loadingRecipes ? (
-                  <div className="flex justify-center py-10">
-                    <Loader2 className="animate-spin text-slate-400" size={24} />
+                  <div className="space-y-3 animate-pulse py-2">
+                    <div className="h-16 bg-slate-100/90 rounded-2xl border border-slate-200/60" />
+                    <div className="h-16 bg-slate-100/90 rounded-2xl border border-slate-200/60" />
                   </div>
                 ) : (
                   <div className="space-y-2.5">
@@ -1076,8 +1131,9 @@ export default function BomPage() {
                 </div>
 
                 {loadingBreakdown ? (
-                  <div className="flex justify-center py-10">
-                    <Loader2 className="animate-spin text-slate-400" size={24} />
+                  <div className="space-y-4 animate-pulse py-2">
+                    <div className="h-24 bg-slate-100/90 rounded-2xl border border-slate-200/60" />
+                    <div className="h-32 bg-slate-100/90 rounded-2xl border border-slate-200/60" />
                   </div>
                 ) : (
                   <div className="space-y-6">
