@@ -17,6 +17,39 @@ interface IngredientListProps {
   setOpenMenuId: (id: string | null) => void;
 }
 
+function ConfirmDelete({ label, onConfirm, onCancel, loading }: {
+  label: string; onConfirm: () => void; onCancel: () => void; loading: boolean;
+}) {
+  return (
+    <div className="absolute inset-0 bg-red-50/95 backdrop-blur-sm rounded-2xl p-4 flex flex-col justify-center items-center z-30 text-center animate-in fade-in zoom-in-95 border-2 border-red-200 shadow-md">
+      <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mb-2 shadow-sm">
+        <Trash2 size={20} />
+      </div>
+      <p className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1">Hapus Data</p>
+      <p className="text-xs font-bold text-red-600 mb-3 px-2 line-clamp-2">
+        Hapus "{label}" secara permanen?
+      </p>
+      <div className="flex gap-2 w-full max-w-xs">
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={loading}
+          className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+        >
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Hapus
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors"
+        >
+          Batal
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function IngredientList({
   ingredients,
   searchQuery,
@@ -31,6 +64,22 @@ export function IngredientList({
   const [newStockValue, setNewStockValue] = useState("");
   const [stockNote, setStockNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetchWithAuth(`/api/ingredients/${deleteTarget.id}`, { method: "DELETE" });
+      if (res.ok) {
+        setDeleteTarget(null);
+        await loadIngredients();
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleStockEdit = async (id: string) => {
     const val = parseFloat(newStockValue);
@@ -100,12 +149,7 @@ export function IngredientList({
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={async () => {
-                      if (confirm(`Hapus "${v.name}" secara permanen dari inventori?`)) {
-                        const res = await fetchWithAuth(`/api/ingredients/${v.id}`, { method: "DELETE" });
-                        if (res.ok) await loadIngredients();
-                      }
-                    }}
+                    onClick={() => setDeleteTarget({ id: v.id, name: v.name })}
                     className="w-8 h-8 flex items-center justify-center rounded-xl text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors"
                     title="Hapus Item"
                   >
@@ -138,12 +182,9 @@ export function IngredientList({
                         <History size={14} className="text-slate-400" /> Lihat Riwayat Mutasi
                       </button>
                       <button
-                        onClick={async () => {
+                        onClick={() => {
                           setOpenMenuId(null);
-                          if (confirm(`Hapus "${v.name}" secara permanen dari inventori?`)) {
-                            const res = await fetchWithAuth(`/api/ingredients/${v.id}`, { method: "DELETE" });
-                            if (res.ok) await loadIngredients();
-                          }
+                          setDeleteTarget({ id: v.id, name: v.name });
                         }}
                         className="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-2"
                       >
@@ -153,6 +194,15 @@ export function IngredientList({
                   </>
                 )}
               </div>
+
+              {deleteTarget?.id === v.id && (
+                <ConfirmDelete
+                  label={v.name}
+                  onConfirm={handleDelete}
+                  onCancel={() => setDeleteTarget(null)}
+                  loading={deleting}
+                />
+              )}
 
               {!isEditing ? (
                 <div className="mt-4 flex items-end justify-between">
