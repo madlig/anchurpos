@@ -1505,8 +1505,21 @@ function MasterDataContent() {
 export default function MasterDataPage() {
   return (
     <Suspense fallback={
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-900" />
+      <div className="min-h-screen bg-slate-50/70 pb-28 animate-pulse">
+        <div className="bg-white px-4 md:px-8 pt-4 pb-3 shadow-sm border-b border-slate-100 space-y-3">
+          <div className="max-w-6xl mx-auto space-y-3">
+            <div className="h-10 w-48 bg-slate-200 rounded-2xl" />
+            <div className="h-8 w-full max-w-md bg-slate-100 rounded-xl" />
+          </div>
+        </div>
+        <div className="px-4 md:px-8 max-w-6xl mx-auto space-y-4 pt-5">
+          <div className="h-10 w-full bg-white rounded-2xl border border-slate-200/80" />
+          <div className="space-y-3">
+            <div className="h-28 bg-white rounded-3xl border border-slate-200/80" />
+            <div className="h-28 bg-white rounded-3xl border border-slate-200/80" />
+            <div className="h-28 bg-white rounded-3xl border border-slate-200/80" />
+          </div>
+        </div>
       </div>
     }>
       <MasterDataContent />
