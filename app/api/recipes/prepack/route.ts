@@ -34,9 +34,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { targetItemId, items } = body as {
+    const { targetItemId, items, outputYieldQty = 1 } = body as {
       targetItemId: string;
       items: Array<{ ingredientId: string; qtyPerPack: number; unit: string }>;
+      outputYieldQty?: number;
     };
 
     if (!targetItemId || !Array.isArray(items)) {
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
     });
 
     // 2. Simpan resep prepack baru & hitung total HPP unit target
-    let calculatedTargetHpp = 0;
+    let totalBatchCost = 0;
 
     for (const item of items) {
       if (item.ingredientId && item.qtyPerPack > 0) {
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
           ingredientId: item.ingredientId,
           qtyPerPack: Number(item.qtyPerPack),
           unit: item.unit || "pcs",
+          outputYieldQty: Number(outputYieldQty) || 1,
           createdAt: new Date().toISOString(),
         });
 
@@ -74,10 +76,13 @@ export async function POST(req: NextRequest) {
         if (ingDoc.exists) {
           const ingData = ingDoc.data();
           const baseCost = Number(ingData?.defaultCostPerBaseUnit || 0);
-          calculatedTargetHpp += baseCost * Number(item.qtyPerPack);
+          totalBatchCost += baseCost * Number(item.qtyPerPack);
         }
       }
     }
+
+    const yieldQty = Number(outputYieldQty) > 0 ? Number(outputYieldQty) : 1;
+    const calculatedTargetHpp = totalBatchCost / yieldQty;
 
     // Update HPP modal dasar targetItemId jika calculatedTargetHpp > 0
     if (calculatedTargetHpp > 0) {

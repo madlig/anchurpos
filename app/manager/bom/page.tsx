@@ -71,6 +71,7 @@ export default function BomPage() {
   // Pre-Packing Sub-Assembly Recipe States
   const [selectedPrepackItemId, setSelectedPrepackItemId] = useState("");
   const [prepackRecipes, setPrepackRecipes] = useState<PrepackRecipeItem[]>([]);
+  const [prepackYieldQty, setPrepackYieldQty] = useState<number>(1);
 
   // Breakdown Multi-Level View States
   const [breakdownProductId, setBreakdownProductId] = useState("");
@@ -168,6 +169,7 @@ export default function BomPage() {
   useEffect(() => {
     if (!selectedPrepackItemId) {
       setPrepackRecipes([]);
+      setPrepackYieldQty(1);
       return;
     }
 
@@ -175,7 +177,13 @@ export default function BomPage() {
     fetchWithAuth(`/api/recipes/prepack?targetItemId=${selectedPrepackItemId}`)
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
-        setPrepackRecipes(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        setPrepackRecipes(list);
+        if (list.length > 0 && list[0].outputYieldQty) {
+          setPrepackYieldQty(Number(list[0].outputYieldQty) || 1);
+        } else {
+          setPrepackYieldQty(1);
+        }
       })
       .finally(() => setLoadingRecipes(false));
   }, [selectedPrepackItemId, fetchWithAuth]);
@@ -219,13 +227,15 @@ export default function BomPage() {
   }, [pkgRecipes, ingredients]);
 
   const selectedPrepackItem = ingredients.find((i) => i.id === selectedPrepackItemId);
-  const totalPrepackCostPerPack = useMemo(() => {
+  const totalPrepackBatchCost = useMemo(() => {
     return prepackRecipes.reduce((sum, item) => {
       const ing = ingredients.find((i) => i.id === item.ingredientId);
       if (!ing) return sum;
       return sum + ing.defaultCostPerBaseUnit * item.qtyPerPack;
     }, 0);
   }, [prepackRecipes, ingredients]);
+
+  const totalPrepackCostPerPack = totalPrepackBatchCost / (prepackYieldQty || 1);
 
   // Food Recipe Handlers
   const handleAddIngredient = () => {
@@ -388,6 +398,7 @@ export default function BomPage() {
         body: JSON.stringify({
           targetItemId: selectedPrepackItemId,
           items: prepackRecipes,
+          outputYieldQty: prepackYieldQty || 1,
         }),
       });
 
@@ -947,21 +958,48 @@ export default function BomPage() {
                   </div>
                 )}
 
+                {/* Output Yield Quantity Input Field (ERP Standard Output Batch) */}
+                <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100/90 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Calculator size={14} className="text-indigo-600" /> Output Hasil Resep Batch (Yield Output)
+                    </h4>
+                    <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                      Jumlah total {selectedPrepackItem?.baseUnit || 'pcs'} yang dihasilkan dari racikan di atas. (Misal: <span className="font-bold text-indigo-700">1540</span> gram untuk 1 tupperware gula cinnamon, atau <span className="font-bold text-indigo-700">1</span> pack untuk kemasan)
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0.001"
+                      value={prepackYieldQty || ""}
+                      onChange={(e) => setPrepackYieldQty(parseFloat(e.target.value) || 1)}
+                      className="h-9 w-28 text-xs font-black text-slate-800 bg-white border-slate-300 text-right focus-visible:ring-indigo-400"
+                      placeholder="1"
+                    />
+                    <span className="text-xs font-extrabold text-slate-700">{selectedPrepackItem?.baseUnit || 'pcs'}</span>
+                  </div>
+                </div>
+
                 {/* HPP Cost Summary Card */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between gap-3 shadow-sm">
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
                       <RefreshCw size={20} className="text-indigo-300" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">Estimasi HPP Pre-Pack</p>
-                      <p className="text-xs font-bold text-slate-300">Biaya Racikan & Kemasan per 1 {selectedPrepackItem?.baseUnit || 'Pack'}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">Estimasi HPP Pre-Pack Sub-Assembly</p>
+                      <p className="text-xs font-bold text-slate-300">
+                        Total Modal Batch: Rp {formatNumber(Math.round(totalPrepackBatchCost))} (untuk {formatNumber(prepackYieldQty)} {selectedPrepackItem?.baseUnit || 'pcs'})
+                      </p>
                     </div>
                   </div>
 
-                  <div className="text-right">
+                  <div className="text-left md:text-right">
                     <p className="text-lg font-black tracking-tight text-white">
-                      Rp {formatNumber(Math.round(totalPrepackCostPerPack))} <span className="text-xs font-bold text-indigo-300">/ {selectedPrepackItem?.baseUnit || 'Pack'}</span>
+                      Rp {formatNumber(Math.round(totalPrepackCostPerPack))} <span className="text-xs font-bold text-indigo-300">/ {selectedPrepackItem?.baseUnit || 'pcs'}</span>
                     </p>
                   </div>
                 </div>
