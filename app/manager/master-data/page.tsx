@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { formatNumber } from "@/lib/formatters";
 
-type Tab = "produk" | "bahan" | "pelanggan";
+type Tab = "produk" | "bahan" | "pelanggan" | "pemasok";
 
 function fmt(n: number) {
   return formatNumber(n);
@@ -23,6 +23,7 @@ interface ProductItem { id: string; name: string; code: string; category?: strin
 interface VariantItem { id: string; productId: string; name: string; sortOrder: number; currentStock: number; minStock: number; freeSauceAllowance?: number; }
 interface IngredientItem { id: string; name: string; category: string; baseUnit: string; currentStock: number; minStock: number; channels?: string[]; unitAlternatives?: { unit: string; conversionToBase: number }[]; defaultCostPerBaseUnit?: number; price?: number; }
 interface CustomerItem { id: string; name: string; customerType: string; channel: string; phoneNumber: string | null; address: string | null; notes: string; discountPerUnit: number; }
+interface SupplierItem { id: string; name: string; category?: string; phoneNumber?: string | null; address?: string | null; contactPerson?: string | null; notes?: string; }
 
 const PRODUCT_CATEGORIES = [
   { id: "frozen", label: "Frozen Food" },
@@ -413,12 +414,19 @@ function MasterDataContent() {
   const [variants, setVariants] = useState<VariantItem[]>([]);
   const [ingredients, setIngredients] = useState<IngredientItem[]>([]);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
 
   // Customer Edit/Delete States
   const [customerForm, setCustomerForm] = useState({ name: "", customerType: "reguler", channel: "walk_in", phoneNumber: "", address: "", notes: "", discountPerUnit: "0" });
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [customerDeleteTarget, setCustomerDeleteTarget] = useState<CustomerItem | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState(false);
+
+  // Supplier Edit/Delete States
+  const [supplierForm, setSupplierForm] = useState({ name: "", category: "Bahan Baku", phoneNumber: "", address: "", contactPerson: "", notes: "" });
+  const [savingSupplier, setSavingSupplier] = useState(false);
+  const [supplierDeleteTarget, setSupplierDeleteTarget] = useState<SupplierItem | null>(null);
+  const [deletingSupplier, setDeletingSupplier] = useState(false);
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
@@ -428,16 +436,18 @@ function MasterDataContent() {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, v, i, c] = await Promise.all([
+      const [p, v, i, c, s] = await Promise.all([
         fetchWithAuth("/api/products").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/variants").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/ingredients").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/customers").then(r => r.ok ? r.json() : []),
+        fetchWithAuth("/api/suppliers").then(r => r.ok ? r.json() : []),
       ]);
       setProducts(Array.isArray(p) ? p : []);
       setVariants(Array.isArray(v) ? v : []);
       setIngredients(Array.isArray(i) ? i : []);
       setCustomers(Array.isArray(c) ? c : []);
+      setSuppliers(Array.isArray(s) ? s : []);
     } finally { setLoading(false); }
   }, [fetchWithAuth]);
 
@@ -502,10 +512,43 @@ function MasterDataContent() {
     } finally { setDeletingCustomer(false); }
   }
 
+  async function handleSaveSupplier() {
+    if (!supplierForm.name.trim()) return;
+    setSavingSupplier(true);
+    try {
+      const res = await fetchWithAuth("/api/suppliers", {
+        method: "POST",
+        body: JSON.stringify({
+          name: supplierForm.name.trim(),
+          category: supplierForm.category,
+          phoneNumber: supplierForm.phoneNumber || null,
+          address: supplierForm.address || null,
+          contactPerson: supplierForm.contactPerson || null,
+          notes: supplierForm.notes || ""
+        })
+      });
+      if (res.ok) {
+        setShowAddForm(false);
+        setSupplierForm({ name: "", category: "Bahan Baku", phoneNumber: "", address: "", contactPerson: "", notes: "" });
+        await loadAll();
+      }
+    } finally { setSavingSupplier(false); }
+  }
+
+  async function handleDeleteSupplier() {
+    if (!supplierDeleteTarget) return;
+    setDeletingSupplier(true);
+    try {
+      const res = await fetchWithAuth(`/api/suppliers/${supplierDeleteTarget.id}`, { method: "DELETE" });
+      if (res.ok) { setSupplierDeleteTarget(null); await loadAll(); }
+    } finally { setDeletingSupplier(false); }
+  }
+
   const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "produk", label: "Produk & Varian Rasa", icon: Package },
     { key: "bahan", label: "Bahan, Packaging & Add-On", icon: Beaker },
     { key: "pelanggan", label: "Pelanggan", icon: Users },
+    { key: "pemasok", label: "Pemasok (Supplier)", icon: Store },
   ];
 
   const q = search.toLowerCase();
@@ -520,6 +563,7 @@ function MasterDataContent() {
   }, [ingredients, q, subCategoryFilter]);
 
   const filteredCustomers = customers.filter(c => !q || c.name.toLowerCase().includes(q) || (c.customerType ?? "").toLowerCase().includes(q));
+  const filteredSuppliers = suppliers.filter(s => !q || s.name.toLowerCase().includes(q) || (s.category ?? "").toLowerCase().includes(q));
 
   const onSuccess = () => { 
     setShowAddForm(false); 
@@ -895,6 +939,148 @@ function MasterDataContent() {
                       )}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── TAB: PEMASOK / SUPPLIER (VENDOR MASTER DATA) ── */}
+            {tab === "pemasok" && (
+              <div className="space-y-4">
+                {showAddForm && (
+                  <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4 animate-in fade-in zoom-in-95">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                        <Store size={18} className="text-amber-600" /> Tambah Pemasok / Supplier Baru
+                      </h3>
+                      <button type="button" onClick={() => setShowAddForm(false)} className="text-slate-400 hover:text-slate-600">
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-3 text-xs">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Toko / Supplier *</label>
+                          <Input
+                            placeholder="Contoh: Toko Bahan Kue Harapan / PT Packaging Jaya"
+                            value={supplierForm.name}
+                            onChange={(e) => setSupplierForm(p => ({ ...p, name: e.target.value }))}
+                            className="h-10 text-xs font-semibold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Kategori Pemasok</label>
+                          <select
+                            value={supplierForm.category}
+                            onChange={(e) => setSupplierForm(p => ({ ...p, category: e.target.value }))}
+                            className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-xs"
+                          >
+                            <option value="Bahan Baku">Bahan Baku (Ingredients)</option>
+                            <option value="Packaging">Kemasan / Packaging</option>
+                            <option value="Operasional">Peralatan Operasional</option>
+                            <option value="Lainnya">Lain-lain</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">No. WhatsApp / Telepon</label>
+                          <Input
+                            placeholder="Contoh: 08123456789"
+                            value={supplierForm.phoneNumber}
+                            onChange={(e) => setSupplierForm(p => ({ ...p, phoneNumber: e.target.value }))}
+                            className="h-10 text-xs font-semibold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Contact Person (Sales / Admin)</label>
+                          <Input
+                            placeholder="Contoh: Pak Budi Sales"
+                            value={supplierForm.contactPerson}
+                            onChange={(e) => setSupplierForm(p => ({ ...p, contactPerson: e.target.value }))}
+                            className="h-10 text-xs font-semibold"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Alamat Pemasok</label>
+                        <Input
+                          placeholder="Alamat lengkap toko / gudang supplier..."
+                          value={supplierForm.address}
+                          onChange={(e) => setSupplierForm(p => ({ ...p, address: e.target.value }))}
+                          className="h-10 text-xs font-semibold"
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={handleSaveSupplier}
+                          disabled={savingSupplier}
+                          className="px-5 h-10 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                          {savingSupplier ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Simpan Supplier
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddForm(false)}
+                          className="px-5 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600 text-xs"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {filteredSuppliers.map(s => (
+                    <div key={s.id} className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm relative overflow-hidden space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 text-amber-700 flex items-center justify-center font-extrabold text-sm">
+                          <Store size={18} />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setSupplierDeleteTarget(s)}
+                          className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+
+                      <div>
+                        <h3 className="text-base font-extrabold text-slate-800">{s.name}</h3>
+                        <p className="text-xs font-semibold text-slate-400 mt-0.5">{s.phoneNumber || "No Telp -"}</p>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 uppercase">
+                          {s.category || "Bahan Baku"}
+                        </span>
+                        {s.contactPerson && (
+                          <span className="font-semibold text-slate-500">Contact: {s.contactPerson}</span>
+                        )}
+                      </div>
+
+                      {supplierDeleteTarget?.id === s.id && (
+                        <ConfirmDelete label={s.name} onConfirm={handleDeleteSupplier} onCancel={() => setSupplierDeleteTarget(null)} loading={deletingSupplier} />
+                      )}
+                    </div>
+                  ))}
+
+                  {filteredSuppliers.length === 0 && (
+                    <div className="col-span-full bg-white rounded-3xl p-10 text-center border border-slate-200/80 space-y-2">
+                      <Store size={32} className="text-slate-400 mx-auto" />
+                      <p className="text-sm font-bold text-slate-700">Belum ada Pemasok / Supplier terdaftar.</p>
+                      <p className="text-xs text-slate-400">Klik "+ Tambah Item Baru" untuk mendaftarkan toko langganan belanja Anda.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
