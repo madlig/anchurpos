@@ -55,7 +55,9 @@ export async function POST(req: NextRequest) {
       batch.delete(doc.ref);
     });
 
-    // 2. Simpan resep prepack baru
+    // 2. Simpan resep prepack baru & hitung total HPP unit target
+    let calculatedTargetHpp = 0;
+
     for (const item of items) {
       if (item.ingredientId && item.qtyPerPack > 0) {
         const ref = adminDb.collection("prepackRecipes").doc();
@@ -66,11 +68,25 @@ export async function POST(req: NextRequest) {
           unit: item.unit || "pcs",
           createdAt: new Date().toISOString(),
         });
+
+        // Query HPP ingredient komponen
+        const ingDoc = await adminDb.collection("ingredients").doc(item.ingredientId).get();
+        if (ingDoc.exists) {
+          const ingData = ingDoc.data();
+          const baseCost = Number(ingData?.defaultCostPerBaseUnit || 0);
+          calculatedTargetHpp += baseCost * Number(item.qtyPerPack);
+        }
       }
     }
 
+    // Update HPP modal dasar targetItemId jika calculatedTargetHpp > 0
+    if (calculatedTargetHpp > 0) {
+      const targetIngRef = adminDb.collection("ingredients").doc(targetItemId);
+      batch.update(targetIngRef, { defaultCostPerBaseUnit: calculatedTargetHpp });
+    }
+
     await batch.commit();
-    return NextResponse.json({ message: "Resep pre-pack berhasil disimpan" });
+    return NextResponse.json({ message: "Resep pre-pack berhasil disimpan", calculatedTargetHpp });
   } catch (error) {
     console.error("POST /api/recipes/prepack error:", error);
     return NextResponse.json({ error: "Gagal menyimpan resep pre-pack" }, { status: 500 });
