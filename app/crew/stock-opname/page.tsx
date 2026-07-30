@@ -2,10 +2,19 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Input } from "@/components/ui/input";
-import { Loader2, Check, ClipboardList, Package, Search, Save, AlertCircle, Layers } from "lucide-react";
-import type { Ingredient } from "@/types";
+import { Loader2, Check, ClipboardList, Package, Search, Save, AlertCircle } from "lucide-react";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
+
+interface OpnameItemUI {
+  id: string;
+  name: string;
+  category: string;
+  baseUnit: string;
+  currentStock: number;
+  opnameMethod?: string;
+  packageUnit?: string;
+  itemType: "ingredient" | "variant";
+}
 
 interface OpnameEntry {
   ingredientId: string; 
@@ -16,6 +25,7 @@ interface OpnameEntry {
 }
 
 const CATEGORY_TABS: { key: string; label: string }[] = [
+  { key: "barang_jadi", label: "Barang Jadi (Frozen)" },
   { key: "bahan_baku", label: "Bahan Baku" },
   { key: "packaging", label: "Kemasan & Packaging" },
   { key: "operasional", label: "Operasional" },
@@ -26,32 +36,60 @@ export default function CrewStockOpnamePage() {
   const { getToken } = useAuth();
   const { alert } = useAlertConfirm();
   
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [items, setItems] = useState<OpnameItemUI[]>([]);
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<Map<string, OpnameEntry>>(new Map());
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("bahan_baku");
+  const [activeTab, setActiveTab] = useState("barang_jadi");
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
     return fetch(url, { ...options, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options?.headers } });
   }, [getToken]);
 
-  useEffect(() => {
-    fetchWithAuth("/api/ingredients")
-      .then((r) => r.json())
-      .then((d) => setIngredients(d as Ingredient[]))
-      .finally(() => setLoading(false));
+  const loadData = useCallback(async () => {
+    try {
+      const [resIng, resVar] = await Promise.all([
+        fetchWithAuth("/api/ingredients"),
+        fetchWithAuth("/api/variants")
+      ]);
+
+      let allItems: OpnameItemUI[] = [];
+      if (resIng.ok) {
+        const data = await resIng.json();
+        allItems = [...allItems, ...data.map((i: any) => ({ ...i, itemType: "ingredient" }))];
+      }
+      if (resVar.ok) {
+        const data = await resVar.json();
+        allItems = [...allItems, ...data.map((v: any) => ({
+          id: v.id,
+          name: v.name,
+          category: "barang_jadi",
+          baseUnit: "pack",
+          currentStock: v.currentStock || 0,
+          itemType: "variant"
+        }))];
+      }
+      setItems(allItems);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, [fetchWithAuth]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   function updateEntry(id: string, updates: Partial<OpnameEntry>) {
     setEntries((prev) => {
       const next = new Map(prev);
       const existing = next.get(id) ?? { ingredientId: id, filled: false };
       const updated = { ...existing, ...updates };
-      const ingredient = ingredients.find((i) => i.id === id);
-      if (ingredient?.opnameMethod === "packaged") {
+      const item = items.find((i) => i.id === id);
+      if (item?.opnameMethod === "packaged") {
         updated.filled = updated.fullPackages !== null && updated.fullPackages !== undefined;
       } else {
         updated.filled = updated.physicalStock !== null && updated.physicalStock !== undefined;
@@ -62,16 +100,16 @@ export default function CrewStockOpnamePage() {
   }
 
   const filledCount = Array.from(entries.values()).filter((e) => e.filled).length;
-  const totalCount = ingredients.length;
+  const totalCount = items.length;
   const progressPercent = totalCount > 0 ? Math.round((filledCount / totalCount) * 100) : 0;
 
-  const filteredIngredients = useMemo(() => {
-    return ingredients.filter(i => {
+  const filteredItems = useMemo(() => {
+    return items.filter(i => {
       const matchCat = (i.category || "bahan_baku") === activeTab;
       const matchSearch = i.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchCat && matchSearch;
     });
-  }, [ingredients, activeTab, searchQuery]);
+  }, [items, activeTab, searchQuery]);
 
   async function handleSubmit() {
     if (filledCount === 0) {
@@ -84,12 +122,12 @@ export default function CrewStockOpnamePage() {
       const itemsToUpdate = Array.from(entries.values())
         .filter((e) => e.filled)
         .map((e) => {
-          const ing = ingredients.find((i) => i.id === e.ingredientId);
-          if (!ing) return null;
+          const item = items.find((i) => i.id === e.ingredientId);
+          if (!item) return null;
 
           let physicalStockConverted = e.physicalStock ?? null;
-          if (ing.opnameMethod === "packaged" && e.fullPackages != null) {
-            const packSize = (ing as any).packageSize ?? 1;
+          if (item.opnameMethod === "packaged" && e.fullPackages != null) {
+            const packSize = (item as any).packageSize ?? 1;
             let fullnessFraction = 0;
             if (e.openPackageFullness === "3/4") fullnessFraction = 0.75;
             else if (e.openPackageFullness === "1/2") fullnessFraction = 0.5;
@@ -98,12 +136,13 @@ export default function CrewStockOpnamePage() {
             physicalStockConverted = (e.fullPackages + fullnessFraction) * packSize;
           }
 
-          const systemStock = ing.currentStock;
+          const systemStock = item.currentStock;
           const diff = physicalStockConverted !== null ? physicalStockConverted - systemStock : 0;
 
           return {
             ingredientId: e.ingredientId,
-            inputMethod: ing.opnameMethod ?? "manual",
+            itemType: item.itemType,
+            inputMethod: item.opnameMethod ?? "manual",
             physicalStock: e.physicalStock ?? null,
             fullPackages: e.fullPackages ?? null,
             openPackageFullness: e.openPackageFullness ?? null,
@@ -149,7 +188,7 @@ export default function CrewStockOpnamePage() {
                 <h1 className="text-lg md:text-xl font-extrabold text-slate-800 tracking-tight">
                   Stock Opname Crew
                 </h1>
-                <p className="text-xs font-semibold text-slate-400">Cek Fisik Bahan Baku & Packaging</p>
+                <p className="text-xs font-semibold text-slate-400">Cek Fisik Produk, Bahan & Packaging</p>
               </div>
             </div>
 
@@ -197,7 +236,7 @@ export default function CrewStockOpnamePage() {
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Cari nama bahan / packaging..."
+            placeholder="Cari nama barang / bahan..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="w-full h-10 pl-9 pr-4 rounded-2xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
@@ -209,29 +248,29 @@ export default function CrewStockOpnamePage() {
           <div className="flex justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-slate-800" />
           </div>
-        ) : filteredIngredients.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm space-y-2">
             <Package size={32} className="text-slate-400 mx-auto" />
             <p className="text-sm font-bold text-slate-700">Tidak ada item ditemukan di kategori ini.</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredIngredients.map(ing => {
-              const entry = entries.get(ing.id) ?? { ingredientId: ing.id, filled: false };
-              const isPackaged = ing.opnameMethod === "packaged";
+            {filteredItems.map(item => {
+              const entry = entries.get(item.id) ?? { ingredientId: item.id, filled: false };
+              const isPackaged = item.opnameMethod === "packaged";
 
               return (
                 <div 
-                  key={ing.id}
+                  key={item.id}
                   className={`bg-white rounded-2xl p-4 border transition-all space-y-3 shadow-sm ${
                     entry.filled ? "border-emerald-300 bg-emerald-50/10" : "border-slate-200/80"
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-extrabold text-slate-800">{ing.name}</h3>
+                      <h3 className="text-sm font-extrabold text-slate-800">{item.name}</h3>
                       <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
-                        Stok Sistem: <span className="font-bold text-slate-700">{ing.currentStock} {ing.baseUnit}</span>
+                        Stok Sistem: <span className="font-bold text-slate-700">{item.currentStock} {item.baseUnit}</span>
                       </p>
                     </div>
 
@@ -245,7 +284,7 @@ export default function CrewStockOpnamePage() {
                   {!isPackaged ? (
                     <div>
                       <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1">
-                        Jumlah Fisik Nyata ({ing.baseUnit}) *
+                        Jumlah Fisik Nyata ({item.baseUnit}) *
                       </label>
                       <input
                         type="number"
@@ -253,7 +292,7 @@ export default function CrewStockOpnamePage() {
                         value={entry.physicalStock ?? ""}
                         onChange={e => {
                           const val = e.target.value === "" ? null : parseFloat(e.target.value);
-                          updateEntry(ing.id, { physicalStock: val });
+                          updateEntry(item.id, { physicalStock: val });
                         }}
                         className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-black text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-slate-900/20"
                       />
@@ -262,7 +301,7 @@ export default function CrewStockOpnamePage() {
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1">
-                          Kemasan Utuh ({(ing as any).packageUnit || "Kemasan"})
+                          Kemasan Utuh ({(item as any).packageUnit || "Kemasan"})
                         </label>
                         <input
                           type="number"
@@ -270,7 +309,7 @@ export default function CrewStockOpnamePage() {
                           value={entry.fullPackages ?? ""}
                           onChange={e => {
                             const val = e.target.value === "" ? null : parseInt(e.target.value, 10);
-                            updateEntry(ing.id, { fullPackages: val });
+                            updateEntry(item.id, { fullPackages: val });
                           }}
                           className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-black text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-slate-900/20"
                         />
@@ -282,7 +321,7 @@ export default function CrewStockOpnamePage() {
                         </label>
                         <select
                           value={entry.openPackageFullness ?? "0"}
-                          onChange={e => updateEntry(ing.id, { openPackageFullness: e.target.value })}
+                          onChange={e => updateEntry(item.id, { openPackageFullness: e.target.value })}
                           className="w-full h-10 px-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-slate-900/20"
                         >
                           <option value="0">Kosong / Tidak Ada</option>
