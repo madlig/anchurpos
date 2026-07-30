@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { 
   Loader2, Plus, Trash2, Save, BookOpen, Package, Layers, RefreshCw, Box, 
-  SlidersHorizontal, AlertCircle, CheckCircle2, DollarSign, Calculator, ChevronRight
+  SlidersHorizontal, AlertCircle, CheckCircle2, DollarSign, Calculator, ChevronRight, GitFork, ArrowDownRight
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect, SearchableOption } from "@/components/shared/SearchableSelect";
@@ -53,7 +53,7 @@ interface PrepackRecipeItem {
 
 export default function BomPage() {
   const { getToken } = useAuth();
-  const [activeTab, setActiveTab] = useState<"food" | "packaging" | "prepack">("food");
+  const [activeTab, setActiveTab] = useState<"food" | "packaging" | "prepack" | "breakdown">("food");
 
   const [products, setProducts] = useState<Product[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
@@ -72,8 +72,16 @@ export default function BomPage() {
   const [selectedPrepackItemId, setSelectedPrepackItemId] = useState("");
   const [prepackRecipes, setPrepackRecipes] = useState<PrepackRecipeItem[]>([]);
 
+  // Breakdown Multi-Level View States
+  const [breakdownProductId, setBreakdownProductId] = useState("");
+  const [breakdownVariantId, setBreakdownVariantId] = useState("");
+  const [breakdownFoodRecipes, setBreakdownFoodRecipes] = useState<RecipeItem[]>([]);
+  const [breakdownPkgRecipes, setBreakdownPkgRecipes] = useState<PackagingRecipeItem[]>([]);
+  const [allPrepackRecipesMap, setAllPrepackRecipesMap] = useState<Record<string, PrepackRecipeItem[]>>({});
+
   const [loadingData, setLoadingData] = useState(true);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
+  const [loadingBreakdown, setLoadingBreakdown] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
@@ -94,16 +102,27 @@ export default function BomPage() {
       fetchWithAuth("/api/products").then((r) => (r.ok ? r.json() : [])),
       fetchWithAuth("/api/variants").then((r) => (r.ok ? r.json() : [])),
       fetchWithAuth("/api/ingredients").then((r) => (r.ok ? r.json() : [])),
+      fetchWithAuth("/api/recipes/prepack").then((r) => (r.ok ? r.json() : [])),
     ])
-      .then(([p, v, i]) => {
+      .then(([p, v, i, pre]) => {
         const prodList = Array.isArray(p) ? p : [];
         const ingList = Array.isArray(i) ? i : [];
+        const preList = Array.isArray(pre) ? pre : [];
         setProducts(prodList);
         setVariants(Array.isArray(v) ? v : []);
         setIngredients(ingList);
 
+        // Group prepack recipes by targetItemId
+        const preMap: Record<string, PrepackRecipeItem[]> = {};
+        for (const item of preList) {
+          if (!preMap[item.targetItemId]) preMap[item.targetItemId] = [];
+          preMap[item.targetItemId].push(item);
+        }
+        setAllPrepackRecipesMap(preMap);
+
         if (prodList.length > 0) {
           setSelectedPkgProductId(prodList[0].id);
+          setBreakdownProductId(prodList[0].id);
         }
         if (ingList.length > 0) {
           const defaultPrepack = ingList.find(item => item.category === "add_on" || item.category === "packaging") || ingList[0];
@@ -161,6 +180,22 @@ export default function BomPage() {
       .finally(() => setLoadingRecipes(false));
   }, [selectedPrepackItemId, fetchWithAuth]);
 
+  // Fetch Breakdown Recipe Data
+  useEffect(() => {
+    if (activeTab !== "breakdown" || !breakdownProductId) return;
+
+    setLoadingBreakdown(true);
+    Promise.all([
+      fetchWithAuth(`/api/recipes/packaging?productId=${breakdownProductId}`).then(r => r.ok ? r.json() : []),
+      breakdownVariantId ? fetchWithAuth(`/api/recipes?variantId=${breakdownVariantId}`).then(r => r.ok ? r.json() : []) : Promise.resolve([]),
+    ])
+      .then(([pkgData, foodData]) => {
+        setBreakdownPkgRecipes(Array.isArray(pkgData) ? pkgData : []);
+        setBreakdownFoodRecipes(Array.isArray(foodData) ? foodData : []);
+      })
+      .finally(() => setLoadingBreakdown(false));
+  }, [activeTab, breakdownProductId, breakdownVariantId, fetchWithAuth]);
+
   // Cost calculations
   const selectedProduct = products.find((p) => p.id === selectedProductId);
   const packPerBatch = selectedProduct?.packPerBatch || 1;
@@ -175,7 +210,6 @@ export default function BomPage() {
 
   const foodCostPerPack = totalFoodCostPerBatch / packPerBatch;
 
-  const selectedPkgProduct = products.find((p) => p.id === selectedPkgProductId);
   const totalPackagingCostPerPack = useMemo(() => {
     return pkgRecipes.reduce((sum, item) => {
       const ing = ingredients.find((i) => i.id === item.ingredientId);
@@ -377,6 +411,11 @@ export default function BomPage() {
     const filtered = variants.filter(v => v.productId === selectedProductId || !v.productId);
     return filtered.map(v => ({ id: v.id, name: v.name }));
   }, [variants, selectedProductId]);
+
+  const breakdownVariantOptions: SearchableOption[] = useMemo(() => {
+    if (!breakdownProductId) return [];
+    return variants.filter(v => v.productId === breakdownProductId || !v.productId).map(v => ({ id: v.id, name: v.name }));
+  }, [variants, breakdownProductId]);
   
   const ingredientOptions: SearchableOption[] = useMemo(() => ingredients.map(i => ({ 
     id: i.id, 
@@ -385,7 +424,6 @@ export default function BomPage() {
   })), [ingredients]);
   
   const prepackTargetOptions: SearchableOption[] = useMemo(() => {
-    // Prioritize add_on and packaging items as target repack outputs
     return [...ingredients]
       .sort((a, b) => {
         const priorityOrder: Record<string, number> = { add_on: 1, packaging: 2, bahan_baku: 3, operasional: 4 };
@@ -401,6 +439,41 @@ export default function BomPage() {
       }));
   }, [ingredients]);
 
+  // Breakdown Multi-Level Tree Calculations
+  const selectedBreakdownProduct = products.find(p => p.id === breakdownProductId);
+  const selectedBreakdownVariant = variants.find(v => v.id === breakdownVariantId);
+  const breakdownPackPerBatch = selectedBreakdownProduct?.packPerBatch || 1;
+
+  const breakdownFoodCostPerBatch = useMemo(() => {
+    return breakdownFoodRecipes.reduce((sum, item) => {
+      const ing = ingredients.find(i => i.id === item.ingredientId);
+      return sum + (ing?.defaultCostPerBaseUnit || 0) * item.qtyPerBatch;
+    }, 0);
+  }, [breakdownFoodRecipes, ingredients]);
+
+  const breakdownFoodCostPerPack = breakdownFoodCostPerBatch / breakdownPackPerBatch;
+
+  const breakdownPkgTotalCost = useMemo(() => {
+    return breakdownPkgRecipes.reduce((sum, item) => {
+      const ing = ingredients.find(i => i.id === item.ingredientId);
+      let cost = (ing?.defaultCostPerBaseUnit || 0) * item.qtyPerPack;
+      
+      // Add subpack BOM costs if this item has prepackRecipe
+      const subRecipes = allPrepackRecipesMap[item.ingredientId];
+      if (subRecipes && subRecipes.length > 0) {
+        const subCost = subRecipes.reduce((subSum, sub) => {
+          const subIng = ingredients.find(i => i.id === sub.ingredientId);
+          return subSum + (subIng?.defaultCostPerBaseUnit || 0) * sub.qtyPerPack;
+        }, 0);
+        cost = subCost * item.qtyPerPack;
+      }
+
+      return sum + cost;
+    }, 0);
+  }, [breakdownPkgRecipes, ingredients, allPrepackRecipesMap]);
+
+  const totalFinishedGoodsHpp = breakdownFoodCostPerPack + breakdownPkgTotalCost;
+
   if (loadingData) {
     return (
       <div className="flex justify-center py-20">
@@ -413,6 +486,7 @@ export default function BomPage() {
     { key: "food", label: "Resep Adonan Makanan", icon: Layers, desc: "Resep Komposisi Adonan Makanan per Batch" },
     { key: "packaging", label: "Resep Kemasan Produk", icon: Package, desc: "BOM Kemasan per Pack Produk Jadi" },
     { key: "prepack", label: "Resep Pre-Packing & Repack", icon: RefreshCw, desc: "Sub-Assembly BOM Repack Gula & Saos" },
+    { key: "breakdown", label: "Ringkasan Isian Produk (Assembly Tree)", icon: GitFork, desc: "Struktur Pohon Isian & HPP Terpadu" },
   ];
 
   return (
@@ -900,6 +974,179 @@ export default function BomPage() {
                 >
                   {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Simpan Resep Pre-Packing (Sub-Assembly BOM)
                 </button>
+
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* TAB 4: BREAKDOWN MULTI-LEVEL ASSEMBLY TREE */}
+        {activeTab === "breakdown" && (
+          <div className="space-y-4">
+            
+            {/* Selection Card */}
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-3">
+              <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider">Pilih Produk & Varian Untuk Melihat Pohon Struktur Isian</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">Produk Induk *</label>
+                  <SearchableSelect
+                    options={productOptions}
+                    value={breakdownProductId}
+                    onChange={(val) => {
+                      setBreakdownProductId(val);
+                      setBreakdownVariantId("");
+                    }}
+                    placeholder="Pilih Produk Induk..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">Varian Rasa / Perisa</label>
+                  <SearchableSelect
+                    options={breakdownVariantOptions}
+                    value={breakdownVariantId}
+                    onChange={(val) => setBreakdownVariantId(val)}
+                    placeholder="Pilih Varian Rasa..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            {breakdownProductId && (
+              <div className="bg-white rounded-3xl p-5 md:p-6 border border-slate-200/90 shadow-sm space-y-6">
+                
+                {/* Header Summary */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 gap-3">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+                      <GitFork size={18} className="text-indigo-600" />
+                      {selectedBreakdownProduct?.name} {selectedBreakdownVariant ? `(${selectedBreakdownVariant.name})` : ""}
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                      Tampilan Structure Tree (Multi-Level BOM ERP) & Rincian Transparan Komponen Isi Pack
+                    </p>
+                  </div>
+
+                  <div className="px-4 py-2.5 rounded-2xl bg-indigo-50 border border-indigo-100 text-right">
+                    <span className="text-[10px] font-bold text-indigo-500 uppercase block">Total HPP Barang Jadi</span>
+                    <span className="text-lg font-black text-indigo-950">
+                      Rp {formatNumber(Math.round(totalFinishedGoodsHpp))} <span className="text-xs font-bold text-indigo-600">/ Pack</span>
+                    </span>
+                  </div>
+                </div>
+
+                {loadingBreakdown ? (
+                  <div className="flex justify-center py-10">
+                    <Loader2 className="animate-spin text-slate-400" size={24} />
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    
+                    {/* SECTION 1: FOOD BOM (BATCH) */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                          <Layers size={15} className="text-slate-600" /> 1. Komponen Adonan Makanan (Food BOM)
+                        </h4>
+                        <span className="text-xs font-extrabold text-slate-700 bg-slate-100 px-3 py-1 rounded-xl">
+                          Subtotal HPP: Rp {formatNumber(Math.round(breakdownFoodCostPerPack))} / Pack
+                        </span>
+                      </div>
+
+                      {breakdownFoodRecipes.length === 0 ? (
+                        <p className="text-xs font-bold text-slate-400 p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                          Belum ada resep adonan yang diatur untuk varian ini.
+                        </p>
+                      ) : (
+                        <div className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-2">
+                          {breakdownFoodRecipes.map(r => {
+                            const ing = ingredients.find(i => i.id === r.ingredientId);
+                            const cost = (ing?.defaultCostPerBaseUnit || 0) * r.qtyPerBatch;
+                            return (
+                              <div key={r.ingredientId} className="flex justify-between items-center text-xs font-medium border-b border-slate-200/50 pb-2 last:border-0 last:pb-0">
+                                <span className="text-slate-700 font-bold flex items-center gap-1.5">
+                                  <ChevronRight size={14} className="text-slate-400" />
+                                  {ing?.name || r.ingredientId} ({r.qtyPerBatch} {r.unit} / Batch)
+                                </span>
+                                <span className="font-extrabold text-slate-800">Rp {formatNumber(Math.round(cost / breakdownPackPerBatch))} / Pack</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* SECTION 2: PACKAGING & SUB-ASSEMBLY PREPACK BOM */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                          <Package size={15} className="text-slate-600" /> 2. Komponen Kemasan & Sub-Assembly (Packaging & Prepack BOM)
+                        </h4>
+                        <span className="text-xs font-extrabold text-slate-700 bg-slate-100 px-3 py-1 rounded-xl">
+                          Subtotal HPP: Rp {formatNumber(Math.round(breakdownPkgTotalCost))} / Pack
+                        </span>
+                      </div>
+
+                      {breakdownPkgRecipes.length === 0 ? (
+                        <p className="text-xs font-bold text-slate-400 p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                          Belum ada kemasan atau item pendamping yang diatur untuk produk ini.
+                        </p>
+                      ) : (
+                        <div className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-3">
+                          {breakdownPkgRecipes.map(r => {
+                            const ing = ingredients.find(i => i.id === r.ingredientId);
+                            const subRecipes = allPrepackRecipesMap[r.ingredientId];
+                            const hasSub = subRecipes && subRecipes.length > 0;
+
+                            let unitCost = ing?.defaultCostPerBaseUnit || 0;
+                            if (hasSub) {
+                              unitCost = subRecipes.reduce((sSum, s) => {
+                                const sIng = ingredients.find(i => i.id === s.ingredientId);
+                                return sSum + (sIng?.defaultCostPerBaseUnit || 0) * s.qtyPerPack;
+                              }, 0);
+                            }
+                            const totalRowCost = unitCost * r.qtyPerPack;
+
+                            return (
+                              <div key={r.ingredientId} className="space-y-1.5 border-b border-slate-200/60 pb-2.5 last:border-0 last:pb-0">
+                                <div className="flex justify-between items-center text-xs font-bold">
+                                  <span className="text-slate-900 flex items-center gap-1.5">
+                                    <ChevronRight size={14} className="text-indigo-600" />
+                                    {ing?.name || r.ingredientId} ({r.qtyPerPack} {r.unit} / Pack)
+                                  </span>
+                                  <span className="font-black text-slate-900">Rp {formatNumber(Math.round(totalRowCost))}</span>
+                                </div>
+
+                                {/* Render Subpack Components Tree */}
+                                {hasSub && (
+                                  <div className="pl-6 space-y-1 border-l-2 border-indigo-200 my-1 py-1">
+                                    <p className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-wider">Resep Racikan Pre-Pack Sub-Assembly:</p>
+                                    {subRecipes.map(s => {
+                                      const sIng = ingredients.find(i => i.id === s.ingredientId);
+                                      const sCost = (sIng?.defaultCostPerBaseUnit || 0) * s.qtyPerPack;
+                                      return (
+                                        <div key={s.ingredientId} className="flex justify-between items-center text-[11px] text-slate-600 font-medium">
+                                          <span className="flex items-center gap-1">
+                                            <ArrowDownRight size={12} className="text-slate-400" />
+                                            {sIng?.name || s.ingredientId} ({s.qtyPerPack} {s.unit})
+                                          </span>
+                                          <span className="font-bold text-slate-700">Rp {formatNumber(Math.round(sCost))}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                )}
 
               </div>
             )}
