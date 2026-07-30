@@ -1110,36 +1110,43 @@ export default function BomPage() {
                             const totalRowCost = unitCost * r.qtyPerPack;
 
                             return (
-                              <div key={r.ingredientId} className="space-y-1.5 border-b border-slate-200/60 pb-2.5 last:border-0 last:pb-0">
-                                <div className="flex justify-between items-center text-xs font-bold">
-                                  <span className="text-slate-900 flex items-center gap-1.5">
-                                    <ChevronRight size={14} className="text-indigo-600" />
-                                    {ing?.name || r.ingredientId} ({r.qtyPerPack} {r.unit} / Pack)
-                                  </span>
-                                  <span className="font-black text-slate-900">Rp {formatNumber(Math.round(totalRowCost))}</span>
-                                </div>
-
-                                {/* Render Subpack Components Tree */}
-                                {hasSub && (
-                                  <div className="pl-6 space-y-1 border-l-2 border-indigo-200 my-1 py-1">
-                                    <p className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-wider">Resep Racikan Pre-Pack Sub-Assembly:</p>
-                                    {subRecipes.map(s => {
-                                      const sIng = ingredients.find(i => i.id === s.ingredientId);
-                                      const sCost = (sIng?.defaultCostPerBaseUnit || 0) * s.qtyPerPack;
-                                      return (
-                                        <div key={s.ingredientId} className="flex justify-between items-center text-[11px] text-slate-600 font-medium">
-                                          <span className="flex items-center gap-1">
-                                            <ArrowDownRight size={12} className="text-slate-400" />
-                                            {sIng?.name || s.ingredientId} ({s.qtyPerPack} {s.unit})
-                                          </span>
-                                          <span className="font-bold text-slate-700">Rp {formatNumber(Math.round(sCost))}</span>
-                                        </div>
-                                      );
-                                    })}
+                                <div key={r.ingredientId} className="space-y-1.5 border-b border-slate-200/60 pb-2.5 last:border-0 last:pb-0">
+                                  <div className="flex justify-between items-center text-xs font-bold">
+                                    <span className="text-slate-900 flex items-center gap-1.5">
+                                      <ChevronRight size={14} className="text-indigo-600" />
+                                      {ing?.name || r.ingredientId} ({r.qtyPerPack} {r.unit} / Pack)
+                                      {ing?.category === "add_on" && (
+                                        <span className="text-[9px] font-black bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                                          Included Add-On
+                                        </span>
+                                      )}
+                                    </span>
+                                    <span className="font-black text-slate-900">Rp {formatNumber(Math.round(totalRowCost))}</span>
                                   </div>
-                                )}
-                              </div>
-                            );
+
+                                  {/* Render Subpack Components Tree */}
+                                  {hasSub && (
+                                    <div className="pl-6 space-y-1 border-l-2 border-indigo-200 my-1 py-1">
+                                      <p className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-wider flex items-center gap-1">
+                                        <GitFork size={12} /> Resep Racikan Pre-Pack Sub-Assembly:
+                                      </p>
+                                      {subRecipes.map(s => {
+                                        const sIng = ingredients.find(i => i.id === s.ingredientId);
+                                        const sCost = (sIng?.defaultCostPerBaseUnit || 0) * s.qtyPerPack;
+                                        return (
+                                          <div key={s.ingredientId} className="flex justify-between items-center text-[11px] text-slate-600 font-medium">
+                                            <span className="flex items-center gap-1">
+                                              <ArrowDownRight size={12} className="text-slate-400" />
+                                              {sIng?.name || s.ingredientId} ({s.qtyPerPack} {s.unit})
+                                            </span>
+                                            <span className="font-bold text-slate-700">Rp {formatNumber(Math.round(sCost))}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
                           })}
                         </div>
                       )}
