@@ -7,7 +7,7 @@ import {
   Loader2, Plus, X, Check, Package, Layers, Beaker, Pencil, Trash2, Users, Search, 
   Store, Phone, MapPin, MessageCircle, Building2, UserCheck, Tag, CreditCard,
   SlidersHorizontal, ChevronRight, CheckCircle2, ShieldCheck, Sparkles, Filter,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, Table, LayoutGrid
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatNumber } from "@/lib/formatters";
@@ -392,6 +392,7 @@ function MasterDataContent() {
   const tabParam = searchParams.get("tab") as Tab | null;
 
   const [tab, setTab] = useState<Tab>("produk");
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [subCategoryFilter, setSubCategoryFilter] = useState<string>("semua");
 
   useEffect(() => {
@@ -664,18 +665,44 @@ function MasterDataContent() {
       {/* Main Content Area */}
       <div className="px-4 md:px-8 max-w-6xl mx-auto space-y-4 pt-5">
         
-        {/* Search Bar */}
-        <div className="relative">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            id="master-search-input"
-            name="master-search-input"
-            type="text"
-            placeholder={`Cari master data ${tab}...`}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-4 rounded-2xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
-          />
+        {/* Search Bar & ERP View Switcher */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              id="master-search-input"
+              name="master-search-input"
+              type="text"
+              placeholder={`Cari master data ${tab}...`}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full h-10 pl-9 pr-4 rounded-2xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20 shadow-2xs"
+            />
+          </div>
+
+          {/* ERP View Switcher Toggle (Table ERP vs Kartu) */}
+          <div className="bg-white p-1 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all ${
+                viewMode === "table" ? "bg-slate-900 text-white shadow-2xs" : "text-slate-500 hover:bg-slate-100"
+              }`}
+              title="Tampilan Tabel ERP (List View)"
+            >
+              <Table size={14} /> <span className="hidden md:inline">Tabel ERP</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all ${
+                viewMode === "grid" ? "bg-slate-900 text-white shadow-2xs" : "text-slate-500 hover:bg-slate-100"
+              }`}
+              title="Tampilan Kartu (Grid View)"
+            >
+              <LayoutGrid size={14} /> <span className="hidden md:inline">Kartu</span>
+            </button>
+          </div>
         </div>
 
         {/* Global Loading */}
@@ -1129,21 +1156,158 @@ function MasterDataContent() {
                   </div>
                 )}
 
-                {/* Professional Customer Cards Grid (Odoo / SAP Standard) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {filteredCustomers.map(c => {
-                    const isVip = (c.customerType || "reguler") !== "reguler";
-                    const cleanPhone = (c.phoneNumber || "").replace(/[^0-9]/g, "");
-                    const formattedWa = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
-                    const custCode = c.code || `CUST-${c.id.slice(0, 4).toUpperCase()}`;
+                {/* Enterprise ERP Data Table View (SAP & Odoo Standard) */}
+                {viewMode === "table" ? (
+                  <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden animate-in fade-in">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-900 text-white uppercase text-[10px] tracking-wider font-extrabold">
+                            <th className="py-3.5 px-4 font-extrabold">Kode ID</th>
+                            <th className="py-3.5 px-4 font-extrabold">Nama Pelanggan / Toko</th>
+                            <th className="py-3.5 px-4 font-extrabold">Tipe Tier</th>
+                            <th className="py-3.5 px-4 font-extrabold">Channel Utama</th>
+                            <th className="py-3.5 px-4 font-extrabold">Kontak WA</th>
+                            <th className="py-3.5 px-4 font-extrabold text-right">Diskon Khusus</th>
+                            <th className="py-3.5 px-4 font-extrabold text-right">Limit Piutang</th>
+                            <th className="py-3.5 px-4 font-extrabold text-center">Aksi ERP</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                          {filteredCustomers.map((c) => {
+                            const cleanPhone = (c.phoneNumber || "").replace(/[^0-9]/g, "");
+                            const formattedWa = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
+                            const custCode = c.code || `CUST-${c.id.slice(0, 4).toUpperCase()}`;
 
-                    return (
-                      <div key={c.id} className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between space-y-4 hover:shadow-md hover:border-slate-300 transition-all group">
-                        <div className="space-y-3">
-                          {/* Card Header: Code, Badge Tier, Action Menu */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-mono font-extrabold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
+                            return (
+                              <tr key={c.id} className="hover:bg-slate-50/80 transition-colors group">
+                                <td className="py-3.5 px-4 font-mono font-extrabold text-slate-500 whitespace-nowrap">
+                                  {custCode}
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="font-extrabold text-slate-800 group-hover:text-indigo-600 transition-colors">
+                                    {c.name}
+                                  </div>
+                                  {c.address && <div className="text-[10px] text-slate-400 font-medium truncate max-w-xs">{c.address}</div>}
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                                    c.customerType === "reseller" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                    c.customerType === "grosir" ? "bg-rose-50 text-rose-700 border-rose-200" :
+                                    c.customerType === "mitra" ? "bg-purple-50 text-purple-700 border-purple-200" :
+                                    "bg-indigo-50 text-indigo-700 border-indigo-200"
+                                  }`}>
+                                    {c.customerType || "Reguler"}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/60 uppercase">
+                                    {c.channel ? c.channel.replace("_", "-") : "WALK-IN"}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  {formattedWa ? (
+                                    <a
+                                      href={`https://wa.me/${formattedWa}?text=Halo%20${encodeURIComponent(c.name)},%20salam%20dari%20AnchurPOS!`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-emerald-700 font-extrabold hover:underline flex items-center gap-1"
+                                    >
+                                      <MessageCircle size={14} className="text-emerald-600 shrink-0" />
+                                      {c.phoneNumber}
+                                    </a>
+                                  ) : (
+                                    <span className="text-slate-400 font-medium">-</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                  {c.discountPerUnit > 0 ? (
+                                    <span className="font-extrabold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                                      Rp {fmt(c.discountPerUnit)}/pk
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-medium">-</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                  {c.creditLimit && c.creditLimit > 0 ? (
+                                    <span className="font-extrabold text-indigo-600">Rp {fmt(c.creditLimit)}</span>
+                                  ) : (
+                                    <span className="text-slate-400 font-medium">Cash</span>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewCustomerItem(c)}
+                                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                                      title="Detail Rekam ERP"
+                                    >
+                                      <Building2 size={14} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditCustomerItem(c);
+                                        setCustomerForm({
+                                          code: c.code || "",
+                                          name: c.name,
+                                          customerType: c.customerType || "reguler",
+                                          channel: c.channel || "walk_in",
+                                          phoneNumber: c.phoneNumber || "",
+                                          email: c.email || "",
+                                          address: c.address || "",
+                                          notes: c.notes || "",
+                                          discountPerUnit: String(c.discountPerUnit || 0),
+                                          creditLimit: String(c.creditLimit || 0)
+                                        });
+                                        setShowAddForm(false);
+                                      }}
+                                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                                      title="Edit"
+                                    >
+                                      <Pencil size={14} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setCustomerDeleteTarget(c)}
+                                      className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors"
+                                      title="Hapus"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+
+                          {filteredCustomers.length === 0 && (
+                            <tr>
+                              <td colSpan={8} className="py-12 text-center text-slate-400 font-bold">
+                                Tidak ada data pelanggan ditemukan.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  /* Professional Clean Grid View (Non-Crowded Kanban) */
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {filteredCustomers.map(c => {
+                      const isVip = (c.customerType || "reguler") !== "reguler";
+                      const cleanPhone = (c.phoneNumber || "").replace(/[^0-9]/g, "");
+                      const formattedWa = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
+                      const custCode = c.code || `CUST-${c.id.slice(0, 4).toUpperCase()}`;
+
+                      return (
+                        <div key={c.id} className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between space-y-4 hover:shadow-md hover:border-slate-300 transition-all group">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono font-extrabold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-md border border-slate-200/60">
                                 {custCode}
                               </span>
                               <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
@@ -1156,119 +1320,115 @@ function MasterDataContent() {
                               </span>
                             </div>
 
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => setViewCustomerItem(c)}
-                                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/60 flex items-center justify-center text-slate-600 transition-colors"
-                                title="Lihat Rekam Master Data ERP"
-                              >
-                                <Building2 size={14} />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditCustomerItem(c);
-                                  setCustomerForm({
-                                    code: c.code || "",
-                                    name: c.name,
-                                    customerType: c.customerType || "reguler",
-                                    channel: c.channel || "walk_in",
-                                    phoneNumber: c.phoneNumber || "",
-                                    email: c.email || "",
-                                    address: c.address || "",
-                                    notes: c.notes || "",
-                                    discountPerUnit: String(c.discountPerUnit || 0),
-                                    creditLimit: String(c.creditLimit || 0)
-                                  });
-                                  setShowAddForm(false);
-                                }}
-                                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/60 flex items-center justify-center text-slate-600 transition-colors"
-                                title="Edit Master Data"
-                              >
-                                <Pencil size={14} />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => setCustomerDeleteTarget(c)}
-                                className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200/60 flex items-center justify-center text-rose-600 transition-colors"
-                                title="Hapus Data"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Customer Identity Row */}
-                          <div className="flex items-start gap-3 pt-1">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-base shrink-0 shadow-sm border ${
-                              isVip ? "bg-gradient-to-br from-amber-100 to-amber-50 text-amber-800 border-amber-200" : "bg-gradient-to-br from-indigo-100 to-indigo-50 text-indigo-800 border-indigo-200"
-                            }`}>
-                              {c.name[0]?.toUpperCase()}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <h3 className="text-base font-black text-slate-800 leading-snug group-hover:text-indigo-600 transition-colors truncate">
-                                {c.name}
-                              </h3>
-                              <p className="text-xs font-bold text-slate-400 mt-0.5 flex items-center gap-1 truncate">
-                                <Phone size={12} className="text-slate-400 shrink-0" />
-                                {c.phoneNumber || "Nomor Telepon Tidak Ada"}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Additional Metadata Info */}
-                          <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs">
-                            {c.address && (
-                              <div className="flex items-start gap-1.5 text-slate-500 font-semibold line-clamp-1">
-                                <MapPin size={13} className="text-slate-400 shrink-0 mt-0.5" />
-                                <span className="truncate">{c.address}</span>
+                            <div className="flex items-center gap-3 pt-1">
+                              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 border ${
+                                isVip ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-indigo-50 text-indigo-800 border-indigo-200"
+                              }`}>
+                                {c.name[0]?.toUpperCase()}
                               </div>
+                              <div className="min-w-0 flex-1">
+                                <h3 className="text-base font-black text-slate-800 group-hover:text-indigo-600 transition-colors truncate">
+                                  {c.name}
+                                </h3>
+                                <p className="text-xs font-semibold text-slate-400 flex items-center gap-1 truncate">
+                                  <Phone size={12} className="text-slate-400 shrink-0" />
+                                  {c.phoneNumber || "-"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs">
+                              {c.address && (
+                                <div className="flex items-start gap-1.5 text-slate-500 font-semibold line-clamp-1">
+                                  <MapPin size={13} className="text-slate-400 shrink-0 mt-0.5" />
+                                  <span className="truncate">{c.address}</span>
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-between gap-2 pt-1">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                  Channel: <strong className="text-slate-700 font-black">{c.channel ? c.channel.replace("_", "-").toUpperCase() : "WALK-IN"}</strong>
+                                </span>
+
+                                {c.discountPerUnit > 0 && (
+                                  <span className="font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-lg text-[11px]">
+                                    Diskon Rp {fmt(c.discountPerUnit)}/pk
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setViewCustomerItem(c)}
+                              className="flex-1 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 transition-colors"
+                            >
+                              <Building2 size={13} /> Detail
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditCustomerItem(c);
+                                setCustomerForm({
+                                  code: c.code || "",
+                                  name: c.name,
+                                  customerType: c.customerType || "reguler",
+                                  channel: c.channel || "walk_in",
+                                  phoneNumber: c.phoneNumber || "",
+                                  email: c.email || "",
+                                  address: c.address || "",
+                                  notes: c.notes || "",
+                                  discountPerUnit: String(c.discountPerUnit || 0),
+                                  creditLimit: String(c.creditLimit || 0)
+                                });
+                                setShowAddForm(false);
+                              }}
+                              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors shrink-0"
+                              title="Edit"
+                            >
+                              <Pencil size={14} />
+                            </button>
+
+                            {formattedWa && (
+                              <a
+                                href={`https://wa.me/${formattedWa}?text=Halo%20${encodeURIComponent(c.name)},%20salam%20dari%20AnchurPOS!`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 flex items-center justify-center border border-emerald-200 transition-colors shrink-0"
+                                title="WhatsApp"
+                              >
+                                <MessageCircle size={14} />
+                              </a>
                             )}
 
-                            <div className="flex items-center justify-between gap-2 pt-1">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                Channel: <strong className="text-slate-700 font-black">{c.channel ? c.channel.replace("_", "-").toUpperCase() : "WALK-IN"}</strong>
-                              </span>
-
-                              {c.discountPerUnit > 0 && (
-                                <span className="font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-lg text-[11px] shadow-2xs">
-                                  Diskon Rp {fmt(c.discountPerUnit)}/pack
-                                </span>
-                              )}
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setCustomerDeleteTarget(c)}
+                              className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center border border-rose-200 transition-colors shrink-0"
+                              title="Hapus"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
+
+                          {customerDeleteTarget?.id === c.id && (
+                            <ConfirmDelete label={c.name} onConfirm={handleDeleteCustomer} onCancel={() => setCustomerDeleteTarget(null)} loading={deletingCustomer} />
+                          )}
                         </div>
+                      );
+                    })}
 
-                        {/* Direct WhatsApp Action Button */}
-                        {formattedWa && (
-                          <a
-                            href={`https://wa.me/${formattedWa}?text=Halo%20${encodeURIComponent(c.name)},%20salam%20dari%20AnchurPOS!`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full py-2.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-extrabold text-xs flex items-center justify-center gap-2 border border-emerald-200 transition-all active:scale-98"
-                          >
-                            <MessageCircle size={16} className="text-emerald-600" /> Hubungi via WhatsApp
-                          </a>
-                        )}
-
-                        {customerDeleteTarget?.id === c.id && (
-                          <ConfirmDelete label={c.name} onConfirm={handleDeleteCustomer} onCancel={() => setCustomerDeleteTarget(null)} loading={deletingCustomer} />
-                        )}
+                    {filteredCustomers.length === 0 && (
+                      <div className="col-span-full bg-white rounded-3xl p-10 text-center border border-slate-200/80 space-y-2">
+                        <Users size={36} className="text-slate-300 mx-auto" />
+                        <p className="text-sm font-bold text-slate-700">Tidak ada pelanggan ditemukan.</p>
+                        <p className="text-xs text-slate-400">Klik "+ Tambah Data" untuk mendaftarkan pelanggan baru.</p>
                       </div>
-                    );
-                  })}
-
-                  {filteredCustomers.length === 0 && (
-                    <div className="col-span-full bg-white rounded-3xl p-10 text-center border border-slate-200/80 space-y-2 shadow-sm">
-                      <Users size={36} className="text-slate-300 mx-auto" />
-                      <p className="text-sm font-bold text-slate-700">Tidak ada data pelanggan ditemukan.</p>
-                      <p className="text-xs text-slate-400">Klik "+ Tambah Data" untuk meregistrasikan pelanggan baru.</p>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Modal Profile Record View ERP (SAP & Odoo Standard) */}
                 {viewCustomerItem && (
