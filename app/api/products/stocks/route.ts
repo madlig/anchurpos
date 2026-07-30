@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     const products = productsSnap.docs.map((doc) => ({ id: doc.id, name: doc.data().name }));
-    const variants = variantsSnap.docs.map((doc) => ({ id: doc.id, name: doc.data().name, minStock: doc.data().minStock ?? 10 }));
+    const variants = variantsSnap.docs.map((doc) => ({ id: doc.id, productId: doc.data().productId ?? "", name: doc.data().name, minStock: doc.data().minStock ?? 10 }));
 
     const stocksMap = new Map<string, number>();
     stocksSnap.docs.forEach((doc) => {
@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
     const results: any[] = [];
     products.forEach((prod) => {
       variants.forEach((v) => {
+        if (v.productId && v.productId !== prod.id) return; // Only pair with parent product!
         const stockId = `${prod.id}_${v.id}`;
         const currentStock = stocksMap.get(stockId) ?? 0;
 

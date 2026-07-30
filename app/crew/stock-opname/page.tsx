@@ -52,7 +52,7 @@ export default function CrewStockOpnamePage() {
     try {
       const [resIng, resVar] = await Promise.all([
         fetchWithAuth("/api/ingredients"),
-        fetchWithAuth("/api/variants")
+        fetchWithAuth("/api/products/stocks")
       ]);
 
       let allItems: OpnameItemUI[] = [];
