@@ -418,6 +418,8 @@ function MasterDataContent() {
 
   // Customer Edit/Delete States
   const [customerForm, setCustomerForm] = useState({ name: "", customerType: "reguler", channel: "walk_in", phoneNumber: "", address: "", notes: "", discountPerUnit: "0" });
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<string>("semua");
+  const [editCustomerItem, setEditCustomerItem] = useState<CustomerItem | null>(null);
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [customerDeleteTarget, setCustomerDeleteTarget] = useState<CustomerItem | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState(false);
@@ -459,6 +461,7 @@ function MasterDataContent() {
     setEditItem(null);
     setEditVariantItem(null);
     setAddVariantForProductId(null);
+    setEditCustomerItem(null);
     setDeleteTarget(null);
     setSearch("");
     setCustomerDeleteTarget(null);
@@ -483,15 +486,19 @@ function MasterDataContent() {
     if (!customerForm.name.trim()) return;
     setSavingCustomer(true);
     try {
-      const res = await fetchWithAuth("/api/customers", {
-        method: "POST",
+      const isEdit = !!editCustomerItem;
+      const url = isEdit ? `/api/customers/${editCustomerItem.id}` : "/api/customers";
+      const method = isEdit ? "PATCH" : "POST";
+
+      const res = await fetchWithAuth(url, {
+        method,
         body: JSON.stringify({
-          name: customerForm.name,
+          name: customerForm.name.trim(),
           customerType: customerForm.customerType,
           channel: customerForm.channel,
           phoneNumber: customerForm.phoneNumber || null,
           address: customerForm.address || null,
-          notes: customerForm.notes,
+          notes: customerForm.notes || "",
           discountPerUnit: parseFloat(customerForm.discountPerUnit) || 0
         })
       });
@@ -562,7 +569,13 @@ function MasterDataContent() {
     });
   }, [ingredients, q, subCategoryFilter]);
 
-  const filteredCustomers = customers.filter(c => !q || c.name.toLowerCase().includes(q) || (c.customerType ?? "").toLowerCase().includes(q));
+  const filteredCustomers = useMemo(() => {
+    return customers.filter(c => {
+      const matchSearch = !q || c.name.toLowerCase().includes(q) || (c.phoneNumber ?? "").includes(q) || (c.customerType ?? "").toLowerCase().includes(q);
+      const matchType = customerTypeFilter === "semua" || (c.customerType || "reguler") === customerTypeFilter;
+      return matchSearch && matchType;
+    });
+  }, [customers, q, customerTypeFilter]);
   const filteredSuppliers = suppliers.filter(s => !q || s.name.toLowerCase().includes(q) || (s.category ?? "").toLowerCase().includes(q));
 
   const onSuccess = () => { 
@@ -888,57 +901,280 @@ function MasterDataContent() {
               </div>
             )}
 
-            {/* ── TAB: PELANGGAN ── */}
+            {/* ── TAB: PELANGGAN (CRM CUSTOMER MASTER DATA) ── */}
             {tab === "pelanggan" && (
               <div className="space-y-4">
-                {showAddForm && (
-                  <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-3 mb-4">
-                    <h3 className="text-sm font-extrabold text-slate-800">Tambah Data Pelanggan Baru</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                      <Input id="cust-name" name="cust-name" placeholder="Nama Pelanggan *" value={customerForm.name} onChange={e => setCustomerForm(p => ({ ...p, name: e.target.value }))} className="h-10" />
-                      <Input id="cust-phone" name="cust-phone" placeholder="Nomor WhatsApp (628...)" value={customerForm.phoneNumber} onChange={e => setCustomerForm(p => ({ ...p, phoneNumber: e.target.value }))} className="h-10" />
+                {/* Executive CRM Banner Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black shrink-0">
+                      <Users size={20} />
                     </div>
-                    <div className="flex gap-2 pt-2">
-                      <button type="button" onClick={handleSaveCustomer} disabled={savingCustomer} className="px-5 h-10 bg-slate-900 text-white rounded-xl font-extrabold text-xs">Simpan Pelanggan</button>
-                      <button type="button" onClick={() => setShowAddForm(false)} className="px-4 h-10 bg-slate-100 font-bold text-xs rounded-xl">Batal</button>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Pelanggan</span>
+                      <p className="text-xl font-black text-slate-800 tabular-nums">{customers.length} Pelanggan</p>
                     </div>
                   </div>
-                )}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {filteredCustomers.map(c => (
-                    <div key={c.id} className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm relative overflow-hidden space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center font-extrabold text-sm">
-                          {c.name[0]}
+                  <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center font-black shrink-0">
+                      <Tag size={20} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Mitra VIP / Reseller</span>
+                      <p className="text-xl font-black text-slate-800 tabular-nums">
+                        {customers.filter(c => (c.customerType || "reguler") !== "reguler").length} Mitra
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center font-black shrink-0">
+                      <Sparkles size={20} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Diskon Khusus Aktif</span>
+                      <p className="text-xl font-black text-slate-800 tabular-nums">
+                        {customers.filter(c => c.discountPerUnit > 0).length} Tiers
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Gojek / Grab Style Horizontal Scroll Filter Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
+                  {[
+                    { key: "semua", label: "Semua Pelanggan" },
+                    { key: "reguler", label: "Reguler" },
+                    { key: "reseller", label: "Reseller VIP" },
+                    { key: "grosir", label: "Grosir" },
+                    { key: "mitra", label: "Mitra Outlet" },
+                  ].map(f => (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => setCustomerTypeFilter(f.key)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all border shrink-0 ${
+                        customerTypeFilter === f.key
+                          ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Add / Edit Form Drawer Card */}
+                {(showAddForm || editCustomerItem) && (
+                  <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4 animate-in fade-in zoom-in-95">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                        <Users size={18} className="text-indigo-600" />
+                        {editCustomerItem ? `Edit Pelanggan: ${editCustomerItem.name}` : "Tambah Pelanggan Baru (CRM Master Data)"}
+                      </h3>
+                      <button type="button" onClick={() => { setShowAddForm(false); setEditCustomerItem(null); }} className="text-slate-400 hover:text-slate-600">
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-3 text-xs">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="md:col-span-2">
+                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Pelanggan / Toko *</label>
+                          <Input
+                            placeholder="Contoh: Ibu Rina Reseller / Kopi Toko Djawa"
+                            value={customerForm.name}
+                            onChange={(e) => setCustomerForm(p => ({ ...p, name: e.target.value }))}
+                            className="h-10 text-xs font-semibold"
+                          />
                         </div>
 
-                        <div className="flex items-center gap-1">
-                          <button type="button" onClick={() => setCustomerDeleteTarget(c)} className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600">
-                            <Trash2 size={14} />
-                          </button>
+                        <div>
+                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Tipe Pelanggan</label>
+                          <select
+                            value={customerForm.customerType}
+                            onChange={(e) => setCustomerForm(p => ({ ...p, customerType: e.target.value }))}
+                            className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-xs"
+                          >
+                            <option value="reguler">Reguler</option>
+                            <option value="reseller">Reseller VIP</option>
+                            <option value="grosir">Grosir</option>
+                            <option value="mitra">Mitra Outlet</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">No. WhatsApp / HP</label>
+                          <Input
+                            placeholder="Contoh: 08123456789 (Otomatis +62)"
+                            value={customerForm.phoneNumber}
+                            onChange={(e) => setCustomerForm(p => ({ ...p, phoneNumber: e.target.value }))}
+                            className="h-10 text-xs font-semibold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Channel Distribusi Utama</label>
+                          <select
+                            value={customerForm.channel}
+                            onChange={(e) => setCustomerForm(p => ({ ...p, channel: e.target.value }))}
+                            className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-xs"
+                          >
+                            <option value="walk_in">Walk-in Outlet</option>
+                            <option value="whatsapp">WhatsApp Order</option>
+                            <option value="tiktok">TikTok Shop</option>
+                            <option value="shopee">Shopee</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Potongan Diskon Khusus (Rp/pack)</label>
+                          <Input
+                            type="number"
+                            placeholder="Contoh: 1000 (Potongan Rp 1.000/pack)"
+                            value={customerForm.discountPerUnit}
+                            onChange={(e) => setCustomerForm(p => ({ ...p, discountPerUnit: e.target.value }))}
+                            className="h-10 text-xs font-semibold"
+                          />
                         </div>
                       </div>
 
                       <div>
-                        <h3 className="text-base font-extrabold text-slate-800">{c.name}</h3>
-                        <p className="text-xs font-semibold text-slate-400 mt-0.5">{c.phoneNumber || "No Telp -"}</p>
+                        <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Alamat Pengiriman Lengkap</label>
+                        <Input
+                          placeholder="Alamat domisili / tempat pengiriman pesanan..."
+                          value={customerForm.address}
+                          onChange={(e) => setCustomerForm(p => ({ ...p, address: e.target.value }))}
+                          className="h-10 text-xs font-semibold"
+                        />
                       </div>
 
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                        <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 uppercase">
-                          {c.customerType || "Reguler"}
-                        </span>
-                        {c.discountPerUnit > 0 && (
-                          <span className="font-bold text-emerald-600">Diskon: Rp {fmt(c.discountPerUnit)}/pack</span>
+                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={handleSaveCustomer}
+                          disabled={savingCustomer}
+                          className="px-5 h-10 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                          {savingCustomer ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                          {editCustomerItem ? "Simpan Perubahan" : "Simpan Pelanggan"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowAddForm(false); setEditCustomerItem(null); }}
+                          className="px-5 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600 text-xs"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Customer Cards Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {filteredCustomers.map(c => {
+                    const isVip = (c.customerType || "reguler") !== "reguler";
+                    const cleanPhone = (c.phoneNumber || "").replace(/[^0-9]/g, "");
+                    const formattedWa = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
+
+                    return (
+                      <div key={c.id} className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm relative overflow-hidden space-y-3 hover:border-slate-300 transition-all">
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 border ${
+                              isVip ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-indigo-50 border-indigo-100 text-indigo-700"
+                            }`}>
+                              {c.name[0]?.toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <h3 className="text-sm font-extrabold text-slate-800 truncate">{c.name}</h3>
+                              <p className="text-xs font-semibold text-slate-400 truncate">{c.phoneNumber || "No Telp -"}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditCustomerItem(c);
+                                setCustomerForm({
+                                  name: c.name,
+                                  customerType: c.customerType || "reguler",
+                                  channel: c.channel || "walk_in",
+                                  phoneNumber: c.phoneNumber || "",
+                                  address: c.address || "",
+                                  notes: c.notes || "",
+                                  discountPerUnit: String(c.discountPerUnit || 0)
+                                });
+                                setShowAddForm(false);
+                              }}
+                              className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                              title="Edit Pelanggan"
+                            >
+                              <Pencil size={14} />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setCustomerDeleteTarget(c)}
+                              className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
+                              title="Hapus Pelanggan"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Customer Channel & Discount Details */}
+                        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-1.5 text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`font-bold px-2.5 py-0.5 rounded-lg border uppercase text-[10px] ${
+                              isVip ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-indigo-50 text-indigo-600 border-indigo-100"
+                            }`}>
+                              {c.customerType || "Reguler"}
+                            </span>
+                            <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">
+                              {c.channel ? c.channel.replace("_", "-").toUpperCase() : "WALK-IN"}
+                            </span>
+                          </div>
+
+                          {c.discountPerUnit > 0 && (
+                            <span className="font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg text-[11px]">
+                              Diskon Rp {fmt(c.discountPerUnit)}/pack
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Direct WhatsApp Quick Chat Link */}
+                        {formattedWa && (
+                          <a
+                            href={`https://wa.me/${formattedWa}?text=Halo%20${encodeURIComponent(c.name)},%20ada%20yang%20bisa%20kami%20bantu%20dari%20AnchurPOS%3F`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-extrabold text-xs flex items-center justify-center gap-1.5 border border-emerald-200/80 transition-colors"
+                          >
+                            <MessageCircle size={15} /> Hubungi WhatsApp Pelanggan
+                          </a>
+                        )}
+
+                        {customerDeleteTarget?.id === c.id && (
+                          <ConfirmDelete label={c.name} onConfirm={handleDeleteCustomer} onCancel={() => setCustomerDeleteTarget(null)} loading={deletingCustomer} />
                         )}
                       </div>
+                    );
+                  })}
 
-                      {customerDeleteTarget?.id === c.id && (
-                        <ConfirmDelete label={c.name} onConfirm={handleDeleteCustomer} onCancel={() => setCustomerDeleteTarget(null)} loading={deletingCustomer} />
-                      )}
+                  {filteredCustomers.length === 0 && (
+                    <div className="col-span-full bg-white rounded-3xl p-10 text-center border border-slate-200/80 space-y-2">
+                      <Users size={32} className="text-slate-400 mx-auto" />
+                      <p className="text-sm font-bold text-slate-700">Tidak ada pelanggan ditemukan.</p>
+                      <p className="text-xs text-slate-400">Klik "+ Tambah Data" untuk mendaftarkan pelanggan baru.</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             )}
