@@ -87,11 +87,19 @@ export default function CrewPrePackingPage() {
   }, [ingredients, selectedTargetId]);
 
   const targetOptions: SearchableOption[] = useMemo(() => {
-    return ingredients.map(i => ({
-      id: i.id,
-      name: i.name,
-      subtext: `Kategori: ${i.category?.replace('_', ' ') || 'Item'} • Stok: ${formatNumber(i.currentStock)} ${i.baseUnit}`
-    }));
+    return [...ingredients]
+      .sort((a, b) => {
+        const priorityOrder: Record<string, number> = { add_on: 1, packaging: 2, bahan_baku: 3, operasional: 4 };
+        const pA = priorityOrder[a.category || "bahan_baku"] || 5;
+        const pB = priorityOrder[b.category || "bahan_baku"] || 5;
+        if (pA !== pB) return pA - pB;
+        return a.name.localeCompare(b.name);
+      })
+      .map(i => ({
+        id: i.id,
+        name: i.name,
+        subtext: `[${(i.category || 'item').toUpperCase().replace('_', ' ')}] Stok: ${formatNumber(i.currentStock)} ${i.baseUnit}`
+      }));
   }, [ingredients]);
 
   const parsedYield = parseFloat(yieldQty) || 0;
