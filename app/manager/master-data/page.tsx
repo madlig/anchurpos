@@ -744,9 +744,44 @@ function MasterDataContent() {
         ) : (
           <div>
             
-            {/* ── TAB: PRODUK & VARIAN RASA (NESTED PARENT-CHILD VIEW) ── */}
+            {/* ── TAB: PRODUK & VARIAN RASA ── */}
             {tab === "produk" && (
               <div className="space-y-4">
+                {/* Executive Product Banner Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black shrink-0">
+                      <Package size={20} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Produk Utama</span>
+                      <p className="text-xl font-black text-slate-800 tabular-nums">{products.length} Produk</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center font-black shrink-0">
+                      <Layers size={20} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Varian Rasa</span>
+                      <p className="text-xl font-black text-slate-800 tabular-nums">{variants.length} Varian</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center font-black shrink-0">
+                      <Tag size={20} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Tiering Harga Grosir</span>
+                      <p className="text-xl font-black text-slate-800 tabular-nums">
+                        {products.reduce((acc, p) => acc + (p.priceTiers?.length || 0), 0)} Tiers
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {(showAddForm || editItem) && (
                   <ProductForm 
                     initial={editItem || undefined} 
@@ -767,117 +802,221 @@ function MasterDataContent() {
                   />
                 )}
                 
-                <div className="space-y-4">
-                  {filteredProducts.map(p => {
-                    const productVariants = variants.filter(v => v.productId === p.id || !v.productId); // attach linked or unassigned
+                {/* Data Table View */}
+                {viewMode === "table" ? (
+                  <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden animate-in fade-in">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-900 text-white uppercase text-[10px] tracking-wider font-extrabold">
+                            <th className="py-3.5 px-4 font-extrabold">Kode ID</th>
+                            <th className="py-3.5 px-4 font-extrabold">Nama Produk</th>
+                            <th className="py-3.5 px-4 font-extrabold">Kategori</th>
+                            <th className="py-3.5 px-4 font-extrabold text-right">Output Batch</th>
+                            <th className="py-3.5 px-4 font-extrabold text-right">Jatah Saos</th>
+                            <th className="py-3.5 px-4 font-extrabold">Varian Rasa Terikat</th>
+                            <th className="py-3.5 px-4 font-extrabold text-center">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                          {filteredProducts.map((p) => {
+                            const productVariants = variants.filter(v => v.productId === p.id || !v.productId);
 
-                    return (
-                      <div key={p.id} className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm relative space-y-4">
-                        
-                        {/* Parent Product Header */}
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-100 uppercase tracking-wider">
-                                {p.code}
-                              </span>
-                              <span className="text-[10px] font-black text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-lg uppercase tracking-wider">
-                                {PRODUCT_CATEGORIES.find(c => c.id === (p.category || "frozen"))?.label || "Frozen Food"}
-                              </span>
-                            </div>
-
-                            <h2 className="text-lg font-black text-slate-800 tracking-tight mt-1.5">{p.name}</h2>
-                            {p.description && <p className="text-xs text-slate-500 font-medium mt-0.5">{p.description}</p>}
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button 
-                              type="button"
-                              onClick={() => { setEditItem(p); setShowAddForm(false); setEditVariantItem(null); }} 
-                              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs flex items-center gap-1 transition-colors"
-                            >
-                              <Pencil size={13} /> Edit Produk
-                            </button>
-                            <button 
-                              type="button"
-                              onClick={() => setDeleteTarget({ id: p.id, name: p.name, type: "product" })} 
-                              className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600 transition-colors"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Product Specs Bar */}
-                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-600">
-                          <span>Output: <strong className="text-slate-800">{p.packPerBatch} Pack/Batch</strong></span>
-                          <span>Jatah Saos: <strong className="text-slate-800">{p.freeSauceAllowance || 0} Pouch</strong></span>
-                          <span className="text-indigo-600 font-extrabold">{p.priceTiers.length} Tiering Harga Grosir</span>
-                        </div>
-
-                        {/* Child Variants List Attached to Product */}
-                        <div className="pt-2 border-t border-slate-100 space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                              <Layers size={14} className="text-amber-500" /> Varian Rasa / Option ({productVariants.length})
-                            </span>
-                            
-                            <button
-                              type="button"
-                              onClick={() => { setAddVariantForProductId(p.id); setEditVariantItem(null); setShowAddForm(false); }}
-                              className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-                            >
-                              <Plus size={14} /> Tambah Varian Rasa
-                            </button>
-                          </div>
-
-                          {productVariants.length === 0 ? (
-                            <div className="p-4 rounded-2xl bg-slate-50 text-center border border-dashed border-slate-200">
-                              <p className="text-xs font-bold text-slate-400">Belum ada varian rasa yang terikat pada produk ini.</p>
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-                              {productVariants.map(v => (
-                                <div key={v.id} className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between gap-2 hover:border-slate-300 transition-colors">
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center font-black text-xs shrink-0">
-                                      {v.name[0]}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="font-extrabold text-xs text-slate-800 truncate">{v.name}</p>
-                                      <p className="text-[10px] font-semibold text-slate-400">Urutan: #{v.sortOrder}</p>
-                                    </div>
+                            return (
+                              <tr key={p.id} className="hover:bg-slate-50/80 transition-colors group">
+                                <td className="py-3.5 px-4 font-mono font-extrabold text-slate-500 whitespace-nowrap">
+                                  {p.code}
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="font-extrabold text-slate-800 group-hover:text-indigo-600 transition-colors">
+                                    {p.name}
                                   </div>
-
-                                  <div className="flex items-center gap-1 shrink-0">
+                                  {p.description && <div className="text-[10px] text-slate-400 font-medium truncate max-w-xs">{p.description}</div>}
+                                </td>
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  <span className="text-[10px] font-black text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 uppercase tracking-wider">
+                                    {PRODUCT_CATEGORIES.find(c => c.id === (p.category || "frozen"))?.label || "Frozen Food"}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 text-right whitespace-nowrap font-bold text-slate-800">
+                                  {p.packPerBatch} Pack
+                                </td>
+                                <td className="py-3.5 px-4 text-right whitespace-nowrap font-bold text-slate-800">
+                                  {p.freeSauceAllowance || 0} Pouch
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="flex flex-wrap items-center gap-1">
+                                    {productVariants.map(v => (
+                                      <span key={v.id} className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 flex items-center gap-1">
+                                        {v.name}
+                                        <button
+                                          type="button"
+                                          onClick={() => { setEditVariantItem(v); setAddVariantForProductId(null); setShowAddForm(false); }}
+                                          className="text-amber-600 hover:text-amber-900"
+                                          title="Edit Varian"
+                                        >
+                                          <Pencil size={10} />
+                                        </button>
+                                      </span>
+                                    ))}
                                     <button
                                       type="button"
-                                      onClick={() => { setEditVariantItem(v); setAddVariantForProductId(null); setShowAddForm(false); }}
-                                      className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                                      onClick={() => { setAddVariantForProductId(p.id); setEditVariantItem(null); setShowAddForm(false); }}
+                                      className="text-[10px] font-extrabold text-indigo-600 hover:underline flex items-center gap-0.5 ml-1"
                                     >
-                                      <Pencil size={12} />
+                                      <Plus size={12} /> Varian
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => { setEditItem(p); setShowAddForm(false); setEditVariantItem(null); }}
+                                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                                      title="Edit Produk"
+                                    >
+                                      <Pencil size={14} />
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => setDeleteTarget({ id: v.id, name: v.name, type: "variant" })}
-                                      className="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
+                                      onClick={() => setDeleteTarget({ id: p.id, name: p.name, type: "product" })}
+                                      className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors"
+                                      title="Hapus Produk"
                                     >
-                                      <Trash2 size={12} />
+                                      <Trash2 size={14} />
                                     </button>
                                   </div>
-                                </div>
-                              ))}
+                                </td>
+                              </tr>
+                            );
+                          })}
+
+                          {filteredProducts.length === 0 && (
+                            <tr>
+                              <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
+                                Tidak ada produk ditemukan.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  /* Clean Grid View for Products */
+                  <div className="space-y-4">
+                    {filteredProducts.map(p => {
+                      const productVariants = variants.filter(v => v.productId === p.id || !v.productId);
+
+                      return (
+                        <div key={p.id} className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm relative space-y-4">
+                          
+                          {/* Parent Product Header */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-100 uppercase tracking-wider">
+                                  {p.code}
+                                </span>
+                                <span className="text-[10px] font-black text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-lg uppercase tracking-wider">
+                                  {PRODUCT_CATEGORIES.find(c => c.id === (p.category || "frozen"))?.label || "Frozen Food"}
+                                </span>
+                              </div>
+
+                              <h2 className="text-lg font-black text-slate-800 tracking-tight mt-1.5">{p.name}</h2>
+                              {p.description && <p className="text-xs text-slate-500 font-medium mt-0.5">{p.description}</p>}
                             </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button 
+                                type="button"
+                                onClick={() => { setEditItem(p); setShowAddForm(false); setEditVariantItem(null); }} 
+                                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs flex items-center gap-1 transition-colors"
+                              >
+                                <Pencil size={13} /> Edit Produk
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => setDeleteTarget({ id: p.id, name: p.name, type: "product" })} 
+                                className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600 transition-colors"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Product Specs Bar */}
+                          <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-600">
+                            <span>Output: <strong className="text-slate-800">{p.packPerBatch} Pack/Batch</strong></span>
+                            <span>Jatah Saos: <strong className="text-slate-800">{p.freeSauceAllowance || 0} Pouch</strong></span>
+                            <span className="text-indigo-600 font-extrabold">{p.priceTiers.length} Tiering Harga Grosir</span>
+                          </div>
+
+                          {/* Child Variants List Attached to Product */}
+                          <div className="pt-2 border-t border-slate-100 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                <Layers size={14} className="text-amber-500" /> Varian Rasa / Option ({productVariants.length})
+                              </span>
+                              
+                              <button
+                                type="button"
+                                onClick={() => { setAddVariantForProductId(p.id); setEditVariantItem(null); setShowAddForm(false); }}
+                                className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                              >
+                                <Plus size={14} /> Tambah Varian Rasa
+                              </button>
+                            </div>
+
+                            {productVariants.length === 0 ? (
+                              <div className="p-4 rounded-2xl bg-slate-50 text-center border border-dashed border-slate-200">
+                                <p className="text-xs font-bold text-slate-400">Belum ada varian rasa yang terikat pada produk ini.</p>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                                {productVariants.map(v => (
+                                  <div key={v.id} className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between gap-2 hover:border-slate-300 transition-colors">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center font-black text-xs shrink-0">
+                                        {v.name[0]}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="font-extrabold text-xs text-slate-800 truncate">{v.name}</p>
+                                        <p className="text-[10px] font-semibold text-slate-400">Urutan: #{v.sortOrder}</p>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => { setEditVariantItem(v); setAddVariantForProductId(null); setShowAddForm(false); }}
+                                        className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                                      >
+                                        <Pencil size={12} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setDeleteTarget({ id: v.id, name: v.name, type: "variant" })}
+                                        className="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {deleteTarget?.id === p.id && (
+                            <ConfirmDelete label={p.name} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} loading={deleting} />
                           )}
                         </div>
-
-                        {deleteTarget?.id === p.id && (
-                          <ConfirmDelete label={p.name} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} loading={deleting} />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
