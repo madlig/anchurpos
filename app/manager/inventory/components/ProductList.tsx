@@ -103,7 +103,7 @@ export function ProductList({
                 {isMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)}></div>
-                    <div className="absolute right-0 top-9 w-40 bg-white rounded-xl shadow-lg border border-slate-100 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                    <div className="absolute right-0 top-9 w-44 bg-white rounded-xl shadow-lg border border-slate-100 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
                       <button
                         onClick={() => { setEditingVariantId(v.id); setOpenMenuId(null); setOpnameValue(v.currentStock.toString()); setOpnameNote(""); }}
                         className="w-full text-left px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 border-b border-slate-50 transition-colors"
@@ -112,9 +112,23 @@ export function ProductList({
                       </button>
                       <button
                         onClick={() => { openMutasiModal(v.id, v.name, "Pack", "variant"); setOpenMenuId(null); }}
-                        className="w-full text-left px-4 py-2.5 text-xs font-semibold text-primary hover:bg-slate-50 transition-colors"
+                        className="w-full text-left px-4 py-2.5 text-xs font-semibold text-primary hover:bg-slate-50 border-b border-slate-50 transition-colors"
                       >
                         Lihat Riwayat Mutasi
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setOpenMenuId(null);
+                          if (confirm(`Hapus "${v.name}" dari inventori?`)) {
+                            // Extract variantId if stockId format "productId_variantId"
+                            const targetId = v.id.includes("_") ? v.id.split("_")[1] : v.id;
+                            const res = await fetchWithAuth(`/api/variants/${targetId}`, { method: "DELETE" });
+                            if (res.ok) await loadVariants();
+                          }
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-1.5"
+                      >
+                        Hapus Item
                       </button>
                     </div>
                   </>
