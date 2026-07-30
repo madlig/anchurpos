@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { formatNumber } from "@/lib/formatters";
 
-type Tab = "produk" | "varian" | "bahan" | "pelanggan" | "addons" | "suppliers" | "configs";
+type Tab = "produk" | "varian" | "bahan" | "pelanggan" | "addons" | "suppliers";
 
 function fmt(n: number) {
   return formatNumber(n);
@@ -41,6 +41,7 @@ function ConfirmDelete({ label, onConfirm, onCancel, loading }: {
       </p>
       <div className="flex gap-2 w-full max-w-xs">
         <button
+          type="button"
           onClick={onConfirm}
           disabled={loading}
           className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-sm"
@@ -48,6 +49,7 @@ function ConfirmDelete({ label, onConfirm, onCancel, loading }: {
           {loading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Hapus
         </button>
         <button
+          type="button"
           onClick={onCancel}
           className="flex-1 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-colors"
         >
@@ -120,34 +122,34 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
     <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4 mb-4">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
         <h3 className="text-sm font-extrabold text-slate-800">{isEdit ? "Edit Produk Jualan" : "Tambah Produk Jualan Baru"}</h3>
-        <button onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+        <button type="button" onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
       </div>
 
       <div className="space-y-3 text-xs">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Produk *</label>
-            <Input placeholder="Contoh: Mozzarella Stick" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="h-10 text-xs font-semibold" />
+            <label htmlFor="product-name" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Produk *</label>
+            <Input id="product-name" name="product-name" placeholder="Contoh: Mozzarella Stick" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="h-10 text-xs font-semibold" />
           </div>
           <div>
-            <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Kode Produk *</label>
-            <Input placeholder="Contoh: MOZ-01" value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))} className="h-10 text-xs font-semibold" />
+            <label htmlFor="product-code" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Kode Produk *</label>
+            <Input id="product-code" name="product-code" placeholder="Contoh: MOZ-01" value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))} className="h-10 text-xs font-semibold" />
           </div>
         </div>
 
         <div>
-          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Deskripsi Produk</label>
-          <Input placeholder="Keterangan rincian produk..." value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} className="h-10 text-xs" />
+          <label htmlFor="product-desc" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Deskripsi Produk</label>
+          <Input id="product-desc" name="product-desc" placeholder="Keterangan rincian produk..." value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} className="h-10 text-xs" />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Hasil Output (Pack/Batch)</label>
-            <Input type="number" value={form.packPerBatch} onChange={e => setForm(p => ({ ...p, packPerBatch: e.target.value }))} className="h-10 text-xs font-bold" />
+            <label htmlFor="pack-per-batch" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Hasil Output (Pack/Batch)</label>
+            <Input id="pack-per-batch" name="pack-per-batch" type="number" value={form.packPerBatch} onChange={e => setForm(p => ({ ...p, packPerBatch: e.target.value }))} className="h-10 text-xs font-bold" />
           </div>
           <div>
-            <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Jatah Saos Gratis (Pouch)</label>
-            <Input type="number" value={form.freeSauceAllowance} onChange={e => setForm(p => ({ ...p, freeSauceAllowance: e.target.value }))} className="h-10 text-xs font-bold" />
+            <label htmlFor="free-sauce-allowance" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Jatah Saos Gratis (Pouch)</label>
+            <Input id="free-sauce-allowance" name="free-sauce-allowance" type="number" value={form.freeSauceAllowance} onChange={e => setForm(p => ({ ...p, freeSauceAllowance: e.target.value }))} className="h-10 text-xs font-bold" />
           </div>
         </div>
 
@@ -161,14 +163,14 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
           </div>
 
           {!hasTiering ? (
-            <Input type="number" placeholder="Harga Satuan (Rp)" value={singlePrice} onChange={e => setSinglePrice(e.target.value)} className="h-10 text-xs font-black text-slate-800 bg-white" />
+            <Input id="single-price" name="single-price" type="number" placeholder="Harga Satuan (Rp)" value={singlePrice} onChange={e => setSinglePrice(e.target.value)} className="h-10 text-xs font-black text-slate-800 bg-white" />
           ) : (
             <div className="space-y-2">
               {tiers.map((t, idx) => (
                 <div key={idx} className="flex gap-2 items-center">
-                  <Input placeholder="Min Qty" value={t.minQty} onChange={e => { const n = [...tiers]; n[idx].minQty = e.target.value; setTiers(n); }} className="h-9 text-xs bg-white w-20" />
-                  <Input placeholder="Max Qty" value={t.maxQty} onChange={e => { const n = [...tiers]; n[idx].maxQty = e.target.value; setTiers(n); }} className="h-9 text-xs bg-white w-20" />
-                  <Input placeholder="Harga per Pack (Rp)" value={t.price} onChange={e => { const n = [...tiers]; n[idx].price = e.target.value; setTiers(n); }} className="h-9 text-xs bg-white flex-1 font-bold" />
+                  <Input name={`minQty-${idx}`} placeholder="Min Qty" value={t.minQty} onChange={e => { const n = [...tiers]; n[idx].minQty = e.target.value; setTiers(n); }} className="h-9 text-xs bg-white w-20" />
+                  <Input name={`maxQty-${idx}`} placeholder="Max Qty" value={t.maxQty} onChange={e => { const n = [...tiers]; n[idx].maxQty = e.target.value; setTiers(n); }} className="h-9 text-xs bg-white w-20" />
+                  <Input name={`price-${idx}`} placeholder="Harga per Pack (Rp)" value={t.price} onChange={e => { const n = [...tiers]; n[idx].price = e.target.value; setTiers(n); }} className="h-9 text-xs bg-white flex-1 font-bold" />
                 </div>
               ))}
               <button type="button" onClick={() => setTiers(p => [...p, { minQty: "", maxQty: "", price: "" }])} className="text-xs font-bold text-indigo-600 hover:underline">+ Tambah Tiering</button>
@@ -179,10 +181,10 @@ function ProductForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
         {err && <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 font-bold text-center">{err}</div>}
 
         <div className="flex gap-2 pt-2">
-          <button onClick={handleSave} disabled={saving} className="flex-1 h-11 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm">
+          <button type="button" onClick={handleSave} disabled={saving} className="flex-1 h-11 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Simpan Produk
           </button>
-          <button onClick={onCancel} className="px-5 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600">Batal</button>
+          <button type="button" onClick={onCancel} className="px-5 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600">Batal</button>
         </div>
       </div>
     </div>
@@ -217,30 +219,30 @@ function VariantForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
   }
 
   return (
-    <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4 mb-4">
+    <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4 mb-4 animate-in fade-in zoom-in-95">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <h3 className="text-sm font-extrabold text-slate-800">{isEdit ? "Edit Varian Perisa Rasa" : "Tambah Varian Perisa Baru"}</h3>
-        <button onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+        <h3 className="text-sm font-extrabold text-slate-800">{isEdit ? `Edit Varian: ${initial.name}` : "Tambah Varian Perisa Baru"}</h3>
+        <button type="button" onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
       </div>
 
       <div className="space-y-3 text-xs">
         <div>
-          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Varian Perisa *</label>
-          <Input placeholder="Contoh: Original, Keju Lumer, Cokelat Melt" value={name} onChange={e => setName(e.target.value)} className="h-10 text-xs font-semibold" />
+          <label htmlFor="variant-name" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Varian Perisa *</label>
+          <Input id="variant-name" name="variant-name" placeholder="Contoh: Original, Keju Lumer, Cokelat Melt" value={name} onChange={e => setName(e.target.value)} className="h-10 text-xs font-semibold" />
         </div>
 
         <div>
-          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Urutan Tampilan (Sort Order)</label>
-          <Input type="number" placeholder="99" value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="h-10 text-xs font-bold" />
+          <label htmlFor="sort-order" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Urutan Tampilan (Sort Order)</label>
+          <Input id="sort-order" name="sort-order" type="number" placeholder="99" value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="h-10 text-xs font-bold" />
         </div>
 
         {err && <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 font-bold text-center">{err}</div>}
 
         <div className="flex gap-2 pt-2">
-          <button onClick={handleSave} disabled={saving} className="flex-1 h-11 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm">
+          <button type="button" onClick={handleSave} disabled={saving} className="flex-1 h-11 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Simpan Varian Perisa
           </button>
-          <button onClick={onCancel} className="px-5 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600">Batal</button>
+          <button type="button" onClick={onCancel} className="px-5 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600">Batal</button>
         </div>
       </div>
     </div>
@@ -289,47 +291,47 @@ function IngredientForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
     <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4 mb-4">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
         <h3 className="text-sm font-extrabold text-slate-800">{isEdit ? "Edit Bahan Baku / Packaging" : "Tambah Bahan Baku Baru"}</h3>
-        <button onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+        <button type="button" onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
       </div>
 
       <div className="space-y-3 text-xs">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Item *</label>
-            <Input placeholder="Contoh: Tepung Terigu / Pouch 250gr" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="h-10 text-xs font-semibold" />
+            <label htmlFor="ing-name" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Item *</label>
+            <Input id="ing-name" name="ing-name" placeholder="Contoh: Tepung Terigu / Pouch 250gr" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="h-10 text-xs font-semibold" />
           </div>
           <div>
-            <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Satuan Dasar (kg, gr, pcs) *</label>
-            <Input placeholder="Contoh: kg / pcs" value={form.baseUnit} onChange={e => setForm(p => ({ ...p, baseUnit: e.target.value }))} className="h-10 text-xs font-semibold" />
+            <label htmlFor="ing-unit" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Satuan Dasar (kg, gr, pcs) *</label>
+            <Input id="ing-unit" name="ing-unit" placeholder="Contoh: kg / pcs" value={form.baseUnit} onChange={e => setForm(p => ({ ...p, baseUnit: e.target.value }))} className="h-10 text-xs font-semibold" />
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Kategori Item</label>
-            <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className="h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-xs">
+            <label htmlFor="ing-cat" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Kategori Item</label>
+            <select id="ing-cat" name="ing-cat" value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className="h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-xs">
               <option value="bahan_baku">Bahan Baku</option>
               <option value="packaging">Kemasan / Packaging</option>
               <option value="operasional">Operasional</option>
             </select>
           </div>
           <div>
-            <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Stok Minimal</label>
-            <Input type="number" value={form.minStock} onChange={e => setForm(p => ({ ...p, minStock: e.target.value }))} className="h-10 text-xs font-bold" />
+            <label htmlFor="ing-min" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Stok Minimal</label>
+            <Input id="ing-min" name="ing-min" type="number" value={form.minStock} onChange={e => setForm(p => ({ ...p, minStock: e.target.value }))} className="h-10 text-xs font-bold" />
           </div>
           <div>
-            <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">HPP Dasar (Rp)</label>
-            <Input type="number" value={form.defaultCostPerBaseUnit} onChange={e => setForm(p => ({ ...p, defaultCostPerBaseUnit: e.target.value }))} className="h-10 text-xs font-bold" />
+            <label htmlFor="ing-hpp" className="font-bold text-slate-600 uppercase tracking-wider block mb-1">HPP Dasar (Rp)</label>
+            <Input id="ing-hpp" name="ing-hpp" type="number" value={form.defaultCostPerBaseUnit} onChange={e => setForm(p => ({ ...p, defaultCostPerBaseUnit: e.target.value }))} className="h-10 text-xs font-bold" />
           </div>
         </div>
 
         {err && <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 font-bold text-center">{err}</div>}
 
         <div className="flex gap-2 pt-2">
-          <button onClick={handleSave} disabled={saving} className="flex-1 h-11 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm">
+          <button type="button" onClick={handleSave} disabled={saving} className="flex-1 h-11 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Simpan Bahan Baku
           </button>
-          <button onClick={onCancel} className="px-5 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600">Batal</button>
+          <button type="button" onClick={onCancel} className="px-5 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600">Batal</button>
         </div>
       </div>
     </div>
@@ -345,7 +347,7 @@ function MasterDataContent() {
   const [tab, setTab] = useState<Tab>("produk");
 
   useEffect(() => {
-    if (tabParam && ["produk", "varian", "bahan", "pelanggan", "addons", "suppliers", "configs"].includes(tabParam)) {
+    if (tabParam && ["produk", "varian", "bahan", "pelanggan", "addons", "suppliers"].includes(tabParam)) {
       setTab(tabParam);
     }
   }, [tabParam]);
@@ -361,11 +363,8 @@ function MasterDataContent() {
   const [variants, setVariants] = useState<VariantItem[]>([]);
   const [ingredients, setIngredients] = useState<IngredientItem[]>([]);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
-  const [addOns, setAddOns] = useState<AddonItem[]>([]);
-  const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
 
   // Customer Edit/Delete States
-  const [editingCustomer, setEditingCustomer] = useState<CustomerItem | null>(null);
   const [customerForm, setCustomerForm] = useState({ name: "", customerType: "reguler", channel: "walk_in", phoneNumber: "", address: "", notes: "", discountPerUnit: "0" });
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [customerDeleteTarget, setCustomerDeleteTarget] = useState<CustomerItem | null>(null);
@@ -379,20 +378,16 @@ function MasterDataContent() {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, v, i, c, a, s] = await Promise.all([
+      const [p, v, i, c] = await Promise.all([
         fetchWithAuth("/api/products").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/variants").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/ingredients").then(r => r.ok ? r.json() : []),
         fetchWithAuth("/api/customers").then(r => r.ok ? r.json() : []),
-        fetchWithAuth("/api/addons").then(r => r.ok ? r.json() : []),
-        fetchWithAuth("/api/suppliers").then(r => r.ok ? r.json() : []),
       ]);
       setProducts(Array.isArray(p) ? p : []);
       setVariants(Array.isArray(v) ? v : []);
       setIngredients(Array.isArray(i) ? i : []);
       setCustomers(Array.isArray(c) ? c : []);
-      setAddOns(Array.isArray(a) ? a : []);
-      setSuppliers(Array.isArray(s) ? s : []);
     } finally { setLoading(false); }
   }, [fetchWithAuth]);
 
@@ -404,7 +399,6 @@ function MasterDataContent() {
     setEditItem(null);
     setDeleteTarget(null);
     setSearch("");
-    setEditingCustomer(null);
     setCustomerDeleteTarget(null);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -427,10 +421,8 @@ function MasterDataContent() {
     if (!customerForm.name.trim()) return;
     setSavingCustomer(true);
     try {
-      const url = editingCustomer ? `/api/customers/${editingCustomer.id}` : "/api/customers";
-      const method = editingCustomer ? "PATCH" : "POST";
-      const res = await fetchWithAuth(url, {
-        method,
+      const res = await fetchWithAuth("/api/customers", {
+        method: "POST",
         body: JSON.stringify({
           name: customerForm.name,
           customerType: customerForm.customerType,
@@ -443,7 +435,6 @@ function MasterDataContent() {
       });
       if (res.ok) {
         setShowAddForm(false);
-        setEditingCustomer(null);
         setCustomerForm({ name: "", customerType: "reguler", channel: "walk_in", phoneNumber: "", address: "", notes: "", discountPerUnit: "0" });
         await loadAll();
       }
@@ -464,8 +455,6 @@ function MasterDataContent() {
     { key: "varian", label: "Varian Perisa", icon: Layers },
     { key: "bahan", label: "Bahan & Packaging", icon: Beaker },
     { key: "pelanggan", label: "Pelanggan", icon: Users },
-    { key: "addons", label: "Add-on", icon: Plus },
-    { key: "suppliers", label: "Supplier", icon: Store },
   ];
 
   const q = search.toLowerCase();
@@ -499,7 +488,8 @@ function MasterDataContent() {
             </div>
 
             <button
-              onClick={() => { setShowAddForm(prev => !prev); setEditItem(null); setEditingCustomer(null); }}
+              type="button"
+              onClick={() => { setShowAddForm(prev => !prev); setEditItem(null); }}
               className="px-3.5 md:px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
             >
               <Plus size={16} /> Tambah Data
@@ -515,6 +505,7 @@ function MasterDataContent() {
                 return (
                   <button
                     key={t.key}
+                    type="button"
                     onClick={() => switchTab(t.key)}
                     className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border ${
                       isActive 
@@ -540,6 +531,8 @@ function MasterDataContent() {
         <div className="relative">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
+            id="master-search-input"
+            name="master-search-input"
             type="text"
             placeholder={`Cari master data ${tab}...`}
             value={search}
@@ -559,7 +552,14 @@ function MasterDataContent() {
             {/* ── TAB: PRODUK ── */}
             {tab === "produk" && (
               <div className="space-y-4">
-                {showAddForm && <ProductForm fetchWithAuth={fetchWithAuth} onSuccess={onSuccess} onCancel={() => setShowAddForm(false)} />}
+                {(showAddForm || editItem) && (
+                  <ProductForm 
+                    initial={editItem || undefined} 
+                    fetchWithAuth={fetchWithAuth} 
+                    onSuccess={onSuccess} 
+                    onCancel={() => { setShowAddForm(false); setEditItem(null); }} 
+                  />
+                )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {filteredProducts.map(p => (
@@ -573,10 +573,18 @@ function MasterDataContent() {
                         </div>
 
                         <div className="flex items-center gap-1">
-                          <button onClick={() => { setEditItem(p); setShowAddForm(false); }} className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">
+                          <button 
+                            type="button"
+                            onClick={() => { setEditItem(p); setShowAddForm(false); }} 
+                            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                          >
                             <Pencil size={14} />
                           </button>
-                          <button onClick={() => setDeleteTarget({ id: p.id, name: p.name })} className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600">
+                          <button 
+                            type="button"
+                            onClick={() => setDeleteTarget({ id: p.id, name: p.name })} 
+                            className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
+                          >
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -601,7 +609,14 @@ function MasterDataContent() {
             {/* ── TAB: VARIAN PERISA (RASA) ── */}
             {tab === "varian" && (
               <div className="space-y-4">
-                {showAddForm && <VariantForm fetchWithAuth={fetchWithAuth} onSuccess={onSuccess} onCancel={() => setShowAddForm(false)} />}
+                {(showAddForm || editItem) && (
+                  <VariantForm 
+                    initial={editItem || undefined} 
+                    fetchWithAuth={fetchWithAuth} 
+                    onSuccess={onSuccess} 
+                    onCancel={() => { setShowAddForm(false); setEditItem(null); }} 
+                  />
+                )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {filteredVariants.map(v => (
@@ -612,10 +627,18 @@ function MasterDataContent() {
                         </div>
 
                         <div className="flex items-center gap-1">
-                          <button onClick={() => { setEditItem(v); setShowAddForm(false); }} className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">
+                          <button 
+                            type="button"
+                            onClick={() => { setEditItem(v); setShowAddForm(false); }} 
+                            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                          >
                             <Pencil size={14} />
                           </button>
-                          <button onClick={() => setDeleteTarget({ id: v.id, name: v.name })} className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600">
+                          <button 
+                            type="button"
+                            onClick={() => setDeleteTarget({ id: v.id, name: v.name })} 
+                            className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
+                          >
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -645,7 +668,14 @@ function MasterDataContent() {
             {/* ── TAB: BAHAN BAKU & PACKAGING ── */}
             {tab === "bahan" && (
               <div className="space-y-4">
-                {showAddForm && <IngredientForm fetchWithAuth={fetchWithAuth} onSuccess={onSuccess} onCancel={() => setShowAddForm(false)} />}
+                {(showAddForm || editItem) && (
+                  <IngredientForm 
+                    initial={editItem || undefined} 
+                    fetchWithAuth={fetchWithAuth} 
+                    onSuccess={onSuccess} 
+                    onCancel={() => { setShowAddForm(false); setEditItem(null); }} 
+                  />
+                )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {filteredIngredients.map(ing => (
@@ -656,10 +686,18 @@ function MasterDataContent() {
                         </span>
 
                         <div className="flex items-center gap-1">
-                          <button onClick={() => { setEditItem(ing); setShowAddForm(false); }} className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">
+                          <button 
+                            type="button"
+                            onClick={() => { setEditItem(ing); setShowAddForm(false); }} 
+                            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                          >
                             <Pencil size={14} />
                           </button>
-                          <button onClick={() => setDeleteTarget({ id: ing.id, name: ing.name })} className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600">
+                          <button 
+                            type="button"
+                            onClick={() => setDeleteTarget({ id: ing.id, name: ing.name })} 
+                            className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
+                          >
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -695,12 +733,12 @@ function MasterDataContent() {
                   <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-3 mb-4">
                     <h3 className="text-sm font-extrabold text-slate-800">Tambah Data Pelanggan Baru</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                      <Input placeholder="Nama Pelanggan *" value={customerForm.name} onChange={e => setCustomerForm(p => ({ ...p, name: e.target.value }))} className="h-10" />
-                      <Input placeholder="Nomor WhatsApp (628...)" value={customerForm.phoneNumber} onChange={e => setCustomerForm(p => ({ ...p, phoneNumber: e.target.value }))} className="h-10" />
+                      <Input id="cust-name" name="cust-name" placeholder="Nama Pelanggan *" value={customerForm.name} onChange={e => setCustomerForm(p => ({ ...p, name: e.target.value }))} className="h-10" />
+                      <Input id="cust-phone" name="cust-phone" placeholder="Nomor WhatsApp (628...)" value={customerForm.phoneNumber} onChange={e => setCustomerForm(p => ({ ...p, phoneNumber: e.target.value }))} className="h-10" />
                     </div>
                     <div className="flex gap-2 pt-2">
-                      <button onClick={handleSaveCustomer} disabled={savingCustomer} className="px-5 h-10 bg-slate-900 text-white rounded-xl font-extrabold text-xs">Simpan Pelanggan</button>
-                      <button onClick={() => setShowAddForm(false)} className="px-4 h-10 bg-slate-100 font-bold text-xs rounded-xl">Batal</button>
+                      <button type="button" onClick={handleSaveCustomer} disabled={savingCustomer} className="px-5 h-10 bg-slate-900 text-white rounded-xl font-extrabold text-xs">Simpan Pelanggan</button>
+                      <button type="button" onClick={() => setShowAddForm(false)} className="px-4 h-10 bg-slate-100 font-bold text-xs rounded-xl">Batal</button>
                     </div>
                   </div>
                 )}
@@ -714,7 +752,7 @@ function MasterDataContent() {
                         </div>
 
                         <div className="flex items-center gap-1">
-                          <button onClick={() => setCustomerDeleteTarget(c)} className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600">
+                          <button type="button" onClick={() => setCustomerDeleteTarget(c)} className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600">
                             <Trash2 size={14} />
                           </button>
                         </div>
