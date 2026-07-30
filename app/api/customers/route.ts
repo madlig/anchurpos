@@ -18,11 +18,14 @@ export async function GET(req: NextRequest) {
       return {
         id: doc.id,
         name: data.name,
+        code: data.code ?? `CUST-${doc.id.slice(0, 4).toUpperCase()}`,
         channel: data.channel ?? "walk_in",
         customerType: data.customerType ?? "reguler",
         phoneNumber: data.phoneNumber ?? null,
+        email: data.email ?? null,
         address: data.address ?? null,
         discountPerUnit: data.discountPerUnit ?? 0,
+        creditLimit: data.creditLimit ?? 0,
         notes: data.notes ?? "",
         isActive: data.isActive,
         createdVia: data.createdVia ?? "manual",
@@ -63,19 +66,24 @@ export async function POST(req: NextRequest) {
 
   try {
     const ref = adminDb.collection("customers").doc();
+    const customerCode = body.code || `CUST-${Math.floor(1000 + Math.random() * 9000)}`;
+
     await ref.set({
       name: name.trim(),
+      code: customerCode,
       channel,
       customerType,
       phoneNumber,
+      email: body.email || null,
       address,
       notes,
-      discountPerUnit: 0,
+      discountPerUnit: Number(body.discountPerUnit) || 0,
+      creditLimit: Number(body.creditLimit) || 0,
       isActive: true,
       createdVia,
       createdAt: new Date().toISOString()
     });
-    return NextResponse.json({ id: ref.id, name: name.trim(), channel, customerType }, { status: 201 });
+    return NextResponse.json({ id: ref.id, name: name.trim(), code: customerCode, channel, customerType }, { status: 201 });
   } catch (err) {
     console.error("POST /api/customers error:", err);
     return NextResponse.json({ error: "Gagal menyimpan pelanggan" }, { status: 500 });

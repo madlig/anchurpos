@@ -22,7 +22,7 @@ interface PriceTier { minQty: number; maxQty: number | null; price: number; }
 interface ProductItem { id: string; name: string; code: string; category?: string; description: string; packPerBatch: number; priceTiers: PriceTier[]; channels?: string[]; freeSauceAllowance?: number; }
 interface VariantItem { id: string; productId: string; name: string; sortOrder: number; currentStock: number; minStock: number; freeSauceAllowance?: number; }
 interface IngredientItem { id: string; name: string; category: string; baseUnit: string; currentStock: number; minStock: number; channels?: string[]; unitAlternatives?: { unit: string; conversionToBase: number }[]; defaultCostPerBaseUnit?: number; price?: number; }
-interface CustomerItem { id: string; name: string; customerType: string; channel: string; phoneNumber: string | null; address: string | null; notes: string; discountPerUnit: number; }
+interface CustomerItem { id: string; code?: string; name: string; customerType: string; channel: string; phoneNumber: string | null; email?: string | null; address: string | null; notes: string; discountPerUnit: number; creditLimit?: number; }
 interface SupplierItem { id: string; name: string; category?: string; phoneNumber?: string | null; address?: string | null; contactPerson?: string | null; notes?: string; }
 
 const PRODUCT_CATEGORIES = [
@@ -416,10 +416,22 @@ function MasterDataContent() {
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
 
-  // Customer Edit/Delete States
-  const [customerForm, setCustomerForm] = useState({ name: "", customerType: "reguler", channel: "walk_in", phoneNumber: "", address: "", notes: "", discountPerUnit: "0" });
+  // Customer Edit/Delete/View States (ERP CRM Standard)
+  const [customerForm, setCustomerForm] = useState({ 
+    code: "", 
+    name: "", 
+    customerType: "reguler", 
+    channel: "walk_in", 
+    phoneNumber: "", 
+    email: "", 
+    address: "", 
+    notes: "", 
+    discountPerUnit: "0",
+    creditLimit: "0"
+  });
   const [customerTypeFilter, setCustomerTypeFilter] = useState<string>("semua");
   const [editCustomerItem, setEditCustomerItem] = useState<CustomerItem | null>(null);
+  const [viewCustomerItem, setViewCustomerItem] = useState<CustomerItem | null>(null);
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [customerDeleteTarget, setCustomerDeleteTarget] = useState<CustomerItem | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState(false);
@@ -494,17 +506,21 @@ function MasterDataContent() {
         method,
         body: JSON.stringify({
           name: customerForm.name.trim(),
+          code: customerForm.code.trim() || undefined,
           customerType: customerForm.customerType,
           channel: customerForm.channel,
           phoneNumber: customerForm.phoneNumber || null,
+          email: customerForm.email || null,
           address: customerForm.address || null,
           notes: customerForm.notes || "",
-          discountPerUnit: parseFloat(customerForm.discountPerUnit) || 0
+          discountPerUnit: parseFloat(customerForm.discountPerUnit) || 0,
+          creditLimit: parseFloat(customerForm.creditLimit) || 0
         })
       });
       if (res.ok) {
         setShowAddForm(false);
-        setCustomerForm({ name: "", customerType: "reguler", channel: "walk_in", phoneNumber: "", address: "", notes: "", discountPerUnit: "0" });
+        setEditCustomerItem(null);
+        setCustomerForm({ code: "", name: "", customerType: "reguler", channel: "walk_in", phoneNumber: "", email: "", address: "", notes: "", discountPerUnit: "0", creditLimit: "0" });
         await loadAll();
       }
     } finally { setSavingCustomer(false); }
@@ -965,37 +981,52 @@ function MasterDataContent() {
                   ))}
                 </div>
 
-                {/* Add / Edit Form Drawer Card */}
+                {/* Add / Edit Form Drawer Card (ERP CRM Standard) */}
                 {(showAddForm || editCustomerItem) && (
-                  <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md space-y-4 animate-in fade-in zoom-in-95">
+                  <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xl space-y-4 animate-in fade-in zoom-in-95 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 via-amber-500 to-emerald-500" />
+                    
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-                        <Users size={18} className="text-indigo-600" />
-                        {editCustomerItem ? `Edit Pelanggan: ${editCustomerItem.name}` : "Tambah Pelanggan Baru (CRM Master Data)"}
-                      </h3>
-                      <button type="button" onClick={() => { setShowAddForm(false); setEditCustomerItem(null); }} className="text-slate-400 hover:text-slate-600">
-                        <X size={18} />
+                      <div>
+                        <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+                          <Users size={20} className="text-indigo-600" />
+                          {editCustomerItem ? `Edit Master Data Pelanggan: ${editCustomerItem.name}` : "Registrasi Master Data Pelanggan (SAP & Odoo Standard)"}
+                        </h3>
+                        <p className="text-xs font-semibold text-slate-400 mt-0.5">Kelola profil pelanggan, limit piutang, dan skema diskon khusus tiering</p>
+                      </div>
+                      <button type="button" onClick={() => { setShowAddForm(false); setEditCustomerItem(null); }} className="text-slate-400 hover:text-slate-600 p-1">
+                        <X size={20} />
                       </button>
                     </div>
 
-                    <div className="space-y-3 text-xs">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="md:col-span-2">
-                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Nama Pelanggan / Toko *</label>
+                    <div className="space-y-4 text-xs">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Kode Pelanggan (Cust ID)</label>
                           <Input
-                            placeholder="Contoh: Ibu Rina Reseller / Kopi Toko Djawa"
+                            placeholder="Otomatis (e.g. CUST-1042)"
+                            value={customerForm.code}
+                            onChange={(e) => setCustomerForm(p => ({ ...p, code: e.target.value }))}
+                            className="h-10 text-xs font-mono font-bold bg-slate-50"
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Nama Pelanggan / Badan Usaha *</label>
+                          <Input
+                            placeholder="Contoh: Ibu Rina Reseller / PT Kopi Toko Djawa"
                             value={customerForm.name}
                             onChange={(e) => setCustomerForm(p => ({ ...p, name: e.target.value }))}
-                            className="h-10 text-xs font-semibold"
+                            className="h-10 text-xs font-bold"
                           />
                         </div>
 
                         <div>
-                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Tipe Pelanggan</label>
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Tipe Pelanggan (Tier)</label>
                           <select
                             value={customerForm.customerType}
                             onChange={(e) => setCustomerForm(p => ({ ...p, customerType: e.target.value }))}
-                            className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-xs"
+                            className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-extrabold text-xs text-slate-800"
                           >
                             <option value="reguler">Reguler</option>
                             <option value="reseller">Reseller VIP</option>
@@ -1005,23 +1036,34 @@ function MasterDataContent() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                         <div>
-                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">No. WhatsApp / HP</label>
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">No. WhatsApp / HP</label>
                           <Input
-                            placeholder="Contoh: 08123456789 (Otomatis +62)"
+                            placeholder="Contoh: 08123456789"
                             value={customerForm.phoneNumber}
                             onChange={(e) => setCustomerForm(p => ({ ...p, phoneNumber: e.target.value }))}
-                            className="h-10 text-xs font-semibold"
+                            className="h-10 text-xs font-bold"
                           />
                         </div>
 
                         <div>
-                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Channel Distribusi Utama</label>
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Email Pelanggan (Opsional)</label>
+                          <Input
+                            type="email"
+                            placeholder="Contoh: rina@gmail.com"
+                            value={customerForm.email}
+                            onChange={(e) => setCustomerForm(p => ({ ...p, email: e.target.value }))}
+                            className="h-10 text-xs font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Channel Utama</label>
                           <select
                             value={customerForm.channel}
                             onChange={(e) => setCustomerForm(p => ({ ...p, channel: e.target.value }))}
-                            className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-xs"
+                            className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-extrabold text-xs text-slate-800"
                           >
                             <option value="walk_in">Walk-in Outlet</option>
                             <option value="whatsapp">WhatsApp Order</option>
@@ -1031,41 +1073,54 @@ function MasterDataContent() {
                         </div>
 
                         <div>
-                          <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Potongan Diskon Khusus (Rp/pack)</label>
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Diskon Khusus (Rp/pack)</label>
                           <Input
                             type="number"
-                            placeholder="Contoh: 1000 (Potongan Rp 1.000/pack)"
+                            placeholder="Contoh: 1000"
                             value={customerForm.discountPerUnit}
                             onChange={(e) => setCustomerForm(p => ({ ...p, discountPerUnit: e.target.value }))}
-                            className="h-10 text-xs font-semibold"
+                            className="h-10 text-xs font-bold text-emerald-700"
                           />
                         </div>
                       </div>
 
-                      <div>
-                        <label className="font-bold text-slate-600 uppercase tracking-wider block mb-1">Alamat Pengiriman Lengkap</label>
-                        <Input
-                          placeholder="Alamat domisili / tempat pengiriman pesanan..."
-                          value={customerForm.address}
-                          onChange={(e) => setCustomerForm(p => ({ ...p, address: e.target.value }))}
-                          className="h-10 text-xs font-semibold"
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="md:col-span-2">
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Alamat Lengkap Pengiriman</label>
+                          <Input
+                            placeholder="Alamat domisili / lokasi pengiriman utama..."
+                            value={customerForm.address}
+                            onChange={(e) => setCustomerForm(p => ({ ...p, address: e.target.value }))}
+                            className="h-10 text-xs font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-extrabold text-slate-700 uppercase tracking-wider block mb-1">Limit Piutang / Plafon (Rp)</label>
+                          <Input
+                            type="number"
+                            placeholder="Contoh: 5000000 (Maks Rp 5jt)"
+                            value={customerForm.creditLimit}
+                            onChange={(e) => setCustomerForm(p => ({ ...p, creditLimit: e.target.value }))}
+                            className="h-10 text-xs font-bold text-indigo-700"
+                          />
+                        </div>
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                      <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                         <button
                           type="button"
                           onClick={handleSaveCustomer}
                           disabled={savingCustomer}
-                          className="px-5 h-10 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm"
+                          className="px-6 h-11 rounded-2xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
                         >
-                          {savingCustomer ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                          {editCustomerItem ? "Simpan Perubahan" : "Simpan Pelanggan"}
+                          {savingCustomer ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                          {editCustomerItem ? "Simpan Perubahan Master Data" : "Simpan Master Data Pelanggan"}
                         </button>
                         <button
                           type="button"
                           onClick={() => { setShowAddForm(false); setEditCustomerItem(null); }}
-                          className="px-5 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-600 text-xs"
+                          className="px-5 h-11 rounded-2xl bg-slate-100 hover:bg-slate-200 font-extrabold text-slate-600 text-xs"
                         >
                           Batal
                         </button>
@@ -1074,90 +1129,128 @@ function MasterDataContent() {
                   </div>
                 )}
 
-                {/* Customer Cards Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Professional Customer Cards Grid (Odoo / SAP Standard) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {filteredCustomers.map(c => {
                     const isVip = (c.customerType || "reguler") !== "reguler";
                     const cleanPhone = (c.phoneNumber || "").replace(/[^0-9]/g, "");
                     const formattedWa = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
+                    const custCode = c.code || `CUST-${c.id.slice(0, 4).toUpperCase()}`;
 
                     return (
-                      <div key={c.id} className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm relative overflow-hidden space-y-3 hover:border-slate-300 transition-all">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 border ${
-                              isVip ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-indigo-50 border-indigo-100 text-indigo-700"
+                      <div key={c.id} className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between space-y-4 hover:shadow-md hover:border-slate-300 transition-all group">
+                        <div className="space-y-3">
+                          {/* Card Header: Code, Badge Tier, Action Menu */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-mono font-extrabold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
+                                {custCode}
+                              </span>
+                              <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                                c.customerType === "reseller" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                c.customerType === "grosir" ? "bg-rose-50 text-rose-700 border-rose-200" :
+                                c.customerType === "mitra" ? "bg-purple-50 text-purple-700 border-purple-200" :
+                                "bg-indigo-50 text-indigo-700 border-indigo-200"
+                              }`}>
+                                {c.customerType || "Reguler"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setViewCustomerItem(c)}
+                                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/60 flex items-center justify-center text-slate-600 transition-colors"
+                                title="Lihat Rekam Master Data ERP"
+                              >
+                                <Building2 size={14} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditCustomerItem(c);
+                                  setCustomerForm({
+                                    code: c.code || "",
+                                    name: c.name,
+                                    customerType: c.customerType || "reguler",
+                                    channel: c.channel || "walk_in",
+                                    phoneNumber: c.phoneNumber || "",
+                                    email: c.email || "",
+                                    address: c.address || "",
+                                    notes: c.notes || "",
+                                    discountPerUnit: String(c.discountPerUnit || 0),
+                                    creditLimit: String(c.creditLimit || 0)
+                                  });
+                                  setShowAddForm(false);
+                                }}
+                                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/60 flex items-center justify-center text-slate-600 transition-colors"
+                                title="Edit Master Data"
+                              >
+                                <Pencil size={14} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setCustomerDeleteTarget(c)}
+                                className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200/60 flex items-center justify-center text-rose-600 transition-colors"
+                                title="Hapus Data"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Customer Identity Row */}
+                          <div className="flex items-start gap-3 pt-1">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-base shrink-0 shadow-sm border ${
+                              isVip ? "bg-gradient-to-br from-amber-100 to-amber-50 text-amber-800 border-amber-200" : "bg-gradient-to-br from-indigo-100 to-indigo-50 text-indigo-800 border-indigo-200"
                             }`}>
                               {c.name[0]?.toUpperCase()}
                             </div>
-                            <div className="min-w-0">
-                              <h3 className="text-sm font-extrabold text-slate-800 truncate">{c.name}</h3>
-                              <p className="text-xs font-semibold text-slate-400 truncate">{c.phoneNumber || "No Telp -"}</p>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-base font-black text-slate-800 leading-snug group-hover:text-indigo-600 transition-colors truncate">
+                                {c.name}
+                              </h3>
+                              <p className="text-xs font-bold text-slate-400 mt-0.5 flex items-center gap-1 truncate">
+                                <Phone size={12} className="text-slate-400 shrink-0" />
+                                {c.phoneNumber || "Nomor Telepon Tidak Ada"}
+                              </p>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditCustomerItem(c);
-                                setCustomerForm({
-                                  name: c.name,
-                                  customerType: c.customerType || "reguler",
-                                  channel: c.channel || "walk_in",
-                                  phoneNumber: c.phoneNumber || "",
-                                  address: c.address || "",
-                                  notes: c.notes || "",
-                                  discountPerUnit: String(c.discountPerUnit || 0)
-                                });
-                                setShowAddForm(false);
-                              }}
-                              className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
-                              title="Edit Pelanggan"
-                            >
-                              <Pencil size={14} />
-                            </button>
+                          {/* Additional Metadata Info */}
+                          <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs">
+                            {c.address && (
+                              <div className="flex items-start gap-1.5 text-slate-500 font-semibold line-clamp-1">
+                                <MapPin size={13} className="text-slate-400 shrink-0 mt-0.5" />
+                                <span className="truncate">{c.address}</span>
+                              </div>
+                            )}
 
-                            <button
-                              type="button"
-                              onClick={() => setCustomerDeleteTarget(c)}
-                              className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-600"
-                              title="Hapus Pelanggan"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            <div className="flex items-center justify-between gap-2 pt-1">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                Channel: <strong className="text-slate-700 font-black">{c.channel ? c.channel.replace("_", "-").toUpperCase() : "WALK-IN"}</strong>
+                              </span>
+
+                              {c.discountPerUnit > 0 && (
+                                <span className="font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-lg text-[11px] shadow-2xs">
+                                  Diskon Rp {fmt(c.discountPerUnit)}/pack
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
-                        {/* Customer Channel & Discount Details */}
-                        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-1.5 text-xs">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`font-bold px-2.5 py-0.5 rounded-lg border uppercase text-[10px] ${
-                              isVip ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-indigo-50 text-indigo-600 border-indigo-100"
-                            }`}>
-                              {c.customerType || "Reguler"}
-                            </span>
-                            <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">
-                              {c.channel ? c.channel.replace("_", "-").toUpperCase() : "WALK-IN"}
-                            </span>
-                          </div>
-
-                          {c.discountPerUnit > 0 && (
-                            <span className="font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg text-[11px]">
-                              Diskon Rp {fmt(c.discountPerUnit)}/pack
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Direct WhatsApp Quick Chat Link */}
+                        {/* Direct WhatsApp Action Button */}
                         {formattedWa && (
                           <a
-                            href={`https://wa.me/${formattedWa}?text=Halo%20${encodeURIComponent(c.name)},%20ada%20yang%20bisa%20kami%20bantu%20dari%20AnchurPOS%3F`}
+                            href={`https://wa.me/${formattedWa}?text=Halo%20${encodeURIComponent(c.name)},%20salam%20dari%20AnchurPOS!`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-full py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-extrabold text-xs flex items-center justify-center gap-1.5 border border-emerald-200/80 transition-colors"
+                            className="w-full py-2.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-extrabold text-xs flex items-center justify-center gap-2 border border-emerald-200 transition-all active:scale-98"
                           >
-                            <MessageCircle size={15} /> Hubungi WhatsApp Pelanggan
+                            <MessageCircle size={16} className="text-emerald-600" /> Hubungi via WhatsApp
                           </a>
                         )}
 
@@ -1169,13 +1262,92 @@ function MasterDataContent() {
                   })}
 
                   {filteredCustomers.length === 0 && (
-                    <div className="col-span-full bg-white rounded-3xl p-10 text-center border border-slate-200/80 space-y-2">
-                      <Users size={32} className="text-slate-400 mx-auto" />
-                      <p className="text-sm font-bold text-slate-700">Tidak ada pelanggan ditemukan.</p>
-                      <p className="text-xs text-slate-400">Klik "+ Tambah Data" untuk mendaftarkan pelanggan baru.</p>
+                    <div className="col-span-full bg-white rounded-3xl p-10 text-center border border-slate-200/80 space-y-2 shadow-sm">
+                      <Users size={36} className="text-slate-300 mx-auto" />
+                      <p className="text-sm font-bold text-slate-700">Tidak ada data pelanggan ditemukan.</p>
+                      <p className="text-xs text-slate-400">Klik "+ Tambah Data" untuk meregistrasikan pelanggan baru.</p>
                     </div>
                   )}
                 </div>
+
+                {/* Modal Profile Record View ERP (SAP & Odoo Standard) */}
+                {viewCustomerItem && (
+                  <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+                    <div className="bg-white rounded-3xl max-w-lg w-full p-6 border border-slate-200 shadow-2xl space-y-5 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-indigo-600 via-amber-500 to-emerald-500" />
+
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center justify-center font-black">
+                            <Building2 size={20} />
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-mono font-extrabold text-slate-400 block">
+                              {viewCustomerItem.code || `CUST-${viewCustomerItem.id.slice(0, 4).toUpperCase()}`}
+                            </span>
+                            <h3 className="text-base font-extrabold text-slate-800">{viewCustomerItem.name}</h3>
+                          </div>
+                        </div>
+
+                        <button type="button" onClick={() => setViewCustomerItem(null)} className="text-slate-400 hover:text-slate-600">
+                          <X size={20} />
+                        </button>
+                      </div>
+
+                      <div className="space-y-3 text-xs">
+                        <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Tipe Pelanggan</span>
+                            <span className="font-extrabold text-slate-800 uppercase">{viewCustomerItem.customerType || "Reguler"}</span>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Channel Penjualan</span>
+                            <span className="font-extrabold text-slate-800 uppercase">{viewCustomerItem.channel ? viewCustomerItem.channel.replace("_", "-") : "WALK-IN"}</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 pt-1">
+                          <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+                            <span className="font-bold text-slate-500 flex items-center gap-1.5"><Phone size={14} /> No. Telepon / WA</span>
+                            <span className="font-extrabold text-slate-800">{viewCustomerItem.phoneNumber || "-"}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+                            <span className="font-bold text-slate-500 flex items-center gap-1.5"><Tag size={14} /> Diskon Khusus</span>
+                            <span className="font-extrabold text-emerald-600">
+                              {viewCustomerItem.discountPerUnit > 0 ? `Rp ${fmt(viewCustomerItem.discountPerUnit)} / pack` : "Tidak ada"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+                            <span className="font-bold text-slate-500 flex items-center gap-1.5"><CreditCard size={14} /> Plafon Piutang / Limit</span>
+                            <span className="font-extrabold text-indigo-600">
+                              {viewCustomerItem.creditLimit && viewCustomerItem.creditLimit > 0 ? `Rp ${fmt(viewCustomerItem.creditLimit)}` : "Tanpa Limit (Cash)"}
+                            </span>
+                          </div>
+
+                          <div className="py-1.5">
+                            <span className="font-bold text-slate-500 block mb-1 flex items-center gap-1.5"><MapPin size={14} /> Alamat Lengkap Pengiriman</span>
+                            <p className="font-semibold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                              {viewCustomerItem.address || "Belum ada alamat pengiriman terdaftar."}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setViewCustomerItem(null)}
+                          className="px-5 h-10 rounded-xl bg-slate-900 text-white font-extrabold text-xs shadow-sm"
+                        >
+                          Tutup Record
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
