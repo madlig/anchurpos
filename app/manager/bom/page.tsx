@@ -571,7 +571,7 @@ export default function BomPage() {
           <div className="space-y-4">
             
             {/* Selection Card */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-3">
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-3 relative z-30">
               <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider">Pilih Produk & Varian Perisa Target</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
@@ -725,7 +725,7 @@ export default function BomPage() {
           <div className="space-y-4">
             
             {/* Selection Card */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-3">
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-3 relative z-30">
               <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider">Pilih Produk Jadi Target</h2>
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1 block">Produk Jadi *</label>
@@ -861,7 +861,7 @@ export default function BomPage() {
           <div className="space-y-4">
             
             {/* Selection Card */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-3">
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-3 relative z-30">
               <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider">Pilih Item Target Hasil Kemas (Sub-Assembly)</h2>
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1 block">Item Hasil Kemas (misal: Pouch Gula Tabur Clip 4x6 / Cup Saos Glaze 25ml) *</label>
@@ -1024,7 +1024,7 @@ export default function BomPage() {
           <div className="space-y-4">
             
             {/* Selection Card */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-3">
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-3 relative z-30">
               <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider">Pilih Produk & Varian Untuk Melihat Pohon Struktur Isian</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
