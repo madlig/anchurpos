@@ -88,6 +88,7 @@ export interface Ingredient {
   channels?: OrderChannel[];
   defaultCostPerBaseUnit: number;
   lastHppUpdateDate?: string;
+  netWeightGrams?: number;
 }
 
 // --- 4b. stockMovements/{movementId} ---

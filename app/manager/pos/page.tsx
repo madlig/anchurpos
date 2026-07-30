@@ -232,7 +232,7 @@ export default function KasirPage() {
         </div>
 
         <div className="p-4" style={{ paddingBottom: cart.length > 0 ? "120px" : "24px" }}>
-          <ProductGrid products={filteredProducts} variantCount={variants.length} onAdd={setSelectedProduct} />
+          <ProductGrid products={filteredProducts} variantCount={variants.length} onAdd={setSelectedProduct} loading={loading} />
         </div>
       </div>
 

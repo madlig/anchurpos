@@ -413,8 +413,10 @@ export default function PurchasesPage() {
 
         {/* ── Purchases Item List ── */}
         {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
+          <div className="space-y-3 animate-pulse">
+            <div className="h-20 bg-white rounded-2xl border border-slate-200/80 p-4" />
+            <div className="h-20 bg-white rounded-2xl border border-slate-200/80 p-4" />
+            <div className="h-20 bg-white rounded-2xl border border-slate-200/80 p-4" />
           </div>
         ) : filteredPurchases.length === 0 ? (
           <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm space-y-2">

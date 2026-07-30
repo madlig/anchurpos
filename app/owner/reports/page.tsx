@@ -283,8 +283,13 @@ function OwnerReportsContent() {
       {/* ── Main Content Area ── */}
       <div className="px-4 md:px-8 max-w-5xl mx-auto space-y-5 pt-5">
         {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="space-y-4 animate-pulse">
+            <div className="h-36 bg-slate-900 rounded-3xl" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="h-28 bg-white rounded-3xl border border-slate-200/80" />
+              <div className="h-28 bg-white rounded-3xl border border-slate-200/80" />
+            </div>
+            <div className="h-36 bg-white rounded-3xl border border-slate-200/80" />
           </div>
         ) : !data ? (
           <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm space-y-2">

@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
         channels: data.channels ?? [],
         defaultCostPerBaseUnit: data.defaultCostPerBaseUnit ?? 0,
         price: data.price ?? 0,
+        netWeightGrams: data.netWeightGrams ?? null,
       };
     });
 
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { name, category, baseUnit, minStock, channels, unitAlternatives, defaultCostPerBaseUnit } = parseResult.data;
+  const netWeightGrams = body.netWeightGrams ? Number(body.netWeightGrams) : null;
 
   try {
     const ref = adminDb.collection("ingredients").doc();
@@ -62,6 +64,7 @@ export async function POST(req: NextRequest) {
       packagedConfig: null,
       channels,
       defaultCostPerBaseUnit: defaultCostPerBaseUnit ?? 0,
+      netWeightGrams,
       lastHppUpdateDate: new Date().toISOString(),
       createdAt: FieldValue.serverTimestamp(),
     });

@@ -5,6 +5,7 @@ interface Props {
   products: ProductItem[];
   variantCount: number;
   onAdd: (product: ProductItem) => void;
+  loading?: boolean;
 }
 
 function fmt(n: number) {
@@ -17,7 +18,23 @@ function startingPrice(product: ProductItem): number {
   return sorted[0].price;
 }
 
-export function ProductGrid({ products, variantCount, onAdd }: Props) {
+export function ProductGrid({ products, variantCount, onAdd, loading }: Props) {
+  if (loading) {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 animate-pulse">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-44 bg-white rounded-3xl border border-slate-200/80 p-3 flex flex-col justify-between">
+            <div className="h-16 bg-slate-100 rounded-2xl" />
+            <div className="space-y-1.5 mt-2">
+              <div className="h-3 w-3/4 bg-slate-200 rounded" />
+              <div className="h-4 w-1/2 bg-slate-200 rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   if (products.length === 0) {
     return (
       <div className="py-16 text-center">

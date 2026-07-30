@@ -607,8 +607,10 @@ function MasterDataContent() {
 
         {/* Global Loading */}
         {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-slate-800" />
+          <div className="space-y-3 animate-pulse">
+            <div className="h-28 bg-white rounded-3xl border border-slate-200/80 p-4" />
+            <div className="h-28 bg-white rounded-3xl border border-slate-200/80 p-4" />
+            <div className="h-28 bg-white rounded-3xl border border-slate-200/80 p-4" />
           </div>
         ) : (
           <div>

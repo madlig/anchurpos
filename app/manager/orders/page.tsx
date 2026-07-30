@@ -335,8 +335,10 @@ export default function OrdersListPage() {
       {/* ── Main Content Area ── */}
       <div className="px-4 md:px-8 max-w-5xl mx-auto space-y-3 pt-5">
         {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="space-y-3 animate-pulse">
+            <div className="h-28 bg-white rounded-3xl border border-slate-200/80 p-4" />
+            <div className="h-28 bg-white rounded-3xl border border-slate-200/80 p-4" />
+            <div className="h-28 bg-white rounded-3xl border border-slate-200/80 p-4" />
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm space-y-3">
