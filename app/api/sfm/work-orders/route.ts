@@ -13,15 +13,19 @@ export async function GET(req: NextRequest) {
   const dateStr = searchParams.get("date");
 
   try {
-    let query = adminDb.collection("workOrders") as FirebaseFirestore.Query;
+    const [woSnap, legacySnap, varSnap] = await Promise.all([
+      adminDb.collection("workOrders").orderBy("createdAt", "desc").get(),
+      adminDb.collection("productions").orderBy("date", "desc").get(),
+      adminDb.collection("variants").get(),
+    ]);
 
-    if (status) {
-      query = query.where("status", "==", status);
-    }
+    const varMap: Record<string, string> = {};
+    varSnap.docs.forEach(doc => {
+      const d = doc.data();
+      varMap[doc.id] = d.name || "Churros Frozen";
+    });
 
-    const snap = await query.orderBy("createdAt", "desc").get();
-
-    let workOrders = snap.docs.map((doc) => {
+    let workOrders = woSnap.docs.map((doc) => {
       const d = doc.data();
       return {
         id: doc.id,
@@ -54,11 +58,53 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    // Map legacy productions to WorkOrder format for 100% backward compatibility
+    const legacyWorkOrders = legacySnap.docs.map((doc) => {
+      const d = doc.data();
+      const createdAt = d.date?.toDate?.().toISOString() ?? d.createdAt?.toDate?.().toISOString() ?? new Date().toISOString();
+      const variantName = varMap[d.variantId] || "Churros Frozen";
+      const loyang = d.loyangCount || 0;
+      const batches = d.batches || 1;
+      const pcs = d.pcsCount || 0;
+
+      return {
+        id: `legacy-${doc.id}`,
+        woNumber: `WO-${doc.id.slice(0, 6).toUpperCase()}`,
+        productId: d.variantId || "legacy-churros",
+        productName: `Churros (${variantName})`,
+        variantIds: d.variantId ? [d.variantId] : [],
+        targetBatches: batches,
+        targetLoyang: loyang || 10,
+        targetPacks: pcs || 50,
+        status: "COMPLETED",
+        currentStage: "DONE",
+        summaryState: {
+          totalDoughBatchesDone: batches,
+          totalTrayPrinted: loyang,
+          totalTrayInFreezer: d.loyangRemaining || 0,
+          totalGoodPacks: pcs,
+          totalDefectPacks: 0,
+          totalDefectPcs: 0,
+        },
+        createdAt,
+        startedAt: createdAt,
+        completedAt: createdAt,
+        assignedCrewId: d.shiftCrewId || "",
+        assignedCrewName: "Crew Dapur",
+        notes: d.notes || "Rekam Produksi Histori",
+        batchCode: `CHR-LEGACY-${doc.id.slice(0, 4).toUpperCase()}`,
+        expiredDate: "",
+      };
+    });
+
+    // Merge new workOrders and legacy workOrders
+    const allWorkOrders = [...workOrders, ...legacyWorkOrders];
+
     if (dateStr) {
-      workOrders = workOrders.filter(wo => wo.createdAt.startsWith(dateStr));
+      return NextResponse.json(allWorkOrders.filter(wo => wo.createdAt.startsWith(dateStr)));
     }
 
-    return NextResponse.json(workOrders);
+    return NextResponse.json(allWorkOrders);
   } catch (err) {
     console.error("GET /api/sfm/work-orders error:", err);
     return NextResponse.json({ error: "Gagal mengambil data Work Order" }, { status: 500 });

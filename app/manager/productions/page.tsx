@@ -315,14 +315,14 @@ export default function ManagerProductionsPage() {
       {/* Main Content Area */}
       <div className="px-4 md:px-8 max-w-6xl mx-auto space-y-4 pt-5">
         {/* Executive Metric Cards Banner */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center font-black shrink-0">
-              <ChefHat size={20} />
+            <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center font-black shrink-0">
+              <ChefHat size={18} />
             </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Output Produksi Loyang</span>
-              <p className="text-lg font-black text-slate-800 tabular-nums">
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">Output Produksi Loyang</span>
+              <p className="text-base sm:text-lg font-black text-slate-800 tabular-nums">
                 {metrics.totalLoyang} / {metrics.targetLoyang} Loyang
               </p>
               <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1 overflow-hidden">
@@ -332,35 +332,35 @@ export default function ManagerProductionsPage() {
           </div>
 
           <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black shrink-0">
-              <Snowflake size={20} />
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black shrink-0">
+              <Snowflake size={18} />
             </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Stok Buffer Freezer</span>
-              <p className="text-lg font-black text-slate-800 tabular-nums">{metrics.totalFreezerLoyang} Loyang Beku</p>
-              <span className="text-[10px] font-bold text-indigo-600">Siap Dikeluarkan untuk Packing</span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center font-black shrink-0">
-              <Package size={20} />
-            </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Hasil Vacuum Pack Bagus</span>
-              <p className="text-lg font-black text-slate-800 tabular-nums">{metrics.totalGoodPacks} Pack Siap Jual</p>
-              <span className="text-[10px] font-bold text-emerald-600">100% Quality Checked</span>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">Stok Buffer Freezer</span>
+              <p className="text-base sm:text-lg font-black text-slate-800 tabular-nums">{metrics.totalFreezerLoyang} Loyang Beku</p>
+              <span className="text-[10px] font-bold text-indigo-600 block truncate">Siap Dikeluarkan untuk Packing</span>
             </div>
           </div>
 
           <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center font-black shrink-0">
-              <AlertTriangle size={20} />
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center font-black shrink-0">
+              <Package size={18} />
             </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Defect / Rusak (Scrap)</span>
-              <p className="text-lg font-black text-rose-700 tabular-nums">{metrics.totalDefectPacks} Pack Rusak</p>
-              <span className="text-[10px] font-bold text-rose-500">Audit HPP & Scrap Transparan</span>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">Hasil Vacuum Pack Bagus</span>
+              <p className="text-base sm:text-lg font-black text-slate-800 tabular-nums">{metrics.totalGoodPacks} Pack Siap Jual</p>
+              <span className="text-[10px] font-bold text-emerald-600 block truncate">100% Quality Checked</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center font-black shrink-0">
+              <AlertTriangle size={18} />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">Defect / Rusak (Scrap)</span>
+              <p className="text-base sm:text-lg font-black text-rose-700 tabular-nums">{metrics.totalDefectPacks} Pack Rusak</p>
+              <span className="text-[10px] font-bold text-rose-500 block truncate">Audit HPP & Scrap Transparan</span>
             </div>
           </div>
         </div>
@@ -370,8 +370,8 @@ export default function ManagerProductionsPage() {
           <div className="space-y-4 animate-in fade-in">
             {viewMode === "table" ? (
               <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
+                <div className="overflow-x-auto hide-scrollbar">
+                  <table className="min-w-[850px] w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-slate-900 text-white uppercase text-[10px] tracking-wider font-extrabold">
                         <th className="py-3.5 px-4 font-extrabold">WO Monospace</th>
@@ -390,11 +390,11 @@ export default function ManagerProductionsPage() {
                           <td className="py-3.5 px-4 font-mono font-extrabold text-slate-500 whitespace-nowrap">
                             {wo.woNumber}
                           </td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-3.5 px-4 whitespace-nowrap">
                             <div className="font-extrabold text-slate-800 group-hover:text-indigo-600 transition-colors">
                               {wo.productName}
                             </div>
-                            {wo.notes && <div className="text-[10px] text-slate-400 font-medium">{wo.notes}</div>}
+                            {wo.notes && <div className="text-[10px] text-slate-400 font-medium truncate max-w-xs">{wo.notes}</div>}
                           </td>
                           <td className="py-3.5 px-4 text-right whitespace-nowrap font-bold text-slate-800">
                             {wo.summaryState?.totalDoughBatchesDone || 0} / {wo.targetBatches} Batch
@@ -445,7 +445,7 @@ export default function ManagerProductionsPage() {
               </div>
             ) : (
               /* Mobile Grab/Gojek PWA Card View */
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {workOrders.map((wo) => (
                   <div key={wo.id} className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-4 hover:border-slate-300 transition-all">
                     <div className="space-y-3">
