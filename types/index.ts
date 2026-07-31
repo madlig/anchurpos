@@ -460,3 +460,79 @@ export interface OperationalConfig {
   expenseCategories: string[];
   deliveryMethods: string[];
 }
+
+// --- 13. Shop Floor Management (SFM) Types ---
+export type WorkOrderStatus = "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+export type WorkOrderStage = "DOUGH" | "TRAY_PRINT" | "FREEZING" | "PACKING" | "DONE";
+export type SFMLogStage = "DOUGH_MIXING" | "TRAY_PRINTING" | "FREEZER_CHECKPOINT" | "FINAL_PACKING";
+
+export interface WorkOrderSummaryState {
+  totalDoughBatchesDone: number;
+  totalTrayPrinted: number;
+  totalTrayInFreezer: number;
+  totalGoodPacks: number;
+  totalDefectPacks: number;
+  totalDefectPcs: number;
+}
+
+export interface WorkOrder {
+  id: string;
+  woNumber: string;
+  productId: string;
+  productName?: string;
+  variantIds: string[];
+  targetBatches: number;
+  targetLoyang: number;
+  targetPacks: number;
+  status: WorkOrderStatus;
+  currentStage: WorkOrderStage;
+  summaryState: WorkOrderSummaryState;
+  createdAt: string;
+  startedAt?: string;
+  freezerInAt?: string;
+  completedAt?: string;
+  assignedCrewId: string;
+  assignedCrewName?: string;
+  notes?: string;
+  batchCode?: string;
+  expiredDate?: string;
+}
+
+export interface WorkOrderLog {
+  id: string;
+  workOrderId: string;
+  stage: SFMLogStage;
+  valueAdded: number;
+  unit: "BATCH" | "LOYANG" | "PACK" | "PCS";
+  defectCount?: number;
+  defectReason?: string;
+  loggedByCrewId: string;
+  loggedByCrewName?: string;
+  timestamp: string;
+  notes?: string;
+}
+
+export interface CrewKpiLog {
+  id: string;
+  workOrderId: string;
+  crewId: string;
+  crewName: string;
+  date: string;
+  durationMinutes: number;
+  standardDurationMinutes: number;
+  speedScore: number;
+  totalTargetPacks: number;
+  goodPacks: number;
+  defectPacks: number;
+  yieldRatePercentage: number;
+  accuracyScore: number;
+  neatnessChecklist: {
+    workstationClean: boolean;
+    trayArrangementNeat: boolean;
+    freezerOrganization: boolean;
+    vacuumSealTight: boolean;
+  };
+  neatnessScore: number;
+  finalKpiScore: number;
+  createdAt: string;
+}
