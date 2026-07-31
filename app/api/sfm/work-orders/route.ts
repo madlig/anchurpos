@@ -11,6 +11,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
   const dateStr = searchParams.get("date");
+  const variantId = searchParams.get("variantId");
+  const search = searchParams.get("search");
 
   try {
     const [woSnap, legacySnap, varSnap] = await Promise.all([
@@ -33,11 +35,12 @@ export async function GET(req: NextRequest) {
         productId: d.productId || "",
         productName: d.productName || "Churros Frozen",
         variantIds: d.variantIds || [],
+        variantNames: (d.variantIds || []).map((vId: string) => varMap[vId] || vId).join(", "),
         targetBatches: d.targetBatches || 1,
         targetLoyang: d.targetLoyang || 10,
         targetPacks: d.targetPacks || 50,
         status: d.status || "PLANNED",
-        currentStage: d.currentStage || "DOUGH",
+        currentStage: d.currentStage || "IN_PROGRESS",
         summaryState: d.summaryState || {
           totalDoughBatchesDone: 0,
           totalTrayPrinted: 0,
@@ -62,7 +65,7 @@ export async function GET(req: NextRequest) {
     const legacyWorkOrders = legacySnap.docs.map((doc) => {
       const d = doc.data();
       const createdAt = d.date?.toDate?.().toISOString() ?? d.createdAt?.toDate?.().toISOString() ?? new Date().toISOString();
-      const variantName = varMap[d.variantId] || "Churros Frozen";
+      const vName = varMap[d.variantId] || "Churros Frozen";
       const loyang = d.loyangCount || 0;
       const batches = d.batches || 1;
       const pcs = d.pcsCount || 0;
@@ -71,8 +74,9 @@ export async function GET(req: NextRequest) {
         id: `legacy-${doc.id}`,
         woNumber: `WO-${doc.id.slice(0, 6).toUpperCase()}`,
         productId: d.variantId || "legacy-churros",
-        productName: `Churros (${variantName})`,
+        productName: `Churros (${vName})`,
         variantIds: d.variantId ? [d.variantId] : [],
+        variantNames: vName,
         targetBatches: batches,
         targetLoyang: loyang || 10,
         targetPacks: pcs || 50,
@@ -97,11 +101,27 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Merge new workOrders and legacy workOrders
-    const allWorkOrders = [...workOrders, ...legacyWorkOrders];
+    let allWorkOrders = [...workOrders, ...legacyWorkOrders];
+
+    if (status) {
+      allWorkOrders = allWorkOrders.filter(w => w.status === status);
+    }
 
     if (dateStr) {
-      return NextResponse.json(allWorkOrders.filter(wo => wo.createdAt.startsWith(dateStr)));
+      allWorkOrders = allWorkOrders.filter(w => w.createdAt.startsWith(dateStr));
+    }
+
+    if (variantId) {
+      allWorkOrders = allWorkOrders.filter(w => w.variantIds.includes(variantId) || w.productId === variantId);
+    }
+
+    if (search) {
+      const q = search.toLowerCase();
+      allWorkOrders = allWorkOrders.filter(w => 
+        w.woNumber.toLowerCase().includes(q) || 
+        w.productName.toLowerCase().includes(q) || 
+        (w.variantNames && w.variantNames.toLowerCase().includes(q))
+      );
     }
 
     return NextResponse.json(allWorkOrders);
@@ -118,7 +138,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { productId, productName, variantIds, targetBatches, targetLoyang, targetPacks, notes } = body;
+    const { productId, productName, variantIds, targetPacks, notes } = body;
 
     const todayStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
     const randomSuffix = Math.floor(10 + Math.random() * 90);
@@ -130,11 +150,11 @@ export async function POST(req: NextRequest) {
       productId: productId || "churros-frozen-food",
       productName: productName || "Churros Frozen Food",
       variantIds: Array.isArray(variantIds) ? variantIds : [],
-      targetBatches: Number(targetBatches) || 1,
-      targetLoyang: Number(targetLoyang) || 10,
+      targetBatches: 1,
+      targetLoyang: 10,
       targetPacks: Number(targetPacks) || 50,
       status: "PLANNED",
-      currentStage: "DOUGH",
+      currentStage: "IN_PROGRESS",
       summaryState: {
         totalDoughBatchesDone: 0,
         totalTrayPrinted: 0,

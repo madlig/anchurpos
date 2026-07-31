@@ -2,22 +2,21 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Check, Plus, ChefHat, Snowflake, Package, AlertTriangle, RefreshCw, Calendar } from "lucide-react";
+import { Loader2, Check, ChefHat, Package, AlertTriangle, RefreshCw, CheckCircle2, Calendar } from "lucide-react";
 import type { WorkOrder } from "@/types";
 
 export default function CrewProductionPage() {
-  const { getToken, user } = useAuth();
+  const { getToken } = useAuth();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
 
-  // Stepper Log Modal State
-  const [activeWo, setActiveWo] = useState<WorkOrder | null>(null);
-  const [stage, setStage] = useState<"DOUGH_MIXING" | "TRAY_PRINTING" | "FREEZER_CHECKPOINT" | "FINAL_PACKING">("DOUGH_MIXING");
-  const [valueAdded, setValueAdded] = useState("1.5");
-  const [defectCount, setDefectCount] = useState("0");
-  const [notes, setNotes] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  // Output Logging Modal
+  const [activeWoForLog, setActiveWoForLog] = useState<{ wo: WorkOrder; action: "GOOD_OUTPUT" | "SCRAP" } | null>(null);
+  const [logQty, setLogQty] = useState("10");
+  const [scrapReason, setScrapReason] = useState("");
+  const [logNotes, setLogNotes] = useState("");
+  const [submittingLog, setSubmittingLog] = useState(false);
 
   const fetchWithAuth = useCallback(
     async (url: string, options?: RequestInit) => {
@@ -46,44 +45,30 @@ export default function CrewProductionPage() {
     loadData();
   }, [loadData]);
 
-  async function handleQuickLog(wo: WorkOrder, targetStage: "DOUGH_MIXING" | "TRAY_PRINTING" | "FREEZER_CHECKPOINT" | "FINAL_PACKING", val: number) {
+  async function handleSubmitLog() {
+    if (!activeWoForLog) return;
+    setSubmittingLog(true);
     try {
-      const res = await fetchWithAuth(`/api/sfm/work-orders/${wo.id}/log`, {
+      const res = await fetchWithAuth(`/api/sfm/work-orders/${activeWoForLog.wo.id}/log`, {
         method: "POST",
         body: JSON.stringify({
-          stage: targetStage,
-          valueAdded: val,
-          unit: targetStage === "DOUGH_MIXING" ? "BATCH" : targetStage === "TRAY_PRINTING" || targetStage === "FREEZER_CHECKPOINT" ? "LOYANG" : "PACK",
-          defectCount: 0,
-        }),
-      });
-      if (res.ok) await loadData();
-    } catch (err) {
-      console.error("handleQuickLog error:", err);
-    }
-  }
-
-  async function handleSubmitDetailedLog() {
-    if (!activeWo) return;
-    setSubmitting(true);
-    try {
-      const res = await fetchWithAuth(`/api/sfm/work-orders/${activeWo.id}/log`, {
-        method: "POST",
-        body: JSON.stringify({
-          stage,
-          valueAdded: parseFloat(valueAdded) || 0,
-          unit: stage === "DOUGH_MIXING" ? "BATCH" : stage === "FINAL_PACKING" ? "PACK" : "LOYANG",
-          defectCount: parseInt(defectCount) || 0,
-          notes,
+          action: activeWoForLog.action,
+          valueAdded: parseFloat(logQty) || 0,
+          defectCount: activeWoForLog.action === "SCRAP" ? (parseInt(logQty) || 1) : 0,
+          defectReason: scrapReason,
+          notes: logNotes,
         }),
       });
 
       if (res.ok) {
-        setActiveWo(null);
+        setActiveWoForLog(null);
+        setLogQty("10");
+        setScrapReason("");
+        setLogNotes("");
         await loadData();
       }
     } finally {
-      setSubmitting(false);
+      setSubmittingLog(false);
     }
   }
 
@@ -96,8 +81,8 @@ export default function CrewProductionPage() {
             <ChefHat size={22} />
           </div>
           <div>
-            <h1 className="text-base font-black text-slate-800">Tugas Dapur Produksi</h1>
-            <p className="text-xs font-semibold text-slate-400">Mobile PWA Checkpoint Execution</p>
+            <h1 className="text-base font-black text-slate-800">Tugas Produksi Dapur</h1>
+            <p className="text-xs font-semibold text-slate-400">Generic Shop Floor PWA Execution</p>
           </div>
         </div>
 
@@ -131,8 +116,10 @@ export default function CrewProductionPage() {
               <span className="text-[11px] font-mono font-extrabold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">
                 {wo.woNumber}
               </span>
-              <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 uppercase">
-                {wo.currentStage}
+              <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                wo.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
+              }`}>
+                {wo.status}
               </span>
             </div>
 
@@ -141,77 +128,44 @@ export default function CrewProductionPage() {
               <p className="text-xs font-semibold text-slate-400 mt-0.5">Penugasan dari Owner</p>
             </div>
 
-            {/* Target vs Progress Bars */}
+            {/* Target vs Progress */}
             <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2 text-xs font-bold">
               <div className="flex justify-between items-center">
-                <span className="text-slate-500">1. Adonan (Batch):</span>
-                <span className="text-slate-800 font-extrabold">{wo.summaryState?.totalDoughBatchesDone || 0} / {wo.targetBatches} Batch</span>
+                <span className="text-slate-500">Target Production:</span>
+                <span className="text-slate-800 font-extrabold">{wo.targetPacks} Pack</span>
               </div>
-
               <div className="flex justify-between items-center">
-                <span className="text-slate-500">2. Loyang Dicetak:</span>
-                <span className="text-amber-700 font-extrabold">{wo.summaryState?.totalTrayPrinted || 0} / {wo.targetLoyang} Loyang</span>
+                <span className="text-slate-500">Hasil Produksi Bagus:</span>
+                <span className="text-emerald-700 font-extrabold">{wo.summaryState?.totalGoodPacks || 0} Pack</span>
               </div>
-
               <div className="flex justify-between items-center">
-                <span className="text-slate-500">3. Masuk Freezer:</span>
-                <span className="text-indigo-700 font-extrabold">{wo.summaryState?.totalTrayInFreezer || 0} Loyang</span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500">4. Vacuum Pack Bagus:</span>
-                <span className="text-emerald-700 font-extrabold">{wo.summaryState?.totalGoodPacks || 0} / {wo.targetPacks} Pack</span>
+                <span className="text-slate-500">Cacat / Scrap (Waste):</span>
+                <span className="text-rose-600 font-extrabold">{wo.summaryState?.totalDefectPacks || 0} Pack</span>
               </div>
             </div>
 
-            {/* Quick Stage Task Action Buttons for Crew */}
+            {/* 2 Main Actions Buttons (56px Touch Target) */}
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => {
-                  setActiveWo(wo);
-                  setStage("DOUGH_MIXING");
-                  setValueAdded("1.5");
+                  setActiveWoForLog({ wo, action: "GOOD_OUTPUT" });
+                  setLogQty("10");
                 }}
                 className="h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
               >
-                <ChefHat size={16} /> Log Adonan Batch
+                <CheckCircle2 size={16} /> Catat Hasil
               </button>
 
               <button
                 type="button"
                 onClick={() => {
-                  setActiveWo(wo);
-                  setStage("TRAY_PRINTING");
-                  setValueAdded("5");
+                  setActiveWoForLog({ wo, action: "SCRAP" });
+                  setLogQty("1");
                 }}
-                className="h-12 rounded-2xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
+                className="h-12 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-extrabold text-xs flex items-center justify-center gap-1.5 border border-rose-200 transition-all active:scale-95"
               >
-                <Plus size={16} /> Cetak Loyang
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveWo(wo);
-                  setStage("FREEZER_CHECKPOINT");
-                  setValueAdded("5");
-                }}
-                className="h-12 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
-              >
-                <Snowflake size={16} /> Freezer In
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveWo(wo);
-                  setStage("FINAL_PACKING");
-                  setValueAdded("25");
-                }}
-                className="h-12 rounded-2xl bg-slate-900 hover:bg-black active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
-              >
-                <Package size={16} /> Vacuum Pack
+                <AlertTriangle size={16} /> Catat Scrap
               </button>
             </div>
           </div>
@@ -226,79 +180,88 @@ export default function CrewProductionPage() {
         )}
       </div>
 
-      {/* Detail Input Modal */}
-      {activeWo && (
+      {/* Output / Scrap Modal */}
+      {activeWoForLog && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-200 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-black text-slate-800">Catat Incremental Task Kru</h3>
-              <button type="button" onClick={() => setActiveWo(null)} className="text-slate-400">✕</button>
+              <div>
+                <span className="text-[10px] font-mono font-extrabold text-slate-400 block">{activeWoForLog.wo.woNumber}</span>
+                <h3 className="text-base font-black text-slate-800">
+                  {activeWoForLog.action === "GOOD_OUTPUT" ? "Catat Hasil Produksi Bagus" : "Catat Produk Cacat / Scrap"}
+                </h3>
+              </div>
+              <button type="button" onClick={() => setActiveWoForLog(null)} className="text-slate-400">✕</button>
             </div>
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="font-extrabold text-slate-700 block mb-1">Tahap Activity</label>
-                <select
-                  value={stage}
-                  onChange={(e) => setStage(e.target.value as any)}
-                  className="h-11 w-full px-3 rounded-2xl border border-slate-200 bg-slate-50 font-extrabold text-xs text-slate-800"
-                >
-                  <option value="DOUGH_MIXING">1. Pembuatan Adonan (Batch)</option>
-                  <option value="TRAY_PRINTING">2. Cetak Churros (Loyang)</option>
-                  <option value="FREEZER_CHECKPOINT">3. Masukkan Freezer (Loyang)</option>
-                  <option value="FINAL_PACKING">4. Vacuum Pack Bagus (Pack)</option>
-                </select>
+                <label className="font-extrabold text-slate-700 block mb-1">
+                  {activeWoForLog.action === "GOOD_OUTPUT" ? "Jumlah Hasil Produksi (Pack Bagus)" : "Jumlah Item Rusak / Cacat (Pack)"}
+                </label>
+                <input
+                  type="number"
+                  placeholder="Nilai kustom..."
+                  value={logQty}
+                  onChange={(e) => setLogQty(e.target.value)}
+                  className={`h-11 w-full px-3 rounded-2xl border border-slate-200 bg-slate-50 font-black text-sm outline-none ${
+                    activeWoForLog.action === "GOOD_OUTPUT" ? "text-emerald-700" : "text-rose-600"
+                  }`}
+                />
+                
+                {/* SAP/Odoo Dynamic Quick Preset Chips */}
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {["1", "5", "10", "25", "50"].map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => setLogQty(chip)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold border transition-all ${
+                        logQty === chip
+                          ? "bg-slate-900 text-white border-slate-900"
+                          : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                      }`}
+                    >
+                      +{chip} Pack
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {activeWoForLog.action === "SCRAP" && (
                 <div>
-                  <label className="font-extrabold text-slate-700 block mb-1">Jumlah Tambahan (+Value)</label>
+                  <label className="font-extrabold text-slate-700 block mb-1">Alasan Cacat / Scrap</label>
                   <input
-                    type="number"
-                    step="0.1"
-                    placeholder="Nilai kustom..."
-                    value={valueAdded}
-                    onChange={(e) => setValueAdded(e.target.value)}
-                    className="h-11 w-full px-3 rounded-2xl border border-slate-200 bg-slate-50 font-black text-sm text-indigo-700 outline-none"
-                  />
-                  {/* SAP/Odoo Dynamic Quick Preset Chips */}
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {(stage === "DOUGH_MIXING" ? ["0.5", "1.0", "1.5", "2.0"] :
-                      stage === "FINAL_PACKING" ? ["10", "25", "50", "100"] :
-                      ["1", "2", "5", "10"]).map((chip) => (
-                      <button
-                        key={chip}
-                        type="button"
-                        onClick={() => setValueAdded(chip)}
-                        className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold border transition-all ${
-                          valueAdded === chip
-                            ? "bg-indigo-600 text-white border-indigo-600"
-                            : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
-                        }`}
-                      >
-                        +{chip} {stage === "DOUGH_MIXING" ? "Batch" : stage === "FINAL_PACKING" ? "Pack" : "Loyang"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="font-extrabold text-slate-700 block mb-1">Defect / Patah (Pack)</label>
-                  <input
-                    type="number"
-                    value={defectCount}
-                    onChange={(e) => setDefectCount(e.target.value)}
-                    className="h-11 w-full px-3 rounded-2xl border border-slate-200 bg-slate-50 font-black text-sm text-rose-600 outline-none"
+                    type="text"
+                    placeholder="Contoh: Patah saat pencetakan, Gosong..."
+                    value={scrapReason}
+                    onChange={(e) => setScrapReason(e.target.value)}
+                    className="h-10 w-full px-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold text-xs outline-none"
                   />
                 </div>
+              )}
+
+              <div>
+                <label className="font-extrabold text-slate-700 block mb-1">Catatan Tambahan</label>
+                <input
+                  type="text"
+                  placeholder="Catatan pengerjaan..."
+                  value={logNotes}
+                  onChange={(e) => setLogNotes(e.target.value)}
+                  className="h-10 w-full px-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold text-xs outline-none"
+                />
               </div>
 
               <button
                 type="button"
-                onClick={handleSubmitDetailedLog}
-                disabled={submitting}
-                className="w-full h-12 rounded-2xl bg-slate-900 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md"
+                onClick={handleSubmitLog}
+                disabled={submittingLog}
+                className={`w-full h-12 rounded-2xl text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md ${
+                  activeWoForLog.action === "GOOD_OUTPUT" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
+                }`}
               >
-                {submitting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Simpan Catatan Crew
+                {submittingLog ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} 
+                {activeWoForLog.action === "GOOD_OUTPUT" ? "Simpan Hasil Produksi" : "Simpan Log Scrap"}
               </button>
             </div>
           </div>
