@@ -233,12 +233,12 @@ export default function ManagerSettingsPage() {
   }
 
   return (
-    <div className="p-5">
-      <h1 className="text-xl font-bold text-stone-900 mb-1">Pengaturan</h1>
-      <p className="text-sm text-stone-500 mb-5">Manajemen Toko & Absensi</p>
+    <div className="min-h-screen bg-brand-50 p-4 md:p-6 pb-28 max-w-4xl mx-auto">
+      <h1 className="text-xl font-bold text-slate-800 mb-1">Pengaturan</h1>
+      <p className="text-sm text-slate-500 mb-5">Manajemen Toko & Absensi</p>
 
       {config?.lastDetectedIp && (
-        <Card className="p-4 mb-4 bg-amber-50 border-amber-200">
+        <div className="bg-amber-50 rounded-3xl p-5 border border-amber-200 shadow-sm mb-5">
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
@@ -253,28 +253,27 @@ export default function ManagerSettingsPage() {
                   </span>
                 )}
               </p>
-              <Button
+              <button
                 onClick={() => addIp(config.lastDetectedIp!)}
                 disabled={submitting}
-                size="sm"
-                className="mt-2 gap-1"
+                className="mt-2 flex items-center justify-center gap-1 h-9 px-4 rounded-xl bg-primary text-white font-bold text-xs shadow-sm hover:bg-primary/90 transition-all"
               >
                 <Plus size={14} /> Approve IP ini
-              </Button>
+              </button>
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Target Produksi Card */}
-      <Card className="p-4 mb-4">
+      <div className="bg-white rounded-3xl p-5 border border-primary/20 shadow-[0_0_15px_rgba(244,63,94,0.05)] mb-5 transition-all hover:border-primary/40">
         <div className="flex items-center gap-2 mb-3">
           <AlertCircle size={16} className="text-emerald-600" />
-          <h2 className="text-sm font-semibold text-stone-900">
+          <h2 className="text-sm font-semibold text-slate-800">
             Target Produksi Harian
           </h2>
         </div>
-        <p className="text-xs text-stone-400 mb-3">
+        <p className="text-xs text-slate-400 mb-3">
           Tentukan target jumlah cetak loyang harian untuk kru produksi.
         </p>
         <div className="flex gap-2">
@@ -284,26 +283,26 @@ export default function ManagerSettingsPage() {
             placeholder="Target loyang harian..."
             value={dailyLoyangTarget}
             onChange={(e) => setDailyLoyangTarget(Number(e.target.value))}
-            className="flex-1 text-sm font-medium"
+            className="flex-1 h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
           />
-          <Button
+          <button
             onClick={updateTarget}
             disabled={submitting || dailyLoyangTarget <= 0}
-            size="sm"
+            className="h-11 px-4 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs shadow-sm active:scale-95 transition-all"
           >
             Simpan Target
-          </Button>
+          </button>
         </div>
-      </Card>
+      </div>
 
-      <Card className="p-4 mb-4">
+      <div className="bg-white rounded-3xl p-5 border border-primary/20 shadow-[0_0_15px_rgba(244,63,94,0.05)] mb-5 transition-all hover:border-primary/40">
         <div className="flex items-center gap-2 mb-3">
           <Wifi size={16} className="text-emerald-600" />
-          <h2 className="text-sm font-semibold text-stone-900">
+          <h2 className="text-sm font-semibold text-slate-800">
             Wi-Fi SSID Whitelist
           </h2>
         </div>
-        <p className="text-xs text-stone-400 mb-3">
+        <p className="text-xs text-slate-400 mb-3">
           Tentukan nama Wi-Fi (SSID) Rumah Produksi untuk membatasi lokasi absensi kru.
         </p>
         <div className="flex gap-2">
@@ -312,28 +311,28 @@ export default function ManagerSettingsPage() {
             placeholder="SSID Wi-Fi (misal: WiFi_Produksi)..."
             value={newSsid}
             onChange={(e) => setNewSsid(e.target.value)}
-            className="flex-1 text-sm"
+            className="flex-1 h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
           />
-          <Button
+          <button
             onClick={updateSsid}
             disabled={submitting}
-            size="sm"
+            className="h-11 px-4 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs shadow-sm active:scale-95 transition-all"
           >
             Simpan SSID
-          </Button>
+          </button>
         </div>
-      </Card>
+      </div>
 
-      <Card className="p-4 mb-4">
+      <div className="bg-white rounded-3xl p-5 border border-primary/20 shadow-[0_0_15px_rgba(244,63,94,0.05)] mb-5 transition-all hover:border-primary/40">
         <div className="flex items-center gap-2 mb-3">
           <Wifi size={16} className="text-emerald-600" />
-          <h2 className="text-sm font-semibold text-stone-900">
+          <h2 className="text-sm font-semibold text-slate-800">
             IP Whitelist
           </h2>
         </div>
 
         {config?.whitelistedIps.length === 0 && (
-          <p className="text-xs text-stone-400 mb-3">
+          <p className="text-xs text-slate-400 mb-3">
             Belum ada IP di whitelist
           </p>
         )}
@@ -342,15 +341,15 @@ export default function ManagerSettingsPage() {
           {config?.whitelistedIps.map((ip) => (
             <div
               key={ip}
-              className="flex items-center justify-between bg-stone-50 rounded-lg px-3 py-2"
+              className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2"
             >
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={14} className="text-emerald-600" />
-                <span className="text-sm font-mono text-stone-700">{ip}</span>
+                <span className="text-sm font-mono text-slate-700">{ip}</span>
               </div>
               <button
                 onClick={() => removeIp(ip)}
-                className="text-stone-400 hover:text-red-500 p-1"
+                className="text-slate-400 hover:text-red-500 p-1"
               >
                 <Trash2 size={14} />
               </button>
@@ -364,23 +363,23 @@ export default function ManagerSettingsPage() {
             placeholder="Tambah IP baru..."
             value={newIp}
             onChange={(e) => setNewIp(e.target.value)}
-            className="flex-1 text-sm font-mono"
+            className="flex-1 h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-800 font-mono outline-none focus:ring-2 focus:ring-slate-900/20"
           />
-          <Button
+          <button
             onClick={() => addIp(newIp)}
             disabled={submitting || !newIp.trim()}
-            size="sm"
+            className="h-11 px-4 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs shadow-sm active:scale-95 transition-all"
           >
             <Plus size={14} />
-          </Button>
+          </button>
         </div>
-      </Card>
+      </div>
 
       {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
       {success && <p className="text-sm text-emerald-600 mt-2">{success}</p>}
 
       {/* ── Fee Platform Marketplace ── */}
-      <Card className="p-5 space-y-4">
+      <div className="bg-white rounded-3xl p-5 border border-primary/20 shadow-[0_0_15px_rgba(244,63,94,0.05)] space-y-4 transition-all hover:border-primary/40">
         <div className="flex items-center gap-2">
           <div style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Tag size={16} className="text-primary" />
@@ -408,7 +407,7 @@ export default function ManagerSettingsPage() {
               className="h-10 text-sm" />
           </div>
         </div>
-        <Button
+        <button
           onClick={async () => {
             setSavingFees(true);
             setFeeSaved("");
@@ -426,11 +425,11 @@ export default function ManagerSettingsPage() {
         >
           {savingFees ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
           Simpan Fee Marketplace
-        </Button>
+        </button>
         {feeSaved && <p style={{ fontSize: "12px", color: "#16A34A", fontWeight: "600" }}>✓ {feeSaved}</p>}
-      </Card>
+      </div>
       {/* ── Inventaris & Repacking ── */}
-      <Card className="p-5 space-y-4 mb-8">
+      <div className="bg-white rounded-3xl p-5 border border-primary/20 shadow-[0_0_15px_rgba(244,63,94,0.05)] mb-8 space-y-4 transition-all hover:border-primary/40">
         <div className="flex items-center gap-2">
           <div style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Package size={16} className="text-primary" />
@@ -470,17 +469,16 @@ export default function ManagerSettingsPage() {
             }}
             className="flex-1 text-sm h-10 rounded-xl"
           />
-          <Button 
+          <button 
             onClick={handleAddKeyword} 
             disabled={!newKeyword.trim()} 
-            className="h-10 px-4 rounded-xl"
-            variant="outline"
+            className="h-10 px-4 rounded-xl flex items-center justify-center bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
             <Plus size={16} />
-          </Button>
+          </button>
         </div>
 
-        <Button
+        <button
           onClick={async () => {
             setSavingInventory(true);
             setInventorySaved("");
@@ -498,12 +496,12 @@ export default function ManagerSettingsPage() {
         >
           {savingInventory ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
           Simpan Kata Kunci
-        </Button>
+        </button>
         {inventorySaved && <p style={{ fontSize: "12px", color: "#16A34A", fontWeight: "600" }}>✓ {inventorySaved}</p>}
-      </Card>
+      </div>
 
       {/* ── POS Packaging Rules Card ── */}
-      <Card className="p-5 space-y-4 mb-8">
+      <div className="bg-white rounded-3xl p-5 border border-primary/20 shadow-[0_0_15px_rgba(244,63,94,0.05)] mb-8 space-y-4 transition-all hover:border-primary/40">
         <div className="flex items-center gap-2">
           <div style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#FEF1F5", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Package size={16} className="text-primary" />
@@ -574,7 +572,7 @@ export default function ManagerSettingsPage() {
           </button>
         </div>
 
-        <Button
+        <button
           onClick={async () => {
             setSavingPosRules(true);
             setPosRulesSaved("");
@@ -592,9 +590,9 @@ export default function ManagerSettingsPage() {
         >
           {savingPosRules ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
           Simpan Aturan Kemasan POS
-        </Button>
+        </button>
         {posRulesSaved && <p style={{ fontSize: "12px", color: "#16A34A", fontWeight: "600" }}>✓ {posRulesSaved}</p>}
-      </Card>
+      </div>
     </div>
   );
 }

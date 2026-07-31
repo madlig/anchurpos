@@ -157,17 +157,22 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { woType, productId, productName, variantIds, targetBatches, targetLoyang, targetPacks, targetPcs, targetQty, targetUom, notes, assignedCrewId } = body;
+    const { woType, productId, productName, variantIds, targetBatches, targetLoyang, targetPacks, targetPcs, targetQty, targetUom, notes, assignedCrewId, productionTargets, opnameScope, opnameItems, sourceOrderId, sourceOrderNumber, repackIngredientId } = body;
 
-    const typePrefix = woType === "REPACK_SAOS" ? "RPK" : woType === "STOCK_OPNAME" ? "SOP" : woType === "GENERAL_TASK" ? "TSK" : woType === "PACKING_PESANAN" ? "PCK" : "WO";
+    const typePrefix = woType === "REPACK_SAOS" || woType === "REPACK_GULA" ? "RPK" : woType === "STOCK_OPNAME" ? "SOP" : woType === "GENERAL_TASK" ? "TSK" : woType === "PACKING_PESANAN" ? "PCK" : "WO";
     const todayStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
     const randomSuffix = Math.floor(10 + Math.random() * 90);
     const woNumber = `${typePrefix}-${todayStr}-${randomSuffix}`;
 
-    const numBatches = Number(targetBatches) || 0;
-    const numLoyang = Number(targetLoyang) || (numBatches * 12);
+    let numBatches = Number(targetBatches) || 0;
+    let numLoyang = Number(targetLoyang) || (numBatches * 12);
     const numPacks = Number(targetPacks) || 0;
     const numPcs = Number(targetPcs) || (numPacks * 12);
+
+    if (productionTargets && Array.isArray(productionTargets)) {
+      numBatches = productionTargets.reduce((sum, t) => sum + (Number(t.targetBatches) || 0), 0);
+      numLoyang = productionTargets.reduce((sum, t) => sum + (Number(t.targetLoyang) || (Number(t.targetBatches) || 0) * 12), 0);
+    }
 
     const woRef = adminDb.collection("workOrders").doc();
     const newWo = {
@@ -182,6 +187,12 @@ export async function POST(req: NextRequest) {
       targetPcs: numPcs,
       targetQty: Number(targetQty) || 0,
       targetUom: targetUom || "",
+      productionTargets: productionTargets || null,
+      opnameScope: opnameScope || null,
+      opnameItems: opnameItems || null,
+      sourceOrderId: sourceOrderId || null,
+      sourceOrderNumber: sourceOrderNumber || null,
+      repackIngredientId: repackIngredientId || null,
       status: "RELEASED", // Released by manager to shop floor
       currentStage: "DOUGH_COOKING",
       summaryState: {
@@ -201,6 +212,15 @@ export async function POST(req: NextRequest) {
     };
 
     await woRef.set(newWo);
+
+    if (sourceOrderId) {
+      try {
+        const orderRef = adminDb.collection("orders").doc(sourceOrderId);
+        await orderRef.update({ hasWorkOrder: true });
+      } catch (orderErr) {
+        console.warn("Failed to lock order:", orderErr);
+      }
+    }
 
     // Auto-deduct raw material ingredients from BOM recipes upon Work Order release
     try {

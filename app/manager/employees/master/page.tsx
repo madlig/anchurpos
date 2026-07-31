@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Loader2, Plus, Users, UserPlus, Pencil, KeyRound, Trash2, ChevronDown, ChevronUp, Check, X } from "lucide-react";
 import { Employee, ROLE_LABEL } from "../types";
 import { EmployeeForm, ChangePasswordForm } from "../components/SharedForms";
@@ -81,13 +82,12 @@ export default function MasterEmployeePage() {
     <div className="animate-in fade-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: "900", color: "#1E293B" }}>Master Karyawan</h2>
-          <p style={{ fontSize: "13px", color: "#64748B", fontWeight: "600" }}>Kelola data dan akses login tim Anda.</p>
+          <h2 className="text-lg font-black text-slate-800">Master Karyawan</h2>
+          <p className="text-xs font-bold text-slate-500 mt-1">Kelola data dan akses login tim Anda.</p>
         </div>
         <button
           onClick={() => { setShowAddForm(true); setEditEmp(null); }}
-          className="tap-target"
-          style={{ background: "#E85D8C", color: "#fff", padding: "10px 16px", borderRadius: "12px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", boxShadow: "0 4px 10px rgba(232, 93, 140, 0.2)" }}
+          className="tap-target flex items-center gap-2 h-11 px-5 rounded-xl bg-slate-900 text-white font-bold text-sm shadow-sm hover:bg-black active:scale-95 transition-all"
         >
           <UserPlus size={16} /> Tambah Karyawan
         </button>
@@ -117,7 +117,11 @@ export default function MasterEmployeePage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-10"><Loader2 className="animate-spin text-slate-400" /></div>
+        <div className="space-y-3">
+          <Skeleton className="h-24 w-full rounded-2xl" />
+          <Skeleton className="h-24 w-full rounded-2xl" />
+          <Skeleton className="h-24 w-full rounded-2xl" />
+        </div>
       ) : error ? (
         <div className="text-center py-10 text-red-500 font-bold">{error}</div>
       ) : (
@@ -128,14 +132,14 @@ export default function MasterEmployeePage() {
               const rc = emp.role === "manager" ? { bg: "#FEF3C7", color: "#D97706" } : { bg: "#F1F5F9", color: "#64748B" };
 
               return (
-                <div key={emp.id} style={{ background: "#fff", borderRadius: "14px", padding: "14px", border: "1px solid #F1F5F9" }}>
+                <div key={emp.id} className="bg-white rounded-3xl p-4 border border-slate-200/60 shadow-sm transition-all hover:border-slate-300">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div style={{ width: "38px", height: "38px", borderRadius: "12px", background: rc.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         <span style={{ fontSize: "15px", fontWeight: "800", color: rc.color }}>{emp.name[0].toUpperCase()}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>{emp.name}</p>
+                        <p className="text-sm font-bold text-slate-800">{emp.name}</p>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span style={{ fontSize: "11px", fontFamily: "monospace", color: "#94A3B8" }}>@{emp.username}</span>
                           <span style={{ padding: "1px 7px", borderRadius: "100px", fontSize: "10px", fontWeight: "700", background: rc.bg, color: rc.color }}>
@@ -146,7 +150,7 @@ export default function MasterEmployeePage() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <button onClick={() => setExpandedId(expanded ? null : emp.id)}
-                        style={{ width: "30px", height: "30px", borderRadius: "9px", background: "#F8FAFC", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        className="flex items-center justify-center w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors">
                         {expanded ? <ChevronUp size={14} style={{ color: "#64748B" }} /> : <ChevronDown size={14} style={{ color: "#64748B" }} />}
                       </button>
                     </div>

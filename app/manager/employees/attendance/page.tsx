@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Loader2, ChevronDown, ChevronUp, Pencil, Check, CalendarDays, User, X } from "lucide-react";
 import { AttendanceRecord, Employee } from "../types";
 
@@ -104,8 +105,8 @@ export default function AttendancePage() {
     <div className="animate-in fade-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: "900", color: "#1E293B" }}>Pantauan Absensi</h2>
-          <p style={{ fontSize: "13px", color: "#64748B", fontWeight: "600" }}>Data absensi bulanan crew otomatis valid.</p>
+          <h2 className="text-lg font-black text-slate-800">Pantauan Absensi</h2>
+          <p className="text-xs font-bold text-slate-500 mt-1">Data absensi bulanan crew otomatis valid.</p>
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -118,7 +119,11 @@ export default function AttendancePage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-10"><Loader2 className="animate-spin text-slate-400" /></div>
+        <div className="space-y-3">
+          <Skeleton className="h-20 w-full rounded-2xl" />
+          <Skeleton className="h-20 w-full rounded-2xl" />
+          <Skeleton className="h-20 w-full rounded-2xl" />
+        </div>
       ) : attendance.length === 0 ? (
         <div style={{ background: "#fff", borderRadius: "14px", padding: "32px 16px", textAlign: "center", border: "1px solid #F1F5F9" }}>
           <p style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>Belum ada riwayat absensi pada bulan ini</p>

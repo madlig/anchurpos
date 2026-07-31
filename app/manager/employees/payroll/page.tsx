@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Loader2, CalendarDays, Check, Search, Lock, Edit3, Save, X, FileText, LayoutList, Wallet, Settings2, ChevronDown, CheckCircle2 } from "lucide-react";
 import { AttendanceRecord, Employee, PayrollRecord } from "../types";
 import { AdaptivePanel } from "@/components/shared/AdaptivePanel";
@@ -219,8 +220,8 @@ export default function PayrollPage() {
     <div className="animate-in fade-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
         <div>
-          <h2 style={{ fontSize: "18px", fontWeight: "900", color: "#1E293B" }}>Sistem Penggajian</h2>
-          <p style={{ fontSize: "13px", color: "#64748B", fontWeight: "600" }}>Kalkulasi gaji real-time berdasarkan absensi berjalan.</p>
+          <h2 className="text-lg font-black text-slate-800">Sistem Penggajian</h2>
+          <p className="text-xs font-bold text-slate-500 mt-1">Kalkulasi gaji real-time berdasarkan absensi berjalan.</p>
         </div>
         <div className="flex items-center gap-2">
           <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} style={{ padding: "8px 12px", borderRadius: "10px", border: "1px solid #E2E8F0", fontSize: "13px", fontWeight: "700", color: "#334155", outline: "none" }} />
@@ -255,7 +256,11 @@ export default function PayrollPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-10"><Loader2 className="animate-spin text-slate-400" /></div>
+        <div className="space-y-3">
+          <Skeleton className="h-20 w-full rounded-2xl" />
+          <Skeleton className="h-20 w-full rounded-2xl" />
+          <Skeleton className="h-20 w-full rounded-2xl" />
+        </div>
       ) : livePayrolls.length === 0 ? (
         <div className="text-center py-10 text-slate-500 font-bold">Tidak ada karyawan aktif untuk dihitung gajinya.</div>
       ) : (

@@ -292,6 +292,17 @@ export default function CrewSFMTerminal() {
                       className="h-10 w-full px-3 rounded-2xl border border-slate-200 bg-slate-50 font-black text-xs text-rose-600 outline-none"
                     />
                   </div>
+
+                  <div className="pt-1 border-t border-slate-100">
+                    <label className="text-slate-700 font-extrabold block mb-1">Catatan Crew (Opsional)</label>
+                    <textarea
+                      placeholder="Misal: Mesin sempat mati 10 menit..."
+                      value={scrapReasonInput}
+                      onChange={(e) => setScrapReasonInput(e.target.value)}
+                      rows={2}
+                      className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 font-medium text-xs text-slate-800 outline-none focus:border-emerald-500"
+                    />
+                  </div>
                 </>
               )}
 

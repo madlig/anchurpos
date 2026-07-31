@@ -463,7 +463,7 @@ export interface OperationalConfig {
 
 // --- 13. Shop Floor Management (SFM) Types ---
 export type WorkOrderStatus = "PLANNED" | "RELEASED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
-export type SFMWorkOrderType = "PRODUKSI" | "REPACK_SAOS" | "PACKING_PESANAN" | "STOCK_OPNAME" | "GENERAL_TASK";
+export type SFMWorkOrderType = "PRODUKSI" | "REPACK_SAOS" | "REPACK_GULA" | "PACKING_PESANAN" | "STOCK_OPNAME" | "GENERAL_TASK";
 export type SFMTaskStep = "DOUGH_COOKING" | "MIXING_EGG" | "TRAY_MOLDING" | "FREEZER_CHECKPOINT" | "PRE_PACK" | "FINAL_PACK";
 export type SFMLogStage = "DOUGH_MIXING" | "TRAY_PRINTING" | "FREEZER_CHECKPOINT" | "FINAL_PACKING";
 
@@ -485,6 +485,12 @@ export interface WorkOrder {
   productName?: string;
   variantIds: string[];
   variantNames?: string;
+  productionTargets?: { variantId: string; variantName: string; targetBatches: number; targetLoyang?: number }[];
+  opnameScope?: "Bahan Baku" | "Kemasan" | "Produk Jadi" | "Spesifik" | "Semua";
+  opnameItems?: string[];
+  sourceOrderId?: string;
+  sourceOrderNumber?: string;
+  repackIngredientId?: string;
   targetBatches?: number;
   targetLoyang?: number;
   targetPacks?: number;

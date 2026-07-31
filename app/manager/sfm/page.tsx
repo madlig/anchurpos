@@ -21,6 +21,7 @@ export default function ManagerSFMPage() {
 
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modal
@@ -34,6 +35,10 @@ export default function ManagerSFMPage() {
     targetQty: "100", // For REPACK
     targetUom: "cup", // For REPACK
     notes: "",
+    productionTargets: [] as { variantId: string; variantName: string; targetBatches: string }[],
+    opnameScope: "Semua" as "Semua" | "Bahan Baku" | "Kemasan" | "Produk Jadi" | "Spesifik",
+    opnameItems: [] as string[],
+    sourceOrderId: "",
   });
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
@@ -48,12 +53,18 @@ export default function ManagerSFMPage() {
     setLoading(true);
     try {
       const activeDateStr = activeTab === "audit_ledger" && date ? date : "";
-      const [woRes, varRes] = await Promise.all([
+      const [woRes, varRes, ordersRes] = await Promise.all([
         fetchWithAuth(`/api/sfm/work-orders?date=${activeDateStr}&search=${encodeURIComponent(searchQuery)}`),
         fetchWithAuth("/api/variants"),
+        fetchWithAuth("/api/orders"),
       ]);
 
       if (woRes.ok) setWorkOrders(await woRes.json());
+      if (varRes.ok) setVariants(await varRes.json());
+      if (ordersRes.ok) {
+        const allOrders = await ordersRes.json();
+        setPendingOrders(Array.isArray(allOrders) ? allOrders.filter(o => o.status === "pending" && !o.hasWorkOrder) : []);
+      }
       if (varRes.ok) setVariants(await varRes.json());
     } catch (err) {
       console.error("loadAllData error:", err);
@@ -93,15 +104,22 @@ export default function ManagerSFMPage() {
           variantIds: newWoForm.variantId ? [newWoForm.variantId] : [],
           targetBatches: newWoForm.woType === "PRODUKSI" ? parseFloat(newWoForm.targetBatches) : 0,
           targetPacks: newWoForm.woType === "PACKING_PESANAN" ? parseInt(newWoForm.targetPacks) : 0,
-          targetQty: (newWoForm.woType === "REPACK_SAOS" || newWoForm.woType === "GENERAL_TASK") ? parseFloat(newWoForm.targetQty) : 0,
-          targetUom: (newWoForm.woType === "REPACK_SAOS" || newWoForm.woType === "GENERAL_TASK") ? newWoForm.targetUom : "",
+          targetQty: (newWoForm.woType === "REPACK_SAOS" || newWoForm.woType === "REPACK_GULA" || newWoForm.woType === "GENERAL_TASK") ? parseFloat(newWoForm.targetQty) : 0,
+          targetUom: (newWoForm.woType === "REPACK_SAOS" || newWoForm.woType === "REPACK_GULA" || newWoForm.woType === "GENERAL_TASK") ? newWoForm.targetUom : "",
+          productionTargets: newWoForm.woType === "PRODUKSI" ? newWoForm.productionTargets : undefined,
+          opnameScope: newWoForm.woType === "STOCK_OPNAME" ? newWoForm.opnameScope : undefined,
+          opnameItems: newWoForm.woType === "STOCK_OPNAME" ? newWoForm.opnameItems : undefined,
+          sourceOrderId: newWoForm.woType === "PACKING_PESANAN" ? newWoForm.sourceOrderId : undefined,
           notes: newWoForm.notes,
         }),
       });
 
       if (res.ok) {
         setShowNewWoModal(false);
-        setNewWoForm({ woType: "PRODUKSI", variantId: "", targetBatches: "3", targetPacks: "48", targetQty: "100", targetUom: "cup", notes: "" });
+        setNewWoForm({ 
+          woType: "PRODUKSI", variantId: "", targetBatches: "3", targetPacks: "48", targetQty: "100", targetUom: "cup", notes: "",
+          productionTargets: [], opnameScope: "Semua", opnameItems: [], sourceOrderId: ""
+        });
         await loadAllData();
       }
     } finally {
@@ -406,14 +424,15 @@ export default function ManagerSFMPage() {
                     {[
                       { val: "PRODUKSI", label: "Produksi Dapur" },
                       { val: "REPACK_SAOS", label: "Repack Saos" },
+                      { val: "REPACK_GULA", label: "Repack Gula" },
                       { val: "PACKING_PESANAN", label: "Packing Pesanan" },
                       { val: "STOCK_OPNAME", label: "Stock Opname" }
                     ].map((opt) => (
                       <button
                         key={opt.val}
                         type="button"
-                        onClick={() => setNewWoForm({ ...newWoForm, woType: opt.val as SFMWorkOrderType })}
-                        className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-left ${
+                        onClick={() => setNewWoForm({ ...newWoForm, woType: opt.val as SFMWorkOrderType, variantId: "", sourceOrderId: "" })}
+                        className={`py-2 px-2 rounded-xl border text-[10px] sm:text-xs font-bold transition-all text-center ${
                           newWoForm.woType === opt.val ? "bg-slate-900 border-slate-900 text-white shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                         }`}
                       >
@@ -423,41 +442,83 @@ export default function ManagerSFMPage() {
                   </div>
                 </div>
 
-                {/* 2. Varian / Produk */}
-                <div>
-                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider block mb-2">2. Varian Produk *</label>
-                  <select
-                    required
-                    value={newWoForm.variantId}
-                    onChange={(e) => setNewWoForm({ ...newWoForm, variantId: e.target.value })}
-                    className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
-                  >
-                    <option value="" disabled>Pilih Varian...</option>
-                    {variants.map((v) => (
-                      <option key={v.id} value={v.id}>{v.name}</option>
-                    ))}
-                  </select>
-                </div>
+                {/* 2. Subjek (Varian / Pesanan) */}
+                {newWoForm.woType !== "REPACK_GULA" && newWoForm.woType !== "STOCK_OPNAME" && newWoForm.woType !== "PRODUKSI" && (
+                  <div>
+                    <label className="text-xs font-black text-slate-700 uppercase tracking-wider block mb-2">
+                      {newWoForm.woType === "PACKING_PESANAN" ? "2. Pilih Pesanan (Pending) *" : "2. Varian Produk *"}
+                    </label>
+                    
+                    {newWoForm.woType === "PACKING_PESANAN" ? (
+                      <select
+                        required
+                        value={newWoForm.sourceOrderId}
+                        onChange={(e) => {
+                          const order = pendingOrders.find(o => o.id === e.target.value);
+                          const totalQty = order?.items?.reduce((sum: number, item: any) => sum + item.qty, 0) || 0;
+                          setNewWoForm({ ...newWoForm, sourceOrderId: e.target.value, targetPacks: totalQty.toString() });
+                        }}
+                        className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
+                      >
+                        <option value="" disabled>Pilih Pesanan...</option>
+                        {pendingOrders.map((o) => (
+                          <option key={o.id} value={o.id}>{o.customerName} - {o.orderChannel.toUpperCase()}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <select
+                        required
+                        value={newWoForm.variantId}
+                        onChange={(e) => setNewWoForm({ ...newWoForm, variantId: e.target.value })}
+                        className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
+                      >
+                        <option value="" disabled>Pilih Varian...</option>
+                        {variants.map((v) => (
+                          <option key={v.id} value={v.id}>{v.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
 
                 {/* 3. Dynamic Target Inputs based on woType */}
                 <div className="p-4 rounded-2xl bg-slate-100/80 border border-slate-200 space-y-4">
                   <label className="text-xs font-black text-slate-900 uppercase tracking-wider block">3. Target (Otomatis Menyesuaikan)</label>
                   
                   {newWoForm.woType === "PRODUKSI" && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-500 mb-1 block">Target Batch Memasak</label>
-                        <Input
-                          type="number"
-                          step="0.5"
-                          min="0.5"
-                          required
-                          value={newWoForm.targetBatches}
-                          onChange={(e) => setNewWoForm({ ...newWoForm, targetBatches: e.target.value })}
-                          className="h-10 text-sm font-black text-slate-900 bg-white"
-                        />
-                        <p className="text-[10px] font-medium text-slate-400 mt-1">Estimasi: {parseFloat(newWoForm.targetBatches || "0") * 12} Loyang</p>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-bold text-slate-500 block">Daftar Produksi per Varian</label>
+                        <button type="button" onClick={() => setNewWoForm({ ...newWoForm, productionTargets: [...newWoForm.productionTargets, { variantId: variants[0]?.id || "", variantName: variants[0]?.name || "", targetBatches: "1" }] })} className="text-[10px] bg-slate-200 px-2 py-1 rounded text-slate-700 font-bold hover:bg-slate-300">+ Tambah</button>
                       </div>
+                      {newWoForm.productionTargets.map((pt, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <select
+                            value={pt.variantId}
+                            onChange={(e) => {
+                              const newArr = [...newWoForm.productionTargets];
+                              newArr[idx].variantId = e.target.value;
+                              newArr[idx].variantName = variants.find(v => v.id === e.target.value)?.name || "";
+                              setNewWoForm({ ...newWoForm, productionTargets: newArr });
+                            }}
+                            className="flex-1 h-9 px-2 rounded-lg border border-slate-200 text-xs font-semibold"
+                          >
+                            {variants.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                          </select>
+                          <Input
+                            type="number" step="0.5" min="0.5"
+                            value={pt.targetBatches}
+                            onChange={(e) => {
+                              const newArr = [...newWoForm.productionTargets];
+                              newArr[idx].targetBatches = e.target.value;
+                              setNewWoForm({ ...newWoForm, productionTargets: newArr });
+                            }}
+                            className="w-20 h-9 text-xs text-center font-bold"
+                          />
+                          <button type="button" onClick={() => setNewWoForm({ ...newWoForm, productionTargets: newWoForm.productionTargets.filter((_, i) => i !== idx) })} className="w-8 h-9 rounded-lg bg-red-100 flex items-center justify-center text-red-600"><X size={14}/></button>
+                        </div>
+                      ))}
+                      {newWoForm.productionTargets.length === 0 && <p className="text-xs text-slate-400 italic">Klik + Tambah untuk menentukan target varian</p>}
                     </div>
                   )}
 
@@ -473,12 +534,46 @@ export default function ManagerSFMPage() {
                           onChange={(e) => setNewWoForm({ ...newWoForm, targetPacks: e.target.value })}
                           className="h-10 text-sm font-black text-slate-900 bg-white"
                         />
-                        <p className="text-[10px] font-medium text-slate-400 mt-1">Estimasi: {parseInt(newWoForm.targetPacks || "0") * 12} Pcs</p>
+                        <p className="text-[10px] font-medium text-slate-400 mt-1">
+                          {newWoForm.sourceOrderId ? "Otomatis diisi dari pesanan." : `Estimasi: ${parseInt(newWoForm.targetPacks || "0") * 12} Pcs`}
+                        </p>
                       </div>
                     </div>
                   )}
 
-                  {(newWoForm.woType === "REPACK_SAOS" || newWoForm.woType === "GENERAL_TASK" || newWoForm.woType === "STOCK_OPNAME") && (
+                  {newWoForm.woType === "STOCK_OPNAME" && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 mb-1 block">Ruang Lingkup Opname</label>
+                        <select
+                          value={newWoForm.opnameScope}
+                          onChange={(e) => setNewWoForm({ ...newWoForm, opnameScope: e.target.value as any })}
+                          className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
+                        >
+                          <option value="Semua">Semua Item Stok</option>
+                          <option value="Bahan Baku">Kategori: Bahan Baku</option>
+                          <option value="Kemasan">Kategori: Kemasan</option>
+                          <option value="Produk Jadi">Kategori: Produk Jadi</option>
+                          <option value="Spesifik">Pilih Spesifik...</option>
+                        </select>
+                      </div>
+                      {newWoForm.opnameScope === "Spesifik" && (
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-500 mb-1 block">Sebutkan Item (Pisahkan dengan koma)</label>
+                          <Input
+                            type="text"
+                            placeholder="Contoh: Terigu, Saos Coklat, Thinwall"
+                            value={newWoForm.opnameItems.join(", ")}
+                            onChange={(e) => setNewWoForm({ ...newWoForm, opnameItems: e.target.value.split(",").map(i => i.trim()).filter(Boolean) })}
+                            className="h-10 text-sm font-bold text-slate-900 bg-white"
+                            required
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {(newWoForm.woType === "REPACK_SAOS" || newWoForm.woType === "REPACK_GULA" || newWoForm.woType === "GENERAL_TASK") && (
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 mb-1 block">Jumlah Target</label>

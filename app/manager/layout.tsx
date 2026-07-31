@@ -4,18 +4,51 @@ import { RoleGuard } from "@/components/shared/RoleGuard";
 import { useAuth } from "@/lib/auth-context";
 import {
   LayoutDashboard, ShoppingCart, Package, User,
-  ClipboardList, LogOut, Banknote, ChefHat, Beaker, Settings, BookOpen
+  ClipboardList, LogOut, Banknote, ChefHat, Settings, BookOpen, Users, LineChart, Database, FileText
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV_ITEMS = [
-  { label: "Beranda", href: "/manager/dashboard", icon: LayoutDashboard },
-  { label: "Pesanan", href: "/manager/orders", icon: ClipboardList },
-  { label: "Buku Kas", href: "/manager/expenses", icon: Banknote },
-  { label: "Kasir", href: "/manager/pos", icon: ShoppingCart, isPosButton: true },
-  { label: "Belanja", href: "/manager/purchases", icon: Package },
-  { label: "Profil", href: "/manager/profile", icon: User },
+const ERP_MENU_GROUPS = [
+  {
+    group: "Dasbor Utama",
+    items: [
+      { label: "Beranda", href: "/manager/dashboard", icon: LayoutDashboard },
+    ]
+  },
+  {
+    group: "Penjualan & Kasir",
+    items: [
+      { label: "Kasir POS", href: "/manager/pos", icon: ShoppingCart },
+      { label: "Pesanan Aktif", href: "/manager/orders", icon: ClipboardList },
+      { label: "Laporan Omzet", href: "/manager/omzet", icon: LineChart },
+    ]
+  },
+  {
+    group: "Produksi & Gudang",
+    items: [
+      { label: "SFM Terpusat", href: "/manager/sfm", icon: ChefHat },
+      { label: "Inventori", href: "/manager/inventory", icon: Package },
+      { label: "Stock Opname", href: "/manager/inventory/stock-opname", icon: FileText },
+      { label: "BOM & Resep", href: "/manager/bom", icon: BookOpen },
+    ]
+  },
+  {
+    group: "Keuangan & P&L",
+    items: [
+      { label: "Buku Kas", href: "/manager/expenses", icon: Banknote },
+      { label: "Belanja Modal", href: "/manager/purchases", icon: ShoppingCart },
+      { label: "Laporan P&L", href: "/manager/reports", icon: FileText },
+    ]
+  },
+  {
+    group: "SDM & Sistem",
+    items: [
+      { label: "Karyawan & Gaji", href: "/manager/employees/master", icon: Users },
+      { label: "Master Data", href: "/manager/master-data", icon: Database },
+      { label: "Pengaturan", href: "/manager/settings", icon: Settings },
+    ]
+  }
 ];
 
 function DesktopSidebar() {
@@ -38,47 +71,29 @@ function DesktopSidebar() {
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
-          const active = pathname.startsWith(item.href);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              data-testid={`sidebar-${item.label.toLowerCase()}`}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
-              style={active ? { background: "#FEF1F5", color: "#E85D8C" } : { color: "#64748B" }}
-            >
-              <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />
-              <span className="text-sm font-semibold">{item.label}</span>
-            </Link>
-          );
-        })}
-        
-        <div className="mt-6 mb-2 px-3">
-          <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Operasional & Gudang</p>
-        </div>
-        {[
-          { label: "SFM Terpusat", href: "/manager/sfm", icon: ChefHat },
-          { label: "BOM & Resep", href: "/manager/bom", icon: BookOpen },
-          { label: "Inventory", href: "/manager/inventory", icon: ClipboardList },
-          { label: "Stock Opname", href: "/manager/inventory/stock-opname", icon: ClipboardList },
-          { label: "Pengaturan", href: "/manager/settings", icon: Settings },
-        ].map((item) => {
-          const active = pathname === item.href || (pathname.startsWith(item.href + '/') && !['/manager/inventory'].includes(item.href));
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all tap-target"
-              style={active ? { background: "#FEF1F5", color: "#E85D8C" } : { color: "#64748B" }}
-            >
-              <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />
-              <span className="text-sm font-semibold">{item.label}</span>
-            </Link>
-          );
-        })}
+        {ERP_MENU_GROUPS.map((group, idx) => (
+          <div key={idx} className="mb-4">
+            <div className="px-3 mb-1">
+              <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">{group.group}</p>
+            </div>
+            {group.items.map((item) => {
+              const active = pathname === item.href || (pathname.startsWith(item.href + '/') && !['/manager/inventory'].includes(item.href));
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  data-testid={`sidebar-${item.label.toLowerCase()}`}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all tap-target"
+                  style={active ? { background: "#FEF1F5", color: "#E85D8C" } : { color: "#64748B" }}
+                >
+                  <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />
+                  <span className="text-sm font-semibold">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
       <div className="px-3 py-3" style={{ borderTop: "1px solid #F1F5F9" }}>
         <div className="flex items-center gap-3 px-3 py-2 mb-1.5">
@@ -172,12 +187,13 @@ function MobileBottomNav() {
               >
                 <Icon size={18} strokeWidth={active ? 2.5 : 1.8} style={{ color: active ? "#E85D8C" : "#94A3B8" }} />
               </div>
-              <span className="text-xs font-bold" style={{ color: active ? "#E85D8C" : "#94A3B8" }}>
+              <span className="text-[10px] font-bold mt-1 text-center" style={{ color: active ? "#E85D8C" : "#94A3B8" }}>
                 {item.label}
               </span>
             </Link>
           );
         })}
+        {/* Mobile Hub Menu Drawer Trigger could go here in the future if needed */}
       </div>
     </nav>
   );

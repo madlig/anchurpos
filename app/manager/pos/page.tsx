@@ -11,6 +11,7 @@ import { VariantSelectorModal } from "./components/VariantSelectorModal";
 import { CartCheckoutPanel } from "./components/CartCheckoutPanel";
 import { CartBottomBar } from "./components/CartBottomBar";
 import { BottomSheet } from "@/components/shared/BottomSheet";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 // Types
 import type { ProductItem, Variant, CustomerItem, CartItem, AddonItem } from "./types";
@@ -149,8 +150,41 @@ export default function KasirPage() {
   const cartCount = useMemo(() => cart.reduce((s, i) => s + i.qty, 0), [cart]);
 
   if (loading) return (
-    <div className="flex h-screen items-center justify-center bg-brand-50">
-      <Loader2 className="h-7 w-7 animate-spin text-pink-400" />
+    <div className="min-h-screen bg-brand-50 flex flex-col md:flex-row">
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="pt-4 px-4 pb-4 bg-white/90 border-b border-primary/20 shadow-sm">
+          <Skeleton className="h-6 w-32 mb-4" />
+          <div className="flex justify-between items-center mb-2">
+            <Skeleton className="h-7 w-24 rounded-xl" />
+            <Skeleton className="h-7 w-24 rounded-xl" />
+          </div>
+          <Skeleton className="h-10 w-full rounded-xl mt-2 mb-3" />
+          <div className="flex gap-2">
+            <Skeleton className="h-7 w-16 rounded-full" />
+            <Skeleton className="h-7 w-20 rounded-full" />
+            <Skeleton className="h-7 w-20 rounded-full" />
+          </div>
+        </div>
+        <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {[1,2,3,4,5,6,7,8,9,10].map(i => (
+            <div key={i} className="bg-white rounded-3xl p-3 shadow-sm border border-slate-100 flex flex-col">
+              <Skeleton className="w-full aspect-square rounded-2xl mb-3" />
+              <Skeleton className="h-4 w-3/4 mb-1" />
+              <Skeleton className="h-3 w-1/2 mb-3" />
+              <Skeleton className="h-8 w-full rounded-xl mt-auto" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="hidden md:flex w-[400px] border-l border-primary/20 bg-white flex-col h-screen p-5">
+        <Skeleton className="h-7 w-40 mb-6" />
+        <Skeleton className="h-20 w-full rounded-2xl mb-3" />
+        <Skeleton className="h-20 w-full rounded-2xl mb-3" />
+        <div className="mt-auto space-y-4">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-14 w-full rounded-2xl" />
+        </div>
+      </div>
     </div>
   );
 

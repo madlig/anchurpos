@@ -201,37 +201,50 @@ export default function ManagerDashboardPage() {
       </div>
 
       <div className="px-4 md:px-8 max-w-5xl mx-auto space-y-5 pt-5">
-        
-        {/* ── Target Omzet Progress Bar ── */}
-        <div className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-5 shadow-sm border border-slate-200/80 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-[11px] md:text-xs font-extrabold text-slate-400 uppercase tracking-wider block flex items-center gap-1">
-                <Target size={13} className="text-primary" /> Target Penjualan Hari Ini
-              </span>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-lg md:text-xl font-black text-slate-800 tabular-nums">{fmt(omzet)}</span>
-                <span className="text-xs font-bold text-slate-400">/ {fmt(DAILY_TARGET)}</span>
+        {/* ── Real-time Status & Priority Alerts ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Order Status */}
+          <div className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-5 shadow-sm border border-slate-200/80">
+            <h2 className="text-[11px] md:text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+              <ClipboardList size={14} className="text-blue-500" /> Status Pesanan
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <p className="text-2xl font-black text-slate-800 tabular-nums">
+                  {recentOrders.filter(o => o.status === "pending").length}
+                </p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">Pending</p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
+                <p className="text-2xl font-black text-blue-700 tabular-nums">
+                  {recentOrders.filter(o => o.status === "proses").length}
+                </p>
+                <p className="text-[10px] font-bold text-blue-600 uppercase mt-1">Diproses</p>
               </div>
             </div>
-            <div className="text-right">
-              <span className={`text-xs md:text-sm font-black px-2.5 py-1 rounded-full ${omzetPct >= 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-primary/10 text-primary'}`}>
-                {omzetPct}%
-              </span>
+          </div>
+
+          {/* Priority Alerts */}
+          <div className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-5 shadow-sm border border-slate-200/80">
+            <h2 className="text-[11px] md:text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+              <AlertTriangle size={14} className="text-rose-500" /> Priority Alerts
+            </h2>
+            <div className="space-y-2">
+              {data?.lowStockItems && data.lowStockItems.length > 0 ? (
+                <div className="bg-rose-50 p-3 rounded-xl border border-rose-100 flex items-start gap-2">
+                  <AlertTriangle size={16} className="text-rose-600 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-rose-800">{data.lowStockItems.length} Item Stok Kritis</p>
+                    <p className="text-[10px] font-semibold text-rose-600 mt-0.5">Segera lakukan re-stock untuk mencegah kendala produksi.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 flex items-center gap-2 h-full">
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                  <p className="text-xs font-bold text-emerald-800">Semua stok dalam kondisi aman.</p>
+                </div>
+              )}
             </div>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden p-0.5">
-            <div 
-              className="h-full rounded-full bg-gradient-to-r from-primary via-rose-500 to-emerald-500 transition-all duration-700"
-              style={{ width: `${omzetPct}%` }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
-            <span>{data?.orderCount ?? 0} Transaksi Terproses</span>
-            <span>{omzet >= DAILY_TARGET ? "Target Tercapai" : `Sisa Target: ${fmt(DAILY_TARGET - omzet)}`}</span>
           </div>
         </div>
 
@@ -368,7 +381,7 @@ export default function ManagerDashboardPage() {
                 </Link>
 
                 <Link href="/manager/sfm" className="flex flex-col items-center group">
-                  <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-white group-hover:scale-105 transition-transform shadow-sm">
+                  <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform shadow-sm">
                     <ChefHat size={20} />
                   </div>
                   <span className="text-[11px] font-bold text-slate-700 text-center mt-1.5">SFM Terpusat</span>

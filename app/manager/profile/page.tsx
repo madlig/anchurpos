@@ -106,16 +106,12 @@ export default function ManagerProfilePage() {
           <h2 className="text-sm font-bold" style={{ color: "#1C1C1E" }}>Operasional Crew</h2>
         </div>
         <div className="space-y-2">
-          <a href="/manager/pre-packing" className="flex items-center justify-between p-3 rounded-2xl transition-colors tap-target" style={{ background: "#FEF1F5" }}>
-            <span className="text-xs font-semibold text-slate-700">Modul Pre-Packing</span>
+          <a href="/manager/sfm" className="flex items-center justify-between p-3 rounded-2xl transition-colors tap-target" style={{ background: "#FEF1F5" }}>
+            <span className="text-xs font-semibold text-slate-700">Manager SFM (Work Orders)</span>
             <span className="text-xs font-bold" style={{ color: "#E85D8C" }}>Buka &rarr;</span>
           </a>
-          <a href="/manager/packing" className="flex items-center justify-between p-3 rounded-2xl transition-colors tap-target" style={{ background: "#FEF1F5" }}>
-            <span className="text-xs font-semibold text-slate-700">Modul Packing</span>
-            <span className="text-xs font-bold" style={{ color: "#E85D8C" }}>Buka &rarr;</span>
-          </a>
-          <a href="/manager/production" className="flex items-center justify-between p-3 rounded-2xl transition-colors tap-target" style={{ background: "#FEF1F5" }}>
-            <span className="text-xs font-semibold text-slate-700">Modul Produksi</span>
+          <a href="/crew/sfm" className="flex items-center justify-between p-3 rounded-2xl transition-colors tap-target" style={{ background: "#FEF1F5" }}>
+            <span className="text-xs font-semibold text-slate-700">Crew SFM (Terminal)</span>
             <span className="text-xs font-bold" style={{ color: "#E85D8C" }}>Buka &rarr;</span>
           </a>
         </div>
