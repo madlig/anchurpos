@@ -41,10 +41,12 @@ export async function GET(req: NextRequest) {
         productName: d.productName || "Churros Frozen",
         variantIds: d.variantIds || [],
         variantNames: (d.variantIds || []).map((vId: string) => varMap[vId] || vId).join(", "),
-        targetBatches: d.targetBatches || 1,
-        targetLoyang: d.targetLoyang || 12,
+        targetBatches: d.targetBatches || 0,
+        targetLoyang: d.targetLoyang || 0,
         targetPacks: targetPacks,
         targetPcs: targetPcs,
+        targetQty: d.targetQty || 0,
+        targetUom: d.targetUom || "",
         status: d.status || "PLANNED",
         currentStage: d.currentStage || "DOUGH_COOKING",
         summaryState: d.summaryState || {
@@ -155,16 +157,17 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { woType, productId, productName, variantIds, targetBatches, targetPacks, notes, assignedCrewId } = body;
+    const { woType, productId, productName, variantIds, targetBatches, targetLoyang, targetPacks, targetPcs, targetQty, targetUom, notes, assignedCrewId } = body;
 
-    const typePrefix = woType === "REPACK_SAOS" ? "RPK" : woType === "STOCK_OPNAME" ? "SOP" : woType === "GENERAL_TASK" ? "TSK" : "WO";
+    const typePrefix = woType === "REPACK_SAOS" ? "RPK" : woType === "STOCK_OPNAME" ? "SOP" : woType === "GENERAL_TASK" ? "TSK" : woType === "PACKING_PESANAN" ? "PCK" : "WO";
     const todayStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
     const randomSuffix = Math.floor(10 + Math.random() * 90);
     const woNumber = `${typePrefix}-${todayStr}-${randomSuffix}`;
 
-    const numBatches = Number(targetBatches) || 1;
-    const numPacks = Number(targetPacks) || numBatches * 16; // 1 Batch ~16 Thinwall Packs
-    const numPcs = numPacks * 12; // 1 Pack = 12 Pcs Churros
+    const numBatches = Number(targetBatches) || 0;
+    const numLoyang = Number(targetLoyang) || (numBatches * 12);
+    const numPacks = Number(targetPacks) || 0;
+    const numPcs = Number(targetPcs) || (numPacks * 12);
 
     const woRef = adminDb.collection("workOrders").doc();
     const newWo = {
@@ -174,9 +177,11 @@ export async function POST(req: NextRequest) {
       productName: productName || "Churros Frozen Food",
       variantIds: Array.isArray(variantIds) ? variantIds : [],
       targetBatches: numBatches,
-      targetLoyang: numBatches * 12, // 1 Batch = 12 Loyang
+      targetLoyang: numLoyang,
       targetPacks: numPacks,
       targetPcs: numPcs,
+      targetQty: Number(targetQty) || 0,
+      targetUom: targetUom || "",
       status: "RELEASED", // Released by manager to shop floor
       currentStage: "DOUGH_COOKING",
       summaryState: {

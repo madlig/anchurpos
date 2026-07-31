@@ -485,10 +485,12 @@ export interface WorkOrder {
   productName?: string;
   variantIds: string[];
   variantNames?: string;
-  targetBatches: number;
-  targetLoyang: number;
-  targetPacks: number;
+  targetBatches?: number;
+  targetLoyang?: number;
+  targetPacks?: number;
   targetPcs?: number;
+  targetQty?: number;
+  targetUom?: string;
   status: WorkOrderStatus;
   currentStage: string;
   summaryState: WorkOrderSummaryState;
