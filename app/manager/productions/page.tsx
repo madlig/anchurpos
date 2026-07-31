@@ -247,10 +247,10 @@ export default function ManagerProductionsPage() {
             <div className="overflow-x-auto hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
               <div className="flex items-center gap-1.5 min-w-max">
                 {[
-                  { key: "wo_produksi", label: "👩‍🍳 Produksi Loyang", icon: ChefHat },
-                  { key: "prepacking", label: "❄️ Pre-Packing Freezer", icon: Snowflake },
-                  { key: "packing", label: "🛍️ Repack & Packing", icon: Package },
-                  { key: "kpi_audit", label: "📊 KPI & Audit Owner", icon: Award },
+                  { key: "wo_produksi", label: "Produksi Loyang", icon: ChefHat },
+                  { key: "prepacking", label: "Pre-Packing Freezer", icon: Snowflake },
+                  { key: "packing", label: "Repack & Packing", icon: Package },
+                  { key: "kpi_audit", label: "KPI & Audit Owner", icon: Award },
                 ].map((t) => {
                   const Icon = t.icon;
                   const isActive = activeTab === t.key;
@@ -666,11 +666,30 @@ export default function ManagerProductionsPage() {
                   <Input
                     type="number"
                     step="0.1"
-                    placeholder="Contoh: 1.5"
+                    placeholder="Nilai kustom..."
                     value={logForm.valueAdded}
                     onChange={(e) => setLogForm(p => ({ ...p, valueAdded: e.target.value }))}
                     className="h-11 font-black text-sm text-indigo-700"
                   />
+                  {/* SAP/Odoo Dynamic Quick Preset Chips */}
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {(logForm.stage === "DOUGH_MIXING" ? ["0.5", "1.0", "1.5", "2.0"] :
+                      logForm.stage === "FINAL_PACKING" ? ["10", "25", "50", "100"] :
+                      ["1", "2", "5", "10"]).map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => setLogForm(p => ({ ...p, valueAdded: chip }))}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold border transition-all ${
+                          logForm.valueAdded === chip
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                        }`}
+                      >
+                        +{chip} {logForm.stage === "DOUGH_MIXING" ? "Batch" : logForm.stage === "FINAL_PACKING" ? "Pack" : "Loyang"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>

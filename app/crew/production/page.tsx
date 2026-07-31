@@ -164,30 +164,42 @@ export default function CrewProductionPage() {
               </div>
             </div>
 
-            {/* Quick Touch Buttons for Crew (56px Touch Target) */}
+            {/* Quick Stage Task Action Buttons for Crew */}
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => handleQuickLog(wo, "DOUGH_MIXING", 1.5)}
-                className="h-12 rounded-2xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1 shadow-sm transition-all"
+                onClick={() => {
+                  setActiveWo(wo);
+                  setStage("DOUGH_MIXING");
+                  setValueAdded("1.5");
+                }}
+                className="h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
               >
-                +1.5 Adonan
+                <ChefHat size={16} /> Log Adonan Batch
               </button>
 
               <button
                 type="button"
-                onClick={() => handleQuickLog(wo, "TRAY_PRINTING", 5)}
-                className="h-12 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1 shadow-sm transition-all"
+                onClick={() => {
+                  setActiveWo(wo);
+                  setStage("TRAY_PRINTING");
+                  setValueAdded("5");
+                }}
+                className="h-12 rounded-2xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
               >
-                +5 Loyang Cetak
+                <Plus size={16} /> Cetak Loyang
               </button>
 
               <button
                 type="button"
-                onClick={() => handleQuickLog(wo, "FREEZER_CHECKPOINT", 5)}
-                className="h-12 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1 shadow-sm transition-all"
+                onClick={() => {
+                  setActiveWo(wo);
+                  setStage("FREEZER_CHECKPOINT");
+                  setValueAdded("5");
+                }}
+                className="h-12 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
               >
-                ❄️ Freezer In
+                <Snowflake size={16} /> Freezer In
               </button>
 
               <button
@@ -195,11 +207,11 @@ export default function CrewProductionPage() {
                 onClick={() => {
                   setActiveWo(wo);
                   setStage("FINAL_PACKING");
-                  setValueAdded("10");
+                  setValueAdded("25");
                 }}
-                className="h-12 rounded-2xl bg-slate-900 hover:bg-black active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1 shadow-sm transition-all"
+                className="h-12 rounded-2xl bg-slate-900 hover:bg-black active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
               >
-                📦 Input Packing
+                <Package size={16} /> Vacuum Pack
               </button>
             </div>
           </div>
@@ -244,10 +256,30 @@ export default function CrewProductionPage() {
                   <input
                     type="number"
                     step="0.1"
+                    placeholder="Nilai kustom..."
                     value={valueAdded}
                     onChange={(e) => setValueAdded(e.target.value)}
-                    className="h-11 w-full px-3 rounded-2xl border border-slate-200 bg-slate-50 font-black text-sm text-indigo-700"
+                    className="h-11 w-full px-3 rounded-2xl border border-slate-200 bg-slate-50 font-black text-sm text-indigo-700 outline-none"
                   />
+                  {/* SAP/Odoo Dynamic Quick Preset Chips */}
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {(stage === "DOUGH_MIXING" ? ["0.5", "1.0", "1.5", "2.0"] :
+                      stage === "FINAL_PACKING" ? ["10", "25", "50", "100"] :
+                      ["1", "2", "5", "10"]).map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => setValueAdded(chip)}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold border transition-all ${
+                          valueAdded === chip
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                        }`}
+                      >
+                        +{chip} {stage === "DOUGH_MIXING" ? "Batch" : stage === "FINAL_PACKING" ? "Pack" : "Loyang"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <label className="font-extrabold text-slate-700 block mb-1">Defect / Patah (Pack)</label>
@@ -255,7 +287,7 @@ export default function CrewProductionPage() {
                     type="number"
                     value={defectCount}
                     onChange={(e) => setDefectCount(e.target.value)}
-                    className="h-11 w-full px-3 rounded-2xl border border-slate-200 bg-slate-50 font-black text-sm text-rose-600"
+                    className="h-11 w-full px-3 rounded-2xl border border-slate-200 bg-slate-50 font-black text-sm text-rose-600 outline-none"
                   />
                 </div>
               </div>
