@@ -367,25 +367,11 @@ export default function ManagerDashboardPage() {
                   <span className="text-[11px] font-bold text-slate-700 text-center mt-1.5">BOM & Resep</span>
                 </Link>
 
-                <Link href="/manager/productions" className="flex flex-col items-center group">
-                  <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 group-hover:scale-105 transition-transform shadow-sm">
+                <Link href="/manager/sfm" className="flex flex-col items-center group">
+                  <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-white group-hover:scale-105 transition-transform shadow-sm">
                     <ChefHat size={20} />
                   </div>
-                  <span className="text-[11px] font-bold text-slate-700 text-center mt-1.5">Produksi</span>
-                </Link>
-
-                <Link href="/manager/pre-packing" className="flex flex-col items-center group">
-                  <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 group-hover:scale-105 transition-transform shadow-sm">
-                    <Layers size={20} />
-                  </div>
-                  <span className="text-[11px] font-bold text-slate-700 text-center mt-1.5">Pre-Packing</span>
-                </Link>
-
-                <Link href="/manager/packing" className="flex flex-col items-center group">
-                  <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-cyan-50 border border-cyan-100 flex items-center justify-center text-cyan-600 group-hover:scale-105 transition-transform shadow-sm">
-                    <Package size={20} />
-                  </div>
-                  <span className="text-[11px] font-bold text-slate-700 text-center mt-1.5">Packing Kirim</span>
+                  <span className="text-[11px] font-bold text-slate-700 text-center mt-1.5">SFM Terpusat</span>
                 </Link>
               </div>
             </div>

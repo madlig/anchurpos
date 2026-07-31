@@ -116,7 +116,7 @@ export default function ManagerSFMPage() {
         <div className="max-w-7xl mx-auto space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-900 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-sm">
                 <LayoutGrid size={20} />
               </div>
               <div>
@@ -141,7 +141,7 @@ export default function ManagerSFMPage() {
               <button
                 type="button"
                 onClick={() => setShowNewWoModal(true)}
-                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
               >
                 <Plus size={16} /> <span className="hidden sm:inline">Terbitkan Work Order</span>
               </button>
@@ -163,7 +163,7 @@ export default function ManagerSFMPage() {
                     onClick={() => setActiveTab(t.key as any)}
                     className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap flex items-center gap-2 border ${
                       isActive
-                        ? "bg-indigo-900 text-white border-indigo-900 shadow-xs"
+                        ? "bg-slate-900 text-white border-slate-900 shadow-xs"
                         : "bg-slate-100/80 text-slate-600 border-slate-200/80 hover:bg-slate-200/60"
                     }`}
                   >
@@ -174,6 +174,23 @@ export default function ManagerSFMPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex bg-slate-100 p-1 rounded-xl mr-2">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("table")}
+                  className={`p-1.5 rounded-lg transition-all ${viewMode === "table" ? "bg-white shadow-sm text-slate-900" : "text-slate-400 hover:text-slate-600"}`}
+                >
+                  <Table size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  className={`p-1.5 rounded-lg transition-all ${viewMode === "grid" ? "bg-white shadow-sm text-slate-900" : "text-slate-400 hover:text-slate-600"}`}
+                >
+                  <LayoutGrid size={14} />
+                </button>
+              </div>
+
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -232,7 +249,7 @@ export default function ManagerSFMPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total WO Aktif</p>
-              <p className="text-2xl font-black text-indigo-700 mt-1">{filteredWorkOrders.length}</p>
+              <p className="text-2xl font-black text-slate-900 mt-1">{filteredWorkOrders.length}</p>
             </div>
             <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Proses Dapur</p>
@@ -255,14 +272,15 @@ export default function ManagerSFMPage() {
           </div>
         )}
 
-        {/* Work Orders List (Grid) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Work Orders List (Grid vs Table) */}
+        {viewMode === "grid" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredWorkOrders.map((wo) => (
             <div key={wo.id} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
               <div>
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono font-extrabold text-indigo-900 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-100">
+                    <span className="text-[10px] font-mono font-extrabold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">
                       {wo.woNumber}
                     </span>
                     <span className="text-[10px] font-black text-slate-500 uppercase">{wo.woType}</span>
@@ -282,7 +300,7 @@ export default function ManagerSFMPage() {
                   {wo.woType === "PRODUKSI" ? (
                     <>
                       <div className="flex justify-between"><span className="text-slate-500">Target Loyang:</span> <span className="text-slate-800 font-extrabold">{wo.targetLoyang} Loyang</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Progress Loyang:</span> <span className="text-indigo-600 font-extrabold">{wo.summaryState?.totalTrayPrinted || 0} / {wo.targetLoyang}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Progress Loyang:</span> <span className="text-slate-900 font-extrabold">{wo.summaryState?.totalTrayPrinted || 0} / {wo.targetLoyang}</span></div>
                     </>
                   ) : wo.woType === "PACKING_PESANAN" ? (
                     <>
@@ -311,6 +329,62 @@ export default function ManagerSFMPage() {
             </div>
           )}
         </div>
+      ) : (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-slate-50 border-b border-slate-100 text-xs text-slate-500 font-bold uppercase tracking-wider">
+                <tr>
+                  <th className="px-5 py-4">Nomor & Tipe</th>
+                  <th className="px-5 py-4">Produk</th>
+                  <th className="px-5 py-4">Target vs Aktual</th>
+                  <th className="px-5 py-4">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredWorkOrders.map(wo => (
+                  <tr key={wo.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="font-mono font-bold text-slate-800">{wo.woNumber}</div>
+                      <div className="text-[10px] text-slate-500 font-black mt-1 uppercase">{wo.woType}</div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="font-bold text-slate-800">{wo.productName}</div>
+                      <div className="text-xs text-slate-500 mt-1">PIC: {wo.assignedCrewName}</div>
+                    </td>
+                    <td className="px-5 py-4">
+                      {wo.woType === "PRODUKSI" ? (
+                        <span className="font-bold text-slate-700">{wo.summaryState?.totalTrayPrinted || 0} / {wo.targetLoyang} <span className="text-slate-400 text-xs font-semibold">Loyang</span></span>
+                      ) : wo.woType === "PACKING_PESANAN" ? (
+                        <span className="font-bold text-slate-700">{wo.summaryState?.totalGoodPacks || 0} / {wo.targetPacks} <span className="text-slate-400 text-xs font-semibold">Pack</span></span>
+                      ) : (
+                        <span className="font-bold text-slate-700">{wo.summaryState?.totalGoodPcs || 0} / {wo.targetQty} <span className="text-slate-400 text-xs font-semibold">{wo.targetUom}</span></span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                        wo.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                        wo.status === "IN_PROGRESS" ? "bg-blue-50 text-blue-700 border-blue-200" :
+                        "bg-amber-50 text-amber-700 border-amber-200"
+                      }`}>
+                        {wo.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {filteredWorkOrders.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-12 text-center">
+                      <Box size={32} className="mx-auto text-slate-300 mb-2" />
+                      <p className="text-slate-500 font-bold">Tidak ada Work Order.</p>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       </div>
 
       {/* Dynamic Create Work Order Modal */}
@@ -340,7 +414,7 @@ export default function ManagerSFMPage() {
                         type="button"
                         onClick={() => setNewWoForm({ ...newWoForm, woType: opt.val as SFMWorkOrderType })}
                         className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-left ${
-                          newWoForm.woType === opt.val ? "bg-indigo-50 border-indigo-200 text-indigo-700 ring-2 ring-indigo-500/20" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          newWoForm.woType === opt.val ? "bg-slate-900 border-slate-900 text-white shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                         }`}
                       >
                         {opt.label}
@@ -356,7 +430,7 @@ export default function ManagerSFMPage() {
                     required
                     value={newWoForm.variantId}
                     onChange={(e) => setNewWoForm({ ...newWoForm, variantId: e.target.value })}
-                    className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
                   >
                     <option value="" disabled>Pilih Varian...</option>
                     {variants.map((v) => (
@@ -366,8 +440,8 @@ export default function ManagerSFMPage() {
                 </div>
 
                 {/* 3. Dynamic Target Inputs based on woType */}
-                <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100/50 space-y-4">
-                  <label className="text-xs font-black text-indigo-900 uppercase tracking-wider block">3. Target (Otomatis Menyesuaikan)</label>
+                <div className="p-4 rounded-2xl bg-slate-100/80 border border-slate-200 space-y-4">
+                  <label className="text-xs font-black text-slate-900 uppercase tracking-wider block">3. Target (Otomatis Menyesuaikan)</label>
                   
                   {newWoForm.woType === "PRODUKSI" && (
                     <div className="grid grid-cols-2 gap-4">
@@ -380,7 +454,7 @@ export default function ManagerSFMPage() {
                           required
                           value={newWoForm.targetBatches}
                           onChange={(e) => setNewWoForm({ ...newWoForm, targetBatches: e.target.value })}
-                          className="h-10 text-sm font-black text-indigo-700 bg-white"
+                          className="h-10 text-sm font-black text-slate-900 bg-white"
                         />
                         <p className="text-[10px] font-medium text-slate-400 mt-1">Estimasi: {parseFloat(newWoForm.targetBatches || "0") * 12} Loyang</p>
                       </div>
@@ -397,7 +471,7 @@ export default function ManagerSFMPage() {
                           required
                           value={newWoForm.targetPacks}
                           onChange={(e) => setNewWoForm({ ...newWoForm, targetPacks: e.target.value })}
-                          className="h-10 text-sm font-black text-indigo-700 bg-white"
+                          className="h-10 text-sm font-black text-slate-900 bg-white"
                         />
                         <p className="text-[10px] font-medium text-slate-400 mt-1">Estimasi: {parseInt(newWoForm.targetPacks || "0") * 12} Pcs</p>
                       </div>
@@ -414,7 +488,7 @@ export default function ManagerSFMPage() {
                           required
                           value={newWoForm.targetQty}
                           onChange={(e) => setNewWoForm({ ...newWoForm, targetQty: e.target.value })}
-                          className="h-10 text-sm font-black text-indigo-700 bg-white"
+                          className="h-10 text-sm font-black text-slate-900 bg-white"
                         />
                       </div>
                       <div>
@@ -425,7 +499,7 @@ export default function ManagerSFMPage() {
                           placeholder="Misal: cup, pouch"
                           value={newWoForm.targetUom}
                           onChange={(e) => setNewWoForm({ ...newWoForm, targetUom: e.target.value })}
-                          className="h-10 text-sm font-black text-indigo-700 bg-white"
+                          className="h-10 text-sm font-black text-slate-900 bg-white"
                         />
                       </div>
                     </div>
@@ -438,7 +512,7 @@ export default function ManagerSFMPage() {
                   <textarea
                     value={newWoForm.notes}
                     onChange={(e) => setNewWoForm({ ...newWoForm, notes: e.target.value })}
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
                     rows={2}
                     placeholder="Misal: Dahulukan pesanan jam 10 pagi..."
                   ></textarea>
@@ -458,7 +532,7 @@ export default function ManagerSFMPage() {
                 type="submit"
                 form="create-wo-form"
                 disabled={creatingWo}
-                className="px-6 py-2.5 rounded-xl font-extrabold text-xs text-white bg-indigo-600 hover:bg-indigo-700 flex items-center gap-2 shadow-sm transition-all"
+                className="px-6 py-2.5 rounded-xl font-extrabold text-xs text-white bg-slate-900 hover:bg-black flex items-center gap-2 shadow-sm transition-all"
               >
                 {creatingWo ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                 Terbitkan & Beri Notif

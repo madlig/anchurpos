@@ -59,15 +59,13 @@ function DesktopSidebar() {
           <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Operasional & Gudang</p>
         </div>
         {[
-          { label: "Pre-Packing", href: "/manager/pre-packing", icon: ClipboardList },
-          { label: "Packing (Kirim)", href: "/manager/packing", icon: Package },
-          { label: "Laporan Produksi", href: "/manager/productions", icon: ChefHat },
+          { label: "SFM Terpusat", href: "/manager/sfm", icon: ChefHat },
           { label: "BOM & Resep", href: "/manager/bom", icon: BookOpen },
           { label: "Inventory", href: "/manager/inventory", icon: ClipboardList },
           { label: "Stock Opname", href: "/manager/inventory/stock-opname", icon: ClipboardList },
           { label: "Pengaturan", href: "/manager/settings", icon: Settings },
         ].map((item) => {
-          const active = pathname === item.href || (pathname.startsWith(item.href + '/') && !['/manager/inventory', '/manager/pre-packing'].includes(item.href));
+          const active = pathname === item.href || (pathname.startsWith(item.href + '/') && !['/manager/inventory'].includes(item.href));
           const Icon = item.icon;
           return (
             <Link

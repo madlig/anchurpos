@@ -119,7 +119,7 @@ export default function CrewSFMTerminal() {
       {/* Native App Mobile Header */}
       <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-900 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
             <ChefHat size={22} />
           </div>
           <div>
@@ -164,7 +164,7 @@ export default function CrewSFMTerminal() {
                   <span className="text-[11px] font-mono font-extrabold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">
                     {wo.woNumber}
                   </span>
-                  <span className="text-[10px] font-black text-indigo-700 uppercase">{wo.woType}</span>
+                  <span className="text-[10px] font-black text-slate-900 uppercase">{wo.woType}</span>
                 </div>
               </div>
 
@@ -183,7 +183,7 @@ export default function CrewSFMTerminal() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-500">Progress Cetak:</span>
-                      <span className="text-indigo-700 font-extrabold">{wo.summaryState?.totalTrayPrinted || 0} Loyang</span>
+                      <span className="text-slate-900 font-extrabold">{wo.summaryState?.totalTrayPrinted || 0} Loyang</span>
                     </div>
                   </>
                 ) : (
@@ -204,13 +204,13 @@ export default function CrewSFMTerminal() {
               <div className="space-y-2 pt-1">
                 <div className="flex items-center justify-between text-xs font-extrabold text-slate-700">
                   <span>Tahap Saat Ini:</span>
-                  <span className="text-indigo-600">{activeStep.label}</span>
+                  <span className="text-slate-900">{activeStep.label}</span>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => handleStartStep(wo, currentStepIdx >= 0 ? currentStepIdx : 0)}
-                  className="w-full h-12 rounded-2xl bg-indigo-900 hover:bg-black active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition-all"
+                  className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-black active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition-all"
                 >
                   <Play size={16} /> Jalankan {activeStep.label}
                 </button>
@@ -245,8 +245,8 @@ export default function CrewSFMTerminal() {
             <div className="space-y-4 text-xs font-bold">
               {/* PRODUKSI: Sub-Batch Iteration */}
               {activeWoForStep.wo.woType === "PRODUKSI" && PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "DOUGH_COOKING" && (
-                <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-2">
-                  <span className="text-indigo-900 font-extrabold block">Catat Sub-Batch Memasak Adonan:</span>
+                <div className="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 space-y-2">
+                  <span className="text-slate-900 font-extrabold block">Catat Sub-Batch Memasak Adonan:</span>
                   <div className="flex gap-2">
                     {["1.0", "1.5", "2.0"].map((chip) => (
                       <button
@@ -254,13 +254,13 @@ export default function CrewSFMTerminal() {
                         type="button"
                         onClick={() => handleLogSubBatch(activeWoForStep.wo, parseFloat(chip))}
                         disabled={submittingStep}
-                        className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-2xs active:scale-95 transition-all"
+                        className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs shadow-2xs active:scale-95 transition-all"
                       >
                         + {chip} Batch
                       </button>
                     ))}
                   </div>
-                  <p className="text-[10px] text-indigo-600 font-medium">Memasak bertahap (1.5 + 1.5) akan menambah akumulasi waktu secara otomatis tanpa pindah tahap.</p>
+                  <p className="text-[10px] text-slate-600 font-medium">Memasak bertahap (1.5 + 1.5) akan menambah akumulasi waktu secara otomatis tanpa pindah tahap.</p>
                 </div>
               )}
 

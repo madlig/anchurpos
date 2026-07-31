@@ -134,8 +134,7 @@ export default function CrewLayout({ children }: { children: React.ReactNode }) 
   const NAV_ITEMS = [
     { label: "Tugas", href: "/crew/dashboard", icon: LayoutDashboard },
     ...(hasCheckedIn ? [
-      { label: "Produksi", href: "/crew/production", icon: ChefHat },
-      { label: "Packing", href: "/crew/packing", icon: PackageOpen },
+      { label: "SFM", href: "/crew/sfm", icon: ChefHat },
       { label: "Opname", href: "/crew/stock-opname", icon: ClipboardList },
     ] : []),
     { label: "Profil", href: "/crew/settings", icon: User },
