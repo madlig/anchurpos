@@ -462,8 +462,9 @@ export interface OperationalConfig {
 }
 
 // --- 13. Shop Floor Management (SFM) Types ---
-export type WorkOrderStatus = "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
-export type WorkOrderStage = "DOUGH" | "TRAY_PRINT" | "FREEZING" | "PACKING" | "DONE";
+export type WorkOrderStatus = "PLANNED" | "RELEASED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+export type SFMWorkOrderType = "PRODUKSI" | "REPACK_SAOS" | "PACKING_PESANAN" | "STOCK_OPNAME" | "GENERAL_TASK";
+export type SFMTaskStep = "DOUGH_COOKING" | "MIXING_EGG" | "TRAY_MOLDING" | "FREEZER_CHECKPOINT" | "PRE_PACK" | "FINAL_PACK";
 export type SFMLogStage = "DOUGH_MIXING" | "TRAY_PRINTING" | "FREEZER_CHECKPOINT" | "FINAL_PACKING";
 
 export interface WorkOrderSummaryState {
@@ -471,6 +472,7 @@ export interface WorkOrderSummaryState {
   totalTrayPrinted: number;
   totalTrayInFreezer: number;
   totalGoodPacks: number;
+  totalGoodPcs?: number;
   totalDefectPacks: number;
   totalDefectPcs: number;
 }
@@ -478,14 +480,17 @@ export interface WorkOrderSummaryState {
 export interface WorkOrder {
   id: string;
   woNumber: string;
+  woType?: SFMWorkOrderType;
   productId: string;
   productName?: string;
   variantIds: string[];
+  variantNames?: string;
   targetBatches: number;
   targetLoyang: number;
   targetPacks: number;
+  targetPcs?: number;
   status: WorkOrderStatus;
-  currentStage: WorkOrderStage;
+  currentStage: string;
   summaryState: WorkOrderSummaryState;
   createdAt: string;
   startedAt?: string;
@@ -496,12 +501,15 @@ export interface WorkOrder {
   notes?: string;
   batchCode?: string;
   expiredDate?: string;
+  stepDurationsMinutes?: Record<string, number>;
 }
 
 export interface WorkOrderLog {
   id: string;
   workOrderId: string;
-  stage: SFMLogStage;
+  stage?: SFMLogStage;
+  step?: SFMTaskStep;
+  action?: "GOOD_OUTPUT" | "SCRAP" | "SUB_BATCH" | "STEP_TRANSITION";
   valueAdded: number;
   unit: "BATCH" | "LOYANG" | "PACK" | "PCS";
   defectCount?: number;
@@ -509,6 +517,7 @@ export interface WorkOrderLog {
   loggedByCrewId: string;
   loggedByCrewName?: string;
   timestamp: string;
+  durationMinutes?: number;
   notes?: string;
 }
 
