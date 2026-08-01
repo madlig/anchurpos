@@ -363,6 +363,7 @@ export interface Order {
   invoiceNumber: string | null;
   invoiceGeneratedAt: string | null;
   invoiceUrl: string | null;
+  items?: any[];
 }
 
 // --- 10. orders/{orderId}/items/{itemId} ---
@@ -490,6 +491,7 @@ export interface WorkOrder {
   opnameItems?: string[];
   sourceOrderId?: string;
   sourceOrderNumber?: string;
+  sourceOrderDetails?: Order;
   repackIngredientId?: string;
   targetBatches?: number;
   targetLoyang?: number;
