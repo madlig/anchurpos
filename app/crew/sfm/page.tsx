@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Check, ChefHat, Package, RefreshCw, Calendar, Play, ArrowRight, Plus, Snowflake, Layers, Box, X } from "lucide-react";
+import { Loader2, Check, ChefHat, Package, RefreshCw, Calendar, Play, ArrowRight, Plus, Snowflake, Layers, Box, X, Clock, PauseCircle } from "lucide-react";
 import type { WorkOrder, SFMTaskStep } from "@/types";
 
 const PRODUKSI_STEPS: { key: SFMTaskStep; label: string; unit: string; icon: any }[] = [
@@ -13,14 +13,50 @@ const PRODUKSI_STEPS: { key: SFMTaskStep; label: string; unit: string; icon: any
   { key: "PRE_PACK", label: "5. Pre-Pack Thinwall / Vacuum", unit: "Pcs", icon: Package },
 ];
 
+function LiveTimer({ startedAt }: { startedAt?: string }) {
+  const [elapsed, setElapsed] = useState("");
+
+  useEffect(() => {
+    if (!startedAt) return;
+    const updateTime = () => {
+      const start = new Date(startedAt).getTime();
+      const now = Date.now();
+      const diffSec = Math.max(0, Math.floor((now - start) / 1000));
+      const hrs = Math.floor(diffSec / 3600);
+      const mins = Math.floor((diffSec % 3600) / 60);
+      const secs = diffSec % 60;
+      
+      if (hrs > 0) {
+        setElapsed(`${hrs}j ${mins}m`);
+      } else {
+        setElapsed(`${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+      }
+    };
+
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, [startedAt]);
+
+  if (!startedAt || !elapsed) return null;
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-black text-[11px] border border-emerald-200/80 shadow-2xs animate-pulse">
+      <Clock size={12} /> {elapsed}
+    </span>
+  );
+}
+
 export default function CrewSFMTerminal() {
   const { getToken } = useAuth();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
 
   const [stepStartTime, setStepStartTime] = useState<number | null>(null);
   const [pcsOutputInput, setPcsOutputInput] = useState("196");
+  const [pcsVariantOutput, setPcsVariantOutput] = useState<Record<string, string>>({});
+  const [loyangInput, setLoyangInput] = useState("");
+  const [packInput, setPackInput] = useState("16");
+  const [packSizeInput, setPackSizeInput] = useState("12");
   const [scrapPcsInput, setScrapPcsInput] = useState("0");
   const [scrapReasonInput, setScrapReasonInput] = useState("");
   const [submittingStep, setSubmittingStep] = useState(false);
@@ -38,7 +74,7 @@ export default function CrewSFMTerminal() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth(`/api/sfm/work-orders?date=${date}`);
+      const res = await fetchWithAuth(`/api/sfm/work-orders`);
       if (res.ok) {
         const data: WorkOrder[] = await res.json();
         setWorkOrders(data.filter(wo => wo.status !== "COMPLETED"));
@@ -48,7 +84,7 @@ export default function CrewSFMTerminal() {
     } finally {
       setLoading(false);
     }
-  }, [date, fetchWithAuth]);
+  }, [fetchWithAuth]);
 
   useEffect(() => {
     loadData();
@@ -57,6 +93,19 @@ export default function CrewSFMTerminal() {
   function handleStartStep(wo: WorkOrder, stepIndex: number) {
     setActiveWoForStep({ wo, stepIndex });
     setStepStartTime(Date.now());
+    setLoyangInput(wo.summaryState?.totalTrayPrinted?.toString() || wo.targetLoyang?.toString() || "");
+    setPackInput(wo.targetPacks?.toString() || "16");
+    setPackSizeInput("12");
+    
+    if (wo.productionTargets && wo.productionTargets.length > 0) {
+      const initial: Record<string, string> = {};
+      wo.productionTargets.forEach(pt => {
+        initial[pt.variantId] = "";
+      });
+      setPcsVariantOutput(initial);
+    } else {
+      setPcsOutputInput("196");
+    }
   }
 
   async function handleLogSubBatch(wo: WorkOrder, val: number) {
@@ -82,20 +131,41 @@ export default function CrewSFMTerminal() {
     }
   }
 
-  async function handleNextStep(wo: WorkOrder, currentStepKey: string, nextStepKey: string) {
+  async function handleNextStep(wo: WorkOrder, currentStepKey: string, nextStepKey: string, isPause = false) {
     setSubmittingStep(true);
     try {
       const duration = stepStartTime ? Math.max(1, Math.round((Date.now() - stepStartTime) / 60000)) : 15;
-      const goodPcs = (currentStepKey === "PRE_PACK" || wo.woType !== "PRODUKSI") ? (parseFloat(pcsOutputInput) || 0) : 0;
+      
+      let goodPcs = 0;
+      let goodPacks = 0;
+      let packSize = 12;
+      let loyangCount = 0;
+
+      if (currentStepKey === "TRAY_MOLDING" || currentStepKey === "FREEZER_CHECKPOINT") {
+        loyangCount = parseFloat(loyangInput) || 0;
+        if (wo.productionTargets && wo.productionTargets.length > 0) {
+          goodPcs = Object.values(pcsVariantOutput).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+        } else {
+          goodPcs = parseFloat(pcsOutputInput) || 0;
+        }
+      } else if (currentStepKey === "PRE_PACK" || wo.woType !== "PRODUKSI") {
+        goodPacks = parseFloat(packInput) || 0;
+        packSize = parseFloat(packSizeInput) || 12;
+        goodPcs = goodPacks * packSize;
+      }
+      
       const scrapPcs = parseFloat(scrapPcsInput) || 0;
 
       const res = await fetchWithAuth(`/api/sfm/work-orders/${wo.id}/step`, {
         method: "POST",
         body: JSON.stringify({
-          action: "STEP_TRANSITION",
+          action: isPause ? "PAUSE" : "STEP_TRANSITION",
           currentStep: currentStepKey,
-          nextStep: nextStepKey,
+          nextStep: isPause ? currentStepKey : nextStepKey,
+          loyangCount,
           goodPcs,
+          goodPacks,
+          packSize,
           scrapPcs,
           durationMinutes: duration,
           notes: scrapReasonInput,
@@ -124,7 +194,7 @@ export default function CrewSFMTerminal() {
           </div>
           <div>
             <h1 className="text-base font-black text-slate-800">Shop Floor Crew Terminal</h1>
-            <p className="text-xs font-semibold text-slate-400">Eksekusi Task PWA Auto-Chained Timer</p>
+            <p className="text-xs font-semibold text-slate-400">Eksekusi Work Order Aktif Global</p>
           </div>
         </div>
 
@@ -135,18 +205,6 @@ export default function CrewSFMTerminal() {
         >
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
         </button>
-      </div>
-
-      <div className="flex items-center justify-between bg-white rounded-2xl p-3 border border-slate-200/80 shadow-2xs">
-        <span className="text-xs font-extrabold text-slate-500 flex items-center gap-1.5">
-          <Calendar size={14} /> Tanggal
-        </span>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="h-8 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none"
-        />
       </div>
 
       {/* Active Work Orders Cards */}
@@ -160,17 +218,23 @@ export default function CrewSFMTerminal() {
           return (
             <div key={wo.id} className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-2 items-center flex-wrap">
                   <span className="text-[11px] font-mono font-extrabold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">
                     {wo.woNumber}
                   </span>
                   <span className="text-[10px] font-black text-slate-900 uppercase">{wo.woType}</span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <LiveTimer startedAt={wo.startedAt || wo.createdAt} />
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {new Date(wo.createdAt).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
               </div>
 
               <div>
                 <h2 className="text-base font-black text-slate-800">{wo.productName}</h2>
-                <p className="text-xs font-semibold text-slate-400 mt-0.5">Varian: {wo.variantNames || "N/A"}</p>
+                <p className="text-xs font-semibold text-slate-400 mt-0.5">Varian: {wo.productionTargets ? wo.productionTargets.map(pt => pt.variantName).join(", ") : (wo.variantNames || "N/A")}</p>
               </div>
 
               {/* Progress Summary Card */}
@@ -185,6 +249,12 @@ export default function CrewSFMTerminal() {
                       <span className="text-slate-500">Progress Cetak:</span>
                       <span className="text-slate-900 font-extrabold">{wo.summaryState?.totalTrayPrinted || 0} Loyang</span>
                     </div>
+                    {wo.summaryState?.totalGoodPcs ? (
+                      <div className="flex justify-between items-center pt-1 border-t border-slate-200/60">
+                        <span className="text-slate-500">Hasil Cetak Churros:</span>
+                        <span className="text-emerald-600 font-black">{wo.summaryState.totalGoodPcs} Pcs</span>
+                      </div>
+                    ) : null}
                   </>
                 ) : (
                   <>
@@ -230,8 +300,8 @@ export default function CrewSFMTerminal() {
 
       {/* Step Action Drawer Modal */}
       {activeWoForStep && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-200 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-4 pb-20 sm:pb-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-200 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <span className="text-[10px] font-mono font-extrabold text-slate-400 block">{activeWoForStep.wo.woNumber}</span>
@@ -239,7 +309,7 @@ export default function CrewSFMTerminal() {
                   {activeWoForStep.wo.woType === "PRODUKSI" ? PRODUKSI_STEPS[activeWoForStep.stepIndex]?.label : `Selesaikan ${activeWoForStep.wo.woType}`}
                 </h3>
               </div>
-              <button type="button" onClick={() => setActiveWoForStep(null)} className="text-slate-400"><X size={20}/></button>
+              <button type="button" onClick={() => setActiveWoForStep(null)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
             </div>
 
             <div className="space-y-4 text-xs font-bold">
@@ -264,21 +334,88 @@ export default function CrewSFMTerminal() {
                 </div>
               )}
 
-              {/* Output & Scrap Log (For non-produksi or final step of produksi) */}
-              {(activeWoForStep.wo.woType !== "PRODUKSI" || PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "PRE_PACK") && (
-                <>
+              {/* TRAY_MOLDING & FREEZER_CHECKPOINT Form (Input Loyang & Pcs Mentah) */}
+              {activeWoForStep.wo.woType === "PRODUKSI" && (PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "TRAY_MOLDING" || PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "FREEZER_CHECKPOINT") && (
+                <div className="space-y-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
                   <div>
-                    <label className="text-slate-700 font-extrabold block mb-1">Total Hasil Selesai (Good Output)</label>
+                    <label className="text-slate-700 font-extrabold block mb-1">Total Loyang Aktual Terbuat</label>
                     <div className="flex gap-2">
                       <input
                         type="number"
-                        value={pcsOutputInput}
-                        onChange={(e) => setPcsOutputInput(e.target.value)}
-                        className="h-11 w-full px-3 rounded-2xl border border-slate-200 bg-slate-50 font-black text-sm text-emerald-700 outline-none focus:border-emerald-500"
+                        placeholder="Contoh: 12"
+                        value={loyangInput}
+                        onChange={(e) => setLoyangInput(e.target.value)}
+                        className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-white font-black text-sm text-slate-800 outline-none focus:border-slate-400"
                       />
-                      <span className="h-11 px-4 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center font-black text-slate-500">
-                        {activeWoForStep.wo.woType === "PRODUKSI" ? "Pcs" : activeWoForStep.wo.targetUom || "Pack"}
-                      </span>
+                      <span className="h-10 px-3 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-extrabold text-slate-500 shrink-0">Loyang</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-700 font-extrabold block mb-1">Hasil Cetakan Churros (Pcs Mentah)</label>
+                    {activeWoForStep.wo.productionTargets && activeWoForStep.wo.productionTargets.length > 0 ? (
+                      <div className="space-y-2">
+                        {activeWoForStep.wo.productionTargets.map(pt => (
+                          <div key={pt.variantId} className="flex gap-2 items-center">
+                            <span className="w-1/3 text-xs font-bold text-slate-500 truncate">{pt.variantName}</span>
+                            <input
+                              type="number"
+                              placeholder="0"
+                              value={pcsVariantOutput[pt.variantId] || ""}
+                              onChange={(e) => setPcsVariantOutput(prev => ({ ...prev, [pt.variantId]: e.target.value }))}
+                              className="h-10 flex-1 px-3 rounded-xl border border-slate-200 bg-white font-black text-sm text-emerald-700 outline-none focus:border-emerald-500"
+                            />
+                            <span className="text-xs font-black text-slate-500 w-12 text-center">Pcs</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          placeholder="Contoh: 196"
+                          value={pcsOutputInput}
+                          onChange={(e) => setPcsOutputInput(e.target.value)}
+                          className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-white font-black text-sm text-emerald-700 outline-none focus:border-emerald-500"
+                        />
+                        <span className="h-10 px-3 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-extrabold text-slate-500 shrink-0">Pcs</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* PRE_PACK Form (Input Pack & Pack Size) */}
+              {(activeWoForStep.wo.woType !== "PRODUKSI" || PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "PRE_PACK") && (
+                <>
+                  <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-200/80 space-y-3">
+                    <div>
+                      <label className="text-emerald-900 font-extrabold block mb-1">Jumlah Pack Hasil Packing</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          value={packInput}
+                          onChange={(e) => setPackInput(e.target.value)}
+                          className="h-11 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-base text-emerald-800 outline-none focus:border-emerald-500"
+                        />
+                        <span className="h-11 px-4 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-black text-emerald-800 shrink-0">Pack</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-600 font-bold block mb-1">Kapasitas Isi per Pack (Default 12 Pcs)</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="number"
+                          value={packSizeInput}
+                          onChange={(e) => setPackSizeInput(e.target.value)}
+                          className="h-9 w-28 px-3 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-800 outline-none"
+                        />
+                        <span className="text-xs text-slate-500 font-semibold">Pcs/Pack</span>
+                        <span className="text-xs text-emerald-700 font-black ml-auto">
+                          = {(parseFloat(packInput) || 0) * (parseFloat(packSizeInput) || 12)} Total Pcs
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -306,24 +443,43 @@ export default function CrewSFMTerminal() {
                 </>
               )}
 
-              {/* Submit / Next Step */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeWoForStep.wo.woType === "PRODUKSI") {
-                    const nextIdx = activeWoForStep.stepIndex + 1;
-                    const nextKey = nextIdx < PRODUKSI_STEPS.length ? PRODUKSI_STEPS[nextIdx].key : "DONE";
-                    handleNextStep(activeWoForStep.wo, PRODUKSI_STEPS[activeWoForStep.stepIndex].key, nextKey);
-                  } else {
-                    handleNextStep(activeWoForStep.wo, "PROCESS", "DONE");
-                  }
-                }}
-                disabled={submittingStep}
-                className="w-full h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all mt-4"
-              >
-                {submittingStep ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                {activeWoForStep.wo.woType === "PRODUKSI" && activeWoForStep.stepIndex + 1 < PRODUKSI_STEPS.length ? `Lanjut ke ${PRODUKSI_STEPS[activeWoForStep.stepIndex + 1].label}` : "Selesaikan Tugas"}
-              </button>
+              {/* Action Buttons */}
+              <div className="space-y-2 mt-4">
+                {/* Pause Button for FREEZER_CHECKPOINT / TRAY_MOLDING */}
+                {activeWoForStep.wo.woType === "PRODUKSI" && (PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "TRAY_MOLDING" || PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "FREEZER_CHECKPOINT") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextIdx = activeWoForStep.stepIndex + 1;
+                      const nextKey = nextIdx < PRODUKSI_STEPS.length ? PRODUKSI_STEPS[nextIdx].key : "DONE";
+                      handleNextStep(activeWoForStep.wo, PRODUKSI_STEPS[activeWoForStep.stepIndex].key, nextKey, true);
+                    }}
+                    disabled={submittingStep}
+                    className="w-full h-11 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all"
+                  >
+                    <PauseCircle size={16} /> Simpan di Freezer (Jeda & Lanjut Nanti)
+                  </button>
+                )}
+
+                {/* Next Step / Complete Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeWoForStep.wo.woType === "PRODUKSI") {
+                      const nextIdx = activeWoForStep.stepIndex + 1;
+                      const nextKey = nextIdx < PRODUKSI_STEPS.length ? PRODUKSI_STEPS[nextIdx].key : "DONE";
+                      handleNextStep(activeWoForStep.wo, PRODUKSI_STEPS[activeWoForStep.stepIndex].key, nextKey, false);
+                    } else {
+                      handleNextStep(activeWoForStep.wo, "PROCESS", "DONE", false);
+                    }
+                  }}
+                  disabled={submittingStep}
+                  className="w-full h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all"
+                >
+                  {submittingStep ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                  {activeWoForStep.wo.woType === "PRODUKSI" && activeWoForStep.stepIndex + 1 < PRODUKSI_STEPS.length ? `Lanjut ke ${PRODUKSI_STEPS[activeWoForStep.stepIndex + 1].label}` : "Selesaikan Task & Closing"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

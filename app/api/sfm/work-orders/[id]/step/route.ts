@@ -16,12 +16,15 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { action, currentStep, nextStep, subBatchVal, goodPcs, scrapPcs, durationMinutes, notes } = body as {
-      action: "START" | "SUB_BATCH" | "STEP_TRANSITION" | "SCRAP";
+    const { action, currentStep, nextStep, subBatchVal, loyangCount, goodPcs, goodPacks, packSize, scrapPcs, durationMinutes, notes } = body as {
+      action: "START" | "SUB_BATCH" | "STEP_TRANSITION" | "SCRAP" | "PAUSE";
       currentStep: string;
       nextStep?: string;
       subBatchVal?: number;
+      loyangCount?: number;
       goodPcs?: number;
+      goodPacks?: number;
+      packSize?: number;
       scrapPcs?: number;
       durationMinutes?: number;
       notes?: string;
@@ -62,8 +65,19 @@ export async function POST(
       nextSummary.totalDoughBatchesDone = (nextSummary.totalDoughBatchesDone || 0) + Number(subBatchVal);
     }
 
+    // Update Loyang count printed / stored in freezer
+    if (loyangCount && loyangCount > 0) {
+      nextSummary.totalTrayPrinted = Number(loyangCount);
+      nextSummary.totalTrayInFreezer = Number(loyangCount);
+    }
+
     // Good Output Pcs / Packs
-    if (goodPcs && goodPcs > 0) {
+    if (goodPacks && goodPacks > 0) {
+      const pCount = Number(goodPacks);
+      const size = Number(packSize) || 12;
+      nextSummary.totalGoodPacks = pCount;
+      nextSummary.totalGoodPcs = pCount * size;
+    } else if (goodPcs && goodPcs > 0) {
       const pCount = Number(goodPcs);
       nextSummary.totalGoodPcs = (nextSummary.totalGoodPcs || 0) + pCount;
       nextSummary.totalGoodPacks = Math.floor(nextSummary.totalGoodPcs / 12);
@@ -77,7 +91,7 @@ export async function POST(
     }
 
     // Work Order Completion check
-    if (targetStage === "DONE" || nextSummary.totalGoodPcs >= (woData.targetPcs || 600)) {
+    if (targetStage === "DONE" || (nextSummary.totalGoodPacks > 0 && currentStep === "PRE_PACK")) {
       nextStatus = "COMPLETED";
       targetStage = "FINAL_PACK";
       completedAt = FieldValue.serverTimestamp();

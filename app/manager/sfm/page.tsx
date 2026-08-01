@@ -390,7 +390,10 @@ export default function ManagerSFMPage() {
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-semibold">
-                <span className="flex items-center gap-1"><Clock size={12}/> {new Date(wo.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                <span className="flex items-center gap-1 font-bold text-slate-700">
+                  <Clock size={12} className="text-slate-400" />
+                  {new Date(wo.createdAt).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })} {new Date(wo.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                </span>
                 <span>PIC: {wo.assignedCrewName}</span>
               </div>
             </div>
@@ -410,6 +413,7 @@ export default function ManagerSFMPage() {
               <thead className="bg-slate-50 border-b border-slate-100 text-xs text-slate-500 font-bold uppercase tracking-wider">
                 <tr>
                   <th className="px-5 py-4">Nomor & Tipe</th>
+                  <th className="px-5 py-4">Tanggal (MFD)</th>
                   <th className="px-5 py-4">Produk</th>
                   <th className="px-5 py-4">Target vs Aktual</th>
                   <th className="px-5 py-4">Status</th>
@@ -421,6 +425,14 @@ export default function ManagerSFMPage() {
                     <td className="px-5 py-4">
                       <div className="font-mono font-bold text-slate-800">{wo.woNumber}</div>
                       <div className="text-[10px] text-slate-500 font-black mt-1 uppercase">{wo.woType}</div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="font-extrabold text-slate-800 text-xs">
+                        {new Date(wo.createdAt).toLocaleDateString("id-ID", { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                        Pukul {new Date(wo.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
                     </td>
                     <td className="px-5 py-4">
                       <div className="font-bold text-slate-800">{wo.productName}</div>
@@ -448,7 +460,7 @@ export default function ManagerSFMPage() {
                 ))}
                 {filteredWorkOrders.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-5 py-12 text-center">
+                    <td colSpan={5} className="px-5 py-12 text-center">
                       <Box size={32} className="mx-auto text-slate-300 mb-2" />
                       <p className="text-slate-500 font-bold">Tidak ada Work Order.</p>
                     </td>
