@@ -55,8 +55,9 @@ export default function CrewSFMTerminal() {
   const [pcsOutputInput, setPcsOutputInput] = useState("196");
   const [pcsVariantOutput, setPcsVariantOutput] = useState<Record<string, string>>({});
   const [loyangInput, setLoyangInput] = useState("");
-  const [packInput, setPackInput] = useState("16");
-  const [packSizeInput, setPackSizeInput] = useState("12");
+  const [prepackMode, setPrepackMode] = useState<"ALL_REGULAR" | "ALL_FULL" | "MIXED">("ALL_REGULAR");
+  const [regularPackInput, setRegularPackInput] = useState("16");
+  const [fullPackInput, setFullPackInput] = useState("0");
   const [scrapPcsInput, setScrapPcsInput] = useState("0");
   const [scrapReasonInput, setScrapReasonInput] = useState("");
   const [submittingStep, setSubmittingStep] = useState(false);
@@ -94,8 +95,9 @@ export default function CrewSFMTerminal() {
     setActiveWoForStep({ wo, stepIndex });
     setStepStartTime(Date.now());
     setLoyangInput(wo.summaryState?.totalTrayPrinted?.toString() || wo.targetLoyang?.toString() || "");
-    setPackInput(wo.targetPacks?.toString() || "16");
-    setPackSizeInput("12");
+    setPrepackMode("ALL_REGULAR");
+    setRegularPackInput(wo.targetPacks?.toString() || "16");
+    setFullPackInput("0");
     
     if (wo.productionTargets && wo.productionTargets.length > 0) {
       const initial: Record<string, string> = {};
@@ -149,9 +151,20 @@ export default function CrewSFMTerminal() {
           goodPcs = parseFloat(pcsOutputInput) || 0;
         }
       } else if (currentStepKey === "PRE_PACK" || wo.woType !== "PRODUKSI") {
-        goodPacks = parseFloat(packInput) || 0;
-        packSize = parseFloat(packSizeInput) || 12;
-        goodPcs = goodPacks * packSize;
+        if (prepackMode === "ALL_REGULAR") {
+          const reg = parseFloat(regularPackInput) || 0;
+          goodPacks = reg;
+          goodPcs = reg * 12;
+        } else if (prepackMode === "ALL_FULL") {
+          const full = parseFloat(fullPackInput) || 0;
+          goodPacks = full;
+          goodPcs = full * 16;
+        } else {
+          const regPacks = parseFloat(regularPackInput) || 0;
+          const fullPacks = parseFloat(fullPackInput) || 0;
+          goodPacks = regPacks + fullPacks;
+          goodPcs = (regPacks * 12) + (fullPacks * 16);
+        }
       }
       
       const scrapPcs = parseFloat(scrapPcsInput) || 0;
@@ -385,37 +398,139 @@ export default function CrewSFMTerminal() {
                 </div>
               )}
 
-              {/* PRE_PACK Form (Input Pack & Pack Size) */}
+              {/* PRE_PACK Form (Mode Selection: All Regular 12, All Full 16, or Mixed) */}
               {(activeWoForStep.wo.woType !== "PRODUKSI" || PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "PRE_PACK") && (
                 <>
-                  <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-200/80 space-y-3">
-                    <div>
-                      <label className="text-emerald-900 font-extrabold block mb-1">Jumlah Pack Hasil Packing</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          value={packInput}
-                          onChange={(e) => setPackInput(e.target.value)}
-                          className="h-11 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-base text-emerald-800 outline-none focus:border-emerald-500"
-                        />
-                        <span className="h-11 px-4 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-black text-emerald-800 shrink-0">Pack</span>
-                      </div>
+                  <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/90 space-y-3">
+                    <span className="text-emerald-950 font-black text-xs block">
+                      Pilih Mode Skema Pre-Pack:
+                    </span>
+
+                    {/* Mode Selector Tabs */}
+                    <div className="grid grid-cols-3 gap-1.5 p-1 bg-emerald-100/70 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPrepackMode("ALL_REGULAR");
+                          setRegularPackInput(activeWoForStep.wo.targetPacks?.toString() || "16");
+                          setFullPackInput("0");
+                        }}
+                        className={`py-1.5 px-2 rounded-lg text-[10px] font-black transition-all text-center ${
+                          prepackMode === "ALL_REGULAR" ? "bg-emerald-700 text-white shadow-xs" : "text-emerald-800 hover:bg-emerald-200/60"
+                        }`}
+                      >
+                        Seluruhnya Regular (12 Pcs)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPrepackMode("ALL_FULL");
+                          setRegularPackInput("0");
+                          setFullPackInput(Math.floor(((activeWoForStep.wo.targetPacks || 16) * 12) / 16).toString());
+                        }}
+                        className={`py-1.5 px-2 rounded-lg text-[10px] font-black transition-all text-center ${
+                          prepackMode === "ALL_FULL" ? "bg-emerald-700 text-white shadow-xs" : "text-emerald-800 hover:bg-emerald-200/60"
+                        }`}
+                      >
+                        Seluruhnya Full (16 Pcs)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPrepackMode("MIXED")}
+                        className={`py-1.5 px-2 rounded-lg text-[10px] font-black transition-all text-center ${
+                          prepackMode === "MIXED" ? "bg-emerald-700 text-white shadow-xs" : "text-emerald-800 hover:bg-emerald-200/60"
+                        }`}
+                      >
+                        Campuran (Mix)
+                      </button>
                     </div>
 
-                    <div>
-                      <label className="text-slate-600 font-bold block mb-1">Kapasitas Isi per Pack (Default 12 Pcs)</label>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="number"
-                          value={packSizeInput}
-                          onChange={(e) => setPackSizeInput(e.target.value)}
-                          className="h-9 w-28 px-3 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-800 outline-none"
-                        />
-                        <span className="text-xs text-slate-500 font-semibold">Pcs/Pack</span>
-                        <span className="text-xs text-emerald-700 font-black ml-auto">
-                          = {(parseFloat(packInput) || 0) * (parseFloat(packSizeInput) || 12)} Total Pcs
-                        </span>
+                    {/* Form Input Mode 1: ALL REGULAR */}
+                    {prepackMode === "ALL_REGULAR" && (
+                      <div>
+                        <label className="text-emerald-900 font-extrabold block mb-1">
+                          Jumlah Pack Regular (Standard Isi 12 Pcs)
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            placeholder="16"
+                            value={regularPackInput}
+                            onChange={(e) => setRegularPackInput(e.target.value)}
+                            className="h-10 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-sm text-emerald-800 outline-none focus:border-emerald-500"
+                          />
+                          <span className="h-10 px-3 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-extrabold text-emerald-800 shrink-0">Pack</span>
+                        </div>
                       </div>
+                    )}
+
+                    {/* Form Input Mode 2: ALL FULL */}
+                    {prepackMode === "ALL_FULL" && (
+                      <div>
+                        <label className="text-emerald-900 font-extrabold block mb-1">
+                          Jumlah Pack Full (Pesanan Isi 16 Pcs)
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            placeholder="12"
+                            value={fullPackInput}
+                            onChange={(e) => setFullPackInput(e.target.value)}
+                            className="h-10 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-sm text-emerald-800 outline-none focus:border-emerald-500"
+                          />
+                          <span className="h-10 px-3 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-extrabold text-emerald-800 shrink-0">Pack</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Form Input Mode 3: MIXED */}
+                    {prepackMode === "MIXED" && (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="text-emerald-900 font-extrabold block mb-1">
+                            1. Pack Regular (Isi 12 Pcs)
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              placeholder="0"
+                              value={regularPackInput}
+                              onChange={(e) => setRegularPackInput(e.target.value)}
+                              className="h-10 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-sm text-emerald-800 outline-none focus:border-emerald-500"
+                            />
+                            <span className="h-10 px-3 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-extrabold text-emerald-800 shrink-0">Pack</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-emerald-900 font-extrabold block mb-1">
+                            2. Pack Full (Isi 16 Pcs)
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              placeholder="0"
+                              value={fullPackInput}
+                              onChange={(e) => setFullPackInput(e.target.value)}
+                              className="h-10 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-sm text-emerald-800 outline-none focus:border-emerald-500"
+                            />
+                            <span className="h-10 px-3 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-extrabold text-emerald-800 shrink-0">Pack</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Total Summary */}
+                    <div className="pt-2 border-t border-emerald-200/80 flex items-center justify-between text-xs font-black text-emerald-900">
+                      <span>Total Hasil Packing:</span>
+                      <span className="bg-emerald-600 text-white px-2.5 py-0.5 rounded-lg text-[11px]">
+                        {prepackMode === "ALL_REGULAR"
+                          ? `${parseFloat(regularPackInput) || 0} Pack (${(parseFloat(regularPackInput) || 0) * 12} Pcs)`
+                          : prepackMode === "ALL_FULL"
+                          ? `${parseFloat(fullPackInput) || 0} Pack (${(parseFloat(fullPackInput) || 0) * 16} Pcs)`
+                          : `${(parseFloat(regularPackInput) || 0) + (parseFloat(fullPackInput) || 0)} Pack (${((parseFloat(regularPackInput) || 0) * 12) + ((parseFloat(fullPackInput) || 0) * 16)} Pcs)`
+                        }
+                      </span>
                     </div>
                   </div>
 
