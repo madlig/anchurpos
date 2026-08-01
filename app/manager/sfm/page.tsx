@@ -86,7 +86,10 @@ export default function ManagerSFMPage() {
   const filteredWorkOrders = useMemo(() => {
     return workOrders.filter((w) => {
       if (selectedVariantFilter !== "all") {
-        const matchesVariant = w.variantIds?.includes(selectedVariantFilter) || w.productId === selectedVariantFilter;
+        const matchesVariant = 
+          w.variantIds?.includes(selectedVariantFilter) || 
+          w.productId === selectedVariantFilter ||
+          w.productionTargets?.some(pt => pt.variantId === selectedVariantFilter);
         if (!matchesVariant) return false;
       }
       if (selectedWoTypeFilter !== "all") {
@@ -368,7 +371,11 @@ export default function ManagerSFMPage() {
                   </span>
                 </div>
 
-                <h3 className="text-sm font-black text-slate-800">{wo.productName}</h3>
+                <h3 className="text-sm font-black text-slate-800">
+                  {wo.woType === "PRODUKSI" && wo.productionTargets && wo.productionTargets.length > 0
+                    ? `Churros (${wo.productionTargets.map(pt => `${pt.variantName}: ${pt.targetBatches}B`).join(", ")})`
+                    : wo.productName || "Work Order"}
+                </h3>
                 
                 <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs font-semibold space-y-1.5">
                   {wo.woType === "PRODUKSI" ? (
@@ -435,8 +442,12 @@ export default function ManagerSFMPage() {
                       </div>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="font-bold text-slate-800">{wo.productName}</div>
-                      <div className="text-xs text-slate-500 mt-1">PIC: {wo.assignedCrewName}</div>
+                      <div className="font-bold text-slate-800">
+                        {wo.woType === "PRODUKSI" && wo.productionTargets && wo.productionTargets.length > 0
+                          ? `Churros (${wo.productionTargets.map(pt => `${pt.variantName}: ${pt.targetBatches}B`).join(", ")})`
+                          : wo.productName || "Work Order"}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">PIC: {wo.assignedCrewName || "Belum ditugaskan"}</div>
                     </td>
                     <td className="px-5 py-4">
                       {wo.woType === "PRODUKSI" ? (

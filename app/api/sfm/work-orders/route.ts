@@ -18,16 +18,22 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get("search");
 
   try {
-    const [woSnap, legacySnap, varSnap] = await Promise.all([
+    const [woSnap, legacySnap, varSnap, ordersSnap] = await Promise.all([
       adminDb.collection("workOrders").orderBy("createdAt", "desc").get(),
       adminDb.collection("productions").orderBy("date", "desc").get(),
       adminDb.collection("variants").get(),
+      adminDb.collection("orders").where("hasWorkOrder", "==", true).get(),
     ]);
 
     const varMap: Record<string, string> = {};
     varSnap.docs.forEach(doc => {
       const d = doc.data();
       varMap[doc.id] = d.name || "Churros Frozen";
+    });
+
+    const ordersMap: Record<string, any> = {};
+    ordersSnap.docs.forEach(doc => {
+      ordersMap[doc.id] = doc.data();
     });
 
     let workOrders = woSnap.docs.map((doc) => {
@@ -49,6 +55,9 @@ export async function GET(req: NextRequest) {
         targetPcs: targetPcs,
         targetQty: d.targetQty || 0,
         targetUom: d.targetUom || "",
+        sourceOrderId: d.sourceOrderId || null,
+        sourceOrderDetails: d.sourceOrderId ? ordersMap[d.sourceOrderId] : null,
+        productionTargets: d.productionTargets || null,
         status: d.status || "PLANNED",
         currentStage: d.currentStage || "DOUGH_COOKING",
         summaryState: d.summaryState || {

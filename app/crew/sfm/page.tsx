@@ -54,6 +54,7 @@ export default function CrewSFMTerminal() {
   const [stepStartTime, setStepStartTime] = useState<number | null>(null);
   const [pcsOutputInput, setPcsOutputInput] = useState("196");
   const [pcsVariantOutput, setPcsVariantOutput] = useState<Record<string, string>>({});
+  const [prepackVariantOutput, setPrepackVariantOutput] = useState<Record<string, { regular: string, full: string }>>({});
   const [loyangInput, setLoyangInput] = useState("");
   const [prepackMode, setPrepackMode] = useState<"ALL_REGULAR" | "ALL_FULL" | "MIXED">("ALL_REGULAR");
   const [regularPackInput, setRegularPackInput] = useState("16");
@@ -100,11 +101,14 @@ export default function CrewSFMTerminal() {
     setFullPackInput("0");
     
     if (wo.productionTargets && wo.productionTargets.length > 0) {
-      const initial: Record<string, string> = {};
+      const initialPcs: Record<string, string> = {};
+      const initialPrepack: Record<string, { regular: string, full: string }> = {};
       wo.productionTargets.forEach(pt => {
-        initial[pt.variantId] = "";
+        initialPcs[pt.variantId] = "";
+        initialPrepack[pt.variantId] = { regular: "", full: "" };
       });
-      setPcsVariantOutput(initial);
+      setPcsVariantOutput(initialPcs);
+      setPrepackVariantOutput(initialPrepack);
     } else {
       setPcsOutputInput("196");
     }
@@ -151,19 +155,28 @@ export default function CrewSFMTerminal() {
           goodPcs = parseFloat(pcsOutputInput) || 0;
         }
       } else if (currentStepKey === "PRE_PACK" || wo.woType !== "PRODUKSI") {
-        if (prepackMode === "ALL_REGULAR") {
-          const reg = parseFloat(regularPackInput) || 0;
-          goodPacks = reg;
-          goodPcs = reg * 12;
-        } else if (prepackMode === "ALL_FULL") {
-          const full = parseFloat(fullPackInput) || 0;
-          goodPacks = full;
-          goodPcs = full * 16;
+        if (wo.productionTargets && wo.productionTargets.length > 0) {
+          Object.values(prepackVariantOutput).forEach(p => {
+            const reg = parseFloat(p.regular) || 0;
+            const ful = parseFloat(p.full) || 0;
+            goodPacks += (reg + ful);
+            goodPcs += (reg * 12) + (ful * 16);
+          });
         } else {
-          const regPacks = parseFloat(regularPackInput) || 0;
-          const fullPacks = parseFloat(fullPackInput) || 0;
-          goodPacks = regPacks + fullPacks;
-          goodPcs = (regPacks * 12) + (fullPacks * 16);
+          if (prepackMode === "ALL_REGULAR") {
+            const reg = parseFloat(regularPackInput) || 0;
+            goodPacks = reg;
+            goodPcs = reg * 12;
+          } else if (prepackMode === "ALL_FULL") {
+            const full = parseFloat(fullPackInput) || 0;
+            goodPacks = full;
+            goodPcs = full * 16;
+          } else {
+            const regPacks = parseFloat(regularPackInput) || 0;
+            const fullPacks = parseFloat(fullPackInput) || 0;
+            goodPacks = regPacks + fullPacks;
+            goodPcs = (regPacks * 12) + (fullPacks * 16);
+          }
         }
       }
       
@@ -180,6 +193,7 @@ export default function CrewSFMTerminal() {
           goodPacks,
           packSize,
           scrapPcs,
+          prepackOutputs: wo.productionTargets && wo.productionTargets.length > 0 ? prepackVariantOutput : undefined,
           durationMinutes: duration,
           notes: scrapReasonInput,
         }),
@@ -250,36 +264,57 @@ export default function CrewSFMTerminal() {
                 <p className="text-xs font-semibold text-slate-400 mt-0.5">Varian: {wo.productionTargets && wo.productionTargets.length > 0 ? wo.productionTargets.map(pt => pt.variantName).join(", ") : (wo.variantNames || "Original")}</p>
               </div>
 
-              {/* Progress Summary Card */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2 text-xs font-bold">
+              {/* Mini Dashboard Progress Tracker */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-3 shadow-sm">
                 {isProduksi ? (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500">Target Loyang:</span>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center text-xs font-bold">
+                      <span className="text-slate-500">Target Produksi:</span>
                       <span className="text-slate-800 font-extrabold">{wo.targetLoyang} Loyang</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500">Progress Cetak:</span>
-                      <span className="text-slate-900 font-extrabold">{wo.summaryState?.totalTrayPrinted || 0} Loyang</span>
-                    </div>
-                    {wo.summaryState?.totalGoodPcs ? (
-                      <div className="flex justify-between items-center pt-1 border-t border-slate-200/60">
-                        <span className="text-slate-500">Hasil Cetak Churros:</span>
-                        <span className="text-emerald-600 font-black">{wo.summaryState.totalGoodPcs} Pcs</span>
+                    {/* Progress Bar Timeline */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                        <span className={wo.summaryState?.totalDoughBatchesDone! > 0 ? "text-emerald-600" : ""}>Adonan ({wo.summaryState?.totalDoughBatchesDone || 0}/{wo.targetBatches || 0})</span>
+                        <span className={wo.summaryState?.totalTrayPrinted! > 0 ? "text-emerald-600" : ""}>Cetak ({wo.summaryState?.totalTrayPrinted || 0}/{wo.targetLoyang || 0})</span>
+                        <span className={wo.summaryState?.totalGoodPcs! > 0 ? "text-emerald-600" : ""}>Pre-Pack ({wo.summaryState?.totalGoodPcs || 0} Pcs)</span>
                       </div>
-                    ) : null}
-                  </>
+                      <div className="flex gap-1 h-2.5">
+                        <div className={`flex-1 rounded-full transition-all ${wo.summaryState?.totalDoughBatchesDone! > 0 ? "bg-emerald-500 shadow-sm" : "bg-slate-200"}`}></div>
+                        <div className={`flex-1 rounded-full transition-all ${wo.summaryState?.totalTrayPrinted! > 0 ? "bg-emerald-500 shadow-sm" : "bg-slate-200"}`}></div>
+                        <div className={`flex-1 rounded-full transition-all ${wo.summaryState?.totalGoodPcs! > 0 ? "bg-emerald-500 shadow-sm" : "bg-slate-200"}`}></div>
+                      </div>
+                    </div>
+                  </div>
+                ) : wo.woType === "PACKING_PESANAN" ? (
+                  <div className="space-y-2 text-xs font-bold">
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-200/50">
+                      <span className="text-slate-500">Target Pesanan:</span>
+                      <span className="text-slate-800 font-extrabold">{wo.targetPacks} Pack</span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                      <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider block mb-2 flex items-center gap-1"><Package size={12}/> Daftar Barang Pesanan</span>
+                      <div className="space-y-1.5">
+                        {wo.sourceOrderDetails?.items?.map((item: any, idx: number) => (
+                          <div key={idx} className="flex justify-between items-center text-slate-700 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                            <span className="font-extrabold">{item.qty}x {item.productName}</span>
+                            <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">{item.variantName || "Original"}</span>
+                          </div>
+                        )) || <span className="text-slate-400 italic text-xs">Akan dimuat saat memproses...</span>}
+                      </div>
+                    </div>
+                  </div>
                 ) : (
-                  <>
+                  <div className="space-y-2 text-xs font-bold">
                     <div className="flex justify-between items-center">
                       <span className="text-slate-500">Target:</span>
-                      <span className="text-slate-800 font-extrabold">{wo.woType === "PACKING_PESANAN" ? wo.targetPacks : wo.targetQty} {wo.targetUom || (wo.woType === "PACKING_PESANAN" ? "Pack" : "Qty")}</span>
+                      <span className="text-slate-800 font-extrabold">{wo.targetQty} {wo.targetUom}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-500">Sudah Selesai:</span>
-                      <span className="text-emerald-700 font-extrabold">{wo.summaryState?.totalGoodPcs || wo.summaryState?.totalGoodPacks || 0}</span>
+                      <span className="text-emerald-700 font-extrabold">{wo.summaryState?.totalGoodPcs || 0}</span>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
 
@@ -423,140 +458,170 @@ export default function CrewSFMTerminal() {
                 </div>
               )}
 
-              {/* PRE_PACK Form (Mode Selection: All Regular 12, All Full 16, or Mixed) */}
+              {/* PRE_PACK Form (Multi-Variant vs Single) */}
               {(activeWoForStep.wo.woType !== "PRODUKSI" || PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "PRE_PACK") && (
                 <>
                   <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/90 space-y-3">
                     <span className="text-emerald-950 font-black text-xs block">
-                      Pilih Mode Skema Pre-Pack:
+                      Hasil Pre-Pack & Vacuum:
                     </span>
 
-                    {/* Mode Selector Tabs */}
-                    <div className="grid grid-cols-3 gap-1.5 p-1 bg-emerald-100/70 rounded-xl">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPrepackMode("ALL_REGULAR");
-                          setRegularPackInput(activeWoForStep.wo.targetPacks?.toString() || "16");
-                          setFullPackInput("0");
-                        }}
-                        className={`py-1.5 px-2 rounded-lg text-[10px] font-black transition-all text-center ${
-                          prepackMode === "ALL_REGULAR" ? "bg-emerald-700 text-white shadow-xs" : "text-emerald-800 hover:bg-emerald-200/60"
-                        }`}
-                      >
-                        Seluruhnya Regular (12 Pcs)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPrepackMode("ALL_FULL");
-                          setRegularPackInput("0");
-                          setFullPackInput(Math.floor(((activeWoForStep.wo.targetPacks || 16) * 12) / 16).toString());
-                        }}
-                        className={`py-1.5 px-2 rounded-lg text-[10px] font-black transition-all text-center ${
-                          prepackMode === "ALL_FULL" ? "bg-emerald-700 text-white shadow-xs" : "text-emerald-800 hover:bg-emerald-200/60"
-                        }`}
-                      >
-                        Seluruhnya Full (16 Pcs)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPrepackMode("MIXED")}
-                        className={`py-1.5 px-2 rounded-lg text-[10px] font-black transition-all text-center ${
-                          prepackMode === "MIXED" ? "bg-emerald-700 text-white shadow-xs" : "text-emerald-800 hover:bg-emerald-200/60"
-                        }`}
-                      >
-                        Campuran (Mix)
-                      </button>
-                    </div>
-
-                    {/* Form Input Mode 1: ALL REGULAR */}
-                    {prepackMode === "ALL_REGULAR" && (
-                      <div>
-                        <label className="text-emerald-900 font-extrabold block mb-1">
-                          Jumlah Pack Regular (Standard Isi 12 Pcs)
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            type="number"
-                            placeholder="16"
-                            value={regularPackInput}
-                            onChange={(e) => setRegularPackInput(e.target.value)}
-                            className="h-10 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-sm text-emerald-800 outline-none focus:border-emerald-500"
-                          />
-                          <span className="h-10 px-3 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-extrabold text-emerald-800 shrink-0">Pack</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Form Input Mode 2: ALL FULL */}
-                    {prepackMode === "ALL_FULL" && (
-                      <div>
-                        <label className="text-emerald-900 font-extrabold block mb-1">
-                          Jumlah Pack Full (Pesanan Isi 16 Pcs)
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            type="number"
-                            placeholder="12"
-                            value={fullPackInput}
-                            onChange={(e) => setFullPackInput(e.target.value)}
-                            className="h-10 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-sm text-emerald-800 outline-none focus:border-emerald-500"
-                          />
-                          <span className="h-10 px-3 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-extrabold text-emerald-800 shrink-0">Pack</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Form Input Mode 3: MIXED */}
-                    {prepackMode === "MIXED" && (
-                      <div className="space-y-2">
-                        <div>
-                          <label className="text-emerald-900 font-extrabold block mb-1">
-                            1. Pack Regular (Isi 12 Pcs)
-                          </label>
-                          <div className="flex gap-2">
-                            <input
-                              type="number"
-                              placeholder="0"
-                              value={regularPackInput}
-                              onChange={(e) => setRegularPackInput(e.target.value)}
-                              className="h-10 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-sm text-emerald-800 outline-none focus:border-emerald-500"
-                            />
-                            <span className="h-10 px-3 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-extrabold text-emerald-800 shrink-0">Pack</span>
+                    {activeWoForStep.wo.productionTargets && activeWoForStep.wo.productionTargets.length > 0 ? (
+                      <div className="space-y-4">
+                        {activeWoForStep.wo.productionTargets.map(pt => (
+                          <div key={pt.variantId} className="p-2.5 bg-white border border-emerald-100 rounded-xl space-y-2">
+                            <span className="font-extrabold text-slate-800 text-xs block">{pt.variantName}</span>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 mb-1 block">Reguler (12 Pcs)</label>
+                                <div className="flex gap-1">
+                                  <input type="number" placeholder="0" 
+                                    value={prepackVariantOutput[pt.variantId]?.regular || ""} 
+                                    onChange={(e) => setPrepackVariantOutput(prev => ({...prev, [pt.variantId]: {...prev[pt.variantId], regular: e.target.value}}))}
+                                    className="h-8 w-full px-2 rounded-lg border border-slate-200 text-xs font-bold text-emerald-800 outline-none focus:border-emerald-500" />
+                                  <span className="h-8 px-2 rounded-lg bg-slate-100 border border-slate-200 text-[10px] flex items-center text-slate-500">Pack</span>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 mb-1 block">Full (16 Pcs)</label>
+                                <div className="flex gap-1">
+                                  <input type="number" placeholder="0" 
+                                    value={prepackVariantOutput[pt.variantId]?.full || ""} 
+                                    onChange={(e) => setPrepackVariantOutput(prev => ({...prev, [pt.variantId]: {...prev[pt.variantId], full: e.target.value}}))}
+                                    className="h-8 w-full px-2 rounded-lg border border-slate-200 text-xs font-bold text-emerald-800 outline-none focus:border-emerald-500" />
+                                  <span className="h-8 px-2 rounded-lg bg-slate-100 border border-slate-200 text-[10px] flex items-center text-slate-500">Pack</span>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-
-                        <div>
-                          <label className="text-emerald-900 font-extrabold block mb-1">
-                            2. Pack Full (Isi 16 Pcs)
-                          </label>
-                          <div className="flex gap-2">
-                            <input
-                              type="number"
-                              placeholder="0"
-                              value={fullPackInput}
-                              onChange={(e) => setFullPackInput(e.target.value)}
-                              className="h-10 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-sm text-emerald-800 outline-none focus:border-emerald-500"
-                            />
-                            <span className="h-10 px-3 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-extrabold text-emerald-800 shrink-0">Pack</span>
-                          </div>
-                        </div>
+                        ))}
                       </div>
-                    )}
+                    ) : (
+                      <>
+                        {/* Mode Selector Tabs for Single Variant */}
+                        <div className="grid grid-cols-3 gap-1.5 p-1 bg-emerald-100/70 rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPrepackMode("ALL_REGULAR");
+                              setRegularPackInput(activeWoForStep.wo.targetPacks?.toString() || "16");
+                              setFullPackInput("0");
+                            }}
+                            className={`py-1.5 px-2 rounded-lg text-[10px] font-black transition-all text-center ${
+                              prepackMode === "ALL_REGULAR" ? "bg-emerald-700 text-white shadow-xs" : "text-emerald-800 hover:bg-emerald-200/60"
+                            }`}
+                          >
+                            Seluruhnya Regular (12 Pcs)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPrepackMode("ALL_FULL");
+                              setRegularPackInput("0");
+                              setFullPackInput(Math.floor(((activeWoForStep.wo.targetPacks || 16) * 12) / 16).toString());
+                            }}
+                            className={`py-1.5 px-2 rounded-lg text-[10px] font-black transition-all text-center ${
+                              prepackMode === "ALL_FULL" ? "bg-emerald-700 text-white shadow-xs" : "text-emerald-800 hover:bg-emerald-200/60"
+                            }`}
+                          >
+                            Seluruhnya Full (16 Pcs)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPrepackMode("MIXED")}
+                            className={`py-1.5 px-2 rounded-lg text-[10px] font-black transition-all text-center ${
+                              prepackMode === "MIXED" ? "bg-emerald-700 text-white shadow-xs" : "text-emerald-800 hover:bg-emerald-200/60"
+                            }`}
+                          >
+                            Campuran (Mix)
+                          </button>
+                        </div>
 
-                    {/* Total Summary */}
-                    <div className="pt-2 border-t border-emerald-200/80 flex items-center justify-between text-xs font-black text-emerald-900">
-                      <span>Total Hasil Packing:</span>
-                      <span className="bg-emerald-600 text-white px-2.5 py-0.5 rounded-lg text-[11px]">
-                        {prepackMode === "ALL_REGULAR"
-                          ? `${parseFloat(regularPackInput) || 0} Pack (${(parseFloat(regularPackInput) || 0) * 12} Pcs)`
-                          : prepackMode === "ALL_FULL"
-                          ? `${parseFloat(fullPackInput) || 0} Pack (${(parseFloat(fullPackInput) || 0) * 16} Pcs)`
-                          : `${(parseFloat(regularPackInput) || 0) + (parseFloat(fullPackInput) || 0)} Pack (${((parseFloat(regularPackInput) || 0) * 12) + ((parseFloat(fullPackInput) || 0) * 16)} Pcs)`
-                        }
-                      </span>
-                    </div>
+                        {prepackMode === "ALL_REGULAR" && (
+                          <div>
+                            <label className="text-emerald-900 font-extrabold block mb-1">
+                              Jumlah Pack Regular (Standard Isi 12 Pcs)
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                placeholder="16"
+                                value={regularPackInput}
+                                onChange={(e) => setRegularPackInput(e.target.value)}
+                                className="h-10 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-sm text-emerald-800 outline-none focus:border-emerald-500"
+                              />
+                              <span className="h-10 px-3 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-extrabold text-emerald-800 shrink-0">Pack</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {prepackMode === "ALL_FULL" && (
+                          <div>
+                            <label className="text-emerald-900 font-extrabold block mb-1">
+                              Jumlah Pack Full (Pesanan Isi 16 Pcs)
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                placeholder="12"
+                                value={fullPackInput}
+                                onChange={(e) => setFullPackInput(e.target.value)}
+                                className="h-10 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-sm text-emerald-800 outline-none focus:border-emerald-500"
+                              />
+                              <span className="h-10 px-3 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-extrabold text-emerald-800 shrink-0">Pack</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {prepackMode === "MIXED" && (
+                          <div className="space-y-2">
+                            <div>
+                              <label className="text-emerald-900 font-extrabold block mb-1">
+                                1. Pack Regular (Isi 12 Pcs)
+                              </label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="number"
+                                  placeholder="0"
+                                  value={regularPackInput}
+                                  onChange={(e) => setRegularPackInput(e.target.value)}
+                                  className="h-10 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-sm text-emerald-800 outline-none focus:border-emerald-500"
+                                />
+                                <span className="h-10 px-3 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-extrabold text-emerald-800 shrink-0">Pack</span>
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="text-emerald-900 font-extrabold block mb-1">
+                                2. Pack Full (Isi 16 Pcs)
+                              </label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="number"
+                                  placeholder="0"
+                                  value={fullPackInput}
+                                  onChange={(e) => setFullPackInput(e.target.value)}
+                                  className="h-10 w-full px-3 rounded-xl border border-emerald-200 bg-white font-black text-sm text-emerald-800 outline-none focus:border-emerald-500"
+                                />
+                                <span className="h-10 px-3 rounded-xl bg-emerald-100/80 border border-emerald-200 flex items-center justify-center font-extrabold text-emerald-800 shrink-0">Pack</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="pt-2 border-t border-emerald-200/80 flex items-center justify-between text-xs font-black text-emerald-900">
+                          <span>Total Hasil Packing:</span>
+                          <span className="bg-emerald-600 text-white px-2.5 py-0.5 rounded-lg text-[11px]">
+                            {prepackMode === "ALL_REGULAR"
+                              ? `${parseFloat(regularPackInput) || 0} Pack (${(parseFloat(regularPackInput) || 0) * 12} Pcs)`
+                              : prepackMode === "ALL_FULL"
+                              ? `${parseFloat(fullPackInput) || 0} Pack (${(parseFloat(fullPackInput) || 0) * 16} Pcs)`
+                              : `${(parseFloat(regularPackInput) || 0) + (parseFloat(fullPackInput) || 0)} Pack (${((parseFloat(regularPackInput) || 0) * 12) + ((parseFloat(fullPackInput) || 0) * 16)} Pcs)`
+                            }
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div className="pt-1 border-t border-slate-100">
@@ -585,30 +650,18 @@ export default function CrewSFMTerminal() {
 
               {/* Action Buttons */}
               <div className="space-y-2 mt-4">
-                {/* Pause Button for FREEZER_CHECKPOINT / TRAY_MOLDING */}
-                {activeWoForStep.wo.woType === "PRODUKSI" && (PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "TRAY_MOLDING" || PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "FREEZER_CHECKPOINT") && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextIdx = activeWoForStep.stepIndex + 1;
-                      const nextKey = nextIdx < PRODUKSI_STEPS.length ? PRODUKSI_STEPS[nextIdx].key : "DONE";
-                      handleNextStep(activeWoForStep.wo, PRODUKSI_STEPS[activeWoForStep.stepIndex].key, nextKey, true);
-                    }}
-                    disabled={submittingStep}
-                    className="w-full h-11 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all"
-                  >
-                    <PauseCircle size={16} /> Simpan di Freezer (Jeda & Lanjut Nanti)
-                  </button>
-                )}
-
                 {/* Next Step / Complete Button */}
                 <button
                   type="button"
                   onClick={() => {
                     if (activeWoForStep.wo.woType === "PRODUKSI") {
-                      const nextIdx = activeWoForStep.stepIndex + 1;
-                      const nextKey = nextIdx < PRODUKSI_STEPS.length ? PRODUKSI_STEPS[nextIdx].key : "DONE";
-                      handleNextStep(activeWoForStep.wo, PRODUKSI_STEPS[activeWoForStep.stepIndex].key, nextKey, false);
+                      if (PRODUKSI_STEPS[activeWoForStep.stepIndex].key === "TRAY_MOLDING") {
+                        handleNextStep(activeWoForStep.wo, "TRAY_MOLDING", "FREEZER_CHECKPOINT", true);
+                      } else {
+                        const nextIdx = activeWoForStep.stepIndex + 1;
+                        const nextKey = nextIdx < PRODUKSI_STEPS.length ? PRODUKSI_STEPS[nextIdx].key : "DONE";
+                        handleNextStep(activeWoForStep.wo, PRODUKSI_STEPS[activeWoForStep.stepIndex].key, nextKey, false);
+                      }
                     } else {
                       handleNextStep(activeWoForStep.wo, "PROCESS", "DONE", false);
                     }
@@ -617,7 +670,10 @@ export default function CrewSFMTerminal() {
                   className="w-full h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all"
                 >
                   {submittingStep ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                  {activeWoForStep.wo.woType === "PRODUKSI" && activeWoForStep.stepIndex + 1 < PRODUKSI_STEPS.length ? `Lanjut ke ${PRODUKSI_STEPS[activeWoForStep.stepIndex + 1].label}` : "Selesaikan Task & Closing"}
+                  {activeWoForStep.wo.woType === "PRODUKSI" 
+                    ? (PRODUKSI_STEPS[activeWoForStep.stepIndex].key === "TRAY_MOLDING" ? "Selesai Cetak & Masukkan ke Freezer" :
+                       activeWoForStep.stepIndex + 1 < PRODUKSI_STEPS.length ? `Lanjut ke ${PRODUKSI_STEPS[activeWoForStep.stepIndex + 1].label}` : "Selesai Pre-Pack & Closing")
+                    : "Selesaikan Task & Closing"}
                 </button>
               </div>
             </div>

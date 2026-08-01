@@ -16,7 +16,7 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { action, currentStep, nextStep, subBatchVal, loyangCount, goodPcs, goodPacks, packSize, scrapPcs, durationMinutes, notes } = body as {
+    const { action, currentStep, nextStep, subBatchVal, loyangCount, goodPcs, goodPacks, packSize, scrapPcs, prepackOutputs, durationMinutes, notes } = body as {
       action: "START" | "SUB_BATCH" | "STEP_TRANSITION" | "SCRAP" | "PAUSE";
       currentStep: string;
       nextStep?: string;
@@ -26,6 +26,7 @@ export async function POST(
       goodPacks?: number;
       packSize?: number;
       scrapPcs?: number;
+      prepackOutputs?: Record<string, { regular: string, full: string }>;
       durationMinutes?: number;
       notes?: string;
     };
@@ -76,7 +77,7 @@ export async function POST(
       const pCount = Number(goodPacks);
       const size = Number(packSize) || 12;
       nextSummary.totalGoodPacks = pCount;
-      nextSummary.totalGoodPcs = pCount * size;
+      nextSummary.totalGoodPcs = Number(goodPcs) || (pCount * size);
     } else if (goodPcs && goodPcs > 0) {
       const pCount = Number(goodPcs);
       nextSummary.totalGoodPcs = (nextSummary.totalGoodPcs || 0) + pCount;
@@ -114,17 +115,106 @@ export async function POST(
       notes: notes || "",
     };
 
-    await Promise.all([
-      logRef.set(logData),
-      woRef.update({
-        status: nextStatus,
-        currentStage: targetStage,
-        summaryState: nextSummary,
-        stepDurationsMinutes: stepDurations,
-        startedAt,
-        completedAt: completedAt || null,
-      }),
-    ]);
+    // --- INVENTORY INTEGRATION LOGIC ---
+    const batch = adminDb.batch();
+    batch.set(logRef, logData);
+    batch.update(woRef, {
+      status: nextStatus,
+      currentStage: targetStage,
+      summaryState: nextSummary,
+      stepDurationsMinutes: stepDurations,
+      startedAt,
+      completedAt: completedAt || null,
+    });
+
+    if (nextStatus === "COMPLETED" && woData.status !== "COMPLETED") {
+      if (woData.woType === "PRODUKSI" && currentStep === "PRE_PACK") {
+        // Handle PRODUKSI BOM Packaging deduction & Product Stock increment
+        if (prepackOutputs && Object.keys(prepackOutputs).length > 0) {
+          // Multi-variant processing
+          for (const [variantId, outputs] of Object.entries(prepackOutputs)) {
+            const regPacks = parseFloat(outputs.regular) || 0;
+            const fullPacks = parseFloat(outputs.full) || 0;
+            
+            if (regPacks > 0) {
+              const rRef = adminDb.collection("productStocks").doc(`${variantId}_12`);
+              batch.set(rRef, { stock: FieldValue.increment(regPacks) }, { merge: true });
+              const mRef = adminDb.collection("stockMovements").doc();
+              batch.set(mRef, { itemId: `${variantId}_12`, type: "PRODUKSI_IN", qty: regPacks, refId: woData.woNumber, timestamp: FieldValue.serverTimestamp() });
+            }
+            if (fullPacks > 0) {
+              const fRef = adminDb.collection("productStocks").doc(`${variantId}_16`);
+              batch.set(fRef, { stock: FieldValue.increment(fullPacks) }, { merge: true });
+              const mRef = adminDb.collection("stockMovements").doc();
+              batch.set(mRef, { itemId: `${variantId}_16`, type: "PRODUKSI_IN", qty: fullPacks, refId: woData.woNumber, timestamp: FieldValue.serverTimestamp() });
+            }
+          }
+        } else if (goodPacks && goodPacks > 0) {
+          // Single variant fallback
+          const targetItem = packSize === 16 ? `${woData.productId}_16` : `${woData.productId}_12`;
+          const pRef = adminDb.collection("productStocks").doc(targetItem);
+          batch.set(pRef, { stock: FieldValue.increment(goodPacks) }, { merge: true });
+          const mRef = adminDb.collection("stockMovements").doc();
+          batch.set(mRef, { itemId: targetItem, type: "PRODUKSI_IN", qty: goodPacks, refId: woData.woNumber, timestamp: FieldValue.serverTimestamp() });
+        }
+        
+        // Deduct Kemasan BOM (Thinwall, Stiker) based on packagingRecipes (mocking the query logic here, assuming typical recipe structure)
+        const packagingRecipesSnap = await adminDb.collection("packagingRecipes").where("productId", "==", woData.productId || "churros-frozen-food").get();
+        if (!packagingRecipesSnap.empty) {
+          const packData = packagingRecipesSnap.docs[0].data();
+          const items = packData.items || [];
+          for (const item of items) {
+            const qtyNeeded = (item.amount || 1) * (goodPacks || 0);
+            if (item.ingredientId && qtyNeeded > 0) {
+              batch.update(adminDb.collection("ingredients").doc(item.ingredientId), { stock: FieldValue.increment(-qtyNeeded) });
+            }
+          }
+        }
+
+      } else if (woData.woType === "REPACK_SAOS" || woData.woType === "REPACK_GULA") {
+        // Handle REPACK: Deduct bulk, Increment small packs (ingredients)
+        const targetId = woData.repackIngredientId || woData.productId; // The result of the repack
+        if (targetId && goodPcs && goodPcs > 0) {
+          batch.set(adminDb.collection("ingredients").doc(targetId), { stock: FieldValue.increment(goodPcs) }, { merge: true });
+          const mRef = adminDb.collection("stockMovements").doc();
+          batch.set(mRef, { itemId: targetId, type: "REPACK_IN", qty: goodPcs, refId: woData.woNumber, timestamp: FieldValue.serverTimestamp() });
+          
+          // Deduct from Repack BOM
+          const repackBomSnap = await adminDb.collection("recipes").where("category", "==", "prepack").where("productId", "==", targetId).get();
+          if (!repackBomSnap.empty) {
+            const recipeData = repackBomSnap.docs[0].data();
+            for (const ing of recipeData.ingredients || []) {
+              const qtyNeeded = (ing.amount || 1) * goodPcs;
+              if (ing.ingredientId && qtyNeeded > 0) {
+                batch.update(adminDb.collection("ingredients").doc(ing.ingredientId), { stock: FieldValue.increment(-qtyNeeded) });
+              }
+            }
+          }
+        }
+
+      } else if (woData.woType === "PACKING_PESANAN" && woData.sourceOrderId) {
+        // Handle PACKING: Complete Order and deduct Product Stocks
+        const orderRef = adminDb.collection("orders").doc(woData.sourceOrderId);
+        const orderSnap = await orderRef.get();
+        if (orderSnap.exists) {
+          batch.update(orderRef, { status: "completed", packedAt: FieldValue.serverTimestamp() });
+          
+          const orderData = orderSnap.data();
+          for (const item of orderData?.items || []) {
+            if (item.type === "product") {
+              const stockId = item.productId === "churros-reguler" ? `${item.variantId}_12` : `${item.variantId}_16`;
+              batch.set(adminDb.collection("productStocks").doc(stockId), { stock: FieldValue.increment(-item.qty) }, { merge: true });
+              const mRef = adminDb.collection("stockMovements").doc();
+              batch.set(mRef, { itemId: stockId, type: "ORDER_OUT", qty: item.qty, refId: orderRef.id, timestamp: FieldValue.serverTimestamp() });
+            } else if (item.type === "addon") {
+              batch.update(adminDb.collection("ingredients").doc(item.addonId), { stock: FieldValue.increment(-item.qty) });
+            }
+          }
+        }
+      }
+    }
+
+    await batch.commit();
 
     return NextResponse.json({
       success: true,
