@@ -14,7 +14,12 @@ export default function ManagerSFMPage() {
   const { getToken } = useAuth();
   const [activeTab, setActiveTab] = useState<"wo_active" | "audit_ledger">("wo_active");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split("T")[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVariantFilter, setSelectedVariantFilter] = useState("all");
   const [selectedWoTypeFilter, setSelectedWoTypeFilter] = useState<string>("all");
@@ -52,9 +57,11 @@ export default function ManagerSFMPage() {
   const loadAllData = useCallback(async () => {
     setLoading(true);
     try {
-      const activeDateStr = activeTab === "audit_ledger" && date ? date : "";
+      const dateParams = activeTab === "audit_ledger" 
+        ? `startDate=${startDate}&endDate=${endDate}` 
+        : "";
       const [woRes, varRes, ordersRes] = await Promise.all([
-        fetchWithAuth(`/api/sfm/work-orders?date=${activeDateStr}&search=${encodeURIComponent(searchQuery)}`),
+        fetchWithAuth(`/api/sfm/work-orders?${dateParams}&search=${encodeURIComponent(searchQuery)}`),
         fetchWithAuth("/api/variants"),
         fetchWithAuth("/api/orders"),
       ]);
@@ -65,13 +72,12 @@ export default function ManagerSFMPage() {
         const allOrders = await ordersRes.json();
         setPendingOrders(Array.isArray(allOrders) ? allOrders.filter(o => o.status === "pending" && !o.hasWorkOrder) : []);
       }
-      if (varRes.ok) setVariants(await varRes.json());
     } catch (err) {
       console.error("loadAllData error:", err);
     } finally {
       setLoading(false);
     }
-  }, [date, activeTab, searchQuery, fetchWithAuth]);
+  }, [startDate, endDate, activeTab, searchQuery, fetchWithAuth]);
 
   useEffect(() => {
     loadAllData();
@@ -245,14 +251,64 @@ export default function ManagerSFMPage() {
               </select>
 
               {activeTab === "audit_ledger" && (
-                <div className="relative">
-                  <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="h-9 pl-8 pr-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none"
-                  />
+                <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 border border-slate-200/90 p-1 rounded-2xl shadow-2xs">
+                  <div className="flex items-center gap-1 pl-1">
+                    <Calendar size={13} className="text-slate-400" />
+                    <span className="text-[10px] font-bold text-slate-500">Dari:</span>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="h-8 px-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 outline-none focus:border-slate-400"
+                    />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400">s/d</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="h-8 px-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 outline-none focus:border-slate-400"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 border-l border-slate-200/80 pl-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const today = new Date().toISOString().split("T")[0];
+                        setStartDate(today);
+                        setEndDate(today);
+                      }}
+                      className="px-2 py-1 text-[10px] font-extrabold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
+                    >
+                      Hari Ini
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const today = new Date();
+                        const d7 = new Date(today);
+                        d7.setDate(d7.getDate() - 6);
+                        setStartDate(d7.toISOString().split("T")[0]);
+                        setEndDate(today.toISOString().split("T")[0]);
+                      }}
+                      className="px-2 py-1 text-[10px] font-extrabold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
+                    >
+                      7 Hari
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const today = new Date();
+                        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                        setStartDate(firstDay.toISOString().split("T")[0]);
+                        setEndDate(today.toISOString().split("T")[0]);
+                      }}
+                      className="px-2 py-1 text-[10px] font-extrabold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
+                    >
+                      Bulan Ini
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -263,32 +319,32 @@ export default function ManagerSFMPage() {
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-6">
         
         {/* Executive Metric Cards */}
-        {activeTab === "wo_active" && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total WO Aktif</p>
-              <p className="text-2xl font-black text-slate-900 mt-1">{filteredWorkOrders.length}</p>
-            </div>
-            <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Proses Dapur</p>
-              <p className="text-2xl font-black text-emerald-600 mt-1">
-                {filteredWorkOrders.filter(w => w.woType === "PRODUKSI").length}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Proses Packing</p>
-              <p className="text-2xl font-black text-blue-600 mt-1">
-                {filteredWorkOrders.filter(w => w.woType === "PACKING_PESANAN" || w.woType === "REPACK_SAOS").length}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Hasil Pcs</p>
-              <p className="text-2xl font-black text-amber-600 mt-1">
-                {formatNumber(filteredWorkOrders.reduce((sum, w) => sum + (w.summaryState?.totalGoodPcs || 0), 0))}
-              </p>
-            </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+              {activeTab === "audit_ledger" ? "Total WO Periode Ini" : "Total WO Aktif"}
+            </p>
+            <p className="text-2xl font-black text-slate-900 mt-1">{filteredWorkOrders.length}</p>
           </div>
-        )}
+          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Proses Dapur</p>
+            <p className="text-2xl font-black text-emerald-600 mt-1">
+              {filteredWorkOrders.filter(w => w.woType === "PRODUKSI").length}
+            </p>
+          </div>
+          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Proses Packing</p>
+            <p className="text-2xl font-black text-blue-600 mt-1">
+              {filteredWorkOrders.filter(w => w.woType === "PACKING_PESANAN" || w.woType === "REPACK_SAOS").length}
+            </p>
+          </div>
+          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Hasil Pcs</p>
+            <p className="text-2xl font-black text-amber-600 mt-1">
+              {formatNumber(filteredWorkOrders.reduce((sum, w) => sum + (w.summaryState?.totalGoodPcs || 0), 0))}
+            </p>
+          </div>
+        </div>
 
         {/* Work Orders List (Grid vs Table) */}
         {viewMode === "grid" ? (

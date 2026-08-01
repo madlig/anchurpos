@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get("status");
   const woType = searchParams.get("woType");
   const dateStr = searchParams.get("date");
+  const startDate = searchParams.get("startDate");
+  const endDate = searchParams.get("endDate");
   const variantId = searchParams.get("variantId");
   const search = searchParams.get("search");
 
@@ -126,7 +128,14 @@ export async function GET(req: NextRequest) {
       allWorkOrders = allWorkOrders.filter(w => w.woType === woType);
     }
 
-    if (dateStr) {
+    if (startDate || endDate) {
+      allWorkOrders = allWorkOrders.filter(w => {
+        const itemDate = (w.createdAt || "").split("T")[0];
+        if (startDate && itemDate < startDate) return false;
+        if (endDate && itemDate > endDate) return false;
+        return true;
+      });
+    } else if (dateStr) {
       allWorkOrders = allWorkOrders.filter(w => w.createdAt.startsWith(dateStr));
     }
 
@@ -165,13 +174,13 @@ export async function POST(req: NextRequest) {
     const woNumber = `${typePrefix}-${todayStr}-${randomSuffix}`;
 
     let numBatches = Number(targetBatches) || 0;
-    let numLoyang = Number(targetLoyang) || (numBatches * 12);
+    let numLoyang = Number(targetLoyang) || (numBatches * 4);
     const numPacks = Number(targetPacks) || 0;
     const numPcs = Number(targetPcs) || (numPacks * 12);
 
     if (productionTargets && Array.isArray(productionTargets)) {
       numBatches = productionTargets.reduce((sum, t) => sum + (Number(t.targetBatches) || 0), 0);
-      numLoyang = productionTargets.reduce((sum, t) => sum + (Number(t.targetLoyang) || (Number(t.targetBatches) || 0) * 12), 0);
+      numLoyang = productionTargets.reduce((sum, t) => sum + (Number(t.targetLoyang) || (Number(t.targetBatches) || 0) * 4), 0);
     }
 
     const woRef = adminDb.collection("workOrders").doc();
