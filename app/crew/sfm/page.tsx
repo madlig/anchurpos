@@ -247,7 +247,7 @@ export default function CrewSFMTerminal() {
 
               <div>
                 <h2 className="text-base font-black text-slate-800">{wo.productName}</h2>
-                <p className="text-xs font-semibold text-slate-400 mt-0.5">Varian: {wo.productionTargets ? wo.productionTargets.map(pt => pt.variantName).join(", ") : (wo.variantNames || "N/A")}</p>
+                <p className="text-xs font-semibold text-slate-400 mt-0.5">Varian: {wo.productionTargets && wo.productionTargets.length > 0 ? wo.productionTargets.map(pt => pt.variantName).join(", ") : (wo.variantNames || "Original")}</p>
               </div>
 
               {/* Progress Summary Card */}
@@ -322,28 +322,53 @@ export default function CrewSFMTerminal() {
                   {activeWoForStep.wo.woType === "PRODUKSI" ? PRODUKSI_STEPS[activeWoForStep.stepIndex]?.label : `Selesaikan ${activeWoForStep.wo.woType}`}
                 </h3>
               </div>
-              <button type="button" onClick={() => setActiveWoForStep(null)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+              <div className="flex items-center gap-3">
+                {stepStartTime && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-lg border border-emerald-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-emerald-700">Durasi Aktifitas:</span>
+                    <LiveTimer startedAt={new Date(stepStartTime).toISOString()} />
+                  </div>
+                )}
+                <button type="button" onClick={() => setActiveWoForStep(null)} className="text-slate-400 hover:text-slate-600 bg-slate-100 p-1 rounded-full"><X size={18}/></button>
+              </div>
             </div>
 
             <div className="space-y-4 text-xs font-bold">
               {/* PRODUKSI: Sub-Batch Iteration */}
               {activeWoForStep.wo.woType === "PRODUKSI" && PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "DOUGH_COOKING" && (
-                <div className="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 space-y-2">
-                  <span className="text-slate-900 font-extrabold block">Catat Sub-Batch Memasak Adonan:</span>
-                  <div className="flex gap-2">
-                    {["1.0", "1.5", "2.0"].map((chip) => (
-                      <button
-                        key={chip}
-                        type="button"
-                        onClick={() => handleLogSubBatch(activeWoForStep.wo, parseFloat(chip))}
-                        disabled={submittingStep}
-                        className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white font-extrabold text-xs shadow-2xs active:scale-95 transition-all"
-                      >
-                        + {chip} Batch
-                      </button>
-                    ))}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 shadow-sm">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <span className="text-slate-700 font-extrabold text-xs block">Progress Adonan</span>
+                    <span className="text-sm font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg">
+                      {activeWoForStep.wo.summaryState?.totalDoughBatchesDone || 0} / {activeWoForStep.wo.targetBatches || activeWoForStep.wo.targetQty || 0} Batch
+                    </span>
                   </div>
-                  <p className="text-[10px] text-slate-600 font-medium">Memasak bertahap (1.5 + 1.5) akan menambah akumulasi waktu secara otomatis tanpa pindah tahap.</p>
+                  
+                  <span className="text-slate-900 font-extrabold block mt-2">Catat Sub-Batch Memasak Adonan:</span>
+                  <div className="flex gap-2">
+                    {["1.0", "1.5", "2.0"].map((chip) => {
+                      const val = parseFloat(chip);
+                      const target = activeWoForStep.wo.targetBatches || activeWoForStep.wo.targetQty || 0;
+                      const current = activeWoForStep.wo.summaryState?.totalDoughBatchesDone || 0;
+                      const remaining = Math.max(0, target - current);
+                      const isDisabled = submittingStep || (remaining > 0 && val > remaining);
+
+                      return (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => handleLogSubBatch(activeWoForStep.wo, val)}
+                          disabled={isDisabled}
+                          className={`flex-1 py-2.5 rounded-xl font-extrabold text-xs shadow-2xs transition-all ${isDisabled ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-black text-white active:scale-95'}`}
+                        >
+                          + {chip} Batch
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-bold bg-slate-100 p-2 rounded-lg border border-slate-200/60 leading-relaxed">
+                    Setiap klik mencatat durasi aktivitas sebelumnya & memulai timer baru. Anda dibatasi oleh total target adonan pada Work Order ini.
+                  </p>
                 </div>
               )}
 
