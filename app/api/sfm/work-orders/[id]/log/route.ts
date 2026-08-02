@@ -4,6 +4,51 @@ import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
 
+// GET: Riwayat aktivitas crew untuk sebuah Work Order (timeline log).
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireRole(req, ["owner", "manager", "crew"]);
+  if (auth instanceof NextResponse) return auth;
+
+  const { id: workOrderId } = await params;
+
+  try {
+    const snap = await adminDb
+      .collection("workOrderLogs")
+      .where("workOrderId", "==", workOrderId)
+      .orderBy("timestamp", "desc")
+      .limit(100)
+      .get();
+
+    const logs = snap.docs.map((doc) => {
+      const d = doc.data();
+      return {
+        id: doc.id,
+        workOrderId: d.workOrderId || workOrderId,
+        stage: d.stage || null,
+        step: d.step || null,
+        action: d.action || null,
+        valueAdded: d.valueAdded || 0,
+        unit: d.unit || null,
+        defectCount: d.defectCount || 0,
+        defectReason: d.defectReason || "",
+        loggedByCrewId: d.loggedByCrewId || "",
+        loggedByCrewName: d.loggedByCrewName || "Crew Dapur",
+        durationMinutes: d.durationMinutes || 0,
+        timestamp: d.timestamp?.toDate?.().toISOString() ?? new Date().toISOString(),
+        notes: d.notes || "",
+      };
+    });
+
+    return NextResponse.json(logs);
+  } catch (err) {
+    console.error("GET /api/sfm/work-orders/[id]/log error:", err);
+    return NextResponse.json({ error: "Gagal mengambil riwayat aktivitas" }, { status: 500 });
+  }
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

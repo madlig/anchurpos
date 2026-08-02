@@ -1,15 +1,111 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { 
+import {
   Loader2, ChefHat, Package, Calendar, Table, LayoutGrid, Plus, Check, X,
-  Snowflake, AlertTriangle, RefreshCw, Search, Award, CheckCircle2, Tag, Eye, Clock, Layers, Box
+  Snowflake, AlertTriangle, RefreshCw, Search, Award, CheckCircle2, Clock,
+  Layers, Box, Users, TrendingDown, Timer, ClipboardList, ChevronRight,
+  ArrowDownToLine, Beaker, Palette, PlayCircle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatNumber } from "@/lib/formatters";
-import type { WorkOrder, Variant, SFMWorkOrderType } from "@/types";
+import type { WorkOrder, WorkOrderLog, Variant, SFMWorkOrderType, SFMTaskStep } from "@/types";
 
+// --- Constants ---
+const PRODUKSI_STEPS: { key: SFMTaskStep; label: string; icon: any }[] = [
+  { key: "DOUGH_COOKING", label: "Masak Adonan", icon: Beaker },
+  { key: "MIXING_EGG", label: "Mixer Telur", icon: Palette },
+  { key: "TRAY_MOLDING", label: "Cetak Loyang", icon: Layers },
+  { key: "FREEZER_CHECKPOINT", label: "Freezer", icon: Snowflake },
+  { key: "PRE_PACK", label: "Pre-Pack", icon: Package },
+];
+
+const STUCK_THRESHOLD_MS = 3.5 * 60 * 60 * 1000; // 3.5 jam
+const PRODUCING_STAGES = new Set(["DOUGH_COOKING", "MIXING_EGG", "TRAY_MOLDING"]);
+
+// --- Helpers (outside component, pure functions) ---
+function fmtDur(min: number): string {
+  if (min <= 0) return "-";
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? `${h}j ${m}m` : `${h}j`;
+}
+
+function fmtTimerMs(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  if (h > 0) return `${h}j ${m}m`;
+  return `${m}m`;
+}
+
+function getStageInfo(stage: string): { label: string; color: string; bg: string; isProducing: boolean; isFreezer: boolean; isDone: boolean } {
+  switch (stage) {
+    case "DOUGH_COOKING": return { label: "Masak Adonan", color: "text-amber-700", bg: "bg-amber-50 border-amber-200", isProducing: true, isFreezer: false, isDone: false };
+    case "MIXING_EGG": return { label: "Mixer Telur", color: "text-purple-700", bg: "bg-purple-50 border-purple-200", isProducing: true, isFreezer: false, isDone: false };
+    case "TRAY_MOLDING": return { label: "Cetak Loyang", color: "text-blue-700", bg: "bg-blue-50 border-blue-200", isProducing: true, isFreezer: false, isDone: false };
+    case "FREEZER_CHECKPOINT": return { label: "Freezer", color: "text-sky-700", bg: "bg-sky-50 border-sky-200", isProducing: false, isFreezer: true, isDone: false };
+    case "PRE_PACK": return { label: "Pre-Pack", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", isProducing: false, isFreezer: false, isDone: false };
+    case "FINAL_PACK": return { label: "Selesai", color: "text-slate-500", bg: "bg-slate-50 border-slate-200", isProducing: false, isFreezer: false, isDone: true };
+    default: return { label: stage || "Draft", color: "text-slate-600", bg: "bg-slate-50 border-slate-200", isProducing: false, isFreezer: false, isDone: false };
+  }
+}
+
+function isStuck(wo: WorkOrder): boolean {
+  if (wo.status === "COMPLETED" || wo.status === "CANCELLED") return false;
+  if (!PRODUCING_STAGES.has(wo.currentStage)) return false;
+  const started = new Date(wo.startedAt || wo.createdAt).getTime();
+  return (Date.now() - started) > STUCK_THRESHOLD_MS;
+}
+
+function getYieldPct(wo: WorkOrder): number {
+  const good = wo.summaryState?.totalGoodPcs || 0;
+  const defect = wo.summaryState?.totalDefectPcs || 0;
+  const total = good + defect;
+  if (total <= 0) return 0;
+  return Math.round((good / total) * 100);
+}
+
+function getProgressPct(wo: WorkOrder): number {
+  if (wo.woType === "PRODUKSI") {
+    const t = wo.targetLoyang || 1;
+    return Math.min(100, Math.round(((wo.summaryState?.totalTrayPrinted || 0) / t) * 100));
+  }
+  if (wo.woType === "PACKING_PESANAN") {
+    const t = wo.targetPacks || 1;
+    return Math.min(100, Math.round(((wo.summaryState?.totalGoodPacks || 0) / t) * 100));
+  }
+  const t = wo.targetQty || 1;
+  return Math.min(100, Math.round(((wo.summaryState?.totalGoodPcs || 0) / t) * 100));
+}
+
+function getActiveTimerMs(wo: WorkOrder): number {
+  const isProduksi = wo.woType === "PRODUKSI";
+  if (isProduksi && wo.currentStage === "FREEZER_CHECKPOINT" && wo.freezerInAt) {
+    return Date.now() - new Date(wo.freezerInAt).getTime();
+  }
+  if (wo.currentStepStartedAt) {
+    return Date.now() - new Date(wo.currentStepStartedAt).getTime();
+  }
+  return 0;
+}
+
+function getTotalDurationMin(wo: WorkOrder): number {
+  const sd = wo.stepDurationsMinutes || {};
+  return Object.values(sd).reduce((sum, v) => sum + (v || 0), 0);
+}
+
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+}
+
+// --- Main Component ---
 export default function ManagerSFMPage() {
   const { getToken } = useAuth();
   const [activeTab, setActiveTab] = useState<"wo_active" | "audit_ledger">("wo_active");
@@ -23,11 +119,22 @@ export default function ManagerSFMPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVariantFilter, setSelectedVariantFilter] = useState("all");
   const [selectedWoTypeFilter, setSelectedWoTypeFilter] = useState<string>("all");
+  const [selectedCrewFilter, setSelectedCrewFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<"newest" | "progress" | "duration" | "yield">("newest");
 
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<{ id: string; name: string; role: string }[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Detail panel
+  const [detailWo, setDetailWo] = useState<WorkOrder | null>(null);
+  const [woLogs, setWoLogs] = useState<WorkOrderLog[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  // Live timer tick (re-render setiap 30 detik)
+  const [liveTick, setLiveTick] = useState(0);
 
   // Modal
   const [showNewWoModal, setShowNewWoModal] = useState(false);
@@ -35,15 +142,17 @@ export default function ManagerSFMPage() {
   const [newWoForm, setNewWoForm] = useState({
     woType: "PRODUKSI" as SFMWorkOrderType,
     variantId: "",
-    targetBatches: "3", // For PRODUKSI
-    targetPacks: "48", // For PACKING
-    targetQty: "100", // For REPACK
-    targetUom: "cup", // For REPACK
+    targetBatches: "3",
+    targetPacks: "48",
+    targetQty: "100",
+    targetUom: "cup",
     notes: "",
     productionTargets: [] as { variantId: string; variantName: string; targetBatches: string }[],
     opnameScope: "Semua" as "Semua" | "Bahan Baku" | "Kemasan" | "Produk Jadi" | "Spesifik",
     opnameItems: [] as string[],
     sourceOrderId: "",
+    assignedCrewId: "",
+    assignedCrewName: "",
   });
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
@@ -57,20 +166,25 @@ export default function ManagerSFMPage() {
   const loadAllData = useCallback(async () => {
     setLoading(true);
     try {
-      const dateParams = activeTab === "audit_ledger" 
-        ? `startDate=${startDate}&endDate=${endDate}` 
+      const dateParams = activeTab === "audit_ledger"
+        ? `startDate=${startDate}&endDate=${endDate}`
         : "";
-      const [woRes, varRes, ordersRes] = await Promise.all([
+      const [woRes, varRes, ordersRes, empRes] = await Promise.all([
         fetchWithAuth(`/api/sfm/work-orders?${dateParams}&search=${encodeURIComponent(searchQuery)}`),
         fetchWithAuth("/api/variants"),
         fetchWithAuth("/api/orders"),
+        fetchWithAuth("/api/employees"),
       ]);
 
       if (woRes.ok) setWorkOrders(await woRes.json());
       if (varRes.ok) setVariants(await varRes.json());
       if (ordersRes.ok) {
         const allOrders = await ordersRes.json();
-        setPendingOrders(Array.isArray(allOrders) ? allOrders.filter(o => o.status === "pending" && !o.hasWorkOrder) : []);
+        setPendingOrders(Array.isArray(allOrders) ? allOrders.filter((o: any) => o.status === "pending" && !o.hasWorkOrder) : []);
+      }
+      if (empRes.ok) {
+        const allEmp = await empRes.json();
+        setEmployees(Array.isArray(allEmp) ? allEmp.filter((e: any) => e.isActive !== false) : []);
       }
     } catch (err) {
       console.error("loadAllData error:", err);
@@ -79,15 +193,22 @@ export default function ManagerSFMPage() {
     }
   }, [startDate, endDate, activeTab, searchQuery, fetchWithAuth]);
 
+  useEffect(() => { loadAllData(); }, [loadAllData]);
+
+  // Live tick: re-render setiap 30 detik untuk timer real-time
   useEffect(() => {
-    loadAllData();
-  }, [loadAllData]);
+    const interval = setInterval(() => setLiveTick(t => t + 1), 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Crew list for filter
+  const crewList = useMemo(() => employees.filter(e => e.role === "crew"), [employees]);
 
   const filteredWorkOrders = useMemo(() => {
-    return workOrders.filter((w) => {
+    let list = workOrders.filter((w) => {
       if (selectedVariantFilter !== "all") {
-        const matchesVariant = 
-          w.variantIds?.includes(selectedVariantFilter) || 
+        const matchesVariant =
+          w.variantIds?.includes(selectedVariantFilter) ||
           w.productId === selectedVariantFilter ||
           w.productionTargets?.some(pt => pt.variantId === selectedVariantFilter);
         if (!matchesVariant) return false;
@@ -95,15 +216,65 @@ export default function ManagerSFMPage() {
       if (selectedWoTypeFilter !== "all") {
         if ((w.woType || "PRODUKSI") !== selectedWoTypeFilter) return false;
       }
+      if (selectedCrewFilter !== "all") {
+        if (w.assignedCrewId !== selectedCrewFilter) return false;
+      }
       return true;
     });
-  }, [workOrders, selectedVariantFilter, selectedWoTypeFilter]);
+
+    // Sort
+    if (sortBy === "newest") {
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (sortBy === "progress") {
+      list.sort((a, b) => getProgressPct(b) - getProgressPct(a));
+    } else if (sortBy === "duration") {
+      list.sort((a, b) => getTotalDurationMin(b) - getTotalDurationMin(a));
+    } else if (sortBy === "yield") {
+      list.sort((a, b) => getYieldPct(a) - getYieldPct(b));
+    }
+
+    return list;
+  }, [workOrders, selectedVariantFilter, selectedWoTypeFilter, selectedCrewFilter, sortBy]);
+
+  // Stuck WOs (hanya tahap produksi, BUKAN freezer)
+  const stuckWos = useMemo(() => filteredWorkOrders.filter(wo => isStuck(wo)), [filteredWorkOrders, liveTick]);
+
+  // Metric computations
+  const activeWos = useMemo(() => filteredWorkOrders.filter(w => w.status !== "COMPLETED" && w.status !== "CANCELLED"), [filteredWorkOrders]);
+  const producingWos = useMemo(() => activeWos.filter(w => w.woType === "PRODUKSI" && PRODUCING_STAGES.has(w.currentStage)), [activeWos]);
+  const inFreezerWos = useMemo(() => activeWos.filter(w => w.currentStage === "FREEZER_CHECKPOINT"), [activeWos]);
+  const avgYield = useMemo(() => {
+    const withOutput = filteredWorkOrders.filter(w => (w.summaryState?.totalGoodPcs || 0) + (w.summaryState?.totalDefectPcs || 0) > 0);
+    if (withOutput.length === 0) return 0;
+    return Math.round(withOutput.reduce((sum, w) => sum + getYieldPct(w), 0) / withOutput.length);
+  }, [filteredWorkOrders]);
+
+  // Detail panel handler
+  async function openDetail(wo: WorkOrder) {
+    setDetailWo(wo);
+    setWoLogs([]);
+    setLoadingDetail(true);
+    try {
+      const res = await fetchWithAuth(`/api/sfm/work-orders/${wo.id}/log`);
+      if (res.ok) setWoLogs(await res.json());
+    } catch (err) {
+      console.error("openDetail error:", err);
+    } finally {
+      setLoadingDetail(false);
+    }
+  }
+
+  function closeDetail() {
+    setDetailWo(null);
+    setWoLogs([]);
+  }
 
   async function handleCreateWo(e: React.FormEvent) {
     e.preventDefault();
     setCreatingWo(true);
     try {
       const selectedVar = variants.find(v => v.id === newWoForm.variantId);
+      const selectedCrew = employees.find(e => e.id === newWoForm.assignedCrewId);
       const res = await fetchWithAuth("/api/sfm/work-orders", {
         method: "POST",
         body: JSON.stringify({
@@ -119,15 +290,17 @@ export default function ManagerSFMPage() {
           opnameScope: newWoForm.woType === "STOCK_OPNAME" ? newWoForm.opnameScope : undefined,
           opnameItems: newWoForm.woType === "STOCK_OPNAME" ? newWoForm.opnameItems : undefined,
           sourceOrderId: newWoForm.woType === "PACKING_PESANAN" ? newWoForm.sourceOrderId : undefined,
+          assignedCrewId: newWoForm.assignedCrewId || undefined,
+          assignedCrewName: selectedCrew?.name || newWoForm.assignedCrewName || undefined,
           notes: newWoForm.notes,
         }),
       });
 
       if (res.ok) {
         setShowNewWoModal(false);
-        setNewWoForm({ 
+        setNewWoForm({
           woType: "PRODUKSI", variantId: "", targetBatches: "3", targetPacks: "48", targetQty: "100", targetUom: "cup", notes: "",
-          productionTargets: [], opnameScope: "Semua", opnameItems: [], sourceOrderId: ""
+          productionTargets: [], opnameScope: "Semua", opnameItems: [], sourceOrderId: "", assignedCrewId: "", assignedCrewName: ""
         });
         await loadAllData();
       }
@@ -135,6 +308,9 @@ export default function ManagerSFMPage() {
       setCreatingWo(false);
     }
   }
+
+  // Reference liveTick so it's used (triggers re-render for timers)
+  void liveTick;
 
   return (
     <div className="min-h-screen bg-slate-50/70 pb-28">
@@ -201,7 +377,7 @@ export default function ManagerSFMPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex bg-slate-100 p-1 rounded-xl mr-2">
+              <div className="flex bg-slate-100 p-1 rounded-xl mr-1">
                 <button
                   type="button"
                   onClick={() => setViewMode("table")}
@@ -234,12 +410,13 @@ export default function ManagerSFMPage() {
                 onChange={(e) => setSelectedWoTypeFilter(e.target.value)}
                 className="h-9 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none"
               >
-                <option value="all">Semua Tipe Task</option>
-                <option value="PRODUKSI">Produksi Dapur</option>
-                <option value="REPACK_SAOS">Repack Saos / Gula</option>
-                <option value="PACKING_PESANAN">Packing Pesanan</option>
-                <option value="STOCK_OPNAME">Stock Opname</option>
-                <option value="GENERAL_TASK">General Task</option>
+                <option value="all">Semua Tipe</option>
+                <option value="PRODUKSI">Produksi</option>
+                <option value="REPACK_SAOS">Repack Saos</option>
+                <option value="REPACK_GULA">Repack Gula</option>
+                <option value="PACKING_PESANAN">Packing</option>
+                <option value="STOCK_OPNAME">Opname</option>
+                <option value="GENERAL_TASK">Task</option>
               </select>
 
               <select
@@ -251,6 +428,30 @@ export default function ManagerSFMPage() {
                 {variants.map(v => (
                   <option key={v.id} value={v.id}>{v.name}</option>
                 ))}
+              </select>
+
+              {/* Crew filter */}
+              <select
+                value={selectedCrewFilter}
+                onChange={(e) => setSelectedCrewFilter(e.target.value)}
+                className="h-9 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none"
+              >
+                <option value="all">Semua Crew</option>
+                {crewList.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+
+              {/* Sort */}
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="h-9 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none"
+              >
+                <option value="newest">Terbaru</option>
+                <option value="progress">Paling Dekat Selesai</option>
+                <option value="duration">Durasi Terlama</option>
+                <option value="yield">Yield Terendah</option>
               </select>
 
               {activeTab === "audit_ledger" && (
@@ -275,42 +476,12 @@ export default function ManagerSFMPage() {
                     />
                   </div>
                   <div className="flex items-center gap-1 border-l border-slate-200/80 pl-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const today = new Date().toISOString().split("T")[0];
-                        setStartDate(today);
-                        setEndDate(today);
-                      }}
-                      className="px-2 py-1 text-[10px] font-extrabold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
-                    >
-                      Hari Ini
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const today = new Date();
-                        const d7 = new Date(today);
-                        d7.setDate(d7.getDate() - 6);
-                        setStartDate(d7.toISOString().split("T")[0]);
-                        setEndDate(today.toISOString().split("T")[0]);
-                      }}
-                      className="px-2 py-1 text-[10px] font-extrabold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
-                    >
-                      7 Hari
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const today = new Date();
-                        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-                        setStartDate(firstDay.toISOString().split("T")[0]);
-                        setEndDate(today.toISOString().split("T")[0]);
-                      }}
-                      className="px-2 py-1 text-[10px] font-extrabold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
-                    >
-                      Bulan Ini
-                    </button>
+                    <button type="button" onClick={() => { const t = new Date().toISOString().split("T")[0]; setStartDate(t); setEndDate(t); }}
+                      className="px-2 py-1 text-[10px] font-extrabold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-all active:scale-95">Hari Ini</button>
+                    <button type="button" onClick={() => { const t = new Date(); const d7 = new Date(t); d7.setDate(d7.getDate() - 6); setStartDate(d7.toISOString().split("T")[0]); setEndDate(t.toISOString().split("T")[0]); }}
+                      className="px-2 py-1 text-[10px] font-extrabold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-all active:scale-95">7 Hari</button>
+                    <button type="button" onClick={() => { const t = new Date(); const f = new Date(t.getFullYear(), t.getMonth(), 1); setStartDate(f.toISOString().split("T")[0]); setEndDate(t.toISOString().split("T")[0]); }}
+                      className="px-2 py-1 text-[10px] font-extrabold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-all active:scale-95">Bulan Ini</button>
                   </div>
                 </div>
               )}
@@ -320,171 +491,502 @@ export default function ManagerSFMPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-6">
-        
-        {/* Executive Metric Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
-              {activeTab === "audit_ledger" ? "Total WO Periode Ini" : "Total WO Aktif"}
-            </p>
-            <p className="text-2xl font-black text-slate-900 mt-1">{filteredWorkOrders.length}</p>
+
+        {/* --- Executive Metric Cards --- */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center"><Layers size={16} className="text-slate-600" /></div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">WO Aktif</p>
+            </div>
+            <p className="text-2xl font-black text-slate-900">{activeWos.length}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-0.5">dari {filteredWorkOrders.length} total</p>
           </div>
-          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Proses Dapur</p>
-            <p className="text-2xl font-black text-emerald-600 mt-1">
-              {filteredWorkOrders.filter(w => w.woType === "PRODUKSI").length}
-            </p>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center"><ChefHat size={16} className="text-emerald-600" /></div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Produksi Dapur</p>
+            </div>
+            <p className="text-2xl font-black text-emerald-600">{producingWos.length}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{inFreezerWos.length} di Freezer</p>
           </div>
-          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Proses Packing</p>
-            <p className="text-2xl font-black text-blue-600 mt-1">
-              {filteredWorkOrders.filter(w => w.woType === "PACKING_PESANAN" || w.woType === "REPACK_SAOS").length}
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center"><TrendingDown size={16} className="text-amber-600" /></div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Rata-rata Yield</p>
+            </div>
+            <p className={`text-2xl font-black ${avgYield >= 90 ? "text-emerald-600" : avgYield >= 80 ? "text-amber-600" : avgYield > 0 ? "text-red-600" : "text-slate-300"}`}>
+              {avgYield > 0 ? `${avgYield}%` : "-"}
             </p>
+            <p className="text-[10px] font-bold text-slate-400 mt-0.5">good vs total output</p>
           </div>
-          <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Hasil Pcs</p>
-            <p className="text-2xl font-black text-amber-600 mt-1">
-              {formatNumber(filteredWorkOrders.reduce((sum, w) => sum + (w.summaryState?.totalGoodPcs || 0), 0))}
-            </p>
+
+          <div className={`p-4 rounded-2xl border shadow-sm ${stuckWos.length > 0 ? "bg-red-50 border-red-200" : "bg-white border-slate-200"}`}>
+            <div className="flex items-center gap-2 mb-1">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${stuckWos.length > 0 ? "bg-red-100" : "bg-slate-100"}`}>
+                <AlertTriangle size={16} className={stuckWos.length > 0 ? "text-red-600" : "text-slate-400"} />
+              </div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Perlu Perhatian</p>
+            </div>
+            <p className={`text-2xl font-black ${stuckWos.length > 0 ? "text-red-600" : "text-slate-900"}`}>{stuckWos.length}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{stuckWos.length > 0 ? "WO stuck di tahap produksi" : "Semua berjalan normal"}</p>
           </div>
         </div>
 
-        {/* Work Orders List (Grid vs Table) */}
+        {/* --- Alert Banner --- */}
+        {stuckWos.length > 0 && (
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={16} className="text-amber-600" />
+              <span className="text-xs font-black text-amber-800 uppercase tracking-wider">WO Perlu Perhatian — Lewat 3.5 Jam di Tahap Produksi</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {stuckWos.map(wo => {
+                const dur = Date.now() - new Date(wo.startedAt || wo.createdAt).getTime();
+                return (
+                  <button
+                    key={wo.id}
+                    type="button"
+                    onClick={() => openDetail(wo)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-amber-200 hover:bg-amber-100 transition-all text-xs font-bold text-amber-800 active:scale-95"
+                  >
+                    <Clock size={12} />
+                    {wo.woNumber}
+                    <span className="text-amber-500">({fmtTimerMs(dur)})</span>
+                    <span className="bg-amber-100 px-1.5 py-0.5 rounded text-[10px] font-black">{getStageInfo(wo.currentStage).label}</span>
+                    <ChevronRight size={12} className="text-amber-400" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* --- Work Orders List --- */}
         {viewMode === "grid" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredWorkOrders.map((wo) => (
-            <div key={wo.id} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-              <div>
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono font-extrabold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">
-                      {wo.woNumber}
-                    </span>
-                    <span className="text-[10px] font-black text-slate-500 uppercase">{wo.woType}</span>
-                  </div>
-                  <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                    wo.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                    wo.status === "IN_PROGRESS" ? "bg-blue-50 text-blue-700 border-blue-200" :
-                    "bg-amber-50 text-amber-700 border-amber-200"
-                  }`}>
-                    {wo.status}
-                  </span>
-                </div>
+            {filteredWorkOrders.map((wo) => {
+              const stageInfo = getStageInfo(wo.currentStage);
+              const stuck = isStuck(wo);
+              const timerMs = getActiveTimerMs(wo);
+              const yieldPct = getYieldPct(wo);
+              const progressPct = getProgressPct(wo);
 
-                <h3 className="text-sm font-black text-slate-800">
-                  {wo.woType === "PRODUKSI" && wo.productionTargets && wo.productionTargets.length > 0
-                    ? `Churros (${wo.productionTargets.map(pt => `${pt.variantName}: ${pt.targetBatches}B`).join(", ")})`
-                    : wo.productName || "Work Order"}
-                </h3>
-                
-                <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs font-semibold space-y-1.5">
-                  {wo.woType === "PRODUKSI" ? (
-                    <>
-                      <div className="flex justify-between"><span className="text-slate-500">Target Loyang:</span> <span className="text-slate-800 font-extrabold">{wo.targetLoyang} Loyang</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Progress Loyang:</span> <span className="text-slate-900 font-extrabold">{wo.summaryState?.totalTrayPrinted || 0} / {wo.targetLoyang}</span></div>
-                    </>
-                  ) : wo.woType === "PACKING_PESANAN" ? (
-                    <>
-                      <div className="flex justify-between"><span className="text-slate-500">Target Pack:</span> <span className="text-slate-800 font-extrabold">{wo.targetPacks} Pack</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Hasil Packing:</span> <span className="text-emerald-600 font-extrabold">{wo.summaryState?.totalGoodPacks || 0} / {wo.targetPacks}</span></div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex justify-between"><span className="text-slate-500">Target {wo.targetUom}:</span> <span className="text-slate-800 font-extrabold">{wo.targetQty}</span></div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-semibold">
-                <span className="flex items-center gap-1 font-bold text-slate-700">
-                  <Clock size={12} className="text-slate-400" />
-                  {new Date(wo.createdAt).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })} {new Date(wo.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                </span>
-                <span>PIC: {wo.assignedCrewName}</span>
-              </div>
-            </div>
-          ))}
-          
-          {filteredWorkOrders.length === 0 && (
-            <div className="col-span-full py-20 text-center">
-              <Box size={40} className="mx-auto text-slate-300 mb-3" />
-              <p className="text-slate-500 font-bold">Tidak ada Work Order yang ditemukan.</p>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-slate-50 border-b border-slate-100 text-xs text-slate-500 font-bold uppercase tracking-wider">
-                <tr>
-                  <th className="px-5 py-4">Nomor & Tipe</th>
-                  <th className="px-5 py-4">Tanggal (MFD)</th>
-                  <th className="px-5 py-4">Produk</th>
-                  <th className="px-5 py-4">Target vs Aktual</th>
-                  <th className="px-5 py-4">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredWorkOrders.map(wo => (
-                  <tr key={wo.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-5 py-4">
-                      <div className="font-mono font-bold text-slate-800">{wo.woNumber}</div>
-                      <div className="text-[10px] text-slate-500 font-black mt-1 uppercase">{wo.woType}</div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="font-extrabold text-slate-800 text-xs">
-                        {new Date(wo.createdAt).toLocaleDateString("id-ID", { day: '2-digit', month: 'short', year: 'numeric' })}
+              return (
+                <div
+                  key={wo.id}
+                  onClick={() => openDetail(wo)}
+                  className={`bg-white rounded-2xl p-5 border shadow-sm flex flex-col justify-between hover:shadow-md transition-all cursor-pointer ${
+                    stuck ? "border-l-4 border-l-red-400 border-t border-t-red-100 border-r border-r-red-100 border-b border-b-red-100 bg-red-50/30" : "border-slate-200"
+                  }`}
+                >
+                  <div>
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-extrabold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">
+                          {wo.woNumber}
+                        </span>
+                        <span className="text-[10px] font-black text-slate-500 uppercase">{wo.woType}</span>
                       </div>
-                      <div className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                        Pukul {new Date(wo.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="font-bold text-slate-800">
-                        {wo.woType === "PRODUKSI" && wo.productionTargets && wo.productionTargets.length > 0
-                          ? `Churros (${wo.productionTargets.map(pt => `${pt.variantName}: ${pt.targetBatches}B`).join(", ")})`
-                          : wo.productName || "Work Order"}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-1">PIC: {wo.assignedCrewName || "Belum ditugaskan"}</div>
-                    </td>
-                    <td className="px-5 py-4">
-                      {wo.woType === "PRODUKSI" ? (
-                        <span className="font-bold text-slate-700">{wo.summaryState?.totalTrayPrinted || 0} / {wo.targetLoyang} <span className="text-slate-400 text-xs font-semibold">Loyang</span></span>
-                      ) : wo.woType === "PACKING_PESANAN" ? (
-                        <span className="font-bold text-slate-700">{wo.summaryState?.totalGoodPacks || 0} / {wo.targetPacks} <span className="text-slate-400 text-xs font-semibold">Pack</span></span>
-                      ) : (
-                        <span className="font-bold text-slate-700">{wo.summaryState?.totalGoodPcs || 0} / {wo.targetQty} <span className="text-slate-400 text-xs font-semibold">{wo.targetUom}</span></span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                      <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
                         wo.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
                         wo.status === "IN_PROGRESS" ? "bg-blue-50 text-blue-700 border-blue-200" :
                         "bg-amber-50 text-amber-700 border-amber-200"
                       }`}>
                         {wo.status}
                       </span>
-                    </td>
-                  </tr>
-                ))}
-                {filteredWorkOrders.length === 0 && (
+                    </div>
+
+                    {/* Product */}
+                    <h3 className="text-sm font-black text-slate-800">
+                      {wo.woType === "PRODUKSI" && wo.productionTargets && wo.productionTargets.length > 0
+                        ? `Churros (${wo.productionTargets.map(pt => `${pt.variantName}: ${pt.targetBatches}B`).join(", ")})`
+                        : wo.productName || "Work Order"}
+                    </h3>
+
+                    {/* Stage + Timer */}
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border ${stageInfo.bg} ${stageInfo.color}`}>
+                        {stageInfo.label}
+                      </span>
+                      {timerMs > 0 && wo.status !== "COMPLETED" && (
+                        <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+                          <Clock size={10} /> {fmtTimerMs(timerMs)}
+                        </span>
+                      )}
+                      {stuck && (
+                        <span className="text-[9px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded animate-pulse">STUCK</span>
+                      )}
+                    </div>
+
+                    {/* Target vs Aktual */}
+                    <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs font-semibold space-y-1.5">
+                      {wo.woType === "PRODUKSI" ? (
+                        <>
+                          <div className="flex justify-between"><span className="text-slate-500">Loyang:</span> <span className="text-slate-800 font-extrabold">{wo.summaryState?.totalTrayPrinted || 0} / {wo.targetLoyang || 0}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-500">Pcs:</span> <span className="text-slate-800 font-extrabold">{wo.summaryState?.totalGoodPcs || 0}</span></div>
+                        </>
+                      ) : wo.woType === "PACKING_PESANAN" ? (
+                        <div className="flex justify-between"><span className="text-slate-500">Pack:</span> <span className="text-slate-800 font-extrabold">{wo.summaryState?.totalGoodPacks || 0} / {wo.targetPacks || 0}</span></div>
+                      ) : (
+                        <div className="flex justify-between"><span className="text-slate-500">Output:</span> <span className="text-slate-800 font-extrabold">{wo.summaryState?.totalGoodPcs || 0} {wo.targetUom}</span></div>
+                      )}
+                      {/* Defect row */}
+                      {(wo.summaryState?.totalDefectPcs || 0) > 0 && (
+                        <div className="flex justify-between text-red-600"><span>Defect:</span> <span className="font-extrabold">{wo.summaryState?.totalDefectPcs} Pcs</span></div>
+                      )}
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${progressPct >= 100 ? "bg-emerald-500" : progressPct > 0 ? "bg-blue-500" : "bg-slate-200"}`} style={{ width: `${progressPct}%` }} />
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-semibold">
+                    <span className="flex items-center gap-1 font-bold text-slate-600">
+                      <Users size={11} className="text-slate-400" /> {wo.assignedCrewName || "Belum ditugaskan"}
+                    </span>
+                    <span>{fmtDate(wo.createdAt)} {fmtTime(wo.createdAt)}</span>
+                  </div>
+                </div>
+              );
+            })}
+
+            {filteredWorkOrders.length === 0 && (
+              <div className="col-span-full py-20 text-center">
+                <Box size={40} className="mx-auto text-slate-300 mb-3" />
+                <p className="text-slate-500 font-bold">Tidak ada Work Order yang ditemukan.</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead className="bg-slate-50 border-b border-slate-100 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                   <tr>
-                    <td colSpan={5} className="px-5 py-12 text-center">
-                      <Box size={32} className="mx-auto text-slate-300 mb-2" />
-                      <p className="text-slate-500 font-bold">Tidak ada Work Order.</p>
-                    </td>
+                    <th className="px-4 py-3">Nomor & Tipe</th>
+                    <th className="px-4 py-3">Produk & PIC</th>
+                    <th className="px-4 py-3">Tahap Saat Ini</th>
+                    <th className="px-4 py-3">Target vs Aktual</th>
+                    <th className="px-4 py-3">Defect</th>
+                    <th className="px-4 py-3">Status</th>
                   </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredWorkOrders.map(wo => {
+                    const stageInfo = getStageInfo(wo.currentStage);
+                    const stuck = isStuck(wo);
+                    const timerMs = getActiveTimerMs(wo);
+
+                    return (
+                      <tr
+                        key={wo.id}
+                        onClick={() => openDetail(wo)}
+                        className={`hover:bg-slate-50/50 transition-colors cursor-pointer ${
+                          stuck ? "bg-red-50/30 border-l-4 border-l-red-400" : ""
+                        }`}
+                      >
+                        <td className="px-4 py-3.5">
+                          <div className="font-mono font-bold text-slate-800 text-xs">{wo.woNumber}</div>
+                          <div className="text-[10px] text-slate-500 font-black mt-0.5 uppercase">{wo.woType}</div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="font-bold text-slate-800 text-xs">
+                            {wo.woType === "PRODUKSI" && wo.productionTargets && wo.productionTargets.length > 0
+                              ? `Churros (${wo.productionTargets.map(pt => `${pt.variantName}: ${pt.targetBatches}B`).join(", ")})`
+                              : wo.productName || "Work Order"}
+                          </div>
+                          <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
+                            <Users size={10} /> {wo.assignedCrewName || "Belum ditugaskan"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border ${stageInfo.bg} ${stageInfo.color}`}>
+                            {stageInfo.label}
+                          </span>
+                          {timerMs > 0 && wo.status !== "COMPLETED" && (
+                            <div className="text-[10px] font-bold text-slate-500 mt-1 flex items-center gap-1">
+                              <Clock size={10} /> {fmtTimerMs(timerMs)}
+                            </div>
+                          )}
+                          {stuck && (
+                            <span className="text-[9px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded animate-pulse ml-1">STUCK</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {wo.woType === "PRODUKSI" ? (
+                            <div className="space-y-0.5">
+                              <span className="font-bold text-slate-700 text-xs">{wo.summaryState?.totalTrayPrinted || 0}/{wo.targetLoyang || 0} <span className="text-slate-400 text-[10px] font-semibold">Loy</span></span>
+                              <span className="text-slate-300"> · </span>
+                              <span className="font-bold text-slate-700 text-xs">{wo.summaryState?.totalGoodPcs || 0} <span className="text-slate-400 text-[10px] font-semibold">Pcs</span></span>
+                            </div>
+                          ) : wo.woType === "PACKING_PESANAN" ? (
+                            <span className="font-bold text-slate-700 text-xs">{wo.summaryState?.totalGoodPacks || 0}/{wo.targetPacks || 0} <span className="text-slate-400 text-[10px] font-semibold">Pack</span></span>
+                          ) : (
+                            <span className="font-bold text-slate-700 text-xs">{wo.summaryState?.totalGoodPcs || 0}/{wo.targetQty || 0} <span className="text-slate-400 text-[10px] font-semibold">{wo.targetUom}</span></span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {(wo.summaryState?.totalDefectPcs || 0) > 0 ? (
+                            <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-lg border border-red-200">
+                              {wo.summaryState?.totalDefectPcs} Pcs
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                            wo.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                            wo.status === "IN_PROGRESS" ? "bg-blue-50 text-blue-700 border-blue-200" :
+                            "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}>
+                            {wo.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredWorkOrders.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-12 text-center">
+                        <Box size={32} className="mx-auto text-slate-300 mb-2" />
+                        <p className="text-slate-500 font-bold">Tidak ada Work Order.</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ========== SIDE SHEET: WO Detail Panel ========== */}
+      {detailWo && (
+        <div className="fixed inset-0 z-50 animate-in fade-in">
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={closeDetail} />
+          {/* Panel */}
+          <div className="absolute right-0 top-0 bottom-0 w-full max-w-lg bg-white shadow-2xl border-l border-slate-200 overflow-y-auto">
+            {/* Panel Header */}
+            <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs font-mono font-extrabold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">{detailWo.woNumber}</span>
+                <span className="text-[10px] font-black text-slate-500 uppercase">{detailWo.woType}</span>
+                <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                  detailWo.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                  detailWo.status === "IN_PROGRESS" ? "bg-blue-50 text-blue-700 border-blue-200" :
+                  "bg-amber-50 text-amber-700 border-amber-200"
+                }`}>{detailWo.status}</span>
+              </div>
+              <button type="button" onClick={closeDetail} className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"><X size={16} /></button>
+            </div>
+
+            <div className="px-5 py-5 space-y-5">
+              {/* Section 1: Ringkasan */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <ClipboardList size={14} /> Ringkasan
+                </h4>
+                <div className="grid grid-cols-2 gap-3 text-xs font-bold">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">PIC Crew</span>
+                    <span className="text-slate-800 font-extrabold flex items-center gap-1"><Users size={11} /> {detailWo.assignedCrewName || "Belum ditugaskan"}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Dimulai</span>
+                    <span className="text-slate-800 font-extrabold">{fmtDate(detailWo.startedAt || detailWo.createdAt)} {fmtTime(detailWo.startedAt || detailWo.createdAt)}</span>
+                  </div>
+                  {detailWo.completedAt && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Selesai</span>
+                      <span className="text-slate-800 font-extrabold">{fmtDate(detailWo.completedAt)} {fmtTime(detailWo.completedAt)}</span>
+                    </div>
+                  )}
+                  {detailWo.batchCode && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Batch Code</span>
+                      <span className="text-slate-800 font-extrabold font-mono">{detailWo.batchCode}</span>
+                    </div>
+                  )}
+                  {detailWo.expiredDate && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Expired</span>
+                      <span className="text-slate-800 font-extrabold">{fmtDate(detailWo.expiredDate)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Target vs Aktual besar */}
+                <div className="border-t border-slate-200 pt-3 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-bold text-xs">Target vs Aktual</span>
+                  </div>
+                  {detailWo.woType === "PRODUKSI" && (
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="text-center p-2 rounded-xl bg-white border border-slate-200">
+                        <span className="text-[10px] text-slate-400 block font-bold">Batch Adonan</span>
+                        <span className="text-lg font-black text-slate-800">{detailWo.summaryState?.totalDoughBatchesDone || 0}<span className="text-slate-400 text-xs font-semibold">/{detailWo.targetBatches || 0}</span></span>
+                      </div>
+                      <div className="text-center p-2 rounded-xl bg-white border border-slate-200">
+                        <span className="text-[10px] text-slate-400 block font-bold">Loyang</span>
+                        <span className="text-lg font-black text-slate-800">{detailWo.summaryState?.totalTrayPrinted || 0}<span className="text-slate-400 text-xs font-semibold">/{detailWo.targetLoyang || 0}</span></span>
+                      </div>
+                      <div className="text-center p-2 rounded-xl bg-white border border-slate-200">
+                        <span className="text-[10px] text-slate-400 block font-bold">Pack</span>
+                        <span className="text-lg font-black text-emerald-700">{detailWo.summaryState?.totalGoodPacks || 0}</span>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="text-slate-500">Total Good Pcs:</span>
+                    <span className="text-slate-800 font-extrabold">{detailWo.summaryState?.totalGoodPcs || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="text-slate-500">Defect Pcs:</span>
+                    <span className={`font-extrabold ${(detailWo.summaryState?.totalDefectPcs || 0) > 0 ? "text-red-600" : "text-slate-400"}`}>
+                      {detailWo.summaryState?.totalDefectPcs || 0}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="text-slate-500">Yield:</span>
+                    <span className={`font-extrabold ${getYieldPct(detailWo) >= 90 ? "text-emerald-600" : getYieldPct(detailWo) >= 80 ? "text-amber-600" : "text-red-600"}`}>
+                      {getYieldPct(detailWo)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Time Tracking per Step */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Timer size={14} /> Time Tracking
+                </h4>
+                <div className="space-y-1.5">
+                  {PRODUKSI_STEPS.map((step, idx) => {
+                    const isProduksi = detailWo.woType === "PRODUKSI";
+                    const currentStage = detailWo.currentStage || "DOUGH_COOKING";
+                    const currentIdx = isProduksi ? PRODUKSI_STEPS.findIndex(s => s.key === currentStage) : 0;
+                    const isDone = idx < currentIdx;
+                    const isActive = idx === currentIdx && detailWo.status !== "COMPLETED" && detailWo.status !== "CANCELLED";
+                    const Icon = step.icon;
+                    const stepDur = detailWo.stepDurationsMinutes?.[step.key] || 0;
+                    const liveAt = isActive
+                      ? (step.key === "FREEZER_CHECKPOINT" && detailWo.freezerInAt ? detailWo.freezerInAt : detailWo.currentStepStartedAt)
+                      : undefined;
+                    const liveMs = liveAt ? Date.now() - new Date(liveAt).getTime() : 0;
+
+                    return (
+                      <div key={step.key} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${
+                        isActive ? "bg-emerald-50 border-emerald-200" : isDone ? "bg-white border-slate-200" : "bg-slate-50/50 border-slate-200/60"
+                      }`}>
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                          isDone ? "bg-emerald-500 text-white" : isActive ? "bg-emerald-600 text-white animate-pulse" : "bg-slate-200 text-slate-400"
+                        }`}>
+                          {isDone ? <CheckCircle2 size={14} /> : isActive ? <span className="w-1.5 h-1.5 rounded-full bg-white" /> : <span className="w-2 h-2 rounded-full bg-slate-300" />}
+                        </div>
+                        <Icon size={14} className={isActive ? "text-emerald-600" : isDone ? "text-slate-500" : "text-slate-300"} />
+                        <span className={`text-xs font-extrabold flex-1 ${isActive ? "text-emerald-800" : isDone ? "text-slate-600" : "text-slate-400"}`}>
+                          {step.label}
+                          {step.key === "FREEZER_CHECKPOINT" && (
+                            <span className="ml-1 text-[10px] font-bold text-sky-500">(storage)</span>
+                          )}
+                        </span>
+                        <span className="text-[11px] font-bold text-right shrink-0">
+                          {isActive ? (
+                            liveMs > 0 ? (
+                              <span className="text-emerald-700 font-extrabold">{fmtTimerMs(liveMs)}</span>
+                            ) : (
+                              <span className="text-emerald-600 font-bold">Dimulai</span>
+                            )
+                          ) : isDone ? (
+                            <span className="text-slate-500">{fmtDur(stepDur)}</span>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Total durasi */}
+                <div className="border-t border-slate-200 pt-2 flex justify-between text-xs font-bold">
+                  <span className="text-slate-500">Total Durasi Terproses:</span>
+                  <span className="text-slate-800 font-extrabold">{fmtDur(getTotalDurationMin(detailWo))}</span>
+                </div>
+              </div>
+
+              {/* Section 3: Riwayat Aktivitas Crew */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <PlayCircle size={14} /> Riwayat Aktivitas Crew
+                </h4>
+                {loadingDetail ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-14 rounded-xl bg-white border border-slate-200 animate-pulse" />
+                    ))}
+                  </div>
+                ) : woLogs.length > 0 ? (
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                    {woLogs.map((log) => (
+                      <div key={log.id} className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-slate-800">
+                            {log.step || log.action || "Activity"}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-bold">{fmtDate(log.timestamp)} {fmtTime(log.timestamp)}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500">
+                          <span className="flex items-center gap-0.5"><Users size={9} /> {log.loggedByCrewName || "Crew"}</span>
+                          {(log.valueAdded || 0) > 0 && <span>Output: {log.valueAdded}</span>}
+                          {(log.defectCount || 0) > 0 && <span className="text-red-600">Defect: {log.defectCount}</span>}
+                          {(log.durationMinutes || 0) > 0 && <span><Clock size={9} /> {fmtDur(log.durationMinutes || 0)}</span>}
+                        </div>
+                        {log.notes && <p className="text-slate-400 text-[10px] italic mt-0.5">{log.notes}</p>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-400 text-xs italic text-center py-3">Belum ada aktivitas tercatat.</p>
                 )}
-              </tbody>
-            </table>
+              </div>
+
+              {/* Section 4: Catatan & Info */}
+              {(detailWo.notes || detailWo.batchCode || detailWo.expiredDate) && (
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">Catatan & Info</h4>
+                  {detailWo.notes && <p className="text-xs text-slate-600 font-medium">{detailWo.notes}</p>}
+                  {detailWo.batchCode && (
+                    <div className="flex justify-between text-xs font-bold">
+                      <span className="text-slate-400">Batch Code:</span>
+                      <span className="font-mono text-slate-800">{detailWo.batchCode}</span>
+                    </div>
+                  )}
+                  {detailWo.expiredDate && (
+                    <div className="flex justify-between text-xs font-bold">
+                      <span className="text-slate-400">Expired:</span>
+                      <span className="text-slate-800">{fmtDate(detailWo.expiredDate)}</span>
+                    </div>
+                  )}
+                  <div className="text-[10px] text-slate-400 font-bold pt-1 border-t border-slate-200">
+                    BOM bahan baku auto-deduct saat WO dirilis. Packaging materials deduct saat COMPLETED.
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
-      </div>
 
-      {/* Dynamic Create Work Order Modal */}
+      {/* ========== MODAL: Create Work Order ========== */}
       {showNewWoModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -495,7 +997,7 @@ export default function ManagerSFMPage() {
 
             <div className="p-6 overflow-y-auto">
               <form id="create-wo-form" onSubmit={handleCreateWo} className="space-y-5">
-                
+
                 {/* 1. Task Type */}
                 <div>
                   <label className="text-xs font-black text-slate-700 uppercase tracking-wider block mb-2">1. Jenis Tugas *</label>
@@ -510,7 +1012,7 @@ export default function ManagerSFMPage() {
                       <button
                         key={opt.val}
                         type="button"
-                        onClick={() => setNewWoForm({ ...newWoForm, woType: opt.val as SFMWorkOrderType, variantId: "", sourceOrderId: "" })}
+                        onClick={() => setNewWoForm({ ...newWoForm, woType: opt.val as SFMWorkOrderType, variantId: "", sourceOrderId: "", assignedCrewId: "" })}
                         className={`py-2 px-2 rounded-xl border text-[10px] sm:text-xs font-bold transition-all text-center ${
                           newWoForm.woType === opt.val ? "bg-slate-900 border-slate-900 text-white shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                         }`}
@@ -527,7 +1029,7 @@ export default function ManagerSFMPage() {
                     <label className="text-xs font-black text-slate-700 uppercase tracking-wider block mb-2">
                       {newWoForm.woType === "PACKING_PESANAN" ? "2. Pilih Pesanan (Pending) *" : "2. Varian Produk *"}
                     </label>
-                    
+
                     {newWoForm.woType === "PACKING_PESANAN" ? (
                       <select
                         required
@@ -560,10 +1062,32 @@ export default function ManagerSFMPage() {
                   </div>
                 )}
 
+                {/* 2b. Assign Crew */}
+                <div>
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider block mb-2">Penanggung Jawab Crew <span className="text-slate-400 font-bold normal-case">(Opsional)</span></label>
+                  <select
+                    value={newWoForm.assignedCrewId}
+                    onChange={(e) => {
+                      const crew = employees.find(emp => emp.id === e.target.value);
+                      setNewWoForm({
+                        ...newWoForm,
+                        assignedCrewId: e.target.value,
+                        assignedCrewName: crew?.name || "",
+                      });
+                    }}
+                    className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
+                  >
+                    <option value="">Belum ditentukan</option>
+                    {crewList.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* 3. Dynamic Target Inputs based on woType */}
                 <div className="p-4 rounded-2xl bg-slate-100/80 border border-slate-200 space-y-4">
                   <label className="text-xs font-black text-slate-900 uppercase tracking-wider block">3. Target (Otomatis Menyesuaikan)</label>
-                  
+
                   {newWoForm.woType === "PRODUKSI" && (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between mb-1">

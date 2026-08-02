@@ -176,7 +176,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { woType, productId, productName, variantIds, targetBatches, targetLoyang, targetPacks, targetPcs, targetQty, targetUom, notes, assignedCrewId, productionTargets, opnameScope, opnameItems, sourceOrderId, sourceOrderNumber, repackIngredientId } = body;
+    const { woType, productId, productName, variantIds, targetBatches, targetLoyang, targetPacks, targetPcs, targetQty, targetUom, notes, assignedCrewId, assignedCrewName, productionTargets, opnameScope, opnameItems, sourceOrderId, sourceOrderNumber, repackIngredientId } = body;
 
     const typePrefix = woType === "REPACK_SAOS" || woType === "REPACK_GULA" ? "RPK" : woType === "STOCK_OPNAME" ? "SOP" : woType === "GENERAL_TASK" ? "TSK" : woType === "PACKING_PESANAN" ? "PCK" : "WO";
     const todayStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -226,7 +226,7 @@ export async function POST(req: NextRequest) {
       stepDurationsMinutes: {},
       createdAt: FieldValue.serverTimestamp(),
       assignedCrewId: assignedCrewId || user.uid,
-      assignedCrewName: user.email || "Crew Dapur",
+      assignedCrewName: assignedCrewName || user.email || "Crew Dapur",
       notes: notes || "",
     };
 
