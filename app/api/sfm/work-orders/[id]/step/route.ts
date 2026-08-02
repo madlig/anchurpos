@@ -54,11 +54,33 @@ export async function POST(
     let nextStatus = woData.status || "IN_PROGRESS";
     let startedAt = woData.startedAt || FieldValue.serverTimestamp();
     let completedAt = woData.completedAt;
+    let freezerInAt = woData.freezerInAt;
     let targetStage = nextStep || woData.currentStage || "DOUGH_COOKING";
 
-    // Update Step Durations Accumulator
-    if (durationMinutes && durationMinutes > 0) {
-      stepDurations[currentStep] = (stepDurations[currentStep] || 0) + Number(durationMinutes);
+    // --- Server-authoritative per-step timing ---
+    // Finalisasi durasi step yang baru saja selesai: hitung dari currentStepStartedAt (server time).
+    // Lebih akurat & tahan refresh/close daripada hitungan dari client.
+    const prevStepStartedAt = woData.currentStepStartedAt;
+    const nowMs = Date.now();
+    let resolvedDurationMin = 0;
+    if (prevStepStartedAt?.toMillis) {
+      const startedMs = prevStepStartedAt.toMillis();
+      resolvedDurationMin = Math.max(0, Math.round((nowMs - startedMs) / 60000));
+    } else if (durationMinutes && durationMinutes > 0) {
+      // Fallback untuk WO lama yang belum punya currentStepStartedAt
+      resolvedDurationMin = Number(durationMinutes);
+    }
+    if (resolvedDurationMin > 0) {
+      stepDurations[currentStep] = (stepDurations[currentStep] || 0) + resolvedDurationMin;
+    }
+    // Step/sub-batch berikutnya dimulai sekarang (server time).
+    let currentStepStartedAt = FieldValue.serverTimestamp();
+
+    // --- Freezer entry timestamp ---
+    // Saat stage masuk FREEZER_CHECKPOINT untuk pertama kali, catat kapan loyang masuk freezer
+    // agar crew bisa melihat sudah berapa lama membeku (tahan refresh karena server-side).
+    if (targetStage === "FREEZER_CHECKPOINT" && !freezerInAt) {
+      freezerInAt = FieldValue.serverTimestamp();
     }
 
     // Sub-Batch Iterations (e.g. 1.5 + 1.5 adonan)
@@ -108,7 +130,7 @@ export async function POST(
       step: currentStep,
       valueAdded: subBatchVal || goodPcs || 0,
       defectCount: scrapPcs || 0,
-      durationMinutes: durationMinutes || 0,
+      durationMinutes: resolvedDurationMin || 0,
       loggedByCrewId: user.uid,
       loggedByCrewName: user.email || "Crew Dapur",
       timestamp: FieldValue.serverTimestamp(),
@@ -124,6 +146,8 @@ export async function POST(
       summaryState: nextSummary,
       stepDurationsMinutes: stepDurations,
       startedAt,
+      freezerInAt: freezerInAt || null,
+      currentStepStartedAt,
       completedAt: completedAt || null,
     });
 

@@ -505,6 +505,7 @@ export interface WorkOrder {
   createdAt: string;
   startedAt?: string;
   freezerInAt?: string;
+  currentStepStartedAt?: string;
   completedAt?: string;
   assignedCrewId: string;
   assignedCrewName?: string;

@@ -73,6 +73,7 @@ export async function GET(req: NextRequest) {
         createdAt: d.createdAt?.toDate?.().toISOString() ?? new Date().toISOString(),
         startedAt: d.startedAt?.toDate?.().toISOString() ?? undefined,
         freezerInAt: d.freezerInAt?.toDate?.().toISOString() ?? undefined,
+        currentStepStartedAt: d.currentStepStartedAt?.toDate?.().toISOString() ?? undefined,
         completedAt: d.completedAt?.toDate?.().toISOString() ?? undefined,
         assignedCrewId: d.assignedCrewId || "",
         assignedCrewName: d.assignedCrewName || "Crew Dapur",

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Check, ChefHat, Package, RefreshCw, Calendar, Play, ArrowRight, Plus, Snowflake, Layers, Box, X, Clock, PauseCircle } from "lucide-react";
+import { Loader2, Check, ChefHat, Package, RefreshCw, Calendar, Play, ArrowRight, Plus, Snowflake, Layers, Box, X, Clock, CheckCircle2, Circle } from "lucide-react";
 import type { WorkOrder, SFMTaskStep } from "@/types";
 
 const PRODUKSI_STEPS: { key: SFMTaskStep; label: string; unit: string; icon: any }[] = [
@@ -51,7 +51,6 @@ export default function CrewSFMTerminal() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [stepStartTime, setStepStartTime] = useState<number | null>(null);
   const [pcsOutputInput, setPcsOutputInput] = useState("196");
   const [pcsVariantOutput, setPcsVariantOutput] = useState<Record<string, string>>({});
   const [prepackVariantOutput, setPrepackVariantOutput] = useState<Record<string, { regular: string, full: string }>>({});
@@ -94,7 +93,6 @@ export default function CrewSFMTerminal() {
 
   function handleStartStep(wo: WorkOrder, stepIndex: number) {
     setActiveWoForStep({ wo, stepIndex });
-    setStepStartTime(Date.now());
     setLoyangInput(wo.summaryState?.totalTrayPrinted?.toString() || wo.targetLoyang?.toString() || "");
     setPrepackMode("ALL_REGULAR");
     setRegularPackInput(wo.targetPacks?.toString() || "16");
@@ -117,19 +115,16 @@ export default function CrewSFMTerminal() {
   async function handleLogSubBatch(wo: WorkOrder, val: number) {
     setSubmittingStep(true);
     try {
-      const duration = stepStartTime ? Math.max(1, Math.round((Date.now() - stepStartTime) / 60000)) : 10;
       const res = await fetchWithAuth(`/api/sfm/work-orders/${wo.id}/step`, {
         method: "POST",
         body: JSON.stringify({
           action: "SUB_BATCH",
           currentStep: "DOUGH_COOKING",
           subBatchVal: val,
-          durationMinutes: duration,
         }),
       });
 
       if (res.ok) {
-        setStepStartTime(Date.now());
         await loadData();
       }
     } finally {
@@ -137,17 +132,15 @@ export default function CrewSFMTerminal() {
     }
   }
 
-  async function handleNextStep(wo: WorkOrder, currentStepKey: string, nextStepKey: string, isPause = false) {
+  async function handleNextStep(wo: WorkOrder, currentStepKey: string, nextStepKey: string) {
     setSubmittingStep(true);
     try {
-      const duration = stepStartTime ? Math.max(1, Math.round((Date.now() - stepStartTime) / 60000)) : 15;
-      
       let goodPcs = 0;
       let goodPacks = 0;
       let packSize = 12;
       let loyangCount = 0;
 
-      if (currentStepKey === "TRAY_MOLDING" || currentStepKey === "FREEZER_CHECKPOINT") {
+      if (currentStepKey === "TRAY_MOLDING") {
         loyangCount = parseFloat(loyangInput) || 0;
         if (wo.productionTargets && wo.productionTargets.length > 0) {
           goodPcs = Object.values(pcsVariantOutput).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
@@ -179,29 +172,27 @@ export default function CrewSFMTerminal() {
           }
         }
       }
-      
+
       const scrapPcs = parseFloat(scrapPcsInput) || 0;
 
       const res = await fetchWithAuth(`/api/sfm/work-orders/${wo.id}/step`, {
         method: "POST",
         body: JSON.stringify({
-          action: isPause ? "PAUSE" : "STEP_TRANSITION",
+          action: "STEP_TRANSITION",
           currentStep: currentStepKey,
-          nextStep: isPause ? currentStepKey : nextStepKey,
+          nextStep: nextStepKey,
           loyangCount,
           goodPcs,
           goodPacks,
           packSize,
           scrapPcs,
           prepackOutputs: wo.productionTargets && wo.productionTargets.length > 0 ? prepackVariantOutput : undefined,
-          durationMinutes: duration,
           notes: scrapReasonInput,
         }),
       });
 
       if (res.ok) {
         setActiveWoForStep(null);
-        setStepStartTime(Date.now());
         setScrapPcsInput("0");
         setScrapReasonInput("");
         await loadData();
@@ -272,18 +263,57 @@ export default function CrewSFMTerminal() {
                       <span className="text-slate-500">Target Produksi:</span>
                       <span className="text-slate-800 font-extrabold">{wo.targetLoyang} Loyang</span>
                     </div>
-                    {/* Progress Bar Timeline */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
-                        <span className={wo.summaryState?.totalDoughBatchesDone! > 0 ? "text-emerald-600" : ""}>Adonan ({wo.summaryState?.totalDoughBatchesDone || 0}/{wo.targetBatches || 0})</span>
-                        <span className={wo.summaryState?.totalTrayPrinted! > 0 ? "text-emerald-600" : ""}>Cetak ({wo.summaryState?.totalTrayPrinted || 0}/{wo.targetLoyang || 0})</span>
-                        <span className={wo.summaryState?.totalGoodPcs! > 0 ? "text-emerald-600" : ""}>Pre-Pack ({wo.summaryState?.totalGoodPcs || 0} Pcs)</span>
-                      </div>
-                      <div className="flex gap-1 h-2.5">
-                        <div className={`flex-1 rounded-full transition-all ${wo.summaryState?.totalDoughBatchesDone! > 0 ? "bg-emerald-500 shadow-sm" : "bg-slate-200"}`}></div>
-                        <div className={`flex-1 rounded-full transition-all ${wo.summaryState?.totalTrayPrinted! > 0 ? "bg-emerald-500 shadow-sm" : "bg-slate-200"}`}></div>
-                        <div className={`flex-1 rounded-full transition-all ${wo.summaryState?.totalGoodPcs! > 0 ? "bg-emerald-500 shadow-sm" : "bg-slate-200"}`}></div>
-                      </div>
+                    {/* 5-Step Progress Tracker dengan Time Tracking */}
+                    <div className="space-y-1.5">
+                      {PRODUKSI_STEPS.map((step, idx) => {
+                        const isDone = idx < currentStepIdx;
+                        const isActive = idx === currentStepIdx;
+                        const Icon = step.icon;
+                        const stepDuration = wo.stepDurationsMinutes?.[step.key] || 0;
+                        const liveStartedAt = isActive
+                          ? (step.key === "FREEZER_CHECKPOINT" && wo.freezerInAt ? wo.freezerInAt : wo.currentStepStartedAt)
+                          : undefined;
+                        const fmtDur = (m: number) => m >= 60 ? `${Math.floor(m / 60)}j ${m % 60}m` : `${m}m`;
+
+                        return (
+                          <div key={step.key} className={`flex items-center gap-2 p-2 rounded-xl border transition-all ${
+                            isActive ? "bg-emerald-50 border-emerald-200 shadow-sm" : isDone ? "bg-white border-slate-200" : "bg-slate-50/50 border-slate-200/60"
+                          }`}>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                              isDone ? "bg-emerald-500 text-white" : isActive ? "bg-emerald-600 text-white animate-pulse" : "bg-slate-200 text-slate-400"
+                            }`}>
+                              {isDone ? <CheckCircle2 size={14} /> : isActive ? <span className="w-2 h-2 rounded-full bg-white" /> : <Circle size={12} />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <Icon size={12} className={isActive ? "text-emerald-700" : isDone ? "text-slate-600" : "text-slate-400"} />
+                                <span className={`text-[11px] font-extrabold truncate ${isActive ? "text-emerald-800" : isDone ? "text-slate-600" : "text-slate-400"}`}>
+                                  {step.label}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              {isActive ? (
+                                liveStartedAt ? (
+                                  <LiveTimer startedAt={liveStartedAt} />
+                                ) : (
+                                  <span className="text-[10px] font-black text-emerald-700 animate-pulse">Dimulai</span>
+                                )
+                              ) : isDone ? (
+                                <span className="text-[10px] font-bold text-slate-500">{fmtDur(stepDuration)}</span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-slate-300">-</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {/* Progress ringkas per tahap */}
+                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 pt-1 border-t border-slate-200/60">
+                      <span>Adonan: {wo.summaryState?.totalDoughBatchesDone || 0}/{wo.targetBatches || 0} Batch</span>
+                      <span>Cetak: {wo.summaryState?.totalTrayPrinted || 0}/{wo.targetLoyang || 0} Loyang</span>
+                      <span>Pack: {wo.summaryState?.totalGoodPacks || 0} Pack</span>
                     </div>
                   </div>
                 ) : wo.woType === "PACKING_PESANAN" ? (
@@ -325,12 +355,23 @@ export default function CrewSFMTerminal() {
                   <span className="text-slate-900">{activeStep.label}</span>
                 </div>
 
+                {isProduksi && currentStageKey === "FREEZER_CHECKPOINT" && wo.freezerInAt && (
+                  <div className="flex items-center justify-center gap-2 p-2 rounded-2xl bg-sky-50 border border-sky-200">
+                    <Snowflake size={14} className="text-sky-600" />
+                    <span className="text-[10px] font-bold text-sky-700">Membeku di Freezer sejak:</span>
+                    <LiveTimer startedAt={wo.freezerInAt} />
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => handleStartStep(wo, currentStepIdx >= 0 ? currentStepIdx : 0)}
-                  className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-black active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition-all"
+                  className={`w-full h-12 rounded-2xl active:scale-95 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition-all ${
+                    isProduksi && currentStageKey === "FREEZER_CHECKPOINT" ? "bg-sky-600 hover:bg-sky-700" : "bg-slate-900 hover:bg-black"
+                  }`}
                 >
-                  <Play size={16} /> Jalankan {activeStep.label}
+                  <Play size={16} />
+                  {isProduksi && currentStageKey === "FREEZER_CHECKPOINT" ? "Lanjut Pre-Pack (Sudah Beku)" : `Jalankan ${activeStep.label}`}
                 </button>
               </div>
             </div>
@@ -358,10 +399,10 @@ export default function CrewSFMTerminal() {
                 </h3>
               </div>
               <div className="flex items-center gap-3">
-                {stepStartTime && (
+                {activeWoForStep.wo.currentStepStartedAt && (
                   <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-lg border border-emerald-100 shadow-2xs">
-                    <span className="text-[10px] font-bold text-emerald-700">Durasi Aktifitas:</span>
-                    <LiveTimer startedAt={new Date(stepStartTime).toISOString()} />
+                    <span className="text-[10px] font-bold text-emerald-700">Durasi Step:</span>
+                    <LiveTimer startedAt={activeWoForStep.wo.currentStepStartedAt} />
                   </div>
                 )}
                 <button type="button" onClick={() => setActiveWoForStep(null)} className="text-slate-400 hover:text-slate-600 bg-slate-100 p-1 rounded-full"><X size={18}/></button>
@@ -407,8 +448,23 @@ export default function CrewSFMTerminal() {
                 </div>
               )}
 
-              {/* TRAY_MOLDING & FREEZER_CHECKPOINT Form (Input Loyang & Pcs Mentah) */}
-              {activeWoForStep.wo.woType === "PRODUKSI" && (PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "TRAY_MOLDING" || PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "FREEZER_CHECKPOINT") && (
+              {/* MIXING_EGG Info Card (tidak ada input numerik, BOM telur auto-deduct) */}
+              {activeWoForStep.wo.woType === "PRODUKSI" && PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "MIXING_EGG" && (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-2 shadow-sm">
+                  <span className="text-amber-950 font-black text-xs block flex items-center gap-1.5">
+                    <Layers size={14} /> Mixer & Emulsifikasi Telur
+                  </span>
+                  <p className="text-[11px] text-amber-900 font-bold leading-relaxed">
+                    Adonan sudah didiamkan di baskom stainless steel. Pindahkan ke mixer, tambahkan telur sesuai resep BOM (sudah auto-deduct dari stok), lalu kocok hingga adonan tercampur rata dan lembut.
+                  </p>
+                  <p className="text-[10px] text-amber-700 font-bold bg-amber-100 p-2 rounded-lg border border-amber-200/60 leading-relaxed">
+                    Tidak perlu input jumlah. Setelah adonan siap, klik tombol di bawah untuk lanjut ke cetak loyang.
+                  </p>
+                </div>
+              )}
+
+              {/* TRAY_MOLDING Form (Input Loyang & Pcs Mentah - input final) */}
+              {activeWoForStep.wo.woType === "PRODUKSI" && PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "TRAY_MOLDING" && (
                 <div className="space-y-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
                   <div>
                     <label className="text-slate-700 font-extrabold block mb-1">Total Loyang Aktual Terbuat</label>
@@ -455,6 +511,27 @@ export default function CrewSFMTerminal() {
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* FREEZER_CHECKPOINT Info Card (jeda pembekuan, timer dari freezerInAt) */}
+              {activeWoForStep.wo.woType === "PRODUKSI" && PRODUKSI_STEPS[activeWoForStep.stepIndex]?.key === "FREEZER_CHECKPOINT" && (
+                <div className="p-4 rounded-2xl bg-sky-50 border border-sky-200 space-y-2 shadow-sm">
+                  <span className="text-sky-950 font-black text-xs block flex items-center gap-1.5">
+                    <Snowflake size={14} /> Pembekuan di Freezer
+                  </span>
+                  <p className="text-[11px] text-sky-900 font-bold leading-relaxed">
+                    Loyang sudah masuk freezer pembekuan. Tunggu hingga churros benar-benar beku sebelum dipindahkan ke pre-pack.
+                  </p>
+                  {activeWoForStep.wo.freezerInAt && (
+                    <div className="flex items-center gap-2 mt-2 p-2 bg-white rounded-xl border border-sky-200">
+                      <span className="text-[10px] font-bold text-sky-700">Waktu membeku:</span>
+                      <LiveTimer startedAt={activeWoForStep.wo.freezerInAt} />
+                    </div>
+                  )}
+                  <p className="text-[10px] text-sky-700 font-bold bg-sky-100 p-2 rounded-lg border border-sky-200/60 leading-relaxed">
+                    Anda bisa tutup halaman ini dan kembali nanti. Timer tetap berjalan. Klik tombol di bawah saat churros sudah beku.
+                  </p>
                 </div>
               )}
 
@@ -655,23 +732,21 @@ export default function CrewSFMTerminal() {
                   type="button"
                   onClick={() => {
                     if (activeWoForStep.wo.woType === "PRODUKSI") {
-                      if (PRODUKSI_STEPS[activeWoForStep.stepIndex].key === "TRAY_MOLDING") {
-                        handleNextStep(activeWoForStep.wo, "TRAY_MOLDING", "FREEZER_CHECKPOINT", true);
-                      } else {
-                        const nextIdx = activeWoForStep.stepIndex + 1;
-                        const nextKey = nextIdx < PRODUKSI_STEPS.length ? PRODUKSI_STEPS[nextIdx].key : "DONE";
-                        handleNextStep(activeWoForStep.wo, PRODUKSI_STEPS[activeWoForStep.stepIndex].key, nextKey, false);
-                      }
+                      const curKey = PRODUKSI_STEPS[activeWoForStep.stepIndex].key;
+                      const nextIdx = activeWoForStep.stepIndex + 1;
+                      const nextKey = nextIdx < PRODUKSI_STEPS.length ? PRODUKSI_STEPS[nextIdx].key : "DONE";
+                      handleNextStep(activeWoForStep.wo, curKey, nextKey);
                     } else {
-                      handleNextStep(activeWoForStep.wo, "PROCESS", "DONE", false);
+                      handleNextStep(activeWoForStep.wo, "PROCESS", "DONE");
                     }
                   }}
                   disabled={submittingStep}
                   className="w-full h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all"
                 >
                   {submittingStep ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                  {activeWoForStep.wo.woType === "PRODUKSI" 
-                    ? (PRODUKSI_STEPS[activeWoForStep.stepIndex].key === "TRAY_MOLDING" ? "Selesai Cetak & Masukkan ke Freezer" :
+                  {activeWoForStep.wo.woType === "PRODUKSI"
+                    ? (PRODUKSI_STEPS[activeWoForStep.stepIndex].key === "FREEZER_CHECKPOINT" ? "Sudah Beku, Lanjut Pre-Pack" :
+                       PRODUKSI_STEPS[activeWoForStep.stepIndex].key === "TRAY_MOLDING" ? "Selesai Cetak & Masukkan ke Freezer" :
                        activeWoForStep.stepIndex + 1 < PRODUKSI_STEPS.length ? `Lanjut ke ${PRODUKSI_STEPS[activeWoForStep.stepIndex + 1].label}` : "Selesai Pre-Pack & Closing")
                     : "Selesaikan Task & Closing"}
                 </button>
