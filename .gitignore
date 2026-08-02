@@ -17,3 +17,5 @@ design_guidelines.json
 test_reports/
 memory/
 CuanPOS_PRD.md
+scratch/
+*.js.tmp
