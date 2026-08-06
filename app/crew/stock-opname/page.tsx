@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Check, ClipboardList, Package, Search, Save, AlertCircle } from "lucide-react";
+import { RefreshCw, LogOut, CheckCircle2, ChevronRight, PackageSearch, Package, PenLine, Scale, Plus, Minus, Search, Check, ClipboardList, AlertCircle, Save, Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 
 interface OpnameItemUI {
@@ -245,8 +246,10 @@ export default function CrewStockOpnamePage() {
 
         {/* Item Cards */}
         {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-slate-800" />
+          <div className="space-y-3">
+            <Skeleton className="h-28 w-full rounded-2xl" />
+            <Skeleton className="h-28 w-full rounded-2xl" />
+            <Skeleton className="h-28 w-full rounded-2xl" />
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm space-y-2">

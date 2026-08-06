@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useParams, useRouter } from "next/navigation";
-import { Loader2, ArrowLeft, AlertCircle, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Check, ArrowRight, Package, Box, AlertCircle, ShoppingBag } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 
 // Components
@@ -301,10 +302,18 @@ export default function EditOrderPage() {
 
   if (dbLoading || loadingOrder) {
     return (
-      <div className="flex h-screen items-center justify-center bg-pink-400">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-white" />
-          <p className="text-white font-semibold text-sm">Memuat data pesanan...</p>
+      <div className="min-h-screen pb-16 bg-pink-400">
+        <div className="sticky top-0 z-20 bg-white border-b border-slate-100">
+          <div className="flex items-center gap-3 px-5 py-4 max-w-5xl mx-auto">
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            <div>
+              <Skeleton className="h-5 w-48 mb-1" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-4 max-w-5xl mx-auto space-y-4">
+          <Skeleton className="h-[400px] w-full rounded-2xl bg-white/20" />
         </div>
       </div>
     );

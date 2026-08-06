@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Loader2, Scale, Clock, Wallet, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface StockOpname { id: string; submittedByName: string; hasDiscrepancy: boolean; reviewAction: string | null; createdAt: string; }
 interface AttendanceFlag {
@@ -174,7 +175,11 @@ export default function OwnerApprovalPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20"><Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} /></div>
+        <div className="space-y-2">
+          <Skeleton className="h-16 w-full rounded-2xl" />
+          <Skeleton className="h-16 w-full rounded-2xl" />
+          <Skeleton className="h-16 w-full rounded-2xl" />
+        </div>
       ) : (
         <>
           {tab === "opname" && (

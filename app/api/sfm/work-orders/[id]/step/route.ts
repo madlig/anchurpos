@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
+import { pushNotificationToRole, createSfmAlert } from "@/lib/sfm-notifications";
 
 export async function POST(
   req: NextRequest,
@@ -16,8 +17,8 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { action, currentStep, nextStep, subBatchVal, loyangCount, goodPcs, goodPacks, packSize, scrapPcs, prepackOutputs, durationMinutes, notes } = body as {
-      action: "START" | "SUB_BATCH" | "STEP_TRANSITION" | "SCRAP" | "PAUSE";
+    const { action, currentStep, nextStep, subBatchVal, loyangCount, goodPcs, goodPacks, packSize, scrapPcs, prepackOutputs, durationMinutes, notes, pausedReason, variantId } = body as {
+      action: "START" | "SUB_BATCH" | "STEP_TRANSITION" | "SCRAP" | "PAUSE" | "RESUME" | "MIXING_SUB_BATCH" | "PARTIAL_PREPACK" | "CUT_TRAY" | "CLOSE_WO";
       currentStep: string;
       nextStep?: string;
       subBatchVal?: number;
@@ -29,6 +30,8 @@ export async function POST(
       prepackOutputs?: Record<string, { regular: string, full: string }>;
       durationMinutes?: number;
       notes?: string;
+      pausedReason?: string;
+      variantId?: string;
     };
 
     const woRef = adminDb.collection("workOrders").doc(workOrderId);
@@ -56,14 +59,58 @@ export async function POST(
     let completedAt = woData.completedAt;
     let freezerInAt = woData.freezerInAt;
     let targetStage = nextStep || woData.currentStage || "DOUGH_COOKING";
+    const nowMs = Date.now();
+
+    // --- PAUSE & RESUME Logic ---
+    if (action === "PAUSE") {
+      if (!pausedReason) return NextResponse.json({ error: "Alasan jeda wajib diisi" }, { status: 400 });
+      const logRef = adminDb.collection("workOrderLogs").doc();
+      const batch = adminDb.batch();
+      batch.update(woRef, { pausedAt: FieldValue.serverTimestamp(), pausedReason });
+      batch.set(logRef, {
+        workOrderId, action: "PAUSE", step: currentStep, valueAdded: 0, unit: "BATCH",
+        loggedByCrewId: user.uid, loggedByCrewName: user.email || "Crew Dapur",
+        timestamp: FieldValue.serverTimestamp(), notes: pausedReason
+      });
+      await batch.commit();
+      return NextResponse.json({ message: "Work Order dijeda" });
+    }
+
+    let nextTotalPauseMs = woData.totalPauseMs || 0;
+    let nextPauseCount = woData.pauseCount || 0;
+    let variantState = woData.variantState || {};
+
+    if (action === "RESUME") {
+      if (woData.pausedAt) {
+        const pauseStartMs = woData.pausedAt.toDate().getTime();
+        const pauseDurationMs = nowMs - pauseStartMs;
+        nextTotalPauseMs += pauseDurationMs;
+        nextPauseCount += 1;
+        
+        // Geser timestamp stasiun agar waktu jeda tidak dihitung sebagai durasi kerja
+        if (variantState) {
+          for (const vid in variantState) {
+            if (variantState[vid].doughStationStartedAt) {
+              const dTime = variantState[vid].doughStationStartedAt.toDate().getTime();
+              variantState[vid].doughStationStartedAt = new Date(dTime + pauseDurationMs);
+            }
+            if (variantState[vid].mixingStationStartedAt) {
+              const mTime = variantState[vid].mixingStationStartedAt.toDate().getTime();
+              variantState[vid].mixingStationStartedAt = new Date(mTime + pauseDurationMs);
+            }
+          }
+        }
+      }
+    }
 
     // --- Server-authoritative per-step timing ---
     // Finalisasi durasi step yang baru saja selesai: hitung dari currentStepStartedAt (server time).
     // Lebih akurat & tahan refresh/close daripada hitungan dari client.
     const prevStepStartedAt = woData.currentStepStartedAt;
-    const nowMs = Date.now();
     let resolvedDurationMin = 0;
-    if (prevStepStartedAt?.toMillis) {
+    if (woData.pausedAt) {
+      resolvedDurationMin = 0; // Jangan hitung durasi saat sedang pause
+    } else if (prevStepStartedAt?.toMillis) {
       const startedMs = prevStepStartedAt.toMillis();
       resolvedDurationMin = Math.max(0, Math.round((nowMs - startedMs) / 60000));
     } else if (durationMinutes && durationMinutes > 0) {
@@ -83,24 +130,62 @@ export async function POST(
       freezerInAt = FieldValue.serverTimestamp();
     }
 
-    // Sub-Batch Iterations (e.g. 1.5 + 1.5 adonan)
+    // Phase 3: Per-Variant tracking & TRAY_MOLDING bug fix
+    if (variantId && variantState[variantId]) {
+      if (action === "SUB_BATCH" && subBatchVal) {
+        variantState[variantId].doughBatchesDone = (variantState[variantId].doughBatchesDone || 0) + Number(subBatchVal);
+        variantState[variantId].doughStationStartedAt = FieldValue.serverTimestamp() as any;
+      } else if (action === "MIXING_SUB_BATCH" && subBatchVal) {
+        variantState[variantId].mixingBatchesDone = (variantState[variantId].mixingBatchesDone || 0) + Number(subBatchVal);
+        variantState[variantId].mixingStationStartedAt = FieldValue.serverTimestamp() as any;
+      } else if (action === "CUT_TRAY") {
+        const lc = Number(loyangCount) || 0;
+        const gp = Number(goodPcs) || 0;
+        if (lc > 0) {
+          variantState[variantId].loyangCut = (variantState[variantId].loyangCut || 0) + lc;
+          variantState[variantId].frozenTrays = (variantState[variantId].frozenTrays || 0) + lc;
+        }
+        if (gp > 0) {
+          variantState[variantId].goodPcs = (variantState[variantId].goodPcs || 0) + gp;
+        }
+      }
+    }
+
+    // Sub-Batch Iterations fallback (single-variant)
     if (action === "SUB_BATCH" && subBatchVal) {
       nextSummary.totalDoughBatchesDone = (nextSummary.totalDoughBatchesDone || 0) + Number(subBatchVal);
     }
 
-    // Update Loyang count printed / stored in freezer
-    if (loyangCount && loyangCount > 0) {
-      nextSummary.totalTrayPrinted = Number(loyangCount);
-      nextSummary.totalTrayInFreezer = Number(loyangCount);
+    // Update Loyang count printed / stored in freezer (TRAY_MOLDING FIX: INCREMENT)
+    if (loyangCount && loyangCount > 0 && action !== "CUT_TRAY") {
+      const lc = Number(loyangCount);
+      nextSummary.totalTrayPrinted = (nextSummary.totalTrayPrinted || 0) + lc;
+      nextSummary.totalTrayInFreezer = (nextSummary.totalTrayInFreezer || 0) + lc;
+      if (variantId && variantState[variantId]) {
+        variantState[variantId].loyangPrinted = (variantState[variantId].loyangPrinted || 0) + lc;
+        variantState[variantId].frozenTrays = (variantState[variantId].frozenTrays || 0) + lc;
+      }
     }
-
-    // Good Output Pcs / Packs
-    if (goodPacks && goodPacks > 0) {
+    
+    // Partial Prepack (Cicilan Pack) & Good Packs logic
+    if (action === "PARTIAL_PREPACK" && goodPacks && goodPacks > 0) {
+      const pCount = Number(goodPacks);
+      const size = Number(packSize) || 12;
+      const lUsed = Number(loyangCount) || 0;
+      
+      nextSummary.totalGoodPacks = (nextSummary.totalGoodPacks || 0) + pCount;
+      nextSummary.totalGoodPcs = (nextSummary.totalGoodPcs || 0) + (pCount * size);
+      
+      if (variantId && variantState[variantId]) {
+        variantState[variantId].goodPacks = (variantState[variantId].goodPacks || 0) + pCount;
+        variantState[variantId].frozenTrays = Math.max(0, (variantState[variantId].frozenTrays || 0) - lUsed);
+      }
+    } else if (goodPacks && goodPacks > 0 && action !== "PARTIAL_PREPACK") {
       const pCount = Number(goodPacks);
       const size = Number(packSize) || 12;
       nextSummary.totalGoodPacks = pCount;
       nextSummary.totalGoodPcs = Number(goodPcs) || (pCount * size);
-    } else if (goodPcs && goodPcs > 0) {
+    } else if (goodPcs && goodPcs > 0 && action !== "CUT_TRAY") {
       const pCount = Number(goodPcs);
       nextSummary.totalGoodPcs = (nextSummary.totalGoodPcs || 0) + pCount;
       nextSummary.totalGoodPacks = Math.floor(nextSummary.totalGoodPcs / 12);
@@ -109,12 +194,25 @@ export async function POST(
     // Scrap Output
     if (action === "SCRAP" || (scrapPcs && scrapPcs > 0)) {
       const sCount = Number(scrapPcs) || 1;
-      nextSummary.totalDefectPcs += sCount;
+      nextSummary.totalDefectPcs = (nextSummary.totalDefectPcs || 0) + sCount;
       nextSummary.totalDefectPacks = Math.floor(nextSummary.totalDefectPcs / 12);
+      if (variantId && variantState[variantId]) {
+        variantState[variantId].defectPcs = (variantState[variantId].defectPcs || 0) + sCount;
+      }
     }
 
     // Work Order Completion check
-    if (targetStage === "DONE" || (nextSummary.totalGoodPacks > 0 && currentStep === "PRE_PACK")) {
+    if (action === "CLOSE_WO" || targetStage === "DONE") {
+      if (variantState && Object.keys(variantState).length > 0) {
+        let remainingTrays = 0;
+        for (const vid in variantState) {
+          remainingTrays += (variantState[vid].frozenTrays || 0);
+        }
+        if (remainingTrays > 0) {
+          return NextResponse.json({ error: `Masih ada ${remainingTrays} loyang di freezer, tidak bisa tutup WO` }, { status: 400 });
+        }
+      }
+      
       nextStatus = "COMPLETED";
       targetStage = "FINAL_PACK";
       completedAt = FieldValue.serverTimestamp();
@@ -140,7 +238,8 @@ export async function POST(
     // --- INVENTORY INTEGRATION LOGIC ---
     const batch = adminDb.batch();
     batch.set(logRef, logData);
-    batch.update(woRef, {
+    
+    const updatePayload: any = {
       status: nextStatus,
       currentStage: targetStage,
       summaryState: nextSummary,
@@ -149,53 +248,68 @@ export async function POST(
       freezerInAt: freezerInAt || null,
       currentStepStartedAt,
       completedAt: completedAt || null,
-    });
+      totalPauseMs: nextTotalPauseMs,
+      pauseCount: nextPauseCount,
+      variantState: variantState
+    };
 
-    if (nextStatus === "COMPLETED" && woData.status !== "COMPLETED") {
-      if (woData.woType === "PRODUKSI" && currentStep === "PRE_PACK") {
-        // Handle PRODUKSI BOM Packaging deduction & Product Stock increment
-        if (prepackOutputs && Object.keys(prepackOutputs).length > 0) {
-          // Multi-variant processing
-          for (const [variantId, outputs] of Object.entries(prepackOutputs)) {
-            const regPacks = parseFloat(outputs.regular) || 0;
-            const fullPacks = parseFloat(outputs.full) || 0;
-            
-            if (regPacks > 0) {
-              const rRef = adminDb.collection("productStocks").doc(`${variantId}_12`);
-              batch.set(rRef, { stock: FieldValue.increment(regPacks) }, { merge: true });
-              const mRef = adminDb.collection("stockMovements").doc();
-              batch.set(mRef, { itemId: `${variantId}_12`, type: "PRODUKSI_IN", qty: regPacks, refId: woData.woNumber, timestamp: FieldValue.serverTimestamp() });
-            }
-            if (fullPacks > 0) {
-              const fRef = adminDb.collection("productStocks").doc(`${variantId}_16`);
-              batch.set(fRef, { stock: FieldValue.increment(fullPacks) }, { merge: true });
-              const mRef = adminDb.collection("stockMovements").doc();
-              batch.set(mRef, { itemId: `${variantId}_16`, type: "PRODUKSI_IN", qty: fullPacks, refId: woData.woNumber, timestamp: FieldValue.serverTimestamp() });
-            }
-          }
-        } else if (goodPacks && goodPacks > 0) {
-          // Single variant fallback
-          const targetItem = packSize === 16 ? `${woData.productId}_16` : `${woData.productId}_12`;
-          const pRef = adminDb.collection("productStocks").doc(targetItem);
-          batch.set(pRef, { stock: FieldValue.increment(goodPacks) }, { merge: true });
-          const mRef = adminDb.collection("stockMovements").doc();
-          batch.set(mRef, { itemId: targetItem, type: "PRODUKSI_IN", qty: goodPacks, refId: woData.woNumber, timestamp: FieldValue.serverTimestamp() });
+    if (action === "RESUME") {
+      updatePayload.pausedAt = FieldValue.delete();
+      updatePayload.pausedReason = FieldValue.delete();
+    }
+    
+    batch.update(woRef, updatePayload);
+
+    // Phase 3 & 4: Inventory Integration per action
+    if (variantId) {
+      if (action === "CUT_TRAY" && loyangCount) {
+        batch.set(adminDb.collection("frozenStocks").doc(variantId), { qty: FieldValue.increment(loyangCount) }, { merge: true });
+      }
+      if (action !== "CUT_TRAY" && loyangCount && loyangCount > 0 && (currentStep === "TRAY_MOLDING" || action === "STEP_TRANSITION" || action === "START")) {
+        batch.set(adminDb.collection("frozenStocks").doc(variantId), { qty: FieldValue.increment(loyangCount) }, { merge: true });
+      }
+    }
+    
+    if (action === "PARTIAL_PREPACK" && prepackOutputs && Object.keys(prepackOutputs).length > 0) {
+      // Multi-variant processing
+      for (const [vId, outputs] of Object.entries(prepackOutputs)) {
+        const regPacks = parseFloat(outputs.regular) || 0;
+        const fullPacks = parseFloat(outputs.full) || 0;
+        
+        if (regPacks > 0) {
+          const rRef = adminDb.collection("productStocks").doc(`${vId}_12`);
+          batch.set(rRef, { stock: FieldValue.increment(regPacks) }, { merge: true });
+          batch.set(adminDb.collection("stockMovements").doc(), { itemId: `${vId}_12`, type: "PRODUKSI_IN", qty: regPacks, refId: woData.woNumber, timestamp: FieldValue.serverTimestamp() });
+        }
+        if (fullPacks > 0) {
+          const fRef = adminDb.collection("productStocks").doc(`${vId}_16`);
+          batch.set(fRef, { stock: FieldValue.increment(fullPacks) }, { merge: true });
+          batch.set(adminDb.collection("stockMovements").doc(), { itemId: `${vId}_16`, type: "PRODUKSI_IN", qty: fullPacks, refId: woData.woNumber, timestamp: FieldValue.serverTimestamp() });
         }
         
-        // Deduct Kemasan BOM (Thinwall, Stiker) based on packagingRecipes (mocking the query logic here, assuming typical recipe structure)
-        const packagingRecipesSnap = await adminDb.collection("packagingRecipes").where("productId", "==", woData.productId || "churros-frozen-food").get();
-        if (!packagingRecipesSnap.empty) {
-          const packData = packagingRecipesSnap.docs[0].data();
-          const items = packData.items || [];
-          for (const item of items) {
-            const qtyNeeded = (item.amount || 1) * (goodPacks || 0);
-            if (item.ingredientId && qtyNeeded > 0) {
-              batch.update(adminDb.collection("ingredients").doc(item.ingredientId), { stock: FieldValue.increment(-qtyNeeded) });
+        const totalPacks = regPacks + fullPacks;
+        if (totalPacks > 0) {
+          const lUsed = Number(loyangCount) || 0;
+          if (lUsed > 0) {
+            batch.set(adminDb.collection("frozenStocks").doc(vId), { qty: FieldValue.increment(-lUsed) }, { merge: true });
+          }
+          // Kemasan deduct
+          const packagingRecipesSnap = await adminDb.collection("packagingRecipes").where("productId", "==", woData.productId || "churros-frozen-food").get();
+          if (!packagingRecipesSnap.empty) {
+            const packData = packagingRecipesSnap.docs[0].data();
+            for (const item of packData.items || []) {
+              const qtyNeeded = (item.amount || 1) * totalPacks;
+              if (item.ingredientId && qtyNeeded > 0) {
+                batch.update(adminDb.collection("ingredients").doc(item.ingredientId), { stock: FieldValue.increment(-qtyNeeded) });
+              }
             }
           }
         }
+      }
+    }
 
-      } else if (woData.woType === "REPACK_SAOS" || woData.woType === "REPACK_GULA") {
+    if (nextStatus === "COMPLETED" && woData.status !== "COMPLETED") {
+      if (woData.woType === "REPACK_SAOS" || woData.woType === "REPACK_GULA") {
         // Handle REPACK: Deduct bulk, Increment small packs (ingredients)
         const targetId = woData.repackIngredientId || woData.productId; // The result of the repack
         if (targetId && goodPcs && goodPcs > 0) {
@@ -239,6 +353,41 @@ export async function POST(
     }
 
     await batch.commit();
+
+    // --- PHASE 3: Trigger Notifications ---
+    if (action === "STEP_TRANSITION" && nextStatus !== "COMPLETED") {
+      await pushNotificationToRole({
+        role: "manager",
+        title: "Update Work Order",
+        body: `WO ${woData.woNumber} - Step ${currentStep} selesai`,
+        data: { type: "sfm_wo_step", workOrderId: woRef.id },
+      });
+    } else if (nextStatus === "COMPLETED") {
+      const title = "Work Order Selesai";
+      const body = `Produksi ${woData.productName || "Produk"} selesai (WO ${woData.woNumber})`;
+      
+      await createSfmAlert({
+        type: "sfm_wo_completed",
+        severity: "success",
+        title,
+        message: body,
+        sourceId: woRef.id,
+      });
+
+      await pushNotificationToRole({
+        role: "manager",
+        title,
+        body,
+        data: { type: "sfm_wo_completed", workOrderId: woRef.id },
+      });
+
+      await pushNotificationToRole({
+        role: "owner",
+        title,
+        body,
+        data: { type: "sfm_wo_completed", workOrderId: woRef.id },
+      });
+    }
 
     return NextResponse.json({
       success: true,

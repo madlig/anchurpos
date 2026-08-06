@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { FCMProvider } from "@/components/shared/FCMProvider";
+import { NotificationBell } from "@/components/shared/NotificationBell";
 
 const ERP_MENU_GROUPS = [
   {
@@ -202,7 +204,11 @@ function MobileBottomNav() {
 export default function ManagerLayout({ children }: { children: React.ReactNode }) {
   return (
     <RoleGuard allowedRoles={["owner", "manager"]}>
+      <FCMProvider />
       <div className="min-h-screen" style={{ background: "#FCABB4" }}>
+        <div className="fixed top-4 right-4 z-50 md:top-5 md:right-8">
+          <NotificationBell />
+        </div>
         <DesktopSidebar />
         <div className="md:ml-60 pb-24 md:pb-6">
           {children}

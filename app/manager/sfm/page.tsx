@@ -9,6 +9,7 @@ import {
   ArrowDownToLine, Beaker, Palette, PlayCircle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { formatNumber } from "@/lib/formatters";
 import type { WorkOrder, WorkOrderLog, Variant, SFMWorkOrderType, SFMTaskStep } from "@/types";
 
@@ -56,13 +57,25 @@ function getStageInfo(stage: string): { label: string; color: string; bg: string
 function isStuck(wo: WorkOrder): boolean {
   if (wo.status === "COMPLETED" || wo.status === "CANCELLED") return false;
   if (!PRODUCING_STAGES.has(wo.currentStage)) return false;
-  const started = new Date(wo.startedAt || wo.createdAt).getTime();
+  if (wo.pausedAt) return false;
+  const stepStartedAt = wo.currentStepStartedAt || wo.startedAt || wo.createdAt;
+  const started = new Date(stepStartedAt).getTime();
   return (Date.now() - started) > STUCK_THRESHOLD_MS;
 }
 
 function getYieldPct(wo: WorkOrder): number {
-  const good = wo.summaryState?.totalGoodPcs || 0;
-  const defect = wo.summaryState?.totalDefectPcs || 0;
+  let good = wo.summaryState?.totalGoodPcs || 0;
+  let defect = wo.summaryState?.totalDefectPcs || 0;
+  
+  if (wo.variantState) {
+    good = 0;
+    defect = 0;
+    Object.values(wo.variantState).forEach((v: any) => {
+      good += v.goodPcs || 0;
+      defect += v.defectPcs || 0;
+    });
+  }
+
   const total = good + defect;
   if (total <= 0) return 0;
   return Math.round((good / total) * 100);
@@ -71,7 +84,14 @@ function getYieldPct(wo: WorkOrder): number {
 function getProgressPct(wo: WorkOrder): number {
   if (wo.woType === "PRODUKSI") {
     const t = wo.targetLoyang || 1;
-    return Math.min(100, Math.round(((wo.summaryState?.totalTrayPrinted || 0) / t) * 100));
+    let printed = wo.summaryState?.totalTrayPrinted || 0;
+    if (wo.variantState) {
+      printed = 0;
+      Object.values(wo.variantState).forEach((v: any) => {
+        printed += v.loyangPrinted || 0;
+      });
+    }
+    return Math.min(100, Math.round((printed / t) * 100));
   }
   if (wo.woType === "PACKING_PESANAN") {
     const t = wo.targetPacks || 1;
@@ -82,6 +102,7 @@ function getProgressPct(wo: WorkOrder): number {
 }
 
 function getActiveTimerMs(wo: WorkOrder): number {
+  if (wo.pausedAt) return 0;
   const isProduksi = wo.woType === "PRODUKSI";
   if (isProduksi && wo.currentStage === "FREEZER_CHECKPOINT" && wo.freezerInAt) {
     return Date.now() - new Date(wo.freezerInAt).getTime();
@@ -153,6 +174,7 @@ export default function ManagerSFMPage() {
     sourceOrderId: "",
     assignedCrewId: "",
     assignedCrewName: "",
+    assignedCrewIds: [] as string[],
   });
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
@@ -193,7 +215,27 @@ export default function ManagerSFMPage() {
     }
   }, [startDate, endDate, activeTab, searchQuery, fetchWithAuth]);
 
-  useEffect(() => { loadAllData(); }, [loadAllData]);
+  useEffect(() => {
+    loadAllData();
+
+    const fetchInterval = setInterval(() => {
+      if (document.visibilityState === "visible") loadAllData();
+    }, 30000);
+
+    const handleFCM = () => loadAllData();
+    window.addEventListener("fcm_message", handleFCM);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") loadAllData();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(fetchInterval);
+      window.removeEventListener("fcm_message", handleFCM);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [loadAllData]);
 
   // Live tick: re-render setiap 30 detik untuk timer real-time
   useEffect(() => {
@@ -242,7 +284,16 @@ export default function ManagerSFMPage() {
   // Metric computations
   const activeWos = useMemo(() => filteredWorkOrders.filter(w => w.status !== "COMPLETED" && w.status !== "CANCELLED"), [filteredWorkOrders]);
   const producingWos = useMemo(() => activeWos.filter(w => w.woType === "PRODUKSI" && PRODUCING_STAGES.has(w.currentStage)), [activeWos]);
-  const inFreezerWos = useMemo(() => activeWos.filter(w => w.currentStage === "FREEZER_CHECKPOINT"), [activeWos]);
+  
+  const totalFrozenTrays = useMemo(() => {
+    return activeWos.reduce((total, wo) => {
+      if (wo.woType !== "PRODUKSI") return total;
+      if (wo.variantState) {
+        return total + Object.values(wo.variantState).reduce((sum, v: any) => sum + (v.frozenTrays || 0), 0);
+      }
+      return total + (wo.summaryState?.totalTrayInFreezer || 0);
+    }, 0);
+  }, [activeWos]);
   const avgYield = useMemo(() => {
     const withOutput = filteredWorkOrders.filter(w => (w.summaryState?.totalGoodPcs || 0) + (w.summaryState?.totalDefectPcs || 0) > 0);
     if (withOutput.length === 0) return 0;
@@ -290,8 +341,8 @@ export default function ManagerSFMPage() {
           opnameScope: newWoForm.woType === "STOCK_OPNAME" ? newWoForm.opnameScope : undefined,
           opnameItems: newWoForm.woType === "STOCK_OPNAME" ? newWoForm.opnameItems : undefined,
           sourceOrderId: newWoForm.woType === "PACKING_PESANAN" ? newWoForm.sourceOrderId : undefined,
-          assignedCrewId: newWoForm.assignedCrewId || undefined,
-          assignedCrewName: selectedCrew?.name || newWoForm.assignedCrewName || undefined,
+          assignedCrewIds: newWoForm.assignedCrewIds && newWoForm.assignedCrewIds.length > 0 ? newWoForm.assignedCrewIds : (newWoForm.assignedCrewId ? [newWoForm.assignedCrewId] : []),
+          assignedCrewName: newWoForm.assignedCrewName || selectedCrew?.name || undefined,
           notes: newWoForm.notes,
         }),
       });
@@ -300,7 +351,7 @@ export default function ManagerSFMPage() {
         setShowNewWoModal(false);
         setNewWoForm({
           woType: "PRODUKSI", variantId: "", targetBatches: "3", targetPacks: "48", targetQty: "100", targetUom: "cup", notes: "",
-          productionTargets: [], opnameScope: "Semua", opnameItems: [], sourceOrderId: "", assignedCrewId: "", assignedCrewName: ""
+          productionTargets: [], opnameScope: "Semua", opnameItems: [], sourceOrderId: "", assignedCrewId: "", assignedCrewName: "", assignedCrewIds: []
         });
         await loadAllData();
       }
@@ -311,6 +362,44 @@ export default function ManagerSFMPage() {
 
   // Reference liveTick so it's used (triggers re-render for timers)
   void liveTick;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50/70 pb-28">
+        <div className="bg-white sticky top-0 z-30 px-4 md:px-8 pt-4 pb-3 shadow-sm border-b border-slate-100">
+          <div className="max-w-7xl mx-auto space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Skeleton className="w-10 h-10 rounded-2xl" />
+                <div>
+                  <Skeleton className="h-6 w-48 mb-1" />
+                  <Skeleton className="h-4 w-64" />
+                </div>
+              </div>
+            </div>
+            <div className="flex overflow-x-auto no-scrollbar gap-2 pb-1">
+              <Skeleton className="h-10 w-24 rounded-xl" />
+              <Skeleton className="h-10 w-24 rounded-xl" />
+            </div>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Skeleton className="h-28 rounded-2xl" />
+            <Skeleton className="h-28 rounded-2xl" />
+            <Skeleton className="h-28 rounded-2xl" />
+            <Skeleton className="h-28 rounded-2xl" />
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50/70 pb-28">
@@ -509,7 +598,7 @@ export default function ManagerSFMPage() {
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Produksi Dapur</p>
             </div>
             <p className="text-2xl font-black text-emerald-600">{producingWos.length}</p>
-            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{inFreezerWos.length} di Freezer</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{totalFrozenTrays} loyang beku di Freezer</p>
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
@@ -617,6 +706,9 @@ export default function ManagerSFMPage() {
                           <Clock size={10} /> {fmtTimerMs(timerMs)}
                         </span>
                       )}
+                      {wo.pausedAt && (
+                        <span className="text-[9px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">PAUSED</span>
+                      )}
                       {stuck && (
                         <span className="text-[9px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded animate-pulse">STUCK</span>
                       )}
@@ -714,6 +806,9 @@ export default function ManagerSFMPage() {
                             <div className="text-[10px] font-bold text-slate-500 mt-1 flex items-center gap-1">
                               <Clock size={10} /> {fmtTimerMs(timerMs)}
                             </div>
+                          )}
+                          {wo.pausedAt && (
+                            <span className="text-[9px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded ml-1">PAUSED</span>
                           )}
                           {stuck && (
                             <span className="text-[9px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded animate-pulse ml-1">STUCK</span>
@@ -981,6 +1076,28 @@ export default function ManagerSFMPage() {
                   </div>
                 </div>
               )}
+              
+              <div className="pt-4 border-t border-slate-200">
+                {detailWo.status !== "COMPLETED" && detailWo.status !== "CANCELLED" && (
+                  <button
+                    onClick={async () => {
+                      if (confirm("Yakin ingin memaksa tutup WO ini? Ini akan memotong sisa target di freezer!")) {
+                        const token = await getToken();
+                        await fetch(`/api/sfm/work-orders/${detailWo.id}/step`, {
+                          method: "POST",
+                          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                          body: JSON.stringify({ action: "CLOSE_WO", currentStep: "PRE_PACK" })
+                        });
+                        closeDetail();
+                        loadAllData();
+                      }
+                    }}
+                    className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-sm active:scale-95 transition-all flex justify-center items-center gap-2"
+                  >
+                    Force Close Work Order
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1065,23 +1182,40 @@ export default function ManagerSFMPage() {
                 {/* 2b. Assign Crew */}
                 <div>
                   <label className="text-xs font-black text-slate-700 uppercase tracking-wider block mb-2">Penanggung Jawab Crew <span className="text-slate-400 font-bold normal-case">(Opsional)</span></label>
-                  <select
-                    value={newWoForm.assignedCrewId}
-                    onChange={(e) => {
-                      const crew = employees.find(emp => emp.id === e.target.value);
-                      setNewWoForm({
-                        ...newWoForm,
-                        assignedCrewId: e.target.value,
-                        assignedCrewName: crew?.name || "",
-                      });
-                    }}
-                    className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
-                  >
-                    <option value="">Belum ditentukan</option>
-                    {crewList.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-xl">
+                    {crewList.map(c => {
+                      const isSelected = newWoForm.assignedCrewIds?.includes(c.id) || newWoForm.assignedCrewId === c.id;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            const currentIds = newWoForm.assignedCrewIds || (newWoForm.assignedCrewId ? [newWoForm.assignedCrewId] : []);
+                            const newIds = isSelected 
+                              ? currentIds.filter(id => id !== c.id)
+                              : [...currentIds, c.id];
+                            
+                            const newNames = newIds.map(id => employees.find(e => e.id === id)?.name || "").filter(Boolean).join(", ");
+                            
+                            setNewWoForm({
+                              ...newWoForm,
+                              assignedCrewIds: newIds,
+                              assignedCrewId: newIds[0] || "",
+                              assignedCrewName: newNames
+                            });
+                          }}
+                          className={`flex items-center gap-2 p-2 rounded-lg border text-left text-xs font-bold transition-all ${
+                            isSelected ? "bg-emerald-50 border-emerald-500 text-emerald-900 shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isSelected ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-300"}`}>
+                            {isSelected && <Check size={10} />}
+                          </div>
+                          <span className="truncate">{c.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* 3. Dynamic Target Inputs based on woType */}

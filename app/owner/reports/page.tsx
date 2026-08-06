@@ -9,6 +9,7 @@ import {
   PieChart, ArrowUpRight, ArrowDownRight, Scale, ShoppingBag, Search, Filter,
   ArrowDownLeft, RefreshCw, Banknote, ShieldCheck
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface CashJournalEntry {
   id: string;
@@ -283,13 +284,13 @@ function OwnerReportsContent() {
       {/* ── Main Content Area ── */}
       <div className="px-4 md:px-8 max-w-5xl mx-auto space-y-5 pt-5">
         {loading ? (
-          <div className="space-y-4 animate-pulse">
-            <div className="h-36 bg-slate-900 rounded-3xl" />
+          <div className="space-y-4">
+            <Skeleton className="h-36 w-full rounded-3xl" />
             <div className="grid grid-cols-2 gap-3">
-              <div className="h-28 bg-white rounded-3xl border border-slate-200/80" />
-              <div className="h-28 bg-white rounded-3xl border border-slate-200/80" />
+              <Skeleton className="h-28 w-full rounded-3xl" />
+              <Skeleton className="h-28 w-full rounded-3xl" />
             </div>
-            <div className="h-36 bg-white rounded-3xl border border-slate-200/80" />
+            <Skeleton className="h-36 w-full rounded-3xl" />
           </div>
         ) : !data ? (
           <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm space-y-2">

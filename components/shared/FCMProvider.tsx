@@ -5,6 +5,7 @@ import { getToken, onMessage } from "firebase/messaging";
 import { messaging, db } from "@/lib/firebase-client";
 import { useAuth } from "@/lib/auth-context";
 import { doc, setDoc } from "firebase/firestore";
+import { toast } from "sonner";
 
 export function FCMProvider() {
   const { user } = useAuth();
@@ -39,9 +40,9 @@ export function FCMProvider() {
     // Handle foreground messages
     const unsubscribe = onMessage(messaging, (payload) => {
       console.log("Foreground FCM Message received:", payload);
-      // Optional: Since it's already an in-app dashboard, 
-      // we don't necessarily need to show an alert, it will just appear in the task list 
-      // when they refresh or we could show a toast here.
+      if (payload.data?.title) {
+        toast.info(payload.data.title, { description: payload.data.body });
+      }
       // Dispatch a custom event so the UI can auto-refresh
       window.dispatchEvent(new CustomEvent('fcm_message', { detail: payload }));
     });

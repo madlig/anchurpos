@@ -70,7 +70,10 @@ export async function GET(req: NextRequest) {
 
     let operationalExpenses = 0;
     for (const doc of expensesSnap.docs) {
-      operationalExpenses += doc.data().totalCost ?? 0;
+      const d = doc.data();
+      // Only count true operational expenses (exclude non-sales income entries)
+      if (d.type === "income") continue;
+      operationalExpenses += d.totalPrice ?? 0;
     }
 
     const totalPengeluaran = hpp + operationalExpenses;

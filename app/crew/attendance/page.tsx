@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Clock, CheckCircle2, AlertTriangle, MapPin, Camera } from "lucide-react";
+import { LogIn, LogOut, CheckCircle, CheckCircle2, UploadCloud, ChevronRight, MessageSquareX, Clock, Loader2, Camera, MapPin, AlertTriangle } from "lucide-react";
+import imageCompression from 'browser-image-compression';
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase-client";
@@ -194,8 +196,17 @@ export default function CrewAttendancePage() {
   })();
 
   if (loading) return (
-    <div className="flex h-screen items-center justify-center" >
-      <Loader2 className="h-7 w-7 animate-spin" style={{ color: "#E85D8C" }} />
+    <div className="page-enter min-h-screen">
+      <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200">
+        <Skeleton className="h-6 w-32 mb-2" />
+        <Skeleton className="h-4 w-48" />
+      </div>
+      <div className="px-4 pt-4 pb-4 md:px-8 md:max-w-2xl">
+        <Skeleton className="h-[120px] w-full rounded-2xl mb-[28px]" />
+        <div className="flex flex-col items-center gap-3" style={{ marginBottom: "20px" }}>
+          <Skeleton className="w-[120px] h-[120px] rounded-full" />
+        </div>
+      </div>
     </div>
   );
 

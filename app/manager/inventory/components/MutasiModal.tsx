@@ -1,6 +1,7 @@
 "use client";
 
-import { Loader2, X } from "lucide-react";
+import { X } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface MutasiModalProps {
   isOpen: boolean;
@@ -134,10 +135,11 @@ export function MutasiModal({
         {/* Modal Body / History List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-[300px]">
           {loadingMutasi ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-2">
-              <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-              <p className="text-xs text-slate-400 font-medium">Memuat mutasi...</p>
-            </div>
+            <>
+              <Skeleton className="h-16 w-full rounded-2xl" />
+              <Skeleton className="h-16 w-full rounded-2xl" />
+              <Skeleton className="h-16 w-full rounded-2xl" />
+            </>
           ) : mutasiMovements.length === 0 ? (
             <div className="py-20 text-center text-slate-400 space-y-1">
               <p className="text-xs font-semibold">Tidak ada data mutasi</p>

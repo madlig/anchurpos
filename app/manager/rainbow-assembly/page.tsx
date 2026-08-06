@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Check, Palette } from "lucide-react";
 import { formatDateTime } from "@/lib/formatters";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface RainbowOrder {
   orderId: string;
@@ -71,8 +72,13 @@ export default function RainbowAssemblyPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+      <div className="p-5">
+        <Skeleton className="h-6 w-48 mb-2" />
+        <Skeleton className="h-4 w-64 mb-8" />
+        <div className="space-y-3">
+          <Skeleton className="h-48 w-full rounded-xl" />
+          <Skeleton className="h-48 w-full rounded-xl" />
+        </div>
       </div>
     );
   }

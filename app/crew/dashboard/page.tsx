@@ -7,6 +7,7 @@ import {
   Loader2, CheckCircle2, ChevronRight, PackageOpen, ChefHat, ClipboardList, Clock
 } from "lucide-react";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function CrewDashboard() {
   const { user, getToken } = useAuth();
@@ -156,7 +157,24 @@ export default function CrewDashboard() {
   const hasCheckedOut = !!todayData?.checkOut?.time;
 
   if (loadingStatus) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-primary" size={32} /></div>;
+    return (
+      <div className="min-h-screen bg-slate-50 pb-28">
+        <div className="bg-white px-5 pt-6 pb-4 rounded-b-[32px] shadow-sm mb-6 border-b border-slate-100 flex justify-between items-center">
+          <div>
+            <Skeleton className="h-3 w-24 mb-1" />
+            <Skeleton className="h-6 w-40" />
+          </div>
+          <div className="flex flex-col items-end">
+            <Skeleton className="h-5 w-16 mb-1" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        </div>
+        <div className="px-5 space-y-4 max-w-md mx-auto">
+          <Skeleton className="h-32 w-full rounded-3xl" />
+          <Skeleton className="h-32 w-full rounded-3xl" />
+        </div>
+      </div>
+    );
   }
 
   // JIKA BELUM ABSEN MASUK, HALAMAN FULL ABSEN MASUK
@@ -201,7 +219,11 @@ export default function CrewDashboard() {
       {/* DAFTAR TUGAS */}
       <div className="px-5 space-y-4 max-w-md mx-auto">
         {loadingTasks ? (
-          <div className="flex justify-center py-10"><Loader2 className="animate-spin text-slate-400" /></div>
+          <div className="space-y-4">
+            <Skeleton className="h-32 w-full rounded-3xl" />
+            <Skeleton className="h-32 w-full rounded-3xl" />
+            <Skeleton className="h-32 w-full rounded-3xl" />
+          </div>
         ) : tasks.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-200">
             <CheckCircle2 size={48} className="mx-auto text-slate-200 mb-3" />

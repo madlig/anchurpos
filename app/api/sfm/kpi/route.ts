@@ -23,6 +23,9 @@ export async function GET(req: NextRequest) {
         crewName: d.crewName || "Crew Dapur",
         date: d.date || dateStr,
         durationMinutes: d.durationMinutes || 0,
+        effectiveDurationMinutes: d.effectiveDurationMinutes || d.durationMinutes || 0,
+        pauseMinutes: d.pauseMinutes || 0,
+        pauseCount: d.pauseCount || 0,
         standardDurationMinutes: d.standardDurationMinutes || 120,
         speedScore: d.speedScore || 85,
         totalTargetPacks: d.totalTargetPacks || 50,
@@ -70,7 +73,22 @@ export async function POST(req: NextRequest) {
 
     const realDuration = Number(durationMinutes) || 120;
     const stdDuration = Number(standardDurationMinutes) || 120;
-    const speedScore = Math.min(100, Math.round((stdDuration / realDuration) * 100));
+    
+    let totalPauseMin = 0;
+    let pauseCount = 0;
+    if (workOrderId) {
+      const woSnap = await adminDb.collection("workOrders").doc(workOrderId).get();
+      if (woSnap.exists) {
+        const woData = woSnap.data()!;
+        if (woData.totalPauseMs) {
+          totalPauseMin = Math.round(woData.totalPauseMs / 60000);
+          pauseCount = woData.pauseCount || 0;
+        }
+      }
+    }
+
+    const effectiveDuration = Math.max(1, realDuration - totalPauseMin);
+    const speedScore = Math.min(100, Math.round((stdDuration / effectiveDuration) * 100));
 
     const totalGood = Number(goodPacks) || 0;
     const totalDefect = Number(defectPacks) || 0;
@@ -97,6 +115,9 @@ export async function POST(req: NextRequest) {
       crewName: crewName || user.email || "Crew Dapur",
       date: todayStr,
       durationMinutes: realDuration,
+      effectiveDurationMinutes: effectiveDuration,
+      pauseMinutes: totalPauseMin,
+      pauseCount,
       standardDurationMinutes: stdDuration,
       speedScore,
       totalTargetPacks: Number(totalTargetPacks) || 50,

@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Loader2, ArrowLeft, Search, FileText } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function StockHistoryPage() {
   const { getToken } = useAuth();
@@ -120,7 +121,11 @@ export default function StockHistoryPage() {
             </div>
 
             {loading ? (
-              <div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary" size={32} /></div>
+              <div className="space-y-4">
+                <Skeleton className="h-24 w-full rounded-2xl" />
+                <Skeleton className="h-24 w-full rounded-2xl" />
+                <Skeleton className="h-24 w-full rounded-2xl" />
+              </div>
             ) : movements.length === 0 ? (
               <div className="text-center py-20 text-slate-400 font-medium">Tidak ada riwayat pergerakan stok.</div>
             ) : (

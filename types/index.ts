@@ -468,6 +468,19 @@ export type SFMWorkOrderType = "PRODUKSI" | "REPACK_SAOS" | "REPACK_GULA" | "PAC
 export type SFMTaskStep = "DOUGH_COOKING" | "MIXING_EGG" | "TRAY_MOLDING" | "FREEZER_CHECKPOINT" | "PRE_PACK" | "FINAL_PACK";
 export type SFMLogStage = "DOUGH_MIXING" | "TRAY_PRINTING" | "FREEZER_CHECKPOINT" | "FINAL_PACKING";
 
+export interface WorkOrderVariantState {
+  doughBatchesDone: number;
+  mixingBatchesDone: number;
+  doughStationStartedAt?: string;
+  mixingStationStartedAt?: string;
+  loyangPrinted: number;    // hasil cetak ke loyang
+  loyangCut: number;         // hasil potong → tahu Pcs
+  frozenTrays: number;       // loyang di freezer belum di-prepack
+  goodPacks: number;
+  goodPcs: number;
+  defectPcs: number;
+}
+
 export interface WorkOrderSummaryState {
   totalDoughBatchesDone: number;
   totalTrayPrinted: number;
@@ -513,6 +526,12 @@ export interface WorkOrder {
   batchCode?: string;
   expiredDate?: string;
   stepDurationsMinutes?: Record<string, number>;
+  pausedAt?: string;
+  pausedReason?: string;
+  totalPauseMs?: number;
+  pauseCount?: number;
+  variantState?: Record<string, WorkOrderVariantState>;
+  assignedCrewIds?: string[];
 }
 
 export interface WorkOrderLog {
@@ -520,7 +539,7 @@ export interface WorkOrderLog {
   workOrderId: string;
   stage?: SFMLogStage;
   step?: SFMTaskStep;
-  action?: "GOOD_OUTPUT" | "SCRAP" | "SUB_BATCH" | "STEP_TRANSITION";
+  action?: "GOOD_OUTPUT" | "SCRAP" | "SUB_BATCH" | "STEP_TRANSITION" | "PAUSE" | "RESUME" | "MIXING_SUB_BATCH" | "PARTIAL_PREPACK" | "CUT_TRAY" | "CLOSE_WO";
   valueAdded: number;
   unit: "BATCH" | "LOYANG" | "PACK" | "PCS";
   defectCount?: number;

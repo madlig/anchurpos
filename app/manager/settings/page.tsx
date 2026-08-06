@@ -6,16 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/formatters";
 import { Input } from "@/components/ui/input";
-import {
-  Loader2,
-  Wifi,
-  Plus,
-  Trash2,
-  AlertCircle,
-  CheckCircle2,
-  Tag,
-  Package,
-} from "lucide-react";
+import { Save, Loader2, RefreshCw, AlertCircle, MapPin, Wifi, Check, Store, Plus, Trash2, CheckCircle2, Tag, Package } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 
 interface AttendanceConfig {
@@ -226,8 +218,11 @@ export default function ManagerSettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+      <div className="min-h-screen bg-brand-50 p-4 md:p-6 pb-28 max-w-4xl mx-auto">
+        <Skeleton className="h-6 w-48 mb-2" />
+        <Skeleton className="h-4 w-64 mb-8" />
+        <Skeleton className="h-64 w-full rounded-3xl mb-6" />
+        <Skeleton className="h-64 w-full rounded-3xl" />
       </div>
     );
   }

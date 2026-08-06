@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { pushNotificationToRole, createSfmAlert } from "@/lib/sfm-notifications";
 import type { AuthUser } from "@/lib/auth-middleware";
 
 export async function GET(req: NextRequest) {
@@ -76,8 +77,14 @@ export async function GET(req: NextRequest) {
         currentStepStartedAt: d.currentStepStartedAt?.toDate?.().toISOString() ?? undefined,
         completedAt: d.completedAt?.toDate?.().toISOString() ?? undefined,
         assignedCrewId: d.assignedCrewId || "",
+        assignedCrewIds: d.assignedCrewIds || (d.assignedCrewId ? [d.assignedCrewId] : []),
         assignedCrewName: d.assignedCrewName || "Crew Dapur",
         notes: d.notes || "",
+        variantState: d.variantState || null,
+        pausedAt: d.pausedAt?.toDate?.().toISOString() ?? null,
+        pausedReason: d.pausedReason || null,
+        totalPauseMs: d.totalPauseMs || 0,
+        pauseCount: d.pauseCount || 0,
         batchCode: d.batchCode || "",
         expiredDate: d.expiredDate || "",
       };
@@ -176,7 +183,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { woType, productId, productName, variantIds, targetBatches, targetLoyang, targetPacks, targetPcs, targetQty, targetUom, notes, assignedCrewId, assignedCrewName, productionTargets, opnameScope, opnameItems, sourceOrderId, sourceOrderNumber, repackIngredientId } = body;
+    const { woType, productId, productName, variantIds, targetBatches, targetLoyang, targetPacks, targetPcs, targetQty, targetUom, notes, assignedCrewId, assignedCrewName, assignedCrewIds, productionTargets, opnameScope, opnameItems, sourceOrderId, sourceOrderNumber, repackIngredientId } = body;
 
     const typePrefix = woType === "REPACK_SAOS" || woType === "REPACK_GULA" ? "RPK" : woType === "STOCK_OPNAME" ? "SOP" : woType === "GENERAL_TASK" ? "TSK" : woType === "PACKING_PESANAN" ? "PCK" : "WO";
     const todayStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -225,9 +232,23 @@ export async function POST(req: NextRequest) {
       },
       stepDurationsMinutes: {},
       createdAt: FieldValue.serverTimestamp(),
-      assignedCrewId: assignedCrewId || user.uid,
+      assignedCrewId: Array.isArray(assignedCrewIds) && assignedCrewIds.length > 0 ? assignedCrewIds[0] : (assignedCrewId || user.uid),
+      assignedCrewIds: Array.isArray(assignedCrewIds) && assignedCrewIds.length > 0 ? assignedCrewIds : [assignedCrewId || user.uid],
       assignedCrewName: assignedCrewName || user.email || "Crew Dapur",
       notes: notes || "",
+      variantState: (() => {
+        const vs: any = {};
+        if (productionTargets && Array.isArray(productionTargets)) {
+          for (const t of productionTargets) {
+            vs[t.variantId] = { doughBatchesDone: 0, mixingBatchesDone: 0, loyangPrinted: 0, loyangCut: 0, frozenTrays: 0, goodPacks: 0, goodPcs: 0, defectPcs: 0 };
+          }
+        } else if (variantIds && Array.isArray(variantIds)) {
+          for (const vId of variantIds) {
+            vs[vId] = { doughBatchesDone: 0, mixingBatchesDone: 0, loyangPrinted: 0, loyangCut: 0, frozenTrays: 0, goodPacks: 0, goodPcs: 0, defectPcs: 0 };
+          }
+        }
+        return vs;
+      })(),
     };
 
     await woRef.set(newWo);
@@ -243,24 +264,57 @@ export async function POST(req: NextRequest) {
 
     // Auto-deduct raw material ingredients from BOM recipes upon Work Order release
     try {
-      const recipeSnap = await adminDb.collection("recipes").where("productId", "==", productId || "churros-frozen-food").get();
-      if (!recipeSnap.empty) {
-        const recipeData = recipeSnap.docs[0].data();
-        const ingredientsNeeded = recipeData.ingredients || [];
-
-        for (const ing of ingredientsNeeded) {
-          const qtyNeeded = (ing.amount || 0) * numBatches;
-          if (ing.ingredientId && qtyNeeded > 0) {
-            const ingRef = adminDb.collection("ingredients").doc(ing.ingredientId);
-            await ingRef.update({
-              stock: FieldValue.increment(-qtyNeeded),
-            });
+      if (productionTargets && Array.isArray(productionTargets)) {
+        for (const target of productionTargets) {
+          const recipeSnap = await adminDb.collection("recipes").where("variantId", "==", target.variantId).get();
+          if (!recipeSnap.empty) {
+            const recipeData = recipeSnap.docs[0].data();
+            const ingredientsNeeded = recipeData.ingredients || [];
+            for (const ing of ingredientsNeeded) {
+              const qtyNeeded = (ing.amount || 0) * (Number(target.targetBatches) || 0);
+              if (ing.ingredientId && qtyNeeded > 0) {
+                await adminDb.collection("ingredients").doc(ing.ingredientId).update({
+                  stock: FieldValue.increment(-qtyNeeded),
+                });
+              }
+            }
+          }
+        }
+      } else {
+        const recipeSnap = await adminDb.collection("recipes").where("productId", "==", productId || "churros-frozen-food").get();
+        if (!recipeSnap.empty) {
+          const recipeData = recipeSnap.docs[0].data();
+          const ingredientsNeeded = recipeData.ingredients || [];
+          for (const ing of ingredientsNeeded) {
+            const qtyNeeded = (ing.amount || 0) * numBatches;
+            if (ing.ingredientId && qtyNeeded > 0) {
+              await adminDb.collection("ingredients").doc(ing.ingredientId).update({
+                stock: FieldValue.increment(-qtyNeeded),
+              });
+            }
           }
         }
       }
     } catch (recipeErr) {
       console.warn("BOM Auto-deduction notice:", recipeErr);
     }
+
+    // --- PHASE 3: Trigger Notifications ---
+    await createSfmAlert({
+      type: "sfm_wo_new",
+      severity: "info",
+      title: "Work Order Baru",
+      message: `${woNumber} - ${body.productName || "Produk"}`,
+      sourceId: woRef.id,
+    });
+
+    await pushNotificationToRole({
+      role: "crew",
+      title: "Work Order Baru",
+      body: `${woNumber} menunggu eksekusi`,
+      data: { type: "sfm_wo_new", workOrderId: woRef.id },
+      targetUserId: body.assignedCrewId || undefined,
+    });
 
     return NextResponse.json({ success: true, id: woRef.id, woNumber });
   } catch (err) {

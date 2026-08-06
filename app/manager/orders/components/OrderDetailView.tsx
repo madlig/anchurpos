@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { formatRupiah } from "@/lib/utils";
 import { formatDateTime } from "@/lib/formatters";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, CheckCircle2, Ban, Package, Printer, MapPin, Truck, CreditCard } from "lucide-react";
+import { X, Copy, Tag, Clock, CalendarDays, ReceiptText, ChefHat, PackageCheck, Truck, MapPin, Edit3, Printer, Trash2, ShieldAlert, CheckCircle2, Package, Ban, CreditCard, Box, Loader2, StickyNote } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface OrderItem {
   id: string; productName: string; variantName: string;
@@ -251,8 +252,19 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
   }
 
   if (loading) return (
-    <div className="flex h-full items-center justify-center py-20">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-start">
+        <div>
+          <Skeleton className="h-6 w-32 mb-2" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+        <Skeleton className="h-8 w-24 rounded-full" />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Skeleton className="h-24 rounded-2xl" />
+        <Skeleton className="h-24 rounded-2xl" />
+      </div>
+      <Skeleton className="h-64 w-full rounded-3xl" />
     </div>
   );
 

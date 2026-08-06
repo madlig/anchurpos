@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useParams } from "next/navigation";
-import { Loader2, PackageOpen, Printer, AlertTriangle } from "lucide-react";
+import { PackageOpen, Printer, AlertTriangle } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface OrderItem {
   id: string; productName: string; variantName: string;
@@ -47,8 +48,9 @@ export default function ShippingLabelPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-white">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+      <div className="p-8 max-w-2xl mx-auto">
+        <Skeleton className="h-32 w-full mb-4" />
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }

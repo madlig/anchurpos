@@ -4,10 +4,11 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 import { 
-  Loader2, Plus, Trash2, ChevronLeft, ChevronRight, X, ArrowLeft,
+  Plus, Trash2, ChevronLeft, ChevronRight, X, ArrowLeft,
   SlidersHorizontal, ArrowUpRight, ArrowDownRight, Package, ShoppingBag,
-  FileText, CheckCircle2, AlertTriangle, Filter, Search, Tag, User
+  FileText, CheckCircle2, AlertTriangle, Filter, Search, Tag, User, Loader2
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
 import Link from "next/link";
 
 interface Adjustment {
@@ -409,8 +410,10 @@ export default function StockAdjustmentsPage() {
 
         {/* ── Adjustments History List ── */}
         {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-slate-800" />
+          <div className="space-y-2.5">
+            <Skeleton className="h-24 w-full rounded-2xl" />
+            <Skeleton className="h-24 w-full rounded-2xl" />
+            <Skeleton className="h-24 w-full rounded-2xl" />
           </div>
         ) : filteredAdjustments.length === 0 ? (
           <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm space-y-2">

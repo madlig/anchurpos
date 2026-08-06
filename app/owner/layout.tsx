@@ -2,13 +2,16 @@
 
 import { RoleGuard } from "@/components/shared/RoleGuard";
 import { useAuth } from "@/lib/auth-context";
-import { LayoutDashboard, FileText, CheckCircle, MoreHorizontal, LogOut } from "lucide-react";
+import { LayoutDashboard, Wallet, ChefHat, CheckCircle, MoreHorizontal, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { FCMProvider } from "@/components/shared/FCMProvider";
+import { NotificationBell } from "@/components/shared/NotificationBell";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", href: "/owner/dashboard", icon: LayoutDashboard },
-  { label: "Laporan", href: "/owner/reports", icon: FileText },
+  { label: "Beranda", href: "/owner/dashboard", icon: LayoutDashboard },
+  { label: "Keuangan", href: "/owner/reports", icon: Wallet },
+  { label: "Produksi", href: "/owner/sfm", icon: ChefHat },
   { label: "Approval", href: "/owner/approval", icon: CheckCircle },
   { label: "Lainnya", href: "/owner/more", icon: MoreHorizontal },
 ];
@@ -119,7 +122,11 @@ function MobileBottomNav() {
 export default function OwnerLayout({ children }: { children: React.ReactNode }) {
   return (
     <RoleGuard allowedRoles={["owner"]}>
+      <FCMProvider />
       <div className="min-h-screen" style={{ background: "#FCABB4" }}>
+        <div className="fixed top-4 right-4 z-50 md:top-5 md:right-8">
+          <NotificationBell />
+        </div>
         <DesktopSidebar />
         <div className="md:ml-60 pb-24 md:pb-6">
           {children}

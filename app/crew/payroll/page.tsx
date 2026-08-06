@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, CalendarDays, ReceiptText, ShieldCheck, Download } from "lucide-react";
+import { ReceiptText, ShieldCheck, Download, ChevronRight } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { PayrollRecord } from "../../manager/employees/types";
 
 const fmtRupiah = (num: number) => {
@@ -60,7 +61,9 @@ export default function CrewPayrollPage() {
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-10"><Loader2 className="animate-spin text-slate-400" /></div>
+          <div className="space-y-4">
+            <Skeleton className="h-96 w-full rounded-[20px]" />
+          </div>
         ) : !payroll ? (
           <div style={{ background: "#fff", borderRadius: "16px", padding: "32px 16px", textAlign: "center", border: "1px dashed #CBD5E1" }}>
             <ReceiptText size={32} className="mx-auto text-slate-300 mb-3" />

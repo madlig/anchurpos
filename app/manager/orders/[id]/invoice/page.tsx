@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Printer } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface OrderItem { productName: string; variantName: string; qty: number; basePrice: number; totalPrice: number; }
 interface OrderDetail {
@@ -55,8 +56,13 @@ export default function InvoicePage() {
   }, [loading, order]);
 
   if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-      <Loader2 className="animate-spin" size={28} />
+    <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto" }}>
+      <Skeleton className="h-12 w-1/3 mb-8" />
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "32px" }}>
+        <Skeleton className="h-24 w-1/3" />
+        <Skeleton className="h-24 w-1/3" />
+      </div>
+      <Skeleton className="h-64 w-full" />
     </div>
   );
   if (!order) return <div style={{ textAlign: "center", padding: "40px" }}>Dokumen tidak ditemukan</div>;
