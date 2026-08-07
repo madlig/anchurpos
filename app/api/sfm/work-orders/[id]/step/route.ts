@@ -18,7 +18,7 @@ export async function POST(
   try {
     const body = await req.json();
     const { action, currentStep, nextStep, subBatchVal, loyangCount, goodPcs, goodPacks, packSize, scrapPcs, prepackOutputs, durationMinutes, notes, pausedReason, variantId } = body as {
-      action: "START" | "SUB_BATCH" | "STEP_TRANSITION" | "SCRAP" | "PAUSE" | "RESUME" | "MIXING_SUB_BATCH" | "PARTIAL_PREPACK" | "CUT_TRAY" | "CLOSE_WO";
+      action: "START" | "SUB_BATCH" | "STEP_TRANSITION" | "SCRAP" | "PAUSE" | "RESUME" | "MIXING_SUB_BATCH" | "TRAY_MOLDING" | "PARTIAL_PREPACK" | "CUT_TRAY" | "CLOSE_WO";
       currentStep: string;
       nextStep?: string;
       subBatchVal?: number;
@@ -235,11 +235,11 @@ export async function POST(
         nextStatus = "IN_PROGRESS";
       }
       
-      const totalFrozen = Object.values(variantState).reduce((s: any, v: any) => s + (v.frozenTrays || 0), 0);
-      const totalGood = Object.values(variantState).reduce((s: any, v: any) => s + (v.goodPacks || 0), 0);
-      const totalCut = Object.values(variantState).reduce((s: any, v: any) => s + (v.loyangCut || 0), 0);
-      const totalPrinted = Object.values(variantState).reduce((s: any, v: any) => s + (v.loyangPrinted || 0), 0);
-      const totalMixing = Object.values(variantState).reduce((s: any, v: any) => s + (v.mixingBatchesDone || 0), 0);
+      const totalFrozen: number = Object.values(variantState).reduce((s: number, v: any) => s + (v.frozenTrays || 0), 0);
+      const totalGood: number = Object.values(variantState).reduce((s: number, v: any) => s + (v.goodPacks || 0), 0);
+      const totalCut: number = Object.values(variantState).reduce((s: number, v: any) => s + (v.loyangCut || 0), 0);
+      const totalPrinted: number = Object.values(variantState).reduce((s: number, v: any) => s + (v.loyangPrinted || 0), 0);
+      const totalMixing: number = Object.values(variantState).reduce((s: number, v: any) => s + (v.mixingBatchesDone || 0), 0);
 
       let computedStage = "DOUGH_COOKING";
       if (totalGood > 0) computedStage = "PRE_PACK";
