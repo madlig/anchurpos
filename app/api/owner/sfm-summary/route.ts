@@ -109,6 +109,24 @@ export async function GET(req: NextRequest) {
       }
 
       const currentStepIndex = ALL_STEPS.indexOf(stage);
+      let progressPct = 0;
+      if (!d.woType || d.woType === "PRODUKSI") {
+        const t = d.targetLoyang || 1;
+        let printed = ss.totalTrayPrinted || 0;
+        if (d.variantState) {
+          printed = 0;
+          Object.values(d.variantState).forEach((v: any) => {
+            printed += v.loyangPrinted || 0;
+          });
+        }
+        progressPct = Math.min(100, Math.round((printed / t) * 100));
+      } else if (d.woType === "PACKING_PESANAN") {
+        const t = d.targetPacks || 1;
+        progressPct = Math.min(100, Math.round(((ss.totalGoodPacks || 0) / t) * 100));
+      } else {
+        const t = d.targetQty || 1;
+        progressPct = Math.min(100, Math.round(((ss.totalGoodPcs || 0) / t) * 100));
+      }
 
       return {
         id: doc.id,
@@ -117,7 +135,7 @@ export async function GET(req: NextRequest) {
         status: d.status || "RELEASED",
         currentStage: stage,
         currentStepIndex: currentStepIndex < 0 ? 0 : currentStepIndex,
-        progressPct: Math.round(((currentStepIndex < 0 ? 0 : currentStepIndex) / (ALL_STEPS.length - 1)) * 100),
+        progressPct,
         assignedCrewName: d.assignedCrewName || "Crew Dapur",
         productName: d.productName || "Churros Frozen",
         variantNames: (d.variantIds || []).join(", "),

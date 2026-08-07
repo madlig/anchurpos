@@ -143,7 +143,15 @@ export default function CrewSFMTerminal() {
     if (!inputModal) return;
     const { wo, variantId, action } = inputModal;
     
-    let payload: any = { action, currentStep: "PROCESS", variantId };
+    const stepMap: any = {
+      SUB_BATCH: "DOUGH_COOKING",
+      MIXING_SUB_BATCH: "MIXING_EGG",
+      TRAY_MOLDING: "TRAY_MOLDING",
+      CUT_TRAY: "CUT_CHURROS",
+      PARTIAL_PREPACK: "PRE_PACK",
+      CLOSE_WO: "PRE_PACK",
+    };
+    let payload: any = { action, currentStep: stepMap[action] || wo.currentStage || "PROCESS", variantId };
     
     if (action === "TRAY_MOLDING") {
       payload.loyangCount = parseFloat(inputValue1) || 0;
@@ -286,69 +294,115 @@ export default function CrewSFMTerminal() {
                 {/* Parallel Lanes */}
                 {isProduksi ? (
                   <div className="space-y-4">
-                    {lanes.map((lane, idx) => (
-                      <div key={idx} className="bg-slate-50 border border-slate-200 rounded-2xl p-3 shadow-xs space-y-3">
-                        <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
-                          <span className="text-sm font-black text-slate-700">Lane: {lane.variantName}</span>
-                        </div>
+                    {lanes.map((lane, idx) => {
+                      const st = lane.state;
+                      
+                      const masakDone = st.doughBatchesDone >= lane.targetBatches;
+                      const mixerUnlocked = st.doughBatchesDone > 0;
+                      const mixerDone = st.mixingBatchesDone >= lane.targetBatches;
+                      const cetakUnlocked = st.mixingBatchesDone > 0;
+                      const potongUnlocked = st.loyangPrinted > 0;
+                      const prepackUnlocked = st.loyangCut > 0 || st.frozenTrays > 0;
+                      
+                      const stations = [
+                        { id: 'masak', title: 'Masak Adonan', active: !masakDone, done: masakDone, locked: false, render: () => (
+                            <div className="space-y-2">
+                              <div className="flex gap-2">
+                                <button onClick={() => handleAction(wo.id, { action: "SUB_BATCH", currentStep: "DOUGH_COOKING", subBatchVal: 1, variantId: lane.variantId })} className="flex-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-black py-3 rounded-xl border border-emerald-300">+1 Batch</button>
+                                <button onClick={() => handleAction(wo.id, { action: "SUB_BATCH", currentStep: "DOUGH_COOKING", subBatchVal: 1.5, variantId: lane.variantId })} className="flex-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-black py-3 rounded-xl border border-emerald-300">+1.5 Batch</button>
+                              </div>
+                              <div className="text-center text-xs font-bold text-slate-500">
+                                Sudah masak: {st.doughBatchesDone} / {lane.targetBatches} Batch
+                              </div>
+                              {st.doughStationStartedAt && <div className="mt-1 text-center"><LiveTimer startedAt={typeof st.doughStationStartedAt === "string" ? st.doughStationStartedAt : (st.doughStationStartedAt as any).toDate?.().toISOString() || undefined} /></div>}
+                            </div>
+                        )},
+                        { id: 'mixer', title: 'Mixer Telur', active: mixerUnlocked && !mixerDone, done: mixerDone, locked: !mixerUnlocked, render: () => (
+                            <div className="space-y-2">
+                              <div className="flex gap-2">
+                                <button onClick={() => handleAction(wo.id, { action: "MIXING_SUB_BATCH", currentStep: "MIXING_EGG", subBatchVal: 1, variantId: lane.variantId })} className="flex-1 bg-purple-100 hover:bg-purple-200 text-purple-800 font-black py-3 rounded-xl border border-purple-300">+1 Batch</button>
+                                <button onClick={() => handleAction(wo.id, { action: "MIXING_SUB_BATCH", currentStep: "MIXING_EGG", subBatchVal: 1.5, variantId: lane.variantId })} className="flex-1 bg-purple-100 hover:bg-purple-200 text-purple-800 font-black py-3 rounded-xl border border-purple-300">+1.5 Batch</button>
+                              </div>
+                              <div className="text-center text-xs font-bold text-slate-500">
+                                Sudah mixer: {st.mixingBatchesDone} / {lane.targetBatches} Batch
+                              </div>
+                              {st.mixingStationStartedAt && <div className="mt-1 text-center"><LiveTimer startedAt={typeof st.mixingStationStartedAt === "string" ? st.mixingStationStartedAt : (st.mixingStationStartedAt as any).toDate?.().toISOString() || undefined} /></div>}
+                            </div>
+                        )},
+                        { id: 'cetak', title: 'Cetak Loyang', active: cetakUnlocked, done: false, locked: !cetakUnlocked, render: () => (
+                            <div className="space-y-2 text-center">
+                              <button onClick={() => { setInputValue1(""); setInputModal({ wo, variantId: lane.variantId, variantName: lane.variantName, action: "TRAY_MOLDING" })}} className="w-full bg-blue-100 hover:bg-blue-200 text-blue-800 font-black py-3 rounded-xl border border-blue-300">+ Cetak Loyang</button>
+                              <div className="text-xs font-bold text-slate-500">Sudah cetak: {st.loyangPrinted} Loyang</div>
+                            </div>
+                        )},
+                        { id: 'potong', title: 'Potong Churros', active: potongUnlocked, done: false, locked: !potongUnlocked, render: () => (
+                            <div className="space-y-2 text-center">
+                              <button onClick={() => { setInputValue1(""); setInputValue2(""); setInputModal({ wo, variantId: lane.variantId, variantName: lane.variantName, action: "CUT_TRAY" })}} className="w-full bg-rose-100 hover:bg-rose-200 text-rose-800 font-black py-3 rounded-xl border border-rose-300">+ Potong Churros</button>
+                              <div className="text-xs font-bold text-slate-500">Sudah potong: {st.loyangCut} Loyang</div>
+                            </div>
+                        )}
+                      ];
 
-                        {/* Dough & Mixing Parallel */}
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-[10px] font-black text-slate-500 flex items-center gap-1"><ChefHat size={12}/> Masak</span>
-                              <span className="text-[10px] font-bold text-slate-600">{lane.state.doughBatchesDone}/{lane.targetBatches}B</span>
+                      return (
+                        <div key={idx} className={`${lanes.length > 1 ? 'bg-slate-50 border border-slate-200 p-3 rounded-2xl shadow-xs space-y-3' : 'space-y-3'}`}>
+                          {lanes.length > 1 && (
+                            <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                              <span className="text-sm font-black text-slate-700">{lane.variantName}</span>
                             </div>
-                            <div className="flex gap-1">
-                              {[1, 1.5].map(v => (
-                                <button key={v} onClick={() => handleAction(wo.id, { action: "SUB_BATCH", subBatchVal: v, variantId: lane.variantId })} className="flex-1 bg-emerald-100 text-emerald-800 text-[10px] font-extrabold py-1.5 rounded-lg active:scale-95 border border-emerald-200">+{v}</button>
-                              ))}
-                            </div>
-                            {lane.state.doughStationStartedAt && <div className="mt-1.5 text-center"><LiveTimer startedAt={typeof lane.state.doughStationStartedAt === "string" ? lane.state.doughStationStartedAt : (lane.state.doughStationStartedAt as any).toDate?.().toISOString() || undefined} /></div>}
-                          </div>
-
-                          <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-[10px] font-black text-slate-500 flex items-center gap-1"><Layers size={12}/> Mixer</span>
-                              <span className="text-[10px] font-bold text-slate-600">{lane.state.mixingBatchesDone}/{lane.targetBatches}B</span>
-                            </div>
-                            <div className="flex gap-1">
-                              {[1, 1.5].map(v => (
-                                <button key={v} onClick={() => handleAction(wo.id, { action: "MIXING_SUB_BATCH", subBatchVal: v, variantId: lane.variantId })} className="flex-1 bg-purple-100 text-purple-800 text-[10px] font-extrabold py-1.5 rounded-lg active:scale-95 border border-purple-200">+{v}</button>
-                              ))}
-                            </div>
-                            {lane.state.mixingStationStartedAt && <div className="mt-1.5 text-center"><LiveTimer startedAt={typeof lane.state.mixingStationStartedAt === "string" ? lane.state.mixingStationStartedAt : (lane.state.mixingStationStartedAt as any).toDate?.().toISOString() || undefined} /></div>}
-                          </div>
-                        </div>
-
-                        {/* Molding & Cut */}
-                        <div className="grid grid-cols-2 gap-2">
-                          <button onClick={() => { setInputValue1(""); setInputModal({ wo, variantId: lane.variantId, variantName: lane.variantName, action: "TRAY_MOLDING" })}} className="bg-white p-2 rounded-xl border border-blue-200 shadow-2xs flex flex-col items-center justify-center gap-1 active:scale-95 group hover:border-blue-400">
-                            <span className="text-[10px] font-black text-blue-700 flex items-center gap-1"><Plus size={12}/> Cetak (Utuh)</span>
-                            <span className="text-[10px] font-bold text-slate-500">{lane.state.loyangPrinted} Loyang</span>
-                          </button>
+                          )}
                           
-                          <button onClick={() => { setInputValue1(""); setInputValue2(""); setInputModal({ wo, variantId: lane.variantId, variantName: lane.variantName, action: "CUT_TRAY" })}} className="bg-white p-2 rounded-xl border border-rose-200 shadow-2xs flex flex-col items-center justify-center gap-1 active:scale-95 group hover:border-rose-400">
-                            <span className="text-[10px] font-black text-rose-700 flex items-center gap-1"><PenLine size={12}/> Potong</span>
-                            <span className="text-[10px] font-bold text-slate-500">{lane.state.loyangCut} L / {lane.state.goodPcs} Pcs</span>
-                          </button>
-                        </div>
+                          <div className="space-y-2">
+                            {stations.map(station => {
+                              if (station.done) {
+                                return (
+                                  <div key={station.id} className="flex justify-between items-center text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">
+                                    <span className="flex items-center gap-1"><Check size={14}/> {station.title} Selesai</span>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })}
+                          </div>
 
-                        {/* Freezer & Pack */}
-                        <div className="grid grid-cols-[1fr,2fr] gap-2">
-                          <div className="bg-sky-50 p-2 rounded-xl border border-sky-200 flex flex-col justify-center items-center">
-                            <Snowflake size={16} className="text-sky-600 mb-1" />
-                            <span className="text-[10px] font-black text-sky-800 text-center leading-tight">{lane.state.frozenTrays} Loyang<br/>Beku</span>
+                          <div className="space-y-3">
+                            {stations.filter(s => !s.done).slice(0, 2).map((station, i) => {
+                              if (station.locked) {
+                                return (
+                                  <div key={station.id} className="p-3 border border-slate-200 border-dashed rounded-xl bg-slate-50/50 flex items-center gap-2 opacity-60">
+                                    <div className="w-6 h-6 rounded-full bg-slate-200 flex justify-center items-center text-slate-400"><Clock size={12}/></div>
+                                    <span className="text-xs font-bold text-slate-500">Berikutnya: {station.title}</span>
+                                  </div>
+                                );
+                              } else {
+                                return (
+                                  <div key={station.id} className="p-4 border border-blue-200 rounded-xl bg-white shadow-sm space-y-3 relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <div className="w-6 h-6 rounded-full bg-blue-100 flex justify-center items-center text-blue-600"><Play size={10} className="fill-blue-600 ml-0.5"/></div>
+                                      <span className="text-sm font-black text-slate-800">SEKARANG: {station.title}</span>
+                                    </div>
+                                    {station.render()}
+                                  </div>
+                                );
+                              }
+                            })}
                           </div>
                           
-                          <button onClick={() => { setInputValue1(""); setInputValue2(""); setInputValue3(""); setInputModal({ wo, variantId: lane.variantId, variantName: lane.variantName, action: "PARTIAL_PREPACK" })}} className="bg-emerald-600 text-white p-2 rounded-xl border border-emerald-700 shadow-md flex flex-col justify-center items-center active:scale-95">
-                            <Package size={16} className="mb-1" />
-                            <span className="text-[11px] font-black">Pre-Pack (Cicil)</span>
-                            <span className="text-[10px] font-medium opacity-90">{lane.state.goodPacks} Pack selesai</span>
-                          </button>
+                          <div className="grid grid-cols-[1fr,2fr] gap-2 pt-2 border-t border-slate-100 mt-2">
+                            <div className="bg-sky-50 p-2 rounded-xl border border-sky-200 flex flex-col justify-center items-center">
+                              <Snowflake size={16} className="text-sky-600 mb-1" />
+                              <span className="text-[10px] font-black text-sky-800 text-center leading-tight">{st.frozenTrays} Loyang<br/>Beku</span>
+                            </div>
+                            
+                            <button disabled={!prepackUnlocked} onClick={() => { setInputValue1(""); setInputValue2(""); setInputValue3(""); setInputModal({ wo, variantId: lane.variantId, variantName: lane.variantName, action: "PARTIAL_PREPACK" })}} className={`p-2 rounded-xl border shadow-md flex flex-col justify-center items-center active:scale-95 ${prepackUnlocked ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                              <Package size={16} className="mb-1" />
+                              <span className="text-[11px] font-black">Pre-Pack (Cicil)</span>
+                              <span className="text-[10px] font-medium opacity-90">{st.goodPacks} Pack selesai</span>
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     {/* Close WO Button */}
                     {canCloseWO ? (

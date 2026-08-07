@@ -238,14 +238,18 @@ export async function POST(req: NextRequest) {
       notes: notes || "",
       variantState: (() => {
         const vs: any = {};
-        if (productionTargets && Array.isArray(productionTargets)) {
+        const zeroState = { doughBatchesDone: 0, mixingBatchesDone: 0, loyangPrinted: 0, loyangCut: 0, frozenTrays: 0, goodPacks: 0, goodPcs: 0, defectPcs: 0 };
+        if (productionTargets?.length) {
           for (const t of productionTargets) {
-            vs[t.variantId] = { doughBatchesDone: 0, mixingBatchesDone: 0, loyangPrinted: 0, loyangCut: 0, frozenTrays: 0, goodPacks: 0, goodPcs: 0, defectPcs: 0 };
+            vs[t.variantId] = { ...zeroState };
           }
-        } else if (variantIds && Array.isArray(variantIds)) {
+        } else if (variantIds?.length) {
           for (const vId of variantIds) {
-            vs[vId] = { doughBatchesDone: 0, mixingBatchesDone: 0, loyangPrinted: 0, loyangCut: 0, frozenTrays: 0, goodPacks: 0, goodPcs: 0, defectPcs: 0 };
+            vs[vId] = { ...zeroState };
           }
+        } else {
+          // SINGLE-VARIANT FALLBACK (kasus Ihsan): pakai productId sebagai key
+          vs[productId || "churros-frozen-food"] = { ...zeroState };
         }
         return vs;
       })(),

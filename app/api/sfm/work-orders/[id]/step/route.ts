@@ -100,28 +100,53 @@ export async function POST(
             }
           }
         }
+        if (woData.currentStepStartedAt) {
+          const cTime = woData.currentStepStartedAt.toDate().getTime();
+          woData.currentStepStartedAt = new Date(cTime + pauseDurationMs) as any;
+        }
       }
     }
 
-    // --- Server-authoritative per-step timing ---
-    // Finalisasi durasi step yang baru saja selesai: hitung dari currentStepStartedAt (server time).
-    // Lebih akurat & tahan refresh/close daripada hitungan dari client.
+    const effectiveVariantId = variantId || (woData.productionTargets?.[0]?.variantId) || woData.productId || "churros-frozen-food";
+    let vs = variantState[effectiveVariantId];
+    if (!vs) {
+      vs = { doughBatchesDone: 0, mixingBatchesDone: 0, loyangPrinted: 0, loyangCut: 0, frozenTrays: 0, goodPacks: 0, goodPcs: 0, defectPcs: 0 };
+      variantState[effectiveVariantId] = vs;
+    }
+
     const prevStepStartedAt = woData.currentStepStartedAt;
     let resolvedDurationMin = 0;
     if (woData.pausedAt) {
-      resolvedDurationMin = 0; // Jangan hitung durasi saat sedang pause
-    } else if (prevStepStartedAt?.toMillis) {
-      const startedMs = prevStepStartedAt.toMillis();
+      resolvedDurationMin = 0;
+    } else {
+      let startedMs = prevStepStartedAt?.toMillis ? prevStepStartedAt.toMillis() : Date.now();
+      
+      if (action === "SUB_BATCH" && vs.doughStationStartedAt?.toMillis) {
+        startedMs = vs.doughStationStartedAt.toMillis();
+      } else if (action === "MIXING_SUB_BATCH" && vs.mixingStationStartedAt?.toMillis) {
+        startedMs = vs.mixingStationStartedAt.toMillis();
+      } else if (durationMinutes && durationMinutes > 0 && !prevStepStartedAt) {
+        startedMs = Date.now() - (durationMinutes * 60000);
+      }
+      
       resolvedDurationMin = Math.max(0, Math.round((nowMs - startedMs) / 60000));
-    } else if (durationMinutes && durationMinutes > 0) {
-      // Fallback untuk WO lama yang belum punya currentStepStartedAt
-      resolvedDurationMin = Number(durationMinutes);
     }
+    
     if (resolvedDurationMin > 0) {
-      stepDurations[currentStep] = (stepDurations[currentStep] || 0) + resolvedDurationMin;
+      const stationKey = action === "SUB_BATCH" ? "DOUGH_COOKING"
+        : action === "MIXING_SUB_BATCH" ? "MIXING_EGG"
+        : action === "TRAY_MOLDING" ? "TRAY_MOLDING"
+        : action === "CUT_TRAY" ? "CUT_CHURROS"
+        : action === "PARTIAL_PREPACK" ? "PRE_PACK"
+        : action === "CLOSE_WO" ? "PRE_PACK"
+        : currentStep;
+      stepDurations[stationKey] = (stepDurations[stationKey] || 0) + resolvedDurationMin;
     }
-    // Step/sub-batch berikutnya dimulai sekarang (server time).
-    let currentStepStartedAt = FieldValue.serverTimestamp();
+    // Step/sub-batch berikutnya dimulai sekarang (server time), kecuali jika resume
+    let currentStepStartedAt: any = FieldValue.serverTimestamp();
+    if (action === "RESUME" && woData.currentStepStartedAt) {
+      currentStepStartedAt = woData.currentStepStartedAt;
+    }
 
     // --- Freezer entry timestamp ---
     // Saat stage masuk FREEZER_CHECKPOINT untuk pertama kali, catat kapan loyang masuk freezer
@@ -131,40 +156,33 @@ export async function POST(
     }
 
     // Phase 3: Per-Variant tracking & TRAY_MOLDING bug fix
-    if (variantId && variantState[variantId]) {
-      if (action === "SUB_BATCH" && subBatchVal) {
-        variantState[variantId].doughBatchesDone = (variantState[variantId].doughBatchesDone || 0) + Number(subBatchVal);
-        variantState[variantId].doughStationStartedAt = FieldValue.serverTimestamp() as any;
-      } else if (action === "MIXING_SUB_BATCH" && subBatchVal) {
-        variantState[variantId].mixingBatchesDone = (variantState[variantId].mixingBatchesDone || 0) + Number(subBatchVal);
-        variantState[variantId].mixingStationStartedAt = FieldValue.serverTimestamp() as any;
-      } else if (action === "CUT_TRAY") {
-        const lc = Number(loyangCount) || 0;
-        const gp = Number(goodPcs) || 0;
-        if (lc > 0) {
-          variantState[variantId].loyangCut = (variantState[variantId].loyangCut || 0) + lc;
-          variantState[variantId].frozenTrays = (variantState[variantId].frozenTrays || 0) + lc;
-        }
-        if (gp > 0) {
-          variantState[variantId].goodPcs = (variantState[variantId].goodPcs || 0) + gp;
-        }
+    if (action === "SUB_BATCH" && subBatchVal) {
+      vs.doughBatchesDone = (vs.doughBatchesDone || 0) + Number(subBatchVal);
+      vs.doughStationStartedAt = FieldValue.serverTimestamp() as any;
+      nextSummary.totalDoughBatchesDone = (nextSummary.totalDoughBatchesDone || 0) + Number(subBatchVal);
+    } else if (action === "MIXING_SUB_BATCH" && subBatchVal) {
+      vs.mixingBatchesDone = (vs.mixingBatchesDone || 0) + Number(subBatchVal);
+      vs.mixingStationStartedAt = FieldValue.serverTimestamp() as any;
+    } else if (action === "CUT_TRAY") {
+      const lc = Number(loyangCount) || 0;
+      const gp = Number(goodPcs) || 0;
+      if (lc > 0) {
+        vs.loyangCut = (vs.loyangCut || 0) + lc;
+        vs.frozenTrays = (vs.frozenTrays || 0) + lc;
+      }
+      if (gp > 0) {
+        vs.goodPcs = (vs.goodPcs || 0) + gp;
+        nextSummary.totalGoodPcs = (nextSummary.totalGoodPcs || 0) + gp;
+        nextSummary.totalGoodPacks = Math.floor(nextSummary.totalGoodPcs / 12);
       }
     }
 
-    // Sub-Batch Iterations fallback (single-variant)
-    if (action === "SUB_BATCH" && subBatchVal) {
-      nextSummary.totalDoughBatchesDone = (nextSummary.totalDoughBatchesDone || 0) + Number(subBatchVal);
-    }
-
-    // Update Loyang count printed / stored in freezer (TRAY_MOLDING FIX: INCREMENT)
-    if (loyangCount && loyangCount > 0 && action !== "CUT_TRAY") {
+    // Update Loyang count printed
+    if (loyangCount && loyangCount > 0 && action === "TRAY_MOLDING") {
       const lc = Number(loyangCount);
       nextSummary.totalTrayPrinted = (nextSummary.totalTrayPrinted || 0) + lc;
-      nextSummary.totalTrayInFreezer = (nextSummary.totalTrayInFreezer || 0) + lc;
-      if (variantId && variantState[variantId]) {
-        variantState[variantId].loyangPrinted = (variantState[variantId].loyangPrinted || 0) + lc;
-        variantState[variantId].frozenTrays = (variantState[variantId].frozenTrays || 0) + lc;
-      }
+      vs.loyangPrinted = (vs.loyangPrinted || 0) + lc;
+      // TRAY_MOLDING TIDAK menambah frozenTrays, baru di CUT_TRAY
     }
     
     // Partial Prepack (Cicilan Pack) & Good Packs logic
@@ -176,10 +194,8 @@ export async function POST(
       nextSummary.totalGoodPacks = (nextSummary.totalGoodPacks || 0) + pCount;
       nextSummary.totalGoodPcs = (nextSummary.totalGoodPcs || 0) + (pCount * size);
       
-      if (variantId && variantState[variantId]) {
-        variantState[variantId].goodPacks = (variantState[variantId].goodPacks || 0) + pCount;
-        variantState[variantId].frozenTrays = Math.max(0, (variantState[variantId].frozenTrays || 0) - lUsed);
-      }
+      vs.goodPacks = (vs.goodPacks || 0) + pCount;
+      vs.frozenTrays = Math.max(0, (vs.frozenTrays || 0) - lUsed);
     } else if (goodPacks && goodPacks > 0 && action !== "PARTIAL_PREPACK") {
       const pCount = Number(goodPacks);
       const size = Number(packSize) || 12;
@@ -196,9 +212,7 @@ export async function POST(
       const sCount = Number(scrapPcs) || 1;
       nextSummary.totalDefectPcs = (nextSummary.totalDefectPcs || 0) + sCount;
       nextSummary.totalDefectPacks = Math.floor(nextSummary.totalDefectPcs / 12);
-      if (variantId && variantState[variantId]) {
-        variantState[variantId].defectPcs = (variantState[variantId].defectPcs || 0) + sCount;
-      }
+      vs.defectPcs = (vs.defectPcs || 0) + sCount;
     }
 
     // Work Order Completion check
@@ -216,8 +230,24 @@ export async function POST(
       nextStatus = "COMPLETED";
       targetStage = "FINAL_PACK";
       completedAt = FieldValue.serverTimestamp();
-    } else if (nextStatus === "PLANNED" || nextStatus === "RELEASED") {
-      nextStatus = "IN_PROGRESS";
+    } else {
+      if (nextStatus === "PLANNED" || nextStatus === "RELEASED") {
+        nextStatus = "IN_PROGRESS";
+      }
+      
+      const totalFrozen = Object.values(variantState).reduce((s: any, v: any) => s + (v.frozenTrays || 0), 0);
+      const totalGood = Object.values(variantState).reduce((s: any, v: any) => s + (v.goodPacks || 0), 0);
+      const totalCut = Object.values(variantState).reduce((s: any, v: any) => s + (v.loyangCut || 0), 0);
+      const totalPrinted = Object.values(variantState).reduce((s: any, v: any) => s + (v.loyangPrinted || 0), 0);
+      const totalMixing = Object.values(variantState).reduce((s: any, v: any) => s + (v.mixingBatchesDone || 0), 0);
+
+      let computedStage = "DOUGH_COOKING";
+      if (totalGood > 0) computedStage = "PRE_PACK";
+      else if (totalFrozen > 0 || totalCut > 0) computedStage = "FREEZER_CHECKPOINT";
+      else if (totalPrinted > 0) computedStage = "TRAY_MOLDING";
+      else if (totalMixing > 0) computedStage = "MIXING_EGG";
+      
+      targetStage = computedStage;
     }
 
     // Create Task Log Record
@@ -261,14 +291,7 @@ export async function POST(
     batch.update(woRef, updatePayload);
 
     // Phase 3 & 4: Inventory Integration per action
-    if (variantId) {
-      if (action === "CUT_TRAY" && loyangCount) {
-        batch.set(adminDb.collection("frozenStocks").doc(variantId), { qty: FieldValue.increment(loyangCount) }, { merge: true });
-      }
-      if (action !== "CUT_TRAY" && loyangCount && loyangCount > 0 && (currentStep === "TRAY_MOLDING" || action === "STEP_TRANSITION" || action === "START")) {
-        batch.set(adminDb.collection("frozenStocks").doc(variantId), { qty: FieldValue.increment(loyangCount) }, { merge: true });
-      }
-    }
+    // frozenStocks collection logic was removed (Bug 1c)
     
     if (action === "PARTIAL_PREPACK" && prepackOutputs && Object.keys(prepackOutputs).length > 0) {
       // Multi-variant processing
@@ -289,10 +312,7 @@ export async function POST(
         
         const totalPacks = regPacks + fullPacks;
         if (totalPacks > 0) {
-          const lUsed = Number(loyangCount) || 0;
-          if (lUsed > 0) {
-            batch.set(adminDb.collection("frozenStocks").doc(vId), { qty: FieldValue.increment(-lUsed) }, { merge: true });
-          }
+          // frozenStocks collection logic removed
           // Kemasan deduct
           const packagingRecipesSnap = await adminDb.collection("packagingRecipes").where("productId", "==", woData.productId || "churros-frozen-food").get();
           if (!packagingRecipesSnap.empty) {
