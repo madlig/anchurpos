@@ -473,6 +473,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("POST /api/orders error:", err);
-    return NextResponse.json({ error: "Gagal membuat order" }, { status: 500 });
+    return NextResponse.json({ error: err.message || "Gagal membuat order", stack: err.stack }, { status: 500 });
   }
 }
