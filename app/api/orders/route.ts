@@ -128,16 +128,17 @@ export async function POST(req: NextRequest) {
     platformFeePercent: inputFeePercent,
     platformFee: inputFeeAmount,
     shippingCost: inputShippingCost,
+    shippingBorneBy,
+    deliveryMethod,
+    sauceDistribution,
+    poNumber,
+    secondaryPackagingIngId: rawSecPkgIngId,
   } = parseResult.data;
   
-  // customDate isn't in schema since it's a server override, extract from body manually
+  // customDate requires server override role check
   const customDate = body.customDate;
   
-  // Extra fields not in zod validation (we need to add them to Zod or extract them)
-  const shippingBorneBy = body.shippingBorneBy;
-  const deliveryMethod = body.deliveryMethod;
-  const sauceDistribution = body.sauceDistribution;
-  const poNumber = body.poNumber;
+  const secondaryPackagingIngId = rawSecPkgIngId === "none" ? null : rawSecPkgIngId;
 
   if (!items?.length) {
     return NextResponse.json({ error: "Pilih minimal 1 item" }, { status: 400 });
@@ -281,7 +282,6 @@ export async function POST(req: NextRequest) {
       }
 
       // 3. Read Secondary Packaging Ingredient
-      const secondaryPackagingIngId = body.secondaryPackagingIngId;
       let secPkgSnap: FirebaseFirestore.DocumentSnapshot | null = null;
       if (secondaryPackagingIngId && secondaryPackagingIngId !== "none") {
         secPkgSnap = await tx.get(adminDb.collection("ingredients").doc(secondaryPackagingIngId));

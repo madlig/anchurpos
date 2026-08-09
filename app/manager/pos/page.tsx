@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useFetchWithAuth } from "@/lib/use-api";
 import { Loader2, Search, X, Store, MessageCircle, Smartphone, ShoppingBag, ArrowLeft, ShoppingCart } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -40,6 +41,7 @@ function getPrice(product: ProductItem, qty: number): number {
 
 export default function KasirPage() {
   const { getToken } = useAuth();
+  const fetchWithAuth = useFetchWithAuth();
   const router = useRouter();
 
   const [products, setProducts] = useState<ProductItem[]>([]);
@@ -56,11 +58,6 @@ export default function KasirPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showMobileCart, setShowMobileCart] = useState(false);
   const [marketplaceFees, setMarketplaceFees] = useState({ tiktok: 0, shopee: 0 });
-
-  const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
-    const token = await getToken();
-    return fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...opts?.headers } });
-  }, [getToken]);
   const [configs, setConfigs] = useState<{ paymentMethods: string[], deliveryMethods: string[], shippingBorneBy: string[] } | null>(null);
 
   useEffect(() => {

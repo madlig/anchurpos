@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { useFetchWithAuth } from "@/lib/use-api";
 import { 
   Loader2, Plus, X, Check, Package, Layers, Beaker, Pencil, Trash2, Users, Search, 
   Store, Phone, MapPin, MessageCircle, Building2, UserCheck, Tag, CreditCard,
@@ -456,10 +457,10 @@ function MasterDataContent() {
   const [supplierDeleteTarget, setSupplierDeleteTarget] = useState<SupplierItem | null>(null);
   const [deletingSupplier, setDeletingSupplier] = useState(false);
 
-  const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
-    const token = await getToken();
-    return fetch(url, { ...options, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options?.headers } });
-  }, [getToken]);
+  const [customerErr, setCustomerErr] = useState("");
+  const [supplierErr, setSupplierErr] = useState("");
+
+  const fetchWithAuth = useFetchWithAuth();
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -493,6 +494,8 @@ function MasterDataContent() {
     setSearch("");
     setCustomerDeleteTarget(null);
     setSupplierDeleteTarget(null);
+    setCustomerErr("");
+    setSupplierErr("");
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       url.searchParams.set("tab", t);
@@ -511,8 +514,8 @@ function MasterDataContent() {
   }
 
   async function handleSaveCustomer() {
-    if (!customerForm.name.trim()) return;
-    setSavingCustomer(true);
+    if (!customerForm.name.trim()) { setCustomerErr("Nama pelanggan wajib diisi"); return; }
+    setSavingCustomer(true); setCustomerErr("");
     try {
       const isEdit = !!editCustomerItem;
       const url = isEdit ? `/api/customers/${editCustomerItem.id}` : "/api/customers";
@@ -538,7 +541,19 @@ function MasterDataContent() {
         setEditCustomerItem(null);
         setCustomerForm({ code: "", name: "", customerType: "reguler", channel: "walk_in", phoneNumber: "", email: "", address: "", notes: "", discountPerUnit: "0", creditLimit: "0" });
         await loadAll();
+      } else {
+        const data = await res.json();
+        if (data.details) {
+          const firstErrorKey = Object.keys(data.details)[0];
+          if (firstErrorKey && data.details[firstErrorKey]?._errors?.[0]) {
+             setCustomerErr(data.details[firstErrorKey]._errors[0]);
+             return;
+          }
+        }
+        setCustomerErr(data.error ?? "Gagal menyimpan pelanggan");
       }
+    } catch (err) {
+      setCustomerErr("Terjadi kesalahan jaringan");
     } finally { setSavingCustomer(false); }
   }
 
@@ -552,8 +567,8 @@ function MasterDataContent() {
   }
 
   async function handleSaveSupplier() {
-    if (!supplierForm.name.trim()) return;
-    setSavingSupplier(true);
+    if (!supplierForm.name.trim()) { setSupplierErr("Nama pemasok wajib diisi"); return; }
+    setSavingSupplier(true); setSupplierErr("");
     try {
       const isEdit = !!editSupplierItem;
       const url = isEdit ? `/api/suppliers/${editSupplierItem.id}` : "/api/suppliers";
@@ -578,7 +593,19 @@ function MasterDataContent() {
         setEditSupplierItem(null);
         setSupplierForm({ code: "", name: "", category: "Bahan Baku", phoneNumber: "", email: "", address: "", contactPerson: "", paymentTerms: "Cash", notes: "" });
         await loadAll();
+      } else {
+        const data = await res.json();
+        if (data.details) {
+          const firstErrorKey = Object.keys(data.details)[0];
+          if (firstErrorKey && data.details[firstErrorKey]?._errors?.[0]) {
+             setSupplierErr(data.details[firstErrorKey]._errors[0]);
+             return;
+          }
+        }
+        setSupplierErr(data.error ?? "Gagal menyimpan pemasok");
       }
+    } catch (err) {
+      setSupplierErr("Terjadi kesalahan jaringan");
     } finally { setSavingSupplier(false); }
   }
 
@@ -1299,6 +1326,7 @@ function MasterDataContent() {
                     { key: "reseller", label: "Reseller VIP" },
                     { key: "grosir", label: "Grosir" },
                     { key: "mitra", label: "Mitra Outlet" },
+                    { key: "b2b", label: "B2B (Corporate)" },
                   ].map(f => (
                     <button
                       key={f.key}
@@ -1363,6 +1391,7 @@ function MasterDataContent() {
                             className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-extrabold text-xs text-slate-800"
                           >
                             <option value="reguler">Reguler</option>
+                            <option value="b2b">B2B (Corporate)</option>
                             <option value="reseller">Reseller VIP</option>
                             <option value="grosir">Grosir</option>
                             <option value="mitra">Mitra Outlet</option>
@@ -1440,6 +1469,8 @@ function MasterDataContent() {
                           />
                         </div>
                       </div>
+
+                      {customerErr && <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 font-bold text-center mt-2">{customerErr}</div>}
 
                       <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                         <button
@@ -1993,6 +2024,8 @@ function MasterDataContent() {
                           className="h-10 text-xs font-bold"
                         />
                       </div>
+
+                      {supplierErr && <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 font-bold text-center mt-2">{supplierErr}</div>}
 
                       <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                         <button

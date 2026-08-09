@@ -89,6 +89,7 @@ export interface Ingredient {
   defaultCostPerBaseUnit: number;
   lastHppUpdateDate?: string;
   netWeightGrams?: number;
+  price?: number;
 }
 
 // --- 4b. stockMovements/{movementId} ---
@@ -132,14 +133,36 @@ export type CustomerChannel =
 export interface Customer {
   id: string;
   name: string;
+  code: string | null;
   channel: CustomerChannel;
-  customerType: "reguler" | "b2b" | "reseller";
+  customerType: "reguler" | "b2b" | "reseller" | "grosir" | "mitra";
   phoneNumber: string | null;
+  email: string | null;
   address: string | null;
   discountPerUnit: number;
+  creditLimit: number | null;
+  poNumber: string | null;
   notes: string;
   isActive: boolean;
   createdVia: "manual" | "wa_form";
+}
+
+// --- 6b. suppliers/{supplierId} ---
+export interface Supplier {
+  id: string;
+  name: string;
+  code?: string;
+  category?: string;
+  contactPerson?: string;
+  phoneNumber?: string;
+  email?: string;
+  address?: string;
+  bankName?: string;
+  bankAccount?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // --- 7. expenses/{expenseId} ---

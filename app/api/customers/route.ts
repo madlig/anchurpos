@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireRole } from "@/lib/auth-middleware";
 import type { Customer } from "@/types";
+import { customerSchema } from "@/lib/validations";
 
 export async function GET(req: NextRequest) {
   const auth = await requireRole(req, ["owner", "manager"]);
@@ -26,6 +27,7 @@ export async function GET(req: NextRequest) {
         address: data.address ?? null,
         discountPerUnit: data.discountPerUnit ?? 0,
         creditLimit: data.creditLimit ?? 0,
+        poNumber: data.poNumber ?? null,
         notes: data.notes ?? "",
         isActive: data.isActive,
         createdVia: data.createdVia ?? "manual",
@@ -44,29 +46,17 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const {
-    name,
-    channel = "walk_in",
-    customerType = "reguler",
-    phoneNumber = null,
-    address = null,
-    notes = "",
-    createdVia = "manual"
-  } = body as {
-    name: string;
-    channel?: string;
-    customerType?: string;
-    phoneNumber?: string | null;
-    address?: string | null;
-    notes?: string;
-    createdVia?: string;
-  };
+  const parseResult = customerSchema.safeParse(body);
+  
+  if (!parseResult.success) {
+    return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
+  }
 
-  if (!name?.trim()) return NextResponse.json({ error: "Nama pelanggan wajib diisi" }, { status: 400 });
+  const { name, code, channel, customerType, phoneNumber, email, address, creditLimit, poNumber, discountPerUnit, notes, createdVia } = parseResult.data;
 
   try {
     const ref = adminDb.collection("customers").doc();
-    const customerCode = body.code || `CUST-${Math.floor(1000 + Math.random() * 9000)}`;
+    const customerCode = code || `CUST-${Math.floor(1000 + Math.random() * 9000)}`;
 
     await ref.set({
       name: name.trim(),
@@ -74,11 +64,12 @@ export async function POST(req: NextRequest) {
       channel,
       customerType,
       phoneNumber,
-      email: body.email || null,
-      address,
-      notes,
-      discountPerUnit: Number(body.discountPerUnit) || 0,
-      creditLimit: Number(body.creditLimit) || 0,
+      email: email || null,
+      address: address || null,
+      notes: notes || "",
+      discountPerUnit: discountPerUnit || 0,
+      creditLimit: creditLimit || 0,
+      poNumber: poNumber || null,
       isActive: true,
       createdVia,
       createdAt: new Date().toISOString()

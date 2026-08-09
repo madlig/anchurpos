@@ -1,0 +1,24 @@
+- [ ] FASE 1 — Perbaikan Kritis Halaman POS (P0)
+  - [ ] 1.1 Fix bug `isB2B` di `CartCheckoutPanel.tsx:152`
+  - [ ] 1.2 Fix bare fetch 401 di `CartCheckoutPanel.tsx`
+  - [ ] 1.3 Validasi client-side + error per-field di `CartCheckoutPanel.tsx`
+  - [ ] 1.4 Tambah field ke schema zod di `lib/validations.ts` & rapihkan route `app/api/orders/route.ts`
+  - [ ] 1.5 Fix `poNumber` hilang saat simpan pelanggan baru di `app/api/customers/route.ts`
+- [ ] FASE 2 — Fix 401 Spam Notifikasi (P0)
+  - [ ] 2.1 NotificationBell attach auth di `components/shared/NotificationBell.tsx`
+- [ ] FASE 3 — Sinkronisasi & Konsistensi Master Data (P1)
+  - [ ] 3.1 Tambah zod schema baru di `lib/validations.ts`
+  - [ ] 3.2 Terapkan schema di API routes (`customers`, `suppliers`, `variants`)
+  - [ ] 3.3 Fix Customer PATCH yang drop field di `app/api/customers/[id]/route.ts`
+  - [ ] 3.4 Fix feedback error form customer/supplier di `app/manager/master-data/page.tsx`
+  - [ ] 3.5 Rekonsiliasi type mismatch di `app/manager/master-data/page.tsx`
+- [ ] FASE 4 — Refactor Bersih: Shared Auth Helper & Tipe (P2)
+  - [ ] 4.1 Buat shared hook `useApi` di `lib/use-api.ts`
+  - [ ] 4.2 Migrasi file yang disentuh + file buggy (`NotificationBell`, `CartCheckoutPanel`, `master-data/page.tsx`)
+  - [ ] 4.3 Lengkapi tipe TypeScript di `types/index.ts`
+  - [ ] 4.4 Verifikasi halaman order publik di `app/order/page.tsx`
+- [ ] FASE 5 — Deep Scan Tambahan & Pembersihan
+  - [ ] Verifikasi filter `isActive` di `app/api/customers/route.ts` GET
+- [ ] Verifikasi & Testing
+  - [ ] TypeScript & Lint
+  - [ ] Build

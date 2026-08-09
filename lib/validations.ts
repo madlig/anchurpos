@@ -36,6 +36,7 @@ export const orderSchema = z.object({
   sauceDistribution: z.record(z.number()).nullable().optional(),
   poNumber: z.string().nullable().optional(),
   customDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal YYYY-MM-DD").optional(),
+  secondaryPackagingIngId: z.string().nullable().optional(),
 });
 
 export const publicOrderSchema = z.object({
@@ -139,4 +140,43 @@ export const ingredientSchema = z.object({
     conversionToBase: z.number()
   })).default([]),
   defaultCostPerBaseUnit: z.number().min(0).default(0),
+});
+
+export const customerSchema = z.object({
+  name: z.string().min(1, "Nama pelanggan wajib diisi"),
+  code: z.string().nullable().optional(),
+  customerType: z.enum(["reguler","b2b","reseller","grosir","mitra"]).default("reguler"),
+  phoneNumber: z.string().nullable().optional(),
+  email: z.string().email("Format email tidak valid").nullable().optional(),
+  address: z.string().nullable().optional(),
+  creditLimit: z.number().min(0).nullable().optional(),
+  poNumber: z.string().nullable().optional(),
+  discountPerUnit: z.number().min(0).optional().default(0),
+  notes: z.string().optional().default(""),
+  channel: z.enum(["b2b", "shopee", "whatsapp", "reseller", "tiktok", "walk_in"]).optional().default("walk_in"),
+  isActive: z.boolean().optional().default(true),
+  createdVia: z.enum(["manual", "wa_form", "pos"]).optional().default("manual"),
+});
+
+export const supplierSchema = z.object({
+  name: z.string().min(1, "Nama pemasok wajib diisi"),
+  code: z.string().nullable().optional(),
+  category: z.string().nullable().optional(),
+  contactPerson: z.string().nullable().optional(),
+  phoneNumber: z.string().nullable().optional(),
+  email: z.union([z.string().email("Format email tidak valid"), z.string().length(0)]).nullable().optional(),
+  address: z.string().nullable().optional(),
+  bankName: z.string().nullable().optional(),
+  bankAccount: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  isActive: z.boolean().optional().default(true),
+});
+
+export const variantSchema = z.object({
+  productId: z.string().min(1),
+  name: z.string().min(1, "Nama varian wajib diisi"),
+  minStock: z.number().min(0).optional().default(0),
+  sortOrder: z.number().optional().default(0),
+  freeSauceAllowance: z.number().min(0).optional().default(0),
+  isProductionVariant: z.boolean().optional().default(false),
 });

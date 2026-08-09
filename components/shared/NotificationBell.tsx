@@ -5,6 +5,8 @@ import { Bell, Check, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { id as localeId } from "date-fns/locale";
+import { useFetchWithAuth } from "@/lib/use-api";
+import { useAuth } from "@/lib/auth-context";
 
 interface AlertItem {
   id: string;
@@ -24,10 +26,13 @@ export function NotificationBell() {
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const fetchWithAuth = useFetchWithAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const fetchAlerts = async () => {
+    if (!user) return;
     try {
-      const res = await fetch("/api/alerts?unread=true");
+      const res = await fetchWithAuth("/api/alerts?unread=true");
       if (!res.ok) return;
       const data = await res.json();
       if (data.alerts) {
@@ -40,6 +45,7 @@ export function NotificationBell() {
   };
 
   useEffect(() => {
+    if (!user || authLoading) return;
     fetchAlerts();
 
     const interval = setInterval(() => {
@@ -61,7 +67,7 @@ export function NotificationBell() {
       window.removeEventListener("fcm_message", handleFCM);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, []);
+  }, [user, authLoading]);
 
   // Close on outside click
   useEffect(() => {
@@ -79,7 +85,7 @@ export function NotificationBell() {
   const markAllAsRead = async () => {
     setLoading(true);
     try {
-      await fetch("/api/alerts/read-all", { method: "PATCH" });
+      await fetchWithAuth("/api/alerts/read-all", { method: "PATCH" });
       setAlerts([]);
       setUnreadCount(0);
       setIsOpen(false);
@@ -105,7 +111,7 @@ export function NotificationBell() {
       setIsOpen(false);
 
       // Call API
-      await fetch(`/api/alerts/${alert.id}/read`, { method: "PATCH" });
+      await fetchWithAuth(`/api/alerts/${alert.id}/read`, { method: "PATCH" });
     } catch (err) {
       console.error("Error marking alert read:", err);
     }

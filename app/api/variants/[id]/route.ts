@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
+import { variantSchema } from "@/lib/validations";
 
 // PATCH /api/variants/[id] — edit info varian ATAU stock opname
 export async function PATCH(
@@ -25,16 +26,21 @@ export async function PATCH(
 
     // Edit info (name/productId/sortOrder/minStock)
     if (name !== undefined) {
-      if (!name.trim()) return NextResponse.json({ error: "Nama varian wajib diisi" }, { status: 400 });
+      const parseResult = variantSchema.partial().safeParse(body);
+      if (!parseResult.success) {
+        return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
+      }
+      const data = parseResult.data;
+
       await ref.update({
-        name: name.trim(),
-        ...(productId !== undefined ? { productId: productId.trim() } : {}),
-        ...(sortOrder !== undefined ? { sortOrder } : {}),
-        ...(minStock !== undefined ? { minStock } : {}),
-        ...(freeSauceAllowance !== undefined ? { freeSauceAllowance } : { freeSauceAllowance: FieldValue.delete() }),
+        name: data.name!.trim(),
+        ...(data.productId !== undefined ? { productId: data.productId.trim() } : {}),
+        ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
+        ...(data.minStock !== undefined ? { minStock: data.minStock } : {}),
+        ...(data.freeSauceAllowance !== undefined ? { freeSauceAllowance: data.freeSauceAllowance } : { freeSauceAllowance: FieldValue.delete() }),
         updatedAt: FieldValue.serverTimestamp(),
       });
-      return NextResponse.json({ id, name: name.trim() });
+      return NextResponse.json({ id, name: data.name!.trim() });
     }
 
     // Stock opname (currentStock / adjustment)

@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
+import { supplierSchema } from "@/lib/validations";
 
 export async function GET(req: NextRequest) {
   const auth = await requireRole(req, ["owner", "manager"]);
@@ -40,16 +41,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name, contactPerson, phoneNumber } = body as {
-      name: string;
-      contactPerson?: string;
-      phoneNumber?: string;
-    };
-
-    if (!name || !name.trim()) {
-      return NextResponse.json({ error: "Nama supplier wajib diisi" }, { status: 400 });
+    const parseResult = supplierSchema.safeParse(body);
+    if (!parseResult.success) {
+      return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
     }
 
+    const { name, code, category, contactPerson, phoneNumber, email, address, bankName, bankAccount, notes } = parseResult.data;
     const trimmedName = name.trim();
 
     // Check duplicate name
@@ -74,12 +71,14 @@ export async function POST(req: NextRequest) {
     await supplierRef.set({
       code: supplierCode,
       name: trimmedName,
-      category: body.category || "Bahan Baku",
-      contactPerson: contactPerson?.trim() || null,
-      phoneNumber: phoneNumber?.trim() || null,
-      email: body.email?.trim() || null,
-      address: body.address?.trim() || null,
-      notes: body.notes?.trim() || "",
+      category: category || "Bahan Baku",
+      contactPerson: contactPerson || null,
+      phoneNumber: phoneNumber || null,
+      email: email || null,
+      address: address || null,
+      bankName: bankName || null,
+      bankAccount: bankAccount || null,
+      notes: notes || "",
       paymentTerms: body.paymentTerms || "Cash",
       createdBy: user.uid,
       createdAt: FieldValue.serverTimestamp(),

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireRole } from "@/lib/auth-middleware";
+import { supplierSchema } from "@/lib/validations";
 
 export async function PATCH(
   req: NextRequest,
@@ -13,7 +14,10 @@ export async function PATCH(
 
   try {
     const body = await req.json();
-    const { name, contactPerson, phoneNumber } = body;
+    const parseResult = supplierSchema.partial().safeParse(body);
+    if (!parseResult.success) {
+      return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
+    }
 
     const supplierRef = adminDb.collection("suppliers").doc(id);
     const snap = await supplierRef.get();
@@ -22,14 +26,19 @@ export async function PATCH(
     }
 
     const updates: Record<string, unknown> = {};
-    if (body.name !== undefined) updates.name = String(body.name).trim();
-    if (body.code !== undefined) updates.code = String(body.code).trim();
-    if (body.category !== undefined) updates.category = body.category;
-    if (body.contactPerson !== undefined) updates.contactPerson = body.contactPerson ? String(body.contactPerson).trim() : null;
-    if (body.phoneNumber !== undefined) updates.phoneNumber = body.phoneNumber ? String(body.phoneNumber).trim() : null;
-    if (body.email !== undefined) updates.email = body.email ? String(body.email).trim() : null;
-    if (body.address !== undefined) updates.address = body.address ? String(body.address).trim() : null;
-    if (body.notes !== undefined) updates.notes = body.notes ? String(body.notes).trim() : "";
+    const { name, code, category, contactPerson, phoneNumber, email, address, bankName, bankAccount, notes, isActive } = parseResult.data;
+    
+    if (name !== undefined) updates.name = name.trim();
+    if (code !== undefined) updates.code = code;
+    if (category !== undefined) updates.category = category;
+    if (contactPerson !== undefined) updates.contactPerson = contactPerson;
+    if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
+    if (email !== undefined) updates.email = email;
+    if (address !== undefined) updates.address = address;
+    if (bankName !== undefined) updates.bankName = bankName;
+    if (bankAccount !== undefined) updates.bankAccount = bankAccount;
+    if (notes !== undefined) updates.notes = notes;
+    if (isActive !== undefined) updates.isActive = isActive;
     if (body.paymentTerms !== undefined) updates.paymentTerms = body.paymentTerms;
 
     await supplierRef.update(updates);

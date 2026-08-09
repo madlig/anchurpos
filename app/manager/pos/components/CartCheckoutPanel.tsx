@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { X, CheckCircle2, CreditCard, MessageCircle, Store, Smartphone, ShoppingBag, Plus, Minus } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { useFetchWithAuth } from "@/lib/use-api";
 import { useRouter } from "next/navigation";
 
 // Types
@@ -40,7 +41,8 @@ export function CartCheckoutPanel({
   cart, cartTotal, orderChannel, customers, setCustomers,
   addOns, marketplaceFees, onClose, onSuccess, removeFromCart, configs
 }: Props) {
-  const { getToken, role } = useAuth();
+  const { getToken, role, loading: authLoading } = useAuth();
+  const fetchWithAuth = useFetchWithAuth();
   const router = useRouter();
 
   // Internal states
@@ -77,9 +79,10 @@ export function CartCheckoutPanel({
   const totalPacksInCart = useMemo(() => cart.reduce((sum, item) => sum + item.qty, 0), [cart]);
 
   useEffect(() => {
+    if (authLoading) return;
     Promise.all([
-      fetch("/api/settings/pos-packaging").then(r => r.ok ? r.json() : { rules: [] }),
-      fetch("/api/ingredients").then(r => r.ok ? r.json() : [])
+      fetchWithAuth("/api/settings/pos-packaging").then(r => r.ok ? r.json() : { rules: [] }).catch(() => ({ rules: [] })),
+      fetchWithAuth("/api/ingredients").then(r => r.ok ? r.json() : []).catch(() => [])
     ]).then(([pRulesData, ingsData]) => {
       const rules = Array.isArray(pRulesData.rules) ? pRulesData.rules : [];
       setPosRules(rules);
@@ -93,7 +96,7 @@ export function CartCheckoutPanel({
         }
       }
     });
-  }, [orderChannel, totalPacksInCart]);
+  }, [orderChannel, totalPacksInCart, fetchWithAuth, authLoading]);
 
   const [sauceDist, setSauceDist] = useState<Record<string, number>>({});
   
@@ -161,15 +164,16 @@ export function CartCheckoutPanel({
   const feeAmount = useMemo(() => Math.round(cartTotal * activeFeePercent / 100), [cartTotal, activeFeePercent]);
 
   async function handleCheckout() {
-    if (!cart.length) return;
+    if (!cart.length) { setError("Keranjang masih kosong"); return; }
+    if (orderChannel === "whatsapp" && !finalCustomerName.trim()) { setError("Nama pelanggan wajib diisi"); return; }
+    if (!payMethod) { setError("Metode bayar wajib dipilih"); return; }
+
     setError(""); setSubmitting(true);
     try {
-      const token = await getToken();
       let customerId = selectedCustomer?.id ?? null;
       if (isNewCustomer && saveNewCustomer && customerSearch.trim()) {
-        const saveRes = await fetch("/api/customers", {
+        const saveRes = await fetchWithAuth("/api/customers", {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             name: customerSearch.trim(), customerType: newCustomerType,
             poNumber: showPoNumber && poNumber.trim() ? poNumber.trim() : null,
@@ -185,9 +189,8 @@ export function CartCheckoutPanel({
         }
       }
 
-      const res = await fetch("/api/orders", {
+      const res = await fetchWithAuth("/api/orders", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           customerName: finalCustomerName, customerId, customerType: isNewCustomer ? newCustomerType : (selectedCustomer?.customerType ?? null),
           source: orderChannel === "walkin" ? "walk_in" : orderChannel === "whatsapp" ? "wa_form" : "marketplace_manual",
@@ -217,7 +220,17 @@ export function CartCheckoutPanel({
         }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Gagal menyimpan pesanan"); return; }
+      if (!res.ok) { 
+        if (data.details) {
+          const firstErrorKey = Object.keys(data.details)[0];
+          if (firstErrorKey && data.details[firstErrorKey]?._errors?.[0]) {
+             setError(data.details[firstErrorKey]._errors[0]);
+             return;
+          }
+        }
+        setError(data.error ?? "Gagal menyimpan pesanan"); 
+        return; 
+      }
       onSuccess(data.orderId);
     } catch { setError("Gagal menghubungi server"); } finally { setSubmitting(false); }
   }

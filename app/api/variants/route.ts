@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { Variant } from "@/types";
+import { variantSchema } from "@/lib/validations";
 
 export async function GET(req: NextRequest) {
   const auth = await requireRole(req, ["owner", "manager", "crew"]);
@@ -41,12 +42,12 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const { name, productId = "", sortOrder = 99, minStock = 10, freeSauceAllowance } = body as {
-    name: string; productId?: string; sortOrder?: number; minStock?: number; freeSauceAllowance?: number;
-  };
-  if (!name?.trim()) {
-    return NextResponse.json({ error: "Nama varian wajib diisi" }, { status: 400 });
+  const parseResult = variantSchema.safeParse(body);
+  if (!parseResult.success) {
+    return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
   }
+
+  const { name, productId, sortOrder, minStock, freeSauceAllowance } = parseResult.data;
 
   try {
     const ref = adminDb.collection("variants").doc();
