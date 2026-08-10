@@ -497,6 +497,7 @@ export interface WorkOrderVariantState {
   doughStationStartedAt?: string;
   mixingStationStartedAt?: string;
   loyangPrinted: number;    // hasil cetak ke loyang
+  moldingDone?: boolean;    // status apakah cetak loyang sudah diselesaikan
   loyangCut: number;         // hasil potong → tahu Pcs
   frozenTrays: number;       // loyang di freezer belum di-prepack
   goodPacks: number;
@@ -562,7 +563,7 @@ export interface WorkOrderLog {
   workOrderId: string;
   stage?: SFMLogStage;
   step?: SFMTaskStep;
-  action?: "GOOD_OUTPUT" | "SCRAP" | "SUB_BATCH" | "STEP_TRANSITION" | "PAUSE" | "RESUME" | "MIXING_SUB_BATCH" | "PARTIAL_PREPACK" | "CUT_TRAY" | "CLOSE_WO";
+  action?: "GOOD_OUTPUT" | "SCRAP" | "SUB_BATCH" | "STEP_TRANSITION" | "PAUSE" | "RESUME" | "MIXING_SUB_BATCH" | "TRAY_MOLDING" | "FINISH_MOLDING" | "PARTIAL_PREPACK" | "CUT_TRAY" | "CLOSE_WO";
   valueAdded: number;
   unit: "BATCH" | "LOYANG" | "PACK" | "PCS";
   defectCount?: number;

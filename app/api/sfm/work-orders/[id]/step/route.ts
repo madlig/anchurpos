@@ -163,6 +163,8 @@ export async function POST(
     } else if (action === "MIXING_SUB_BATCH" && subBatchVal) {
       vs.mixingBatchesDone = (vs.mixingBatchesDone || 0) + Number(subBatchVal);
       vs.mixingStationStartedAt = FieldValue.serverTimestamp() as any;
+    } else if (action === "FINISH_MOLDING") {
+      vs.moldingDone = true;
     } else if (action === "CUT_TRAY") {
       const lc = Number(loyangCount) || 0;
       const gp = Number(goodPcs) || 0;
@@ -252,10 +254,11 @@ export async function POST(
 
     // Create Task Log Record
     const logRef = adminDb.collection("workOrderLogs").doc();
-    const logData = {
-      workOrderId,
+    const logData: any = {
+      workOrderId: id,
+      stage: targetStage,
+      step: (action === "TRAY_MOLDING" || action === "FINISH_MOLDING") ? "TRAY_MOLDING" : (action === "SUB_BATCH" ? "DOUGH_COOKING" : (action === "MIXING_SUB_BATCH" ? "MIXING_EGG" : "FREEZER_CHECKPOINT")),
       action: action || "STEP_TRANSITION",
-      step: currentStep,
       valueAdded: subBatchVal || goodPcs || 0,
       defectCount: scrapPcs || 0,
       durationMinutes: resolvedDurationMin || 0,

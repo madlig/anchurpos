@@ -59,7 +59,14 @@ export default function CrewSFMTerminal() {
 
   const [inputValue1, setInputValue1] = useState(""); // loyangCount (cut/cetak) or regularPacks (prepack)
   const [inputValue2, setInputValue2] = useState(""); // goodPcs (cut) or fullPacks (prepack)
-  const [inputValue3, setInputValue3] = useState(""); // loyangUsed (prepack)
+  const [inputValue3, setInputValue3] = useState(""); // loyang freezing used
+
+  const [finishMoldingModal, setFinishMoldingModal] = useState<{
+    wo: WorkOrder;
+    variantId: string;
+    variantName: string;
+    printedLoyang: number;
+  } | null>(null);
 
   const [closeModalWo, setCloseModalWo] = useState<WorkOrder | null>(null);
 
@@ -182,6 +189,15 @@ export default function CrewSFMTerminal() {
     }
   }
 
+  async function submitFinishMolding() {
+    if (!finishMoldingModal) return;
+    const { wo, variantId } = finishMoldingModal;
+    const ok = await handleAction(wo.id, { action: "FINISH_MOLDING", currentStep: "TRAY_MOLDING", variantId });
+    if (ok) {
+      setFinishMoldingModal(null);
+    }
+  }
+
   async function submitCloseWO() {
     if (!closeModalWo) return;
     const ok = await handleAction(closeModalWo.id, { action: "CLOSE_WO", currentStep: "PRE_PACK" });
@@ -301,7 +317,9 @@ export default function CrewSFMTerminal() {
                       const mixerUnlocked = st.doughBatchesDone > 0;
                       const mixerDone = st.mixingBatchesDone >= lane.targetBatches;
                       const cetakUnlocked = st.mixingBatchesDone > 0;
+                      const cetakDone = !!st.moldingDone;
                       const potongUnlocked = st.loyangPrinted > 0;
+                      const potongDone = st.moldingDone && (st.loyangCut >= st.loyangPrinted);
                       const prepackUnlocked = st.loyangCut > 0 || st.frozenTrays > 0;
                       
                       const stations = [
@@ -329,16 +347,23 @@ export default function CrewSFMTerminal() {
                               {st.mixingStationStartedAt && <div className="mt-1 text-center"><LiveTimer startedAt={typeof st.mixingStationStartedAt === "string" ? st.mixingStationStartedAt : (st.mixingStationStartedAt as any).toDate?.().toISOString() || undefined} /></div>}
                             </div>
                         )},
-                        { id: 'cetak', title: 'Cetak Loyang', active: cetakUnlocked, done: false, locked: !cetakUnlocked, render: () => (
+                        { id: 'cetak', title: 'Cetak Loyang', active: cetakUnlocked && !cetakDone, done: cetakDone, locked: !cetakUnlocked, render: () => (
                             <div className="space-y-2 text-center">
-                              <button onClick={() => { setInputValue1(""); setInputModal({ wo, variantId: lane.variantId, variantName: lane.variantName, action: "TRAY_MOLDING" })}} className="w-full bg-blue-100 hover:bg-blue-200 text-blue-800 font-black py-3 rounded-xl border border-blue-300">+ Cetak Loyang</button>
+                              <div className="flex gap-2">
+                                <button onClick={() => { setInputValue1(""); setInputModal({ wo, variantId: lane.variantId, variantName: lane.variantName, action: "TRAY_MOLDING" })}} className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-800 font-black py-3 rounded-xl border border-blue-300">+ Cetak Loyang</button>
+                                {st.loyangPrinted > 0 && (
+                                  <button onClick={() => {
+                                    setFinishMoldingModal({ wo, variantId: lane.variantId, variantName: lane.variantName, printedLoyang: st.loyangPrinted });
+                                  }} className="px-4 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-black py-3 rounded-xl border border-emerald-300 text-sm active:scale-95 transition-all">Selesai<br/>Cetak</button>
+                                )}
+                              </div>
                               <div className="text-xs font-bold text-slate-500">Sudah cetak: {st.loyangPrinted} Loyang</div>
                             </div>
                         )},
-                        { id: 'potong', title: 'Potong Churros', active: potongUnlocked, done: false, locked: !potongUnlocked, render: () => (
+                        { id: 'potong', title: 'Potong Churros', active: potongUnlocked && !potongDone, done: potongDone, locked: !potongUnlocked, render: () => (
                             <div className="space-y-2 text-center">
                               <button onClick={() => { setInputValue1(""); setInputValue2(""); setInputModal({ wo, variantId: lane.variantId, variantName: lane.variantName, action: "CUT_TRAY" })}} className="w-full bg-rose-100 hover:bg-rose-200 text-rose-800 font-black py-3 rounded-xl border border-rose-300">+ Potong Churros</button>
-                              <div className="text-xs font-bold text-slate-500">Sudah potong: {st.loyangCut} Loyang</div>
+                              <div className="text-xs font-bold text-slate-500">Sudah potong: {st.loyangCut} / {st.moldingDone ? st.loyangPrinted : '?'} Loyang</div>
                             </div>
                         )}
                       ];
@@ -505,6 +530,28 @@ export default function CrewSFMTerminal() {
             <button onClick={submitInput} disabled={submitting} className="w-full py-3 mt-4 rounded-xl bg-black text-white font-black text-sm flex items-center justify-center gap-2 active:scale-95 shadow-lg">
               {submitting ? <Loader2 size={16} className="animate-spin" /> : "SIMPAN"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {finishMoldingModal && (
+        <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl text-center space-y-4">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 size={32} />
+            </div>
+            <h3 className="text-xl font-black text-slate-800">Selesai Cetak?</h3>
+            <p className="text-xs font-bold text-slate-500">
+              Yakin menyelesaikan proses cetak untuk <strong className="text-emerald-700">{finishMoldingModal.variantName}</strong>?<br/><br/>
+              Total yang telah dicetak: <span className="px-2 py-1 bg-slate-100 rounded text-slate-700">{finishMoldingModal.printedLoyang} Loyang</span><br/>
+              Angka ini akan mengunci batas maksimal task potong churros.
+            </p>
+            <div className="flex gap-2 pt-4">
+              <button onClick={() => setFinishMoldingModal(null)} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold active:scale-95">Batal</button>
+              <button onClick={submitFinishMolding} disabled={submitting} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-black active:scale-95 flex items-center justify-center">
+                {submitting ? <Loader2 size={16} className="animate-spin" /> : "YAKIN"}
+              </button>
+            </div>
           </div>
         </div>
       )}
