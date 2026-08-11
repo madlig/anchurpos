@@ -255,7 +255,7 @@ export async function POST(req: NextRequest) {
       repackIngredientId: repackIngredientId || null,
       targetDate: targetDate || new Date().toLocaleString("en-CA", { timeZone: "Asia/Jakarta" }).split(',')[0],
       status: "RELEASED", // Released by manager to shop floor
-      currentStage: "DOUGH_COOKING",
+      currentStage: (woType === "PRODUKSI" || !woType) ? "DOUGH_COOKING" : "PENDING",
       summaryState: {
         totalDoughBatchesDone: 0,
         totalTrayPrinted: 0,

@@ -16,14 +16,13 @@ import type { WorkOrder, WorkOrderLog, Variant, SFMWorkOrderType, SFMTaskStep } 
 // --- Constants ---
 const PRODUKSI_STEPS: { key: SFMTaskStep; label: string; icon: any }[] = [
   { key: "DOUGH_COOKING", label: "Masak Adonan", icon: Beaker },
-  { key: "MIXING_EGG", label: "Mixer Telur", icon: Palette },
   { key: "TRAY_MOLDING", label: "Cetak Loyang", icon: Layers },
   { key: "FREEZER_CHECKPOINT", label: "Freezer", icon: Snowflake },
-  { key: "PRE_PACK", label: "Pre-Pack", icon: Package },
+  { key: "FINAL_PACK", label: "Packing", icon: Package },
 ];
 
 const STUCK_THRESHOLD_MS = 3.5 * 60 * 60 * 1000; // 3.5 jam
-const PRODUCING_STAGES = new Set(["DOUGH_COOKING", "MIXING_EGG", "TRAY_MOLDING"]);
+const PRODUCING_STAGES = new Set(["DOUGH_COOKING", "TRAY_MOLDING"]);
 
 // --- Helpers (outside component, pure functions) ---
 function fmtDur(min: number): string {
@@ -45,11 +44,14 @@ function fmtTimerMs(ms: number): string {
 function getStageInfo(stage: string): { label: string; color: string; bg: string; isProducing: boolean; isFreezer: boolean; isDone: boolean } {
   switch (stage) {
     case "DOUGH_COOKING": return { label: "Masak Adonan", color: "text-amber-700", bg: "bg-amber-50 border-amber-200", isProducing: true, isFreezer: false, isDone: false };
-    case "MIXING_EGG": return { label: "Mixer Telur", color: "text-purple-700", bg: "bg-purple-50 border-purple-200", isProducing: true, isFreezer: false, isDone: false };
     case "TRAY_MOLDING": return { label: "Cetak Loyang", color: "text-blue-700", bg: "bg-blue-50 border-blue-200", isProducing: true, isFreezer: false, isDone: false };
     case "FREEZER_CHECKPOINT": return { label: "Freezer", color: "text-sky-700", bg: "bg-sky-50 border-sky-200", isProducing: false, isFreezer: true, isDone: false };
-    case "PRE_PACK": return { label: "Pre-Pack", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", isProducing: false, isFreezer: false, isDone: false };
     case "FINAL_PACK": return { label: "Selesai", color: "text-slate-500", bg: "bg-slate-50 border-slate-200", isProducing: false, isFreezer: false, isDone: true };
+    case "PACKING": return { label: "Packing", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", isProducing: false, isFreezer: false, isDone: false };
+    case "REPACKING": return { label: "Repacking", color: "text-amber-700", bg: "bg-amber-50 border-amber-200", isProducing: false, isFreezer: false, isDone: false };
+    case "COUNTING": return { label: "Counting", color: "text-purple-700", bg: "bg-purple-50 border-purple-200", isProducing: false, isFreezer: false, isDone: false };
+    case "PENDING": return { label: "Pending", color: "text-slate-500", bg: "bg-slate-50 border-slate-200", isProducing: false, isFreezer: false, isDone: false };
+    case "IN_PROGRESS": return { label: "Diproses", color: "text-blue-700", bg: "bg-blue-50 border-blue-200", isProducing: false, isFreezer: false, isDone: false };
     default: return { label: stage || "Draft", color: "text-slate-600", bg: "bg-slate-50 border-slate-200", isProducing: false, isFreezer: false, isDone: false };
   }
 }
@@ -665,6 +667,45 @@ export default function ManagerSFMPage() {
               const yieldPct = getYieldPct(wo);
               const progressPct = getProgressPct(wo);
 
+              const isProduksi = wo.woType === "PRODUKSI" || !wo.woType;
+
+              if (!isProduksi) {
+                return (
+                  <div
+                    key={wo.id}
+                    onClick={() => openDetail(wo)}
+                    className="bg-white rounded-2xl p-4 border shadow-sm flex flex-col justify-between hover:shadow-md transition-all cursor-pointer border-slate-200"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-extrabold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                          {wo.woNumber}
+                        </span>
+                        <span className="text-[10px] font-black text-slate-500 uppercase">{(wo.woType || "PRODUKSI").replace("_", " ")}</span>
+                      </div>
+                      <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                        wo.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                        wo.status === "IN_PROGRESS" ? "bg-blue-50 text-blue-700 border-blue-200" :
+                        "bg-slate-50 text-slate-700 border-slate-200"
+                      }`}>
+                        {wo.status}
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-black text-slate-800 mb-3 truncate">
+                      {wo.productName || "Work Order"}
+                    </h3>
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-semibold border-t border-slate-100 pt-2.5">
+                      <span className="flex items-center gap-1 font-bold text-slate-600 truncate mr-2 max-w-[120px]">
+                        <Users size={11} className="text-slate-400 shrink-0" /> <span className="truncate">{wo.assignedCrewName || "Belum ditugaskan"}</span>
+                      </span>
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border whitespace-nowrap ${stageInfo.bg} ${stageInfo.color}`}>
+                        {stageInfo.label}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div
                   key={wo.id}
@@ -718,16 +759,9 @@ export default function ManagerSFMPage() {
 
                     {/* Target vs Aktual */}
                     <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs font-semibold space-y-1.5">
-                      {wo.woType === "PRODUKSI" ? (
-                        <>
-                          <div className="flex justify-between"><span className="text-slate-500">Loyang:</span> <span className="text-slate-800 font-extrabold">{wo.summaryState?.totalTrayPrinted || 0} / {wo.targetLoyang || 0}</span></div>
-                          <div className="flex justify-between"><span className="text-slate-500">Pcs:</span> <span className="text-slate-800 font-extrabold">{wo.summaryState?.totalGoodPcs || 0}</span></div>
-                        </>
-                      ) : wo.woType === "PACKING_PESANAN" ? (
-                        <div className="flex justify-between"><span className="text-slate-500">Pack:</span> <span className="text-slate-800 font-extrabold">{wo.summaryState?.totalGoodPacks || 0} / {wo.targetPacks || 0}</span></div>
-                      ) : (
-                        <div className="flex justify-between"><span className="text-slate-500">Output:</span> <span className="text-slate-800 font-extrabold">{wo.summaryState?.totalGoodPcs || 0} {wo.targetUom}</span></div>
-                      )}
+                      <div className="flex justify-between"><span className="text-slate-500">Loyang:</span> <span className="text-slate-800 font-extrabold">{wo.summaryState?.totalTrayPrinted || 0} / {wo.targetLoyang || 0}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Pcs:</span> <span className="text-slate-800 font-extrabold">{wo.summaryState?.totalGoodPcs || 0}</span></div>
+                      
                       {/* Defect row */}
                       {(wo.summaryState?.totalDefectPcs || 0) > 0 && (
                         <div className="flex justify-between text-red-600"><span>Defect:</span> <span className="font-extrabold">{wo.summaryState?.totalDefectPcs} Pcs</span></div>
@@ -961,64 +995,66 @@ export default function ManagerSFMPage() {
                 </div>
               </div>
 
-              {/* Section 2: Time Tracking per Step */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Timer size={14} /> Time Tracking
-                </h4>
-                <div className="space-y-1.5">
-                  {PRODUKSI_STEPS.map((step, idx) => {
-                    const isProduksi = detailWo.woType === "PRODUKSI";
-                    const currentStage = detailWo.currentStage || "DOUGH_COOKING";
-                    const currentIdx = isProduksi ? PRODUKSI_STEPS.findIndex(s => s.key === currentStage) : 0;
-                    const isDone = idx < currentIdx;
-                    const isActive = idx === currentIdx && detailWo.status !== "COMPLETED" && detailWo.status !== "CANCELLED";
-                    const Icon = step.icon;
-                    const stepDur = detailWo.stepDurationsMinutes?.[step.key] || 0;
-                    const liveAt = isActive
-                      ? (step.key === "FREEZER_CHECKPOINT" && detailWo.freezerInAt ? detailWo.freezerInAt : detailWo.currentStepStartedAt)
-                      : undefined;
-                    const liveMs = liveAt ? Date.now() - new Date(liveAt).getTime() : 0;
+              {/* Section 2: Time Tracking per Step (Only for Produksi) */}
+              {detailWo.woType === "PRODUKSI" && (
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Timer size={14} /> Time Tracking
+                  </h4>
+                  <div className="space-y-1.5">
+                    {PRODUKSI_STEPS.map((step, idx) => {
+                      const isProduksi = detailWo.woType === "PRODUKSI";
+                      const currentStage = detailWo.currentStage || "DOUGH_COOKING";
+                      const currentIdx = isProduksi ? PRODUKSI_STEPS.findIndex(s => s.key === currentStage) : 0;
+                      const isDone = idx < currentIdx;
+                      const isActive = idx === currentIdx && detailWo.status !== "COMPLETED" && detailWo.status !== "CANCELLED";
+                      const Icon = step.icon;
+                      const stepDur = detailWo.stepDurationsMinutes?.[step.key] || 0;
+                      const liveAt = isActive
+                        ? (step.key === "FREEZER_CHECKPOINT" && detailWo.freezerInAt ? detailWo.freezerInAt : detailWo.currentStepStartedAt)
+                        : undefined;
+                      const liveMs = liveAt ? Date.now() - new Date(liveAt).getTime() : 0;
 
-                    return (
-                      <div key={step.key} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${
-                        isActive ? "bg-emerald-50 border-emerald-200" : isDone ? "bg-white border-slate-200" : "bg-slate-50/50 border-slate-200/60"
-                      }`}>
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
-                          isDone ? "bg-emerald-500 text-white" : isActive ? "bg-emerald-600 text-white animate-pulse" : "bg-slate-200 text-slate-400"
+                      return (
+                        <div key={step.key} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${
+                          isActive ? "bg-emerald-50 border-emerald-200" : isDone ? "bg-white border-slate-200" : "bg-slate-50/50 border-slate-200/60"
                         }`}>
-                          {isDone ? <CheckCircle2 size={14} /> : isActive ? <span className="w-1.5 h-1.5 rounded-full bg-white" /> : <span className="w-2 h-2 rounded-full bg-slate-300" />}
-                        </div>
-                        <Icon size={14} className={isActive ? "text-emerald-600" : isDone ? "text-slate-500" : "text-slate-300"} />
-                        <span className={`text-xs font-extrabold flex-1 ${isActive ? "text-emerald-800" : isDone ? "text-slate-600" : "text-slate-400"}`}>
-                          {step.label}
-                          {step.key === "FREEZER_CHECKPOINT" && (
-                            <span className="ml-1 text-[10px] font-bold text-sky-500">(storage)</span>
-                          )}
-                        </span>
-                        <span className="text-[11px] font-bold text-right shrink-0">
-                          {isActive ? (
-                            liveMs > 0 ? (
-                              <span className="text-emerald-700 font-extrabold">{fmtTimerMs(liveMs)}</span>
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                            isDone ? "bg-emerald-500 text-white" : isActive ? "bg-emerald-600 text-white animate-pulse" : "bg-slate-200 text-slate-400"
+                          }`}>
+                            {isDone ? <CheckCircle2 size={14} /> : isActive ? <span className="w-1.5 h-1.5 rounded-full bg-white" /> : <span className="w-2 h-2 rounded-full bg-slate-300" />}
+                          </div>
+                          <Icon size={14} className={isActive ? "text-emerald-600" : isDone ? "text-slate-500" : "text-slate-300"} />
+                          <span className={`text-xs font-extrabold flex-1 ${isActive ? "text-emerald-800" : isDone ? "text-slate-600" : "text-slate-400"}`}>
+                            {step.label}
+                            {step.key === "FREEZER_CHECKPOINT" && (
+                              <span className="block text-[9px] font-bold text-slate-400 mt-0.5">Maks. beku 24 Jam</span>
+                            )}
+                          </span>
+                          <span className="text-[11px] font-bold text-right shrink-0">
+                            {isActive ? (
+                              liveMs > 0 ? (
+                                <span className="text-emerald-700 font-extrabold">{fmtTimerMs(liveMs)}</span>
+                              ) : (
+                                <span className="text-emerald-600 font-bold">Dimulai</span>
+                              )
+                            ) : isDone ? (
+                              <span className="text-slate-500">{fmtDur(stepDur)}</span>
                             ) : (
-                              <span className="text-emerald-600 font-bold">Dimulai</span>
-                            )
-                          ) : isDone ? (
-                            <span className="text-slate-500">{fmtDur(stepDur)}</span>
-                          ) : (
-                            <span className="text-slate-300">—</span>
-                          )}
-                        </span>
-                      </div>
-                    );
-                  })}
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Total durasi */}
+                  <div className="border-t border-slate-200 pt-2 flex justify-between text-xs font-bold">
+                    <span className="text-slate-500">Total Durasi Terproses:</span>
+                    <span className="text-slate-800 font-extrabold">{fmtDur(getTotalDurationMin(detailWo))}</span>
+                  </div>
                 </div>
-                {/* Total durasi */}
-                <div className="border-t border-slate-200 pt-2 flex justify-between text-xs font-bold">
-                  <span className="text-slate-500">Total Durasi Terproses:</span>
-                  <span className="text-slate-800 font-extrabold">{fmtDur(getTotalDurationMin(detailWo))}</span>
-                </div>
-              </div>
+              )}
 
               {/* Section 3: Riwayat Aktivitas Crew */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
@@ -1088,7 +1124,7 @@ export default function ManagerSFMPage() {
                         await fetch(`/api/sfm/work-orders/${detailWo.id}/step`, {
                           method: "POST",
                           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-                          body: JSON.stringify({ action: "CLOSE_WO", currentStep: "PRE_PACK" })
+                          body: JSON.stringify({ action: "CLOSE_WO", currentStep: "FINAL_PACK" })
                         });
                         closeDetail();
                         loadAllData();

@@ -481,7 +481,7 @@ export interface OperationalConfig {
 // --- 13. Shop Floor Management (SFM) Types ---
 export type WorkOrderStatus = "PLANNED" | "RELEASED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 export type SFMWorkOrderType = "PRODUKSI" | "REPACK_SAOS" | "REPACK_GULA" | "PACKING_PESANAN" | "STOCK_OPNAME" | "GENERAL_TASK";
-export type SFMTaskStep = "DOUGH_COOKING" | "MIXING_EGG" | "TRAY_MOLDING" | "FREEZER_CHECKPOINT" | "PRE_PACK" | "FINAL_PACK";
+export type SFMTaskStep = "DOUGH_COOKING" | "MIXING_EGG" | "TRAY_MOLDING" | "FREEZER_CHECKPOINT" | "PRE_PACK" | "FINAL_PACK" | "PACKING" | "REPACKING" | "COUNTING" | "IN_PROGRESS" | "PENDING";
 export type SFMLogStage = "DOUGH_MIXING" | "TRAY_PRINTING" | "FREEZER_CHECKPOINT" | "FINAL_PACKING";
 
 export interface WorkOrderVariantState {

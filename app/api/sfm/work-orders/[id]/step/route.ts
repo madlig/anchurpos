@@ -208,6 +208,21 @@ export async function POST(
       nextSummary.totalGoodPcs = (nextSummary.totalGoodPcs || 0) + pCount;
       nextSummary.totalGoodPacks = Math.floor(nextSummary.totalGoodPcs / 12);
     }
+    
+    // Auto-fill output for PACKING_PESANAN on completion if not provided
+    if (action === "CLOSE_WO" && woData.woType === "PACKING_PESANAN") {
+      if (!goodPacks && !goodPcs) {
+        const targetPacks = woData.targetPacks || 0;
+        const targetQty = woData.targetQty || 0;
+        if (targetPacks > 0) {
+          nextSummary.totalGoodPacks = targetPacks;
+          nextSummary.totalGoodPcs = targetPacks * 12;
+        } else if (targetQty > 0) {
+          nextSummary.totalGoodPcs = targetQty;
+          nextSummary.totalGoodPacks = Math.floor(targetQty / 12);
+        }
+      }
+    }
 
     // Scrap Output
     if (action === "SCRAP" || (scrapPcs && scrapPcs > 0)) {
@@ -219,7 +234,7 @@ export async function POST(
 
     // Work Order Completion check
     if (action === "CLOSE_WO" || targetStage === "DONE") {
-      if (variantState && Object.keys(variantState).length > 0) {
+      if (woData.woType === "PRODUKSI" && variantState && Object.keys(variantState).length > 0) {
         let remainingTrays = 0;
         for (const vid in variantState) {
           remainingTrays += (variantState[vid].frozenTrays || 0);
@@ -230,7 +245,12 @@ export async function POST(
       }
       
       nextStatus = "COMPLETED";
-      targetStage = "FINAL_PACK";
+      if (woData.woType === "PRODUKSI" || !woData.woType) targetStage = "FINAL_PACK";
+      else if (woData.woType === "PACKING_PESANAN") targetStage = "PACKING";
+      else if (woData.woType === "REPACK_SAOS" || woData.woType === "REPACK_GULA") targetStage = "REPACKING";
+      else if (woData.woType === "STOCK_OPNAME") targetStage = "COUNTING";
+      else targetStage = "IN_PROGRESS";
+      
       completedAt = FieldValue.serverTimestamp();
     } else {
       if (nextStatus === "PLANNED" || nextStatus === "RELEASED") {
@@ -241,13 +261,19 @@ export async function POST(
       const totalGood: number = Object.values(variantState).reduce((s: number, v: any) => s + (v.goodPacks || 0), 0);
       const totalCut: number = Object.values(variantState).reduce((s: number, v: any) => s + (v.loyangCut || 0), 0);
       const totalPrinted: number = Object.values(variantState).reduce((s: number, v: any) => s + (v.loyangPrinted || 0), 0);
-      const totalMixing: number = Object.values(variantState).reduce((s: number, v: any) => s + (v.mixingBatchesDone || 0), 0);
 
       let computedStage = "DOUGH_COOKING";
-      if (totalGood > 0) computedStage = "PRE_PACK";
-      else if (totalFrozen > 0 || totalCut > 0) computedStage = "FREEZER_CHECKPOINT";
-      else if (totalPrinted > 0) computedStage = "TRAY_MOLDING";
-      else if (totalMixing > 0) computedStage = "MIXING_EGG";
+      if (woData.woType === "PRODUKSI" || !woData.woType) {
+        if (totalGood > 0) computedStage = "FINAL_PACK";
+        else if (totalFrozen > 0 || totalCut > 0) computedStage = "FREEZER_CHECKPOINT";
+        else if (totalPrinted > 0) computedStage = "TRAY_MOLDING";
+        else computedStage = "DOUGH_COOKING";
+      } else {
+        if (woData.woType === "PACKING_PESANAN") computedStage = "PACKING";
+        else if (woData.woType === "REPACK_SAOS" || woData.woType === "REPACK_GULA") computedStage = "REPACKING";
+        else if (woData.woType === "STOCK_OPNAME") computedStage = "COUNTING";
+        else computedStage = "IN_PROGRESS";
+      }
       
       targetStage = computedStage;
     }
@@ -257,7 +283,7 @@ export async function POST(
     const logData: any = {
       workOrderId: workOrderId,
       stage: targetStage,
-      step: (action === "TRAY_MOLDING" || action === "FINISH_MOLDING") ? "TRAY_MOLDING" : (action === "SUB_BATCH" ? "DOUGH_COOKING" : (action === "MIXING_SUB_BATCH" ? "MIXING_EGG" : "FREEZER_CHECKPOINT")),
+      step: targetStage,
       action: action || "STEP_TRANSITION",
       valueAdded: subBatchVal || goodPcs || 0,
       defectCount: scrapPcs || 0,

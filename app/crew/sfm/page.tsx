@@ -55,7 +55,7 @@ export default function CrewSFMTerminal() {
     wo: WorkOrder;
     variantId: string;
     variantName: string;
-    action: "CUT_TRAY" | "TRAY_MOLDING" | "PARTIAL_PREPACK";
+    action: "CUT_TRAY" | "TRAY_MOLDING" | "PARTIAL_PREPACK" | "REPACK";
   } | null>(null);
 
   const [inputValue1, setInputValue1] = useState(""); // loyangCount (cut/cetak) or regularPacks (prepack)
@@ -181,6 +181,11 @@ export default function CrewSFMTerminal() {
       };
       payload.loyangCount = lUsed;
       payload.goodPacks = regPacks + fullPacks;
+    } else if (action === "REPACK") {
+      const output = parseFloat(inputValue1) || 0;
+      if (output <= 0) return alert("Jumlah hasil repack harus > 0");
+      payload.action = "CLOSE_WO"; // Close WO because it's frictionless
+      payload.goodPcs = output;
     }
 
     const ok = await handleAction(wo.id, payload);
@@ -510,14 +515,24 @@ export default function CrewSFMTerminal() {
                         </div>
                       )}
                     </div>
-                    <button 
-                      onClick={() => handleAction(wo.id, { action: "CLOSE_WO", currentStep: "PROCESS" })} 
-                      disabled={submitting}
-                      className="w-full py-4 rounded-2xl bg-black text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 active:scale-95 hover:bg-slate-800 mt-4 border border-slate-700 transition-all"
-                    >
-                      {submitting ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-                      TANDAI SELESAI
-                    </button>
+                    {wo.woType === "REPACK_SAOS" || wo.woType === "REPACK_GULA" ? (
+                      <button 
+                        onClick={() => { setInputValue1(""); setInputModal({ wo, variantId: "", variantName: "", action: "REPACK" })}} 
+                        disabled={submitting}
+                        className="w-full py-4 rounded-2xl bg-black text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 active:scale-95 hover:bg-slate-800 mt-4 border border-slate-700 transition-all"
+                      >
+                        <Package size={18} /> INPUT HASIL REPACK
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleAction(wo.id, { action: "CLOSE_WO", currentStep: "PROCESS" })} 
+                        disabled={submitting}
+                        className="w-full py-4 rounded-2xl bg-black text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 active:scale-95 hover:bg-slate-800 mt-4 border border-slate-700 transition-all"
+                      >
+                        {submitting ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                        TANDAI SELESAI
+                      </button>
+                    )}
                   </>
                 )}
               </>
@@ -557,11 +572,13 @@ export default function CrewSFMTerminal() {
           <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4">
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-base font-black text-slate-800">
-                {inputModal.action === "TRAY_MOLDING" ? "Cetak Utuh" : inputModal.action === "CUT_TRAY" ? "Potong Churros" : "Pre-Pack Cicilan"}
+                {inputModal.action === "TRAY_MOLDING" ? "Cetak Utuh" : inputModal.action === "CUT_TRAY" ? "Potong Churros" : inputModal.action === "REPACK" ? "Input Hasil Repack" : "Pre-Pack Cicilan"}
               </h3>
               <button onClick={() => setInputModal(null)} className="p-1 rounded-full bg-slate-100 text-slate-400"><X size={16}/></button>
             </div>
-            <p className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg inline-block mb-2">Lane: {inputModal.variantName}</p>
+            {inputModal.variantName && (
+              <p className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg inline-block mb-2">Lane: {inputModal.variantName}</p>
+            )}
 
             {inputModal.action === "TRAY_MOLDING" && (
               <div>
@@ -599,6 +616,13 @@ export default function CrewSFMTerminal() {
                     <input type="number" placeholder="0" value={inputValue2} onChange={(e) => setInputValue2(e.target.value)} className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-slate-50 font-black text-sm outline-none focus:border-emerald-400" />
                   </div>
                 </div>
+              </div>
+            )}
+
+            {inputModal.action === "REPACK" && (
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Jumlah Hasil Repack ({inputModal.wo?.targetUom || 'Pcs'})</label>
+                <input type="number" placeholder="Berapa Pcs/Pack?" value={inputValue1} onChange={(e) => setInputValue1(e.target.value)} className="h-12 w-full px-4 rounded-xl border border-slate-200 bg-slate-50 font-black text-lg text-slate-800 outline-none focus:border-amber-400" />
               </div>
             )}
 
