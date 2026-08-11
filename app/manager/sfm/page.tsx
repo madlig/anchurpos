@@ -175,6 +175,7 @@ export default function ManagerSFMPage() {
     assignedCrewId: "",
     assignedCrewName: "",
     assignedCrewIds: [] as string[],
+    targetDate: new Date().toLocaleString("en-CA", { timeZone: "Asia/Jakarta" }).split(',')[0],
   });
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
@@ -343,6 +344,7 @@ export default function ManagerSFMPage() {
           sourceOrderId: newWoForm.woType === "PACKING_PESANAN" ? newWoForm.sourceOrderId : undefined,
           assignedCrewIds: newWoForm.assignedCrewIds && newWoForm.assignedCrewIds.length > 0 ? newWoForm.assignedCrewIds : (newWoForm.assignedCrewId ? [newWoForm.assignedCrewId] : []),
           assignedCrewName: newWoForm.assignedCrewName || selectedCrew?.name || undefined,
+          targetDate: newWoForm.targetDate,
           notes: newWoForm.notes,
         }),
       });
@@ -351,7 +353,7 @@ export default function ManagerSFMPage() {
         setShowNewWoModal(false);
         setNewWoForm({
           woType: "PRODUKSI", variantId: "", targetBatches: "3", targetPacks: "48", targetQty: "100", targetUom: "cup", notes: "",
-          productionTargets: [], opnameScope: "Semua", opnameItems: [], sourceOrderId: "", assignedCrewId: "", assignedCrewName: "", assignedCrewIds: []
+          productionTargets: [], opnameScope: "Semua", opnameItems: [], sourceOrderId: "", assignedCrewId: "", assignedCrewName: "", assignedCrewIds: [], targetDate: new Date().toLocaleString("en-CA", { timeZone: "Asia/Jakarta" }).split(',')[0]
         });
         await loadAllData(true);
       }
@@ -1338,7 +1340,20 @@ export default function ManagerSFMPage() {
                   )}
                 </div>
 
-                {/* 4. Notes */}
+                {/* 4. Target Date */}
+                <div>
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider block mb-2">4. Tanggal Target Penyelesaian</label>
+                  <input 
+                    type="date"
+                    value={newWoForm.targetDate}
+                    onChange={(e) => setNewWoForm({ ...newWoForm, targetDate: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-slate-200 bg-white font-bold text-sm text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/20"
+                    required
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">Tugas tidak akan muncul di layar Crew sebelum tanggal ini.</p>
+                </div>
+
+                {/* 5. Notes */}
                 <div>
                   <label className="text-xs font-black text-slate-700 uppercase tracking-wider block mb-2">Catatan Tambahan (Opsional)</label>
                   <textarea

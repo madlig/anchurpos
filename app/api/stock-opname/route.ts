@@ -12,13 +12,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Hanya crew yang bisa submit opname" }, { status: 403 });
   }
 
-  const { items } = (await req.json()) as {
+  const { items, woId } = (await req.json()) as {
     items: {
       ingredientId: string;
       physicalStock?: number | null;
       fullPackages?: number | null;
       openPackageFullness?: string | null;
     }[];
+    woId?: string;
   };
 
   if (!items?.length) {
@@ -125,6 +126,15 @@ export async function POST(req: NextRequest) {
           readBy: null,
           readAt: null,
           createdAt: FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (woId) {
+        const woRef = adminDb.collection("workOrders").doc(woId);
+        tx.update(woRef, {
+          status: "COMPLETED",
+          completedAt: FieldValue.serverTimestamp(),
+          opnameId: opnameRef.id,
         });
       }
     });

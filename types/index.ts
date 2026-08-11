@@ -533,6 +533,7 @@ export interface WorkOrder {
   currentStage: string;
   summaryState: WorkOrderSummaryState;
   createdAt: string;
+  targetDate?: string;
   startedAt?: string;
   freezerInAt?: string;
   currentStepStartedAt?: string;

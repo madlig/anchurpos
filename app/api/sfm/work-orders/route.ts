@@ -169,6 +169,15 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    if ((auth as AuthUser).role === "crew") {
+      const today = new Date().toLocaleString("en-CA", { timeZone: "Asia/Jakarta" }).split(',')[0];
+      allWorkOrders = allWorkOrders.filter(w => {
+        const isMine = w.assignedCrewId === (auth as AuthUser).uid || (w.assignedCrewIds && w.assignedCrewIds.includes((auth as AuthUser).uid));
+        const isPastOrToday = !w.targetDate || w.targetDate <= today;
+        return isMine && isPastOrToday;
+      });
+    }
+
     return NextResponse.json(allWorkOrders);
   } catch (err) {
     console.error("GET /api/sfm/work-orders error:", err);
@@ -183,7 +192,29 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { woType, productId, productName, variantIds, targetBatches, targetLoyang, targetPacks, targetPcs, targetQty, targetUom, notes, assignedCrewId, assignedCrewName, assignedCrewIds, productionTargets, opnameScope, opnameItems, sourceOrderId, sourceOrderNumber, repackIngredientId } = body;
+    const {
+      woType,
+      productId,
+      productName,
+      variantIds,
+      targetBatches,
+      targetLoyang,
+      targetPacks,
+      targetPcs,
+      targetQty,
+      targetUom,
+      productionTargets,
+      opnameScope,
+      opnameItems,
+      sourceOrderId,
+      sourceOrderNumber,
+      repackIngredientId,
+      assignedCrewId,
+      assignedCrewIds,
+      assignedCrewName,
+      notes,
+      targetDate,
+    } = body;
 
     const typePrefix = woType === "REPACK_SAOS" || woType === "REPACK_GULA" ? "RPK" : woType === "STOCK_OPNAME" ? "SOP" : woType === "GENERAL_TASK" ? "TSK" : woType === "PACKING_PESANAN" ? "PCK" : "WO";
     const todayStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -219,6 +250,7 @@ export async function POST(req: NextRequest) {
       sourceOrderId: sourceOrderId || null,
       sourceOrderNumber: sourceOrderNumber || null,
       repackIngredientId: repackIngredientId || null,
+      targetDate: targetDate || new Date().toLocaleString("en-CA", { timeZone: "Asia/Jakarta" }).split(',')[0],
       status: "RELEASED", // Released by manager to shop floor
       currentStage: "DOUGH_COOKING",
       summaryState: {

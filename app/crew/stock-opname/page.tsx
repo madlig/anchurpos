@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { RefreshCw, LogOut, CheckCircle2, ChevronRight, PackageSearch, Package, PenLine, Scale, Plus, Minus, Search, Check, ClipboardList, AlertCircle, Save, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 
@@ -43,6 +44,22 @@ export default function CrewStockOpnamePage() {
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("barang_jadi");
+  
+  const [woId, setWoId] = useState<string | null>(null);
+  const [scope, setScope] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      setWoId(sp.get("woId"));
+      const sc = sp.get("scope");
+      setScope(sc);
+      if (sc === "Bahan Baku") setActiveTab("bahan_baku");
+      else if (sc === "Kemasan") setActiveTab("packaging");
+      else if (sc === "Produk Jadi") setActiveTab("barang_jadi");
+    }
+  }, []);
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
@@ -106,11 +123,20 @@ export default function CrewStockOpnamePage() {
 
   const filteredItems = useMemo(() => {
     return items.filter(i => {
-      const matchCat = (i.category || "bahan_baku") === activeTab;
+      let matchCat = (i.category || "bahan_baku") === activeTab;
+      
+      // If scope is specific, we only want to show items matching that scope category.
+      // E.g., if scope is "Bahan Baku", we only want to show if activeTab is "bahan_baku",
+      // meaning the other tabs will be empty, which is a bit clunky but works. 
+      // Wait, we can just let activeTab filter it, but we should enforce scope.
+      if (scope === "Bahan Baku" && (i.category || "bahan_baku") !== "bahan_baku") return false;
+      if (scope === "Kemasan" && i.category !== "packaging") return false;
+      if (scope === "Produk Jadi" && i.category !== "barang_jadi") return false;
+
       const matchSearch = i.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchCat && matchSearch;
     });
-  }, [items, activeTab, searchQuery]);
+  }, [items, activeTab, searchQuery, scope]);
 
   async function handleSubmit() {
     if (filledCount === 0) {
@@ -156,12 +182,15 @@ export default function CrewStockOpnamePage() {
 
       const res = await fetchWithAuth("/api/stock-opname", {
         method: "POST",
-        body: JSON.stringify({ items: itemsToUpdate }),
+        body: JSON.stringify({ items: itemsToUpdate, woId }),
       });
 
       if (res.ok) {
         await alert("Stock opname berhasil disimpan dan dikirim untuk direview Manager!", "Tersimpan", "success");
         setEntries(new Map());
+        if (woId) {
+          router.push("/crew/sfm");
+        }
       } else {
         const d = await res.json();
         await alert(d.error ?? "Gagal menyimpan stock opname.", "Gagal", "danger");
@@ -206,7 +235,12 @@ export default function CrewStockOpnamePage() {
 
         <div className="overflow-x-auto hide-scrollbar -mx-5 px-5 pt-1">
           <div className="flex items-center gap-2 min-w-max">
-            {CATEGORY_TABS.map(t => (
+            {CATEGORY_TABS.filter(t => {
+              if (scope === "Bahan Baku" && t.key !== "bahan_baku") return false;
+              if (scope === "Kemasan" && t.key !== "packaging") return false;
+              if (scope === "Produk Jadi" && t.key !== "barang_jadi") return false;
+              return true;
+            }).map(t => (
               <button
                 key={t.key}
                 onClick={() => setActiveTab(t.key)}

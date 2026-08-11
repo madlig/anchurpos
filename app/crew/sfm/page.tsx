@@ -222,21 +222,6 @@ export default function CrewSFMTerminal() {
         </button>
       </div>
 
-      <Link href="/crew/stock-opname" className="w-full bg-slate-900 rounded-3xl p-5 flex items-center justify-between text-white shadow-md active:scale-95 transition-all block">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
-            <Package size={20} />
-          </div>
-          <div>
-            <h2 className="text-sm font-black">Lakukan Stock Opname</h2>
-            <p className="text-[11px] font-semibold text-slate-300">Hitung & sesuaikan sisa bahan</p>
-          </div>
-        </div>
-        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-          <ChevronRight size={16} />
-        </div>
-      </Link>
-
       {loading && workOrders.length === 0 ? (
         <div className="space-y-4">
           <Skeleton className="h-64 w-full rounded-3xl" />
@@ -290,7 +275,7 @@ export default function CrewSFMTerminal() {
                   <div className="absolute inset-0 bg-amber-500/10 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center pointer-events-none p-4">
                     <div className="bg-white/95 p-5 rounded-2xl shadow-xl border border-amber-200 text-center pointer-events-auto max-w-xs w-full">
                       <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <Pause size={24} className="fill-amber-600" />
+                         <Pause size={24} className="fill-amber-600" />
                       </div>
                       <h3 className="text-lg font-black text-amber-900 mb-1">DIJEDA</h3>
                       <p className="text-xs font-bold text-amber-700 mb-4">{wo.pausedReason}</p>
@@ -304,24 +289,56 @@ export default function CrewSFMTerminal() {
                   </div>
                 )}
 
-                {/* Header */}
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div className="flex gap-2 items-center flex-wrap">
-                    <span className="text-[11px] font-mono font-extrabold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">
-                      {wo.woNumber}
-                    </span>
-                    <span className="text-[10px] font-black text-emerald-800 uppercase bg-emerald-50 px-2 rounded">{wo.woType}</span>
-                  </div>
-                  {!isPaused && (
-                    <button onClick={() => setPauseModalWo(wo)} className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg flex items-center gap-1 active:scale-95">
-                      <Pause size={12} className="fill-amber-700" /> JEDA
-                    </button>
-                  )}
-                </div>
+                {wo.woType === "STOCK_OPNAME" ? (
+                  <>
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="flex gap-2 items-center flex-wrap">
+                        <span className="text-[11px] font-mono font-extrabold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">
+                          {wo.woNumber}
+                        </span>
+                        <span className="text-[10px] font-black text-blue-800 uppercase bg-blue-50 px-2 rounded">Stock Opname</span>
+                        {wo.targetDate && wo.targetDate < new Date().toLocaleString("en-CA", { timeZone: "Asia/Jakarta" }).split(',')[0] && (
+                          <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 rounded flex items-center gap-1"><AlertTriangle size={10}/> Tertunda</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-black text-slate-800">Tugas Stock Opname</h2>
+                      <p className="text-sm font-semibold text-slate-500 mt-1">Scope: <span className="text-slate-700 font-bold">{wo.opnameScope || "Semua"}</span></p>
+                      {wo.notes && (
+                        <div className="mt-3 p-3 bg-slate-50 border border-slate-200 border-dashed rounded-xl flex gap-2">
+                          <AlertTriangle size={16} className="text-slate-400 mt-0.5 shrink-0" />
+                          <p className="text-xs font-medium text-slate-600 italic">"{wo.notes}"</p>
+                        </div>
+                      )}
+                    </div>
+                    <Link href={`/crew/stock-opname?woId=${wo.id}&scope=${encodeURIComponent(wo.opnameScope || "Semua")}`} className="w-full py-4 rounded-2xl bg-blue-600 text-white font-black text-sm shadow-lg flex items-center justify-center gap-2 active:scale-95 hover:bg-blue-700 mt-2 transition-all">
+                      <Package size={18} /> Mulai Opname
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="flex gap-2 items-center flex-wrap">
+                        <span className="text-[11px] font-mono font-extrabold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">
+                          {wo.woNumber}
+                        </span>
+                        <span className="text-[10px] font-black text-emerald-800 uppercase bg-emerald-50 px-2 rounded">{wo.woType}</span>
+                        {wo.targetDate && wo.targetDate < new Date().toLocaleString("en-CA", { timeZone: "Asia/Jakarta" }).split(',')[0] && (
+                          <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 rounded flex items-center gap-1"><AlertTriangle size={10}/> Tertunda</span>
+                        )}
+                      </div>
+                      {!isPaused && (
+                        <button onClick={() => setPauseModalWo(wo)} className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg flex items-center gap-1 active:scale-95">
+                          <Pause size={12} className="fill-amber-700" /> JEDA
+                        </button>
+                      )}
+                    </div>
 
-                <div>
-                  <h2 className="text-lg font-black text-slate-800">{wo.productName}</h2>
-                </div>
+                    <div>
+                      <h2 className="text-lg font-black text-slate-800">{wo.productName}</h2>
+                    </div>
 
                 {/* Parallel Lanes */}
                 {isProduksi ? (
@@ -444,7 +461,6 @@ export default function CrewSFMTerminal() {
                         </div>
                       );
                     })}
-
                     {/* Close WO Button */}
                     {canCloseWO ? (
                       <button onClick={() => setCloseModalWo(wo)} className="w-full py-4 rounded-2xl bg-black text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 active:scale-95 hover:bg-slate-800 mt-4 border border-slate-700">
@@ -457,14 +473,57 @@ export default function CrewSFMTerminal() {
                     )}
                   </div>
                 ) : (
-                  // Non-Produksi fallback
-                  <div className="space-y-3">
-                     <p className="text-sm font-bold text-slate-600">Bukan WO Produksi.</p>
-                     <button onClick={() => handleAction(wo.id, { action: "CLOSE_WO", currentStep: "PROCESS" })} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm">Selesaikan</button>
-                  </div>
+                  // Non-Produksi / General Task
+                  <>
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="flex gap-2 items-center flex-wrap">
+                        <span className="text-[11px] font-mono font-extrabold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">
+                          {wo.woNumber}
+                        </span>
+                        <span className={`text-[10px] font-black uppercase px-2 rounded ${
+                          wo.woType === "REPACK_SAOS" || wo.woType === "REPACK_GULA" ? "text-purple-800 bg-purple-50" :
+                          wo.woType === "GENERAL_TASK" ? "text-slate-800 bg-slate-200" :
+                          wo.woType === "PACKING_PESANAN" ? "text-orange-800 bg-orange-50" :
+                          "text-emerald-800 bg-emerald-50"
+                        }`}>
+                          {wo.woType.replace(/_/g, ' ')}
+                        </span>
+                        {wo.targetDate && wo.targetDate < new Date().toLocaleString("en-CA", { timeZone: "Asia/Jakarta" }).split(',')[0] && (
+                          <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 rounded flex items-center gap-1"><AlertTriangle size={10}/> Tertunda</span>
+                        )}
+                      </div>
+                      {!isPaused && (
+                        <button onClick={() => setPauseModalWo(wo)} className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg flex items-center gap-1 active:scale-95">
+                          <Pause size={12} className="fill-amber-700" /> JEDA
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-black text-slate-800">{wo.productName || "Tugas Operasional"}</h2>
+                      {(wo.targetQty > 0 || wo.targetUom) && (
+                        <p className="text-sm font-semibold text-slate-500 mt-1">Target: <span className="text-slate-700 font-bold">{wo.targetQty || "-"} {wo.targetUom}</span></p>
+                      )}
+                      {wo.notes && (
+                        <div className="mt-3 p-3 bg-slate-50 border border-slate-200 border-dashed rounded-xl flex gap-2">
+                          <AlertTriangle size={16} className="text-slate-400 mt-0.5 shrink-0" />
+                          <p className="text-xs font-medium text-slate-600 italic">"{wo.notes}"</p>
+                        </div>
+                      )}
+                    </div>
+                    <button 
+                      onClick={() => handleAction(wo.id, { action: "CLOSE_WO", currentStep: "PROCESS" })} 
+                      disabled={submitting}
+                      className="w-full py-4 rounded-2xl bg-black text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 active:scale-95 hover:bg-slate-800 mt-4 border border-slate-700 transition-all"
+                    >
+                      {submitting ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                      TANDAI SELESAI
+                    </button>
+                  </>
                 )}
-              </div>
-            );
+              </>
+            )}
+          </div>
+        );
           })}
         </div>
       )}
