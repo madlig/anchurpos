@@ -9,7 +9,7 @@ import type { Role } from "@/types";
 const ROLE_HOME: Record<Role, string> = {
   owner: "/owner/dashboard",
   manager: "/manager/dashboard",
-  crew: "/crew/dashboard",
+  crew: "/crew/attendance",
 };
 
 export default function RootPage() {

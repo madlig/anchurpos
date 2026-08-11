@@ -14,7 +14,7 @@ interface RoleGuardProps {
 const ROLE_HOME: Record<string, string> = {
   owner: "/owner/dashboard",
   manager: "/manager/dashboard",
-  crew: "/crew/dashboard",
+  crew: "/crew/attendance",
 };
 
 export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
