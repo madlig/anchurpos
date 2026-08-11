@@ -108,8 +108,8 @@ export default function OwnerSFMPage() {
     return fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   }, [getToken]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (showSkeleton = false) => {
+    if (showSkeleton === true) setLoading(true);
     try {
       const res = await fetchWithAuth("/api/owner/sfm-summary");
       if (res.ok) setData(await res.json());
@@ -121,17 +121,17 @@ export default function OwnerSFMPage() {
   }, [fetchWithAuth]);
 
   useEffect(() => {
-    load();
+    load(!data);
 
     const intervalId = setInterval(() => {
-      if (document.visibilityState === "visible") load();
+      if (document.visibilityState === "visible") load(false);
     }, 30000);
 
-    const handleFCM = () => load();
+    const handleFCM = () => load(false);
     window.addEventListener("fcm_message", handleFCM);
 
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") load();
+      if (document.visibilityState === "visible") load(false);
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
@@ -199,7 +199,7 @@ export default function OwnerSFMPage() {
               </div>
             </div>
             <button
-              onClick={load}
+              onClick={() => load(true)}
               className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors"
             >
               <RefreshCw size={16} className={loading ? "animate-spin text-primary" : ""} />

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CUSTOMER_TYPES, ORDER_CHANNELS } from "./constants";
 
 // Base schemas
 export const orderItemSchema = z.object({
@@ -140,12 +141,13 @@ export const ingredientSchema = z.object({
     conversionToBase: z.number()
   })).default([]),
   defaultCostPerBaseUnit: z.number().min(0).default(0),
+  netWeightGrams: z.number().nullable().optional(),
 });
 
 export const customerSchema = z.object({
   name: z.string().min(1, "Nama pelanggan wajib diisi"),
   code: z.string().nullable().optional(),
-  customerType: z.enum(["reguler","b2b","reseller","grosir","mitra"]).default("reguler"),
+  customerType: z.enum(CUSTOMER_TYPES).default("reguler"),
   phoneNumber: z.string().nullable().optional(),
   email: z.string().email("Format email tidak valid").nullable().optional(),
   address: z.string().nullable().optional(),
@@ -169,6 +171,7 @@ export const supplierSchema = z.object({
   bankName: z.string().nullable().optional(),
   bankAccount: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  paymentTerms: z.string().nullable().optional(),
   isActive: z.boolean().optional().default(true),
 });
 

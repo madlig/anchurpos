@@ -2,6 +2,8 @@
 // Maps to Firestore collections defined in Firestore_Data_Model.md
 // Timestamps stored as Firestore Timestamps in DB, serialized to ISO strings in API responses.
 
+import type { CustomerType, OrderChannel, OrderStatus, PaymentStatus } from "@/lib/constants";
+
 export type Role = "owner" | "manager" | "crew";
 
 // --- 1. users/{uid} ---
@@ -122,20 +124,14 @@ export interface Recipe {
 }
 
 // --- 6. customers/{customerId} ---
-export type CustomerChannel =
-  | "b2b"
-  | "shopee"
-  | "whatsapp"
-  | "reseller"
-  | "tiktok"
-  | "walk_in";
+export type CustomerChannel = OrderChannel | "b2b"; // Assuming they overlap based on the list
 
 export interface Customer {
   id: string;
   name: string;
   code: string | null;
   channel: CustomerChannel;
-  customerType: "reguler" | "b2b" | "reseller" | "grosir" | "mitra";
+  customerType: CustomerType;
   phoneNumber: string | null;
   email: string | null;
   address: string | null;
@@ -353,9 +349,6 @@ export interface Alert {
 
 // --- 10. orders/{orderId} ---
 export type OrderSource = "marketplace_manual" | "wa_form" | "walk_in";
-export type OrderChannel = "walkin" | "whatsapp" | "tiktok" | "shopee";
-export type OrderStatus = "pending" | "proses" | "selesai" | "void";
-export type PaymentStatus = "belum_bayar" | "sudah_bayar";
 
 export interface Order {
   id: string;
@@ -364,7 +357,7 @@ export interface Order {
   orderChannel: OrderChannel;
   customerId: string | null;
   customerName: string;
-  customerType: "reguler" | "b2b" | "reseller" | null;
+  customerType: CustomerType | null;
   customerPhone: string | null;
   channel: string;
   status: OrderStatus;

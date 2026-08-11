@@ -54,82 +54,68 @@ export default function CrewSettingsPage() {
   }
 
   return (
-    <div className="page-enter min-h-screen" >
-      {/* Header (Glassmorphism) */}
-      <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200">
-        <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">Pengaturan Akun</h1>
-        <p className="text-[12px] font-medium mt-1 text-slate-500">
-          {user?.displayName ?? "Crew"} · Kelola profil dan password
-        </p>
+    <div className="min-h-screen bg-slate-50/80 pb-28 px-4 pt-4 max-w-xl mx-auto space-y-4 page-enter">
+      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
+            <KeyRound size={22} />
+          </div>
+          <div>
+            <h1 className="text-base font-black text-slate-800">Pengaturan</h1>
+            <p className="text-xs font-semibold text-slate-400">
+              {user?.displayName ?? "Crew"} · Kelola Akun
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="px-4 pt-6 pb-4 md:px-8 md:max-w-2xl">
-        <div style={{ background: "#fff", borderRadius: "16px", padding: "20px", border: "1px solid #F1F5F9", boxShadow: "0 4px 12px rgba(0,0,0,0.02)" }}>
-          <div className="flex items-center gap-2.5 mb-4">
-            <div style={{ padding: "8px", background: "#FEF1F5", borderRadius: "10px", color: "#E85D8C" }}>
-              <KeyRound size={20} />
+      <div className="space-y-4">
+        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-700 shrink-0">
+              <KeyRound size={18} />
             </div>
             <div>
-              <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>Ubah Password Login</p>
-              <p style={{ fontSize: "11px", color: "#94A3B8" }}>Ganti password akun POS Anda secara mandiri</p>
+              <p className="text-sm font-black text-slate-800">Ubah Password Login</p>
+              <p className="text-[11px] font-semibold text-slate-400">Ganti password akun POS Anda secara mandiri</p>
             </div>
           </div>
 
           <form onSubmit={handlePasswordChange} className="space-y-4">
             {error && (
-              <div style={{ background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: "10px", padding: "10px 12px", display: "flex", gap: "8px", alignItems: "flex-start" }}>
+              <div className="p-3 rounded-2xl bg-red-50 border border-red-200 flex items-start gap-2">
                 <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
-                <p style={{ fontSize: "11px", color: "#B91C1C", fontWeight: "500" }}>{error}</p>
+                <p className="text-xs font-bold text-red-600">{error}</p>
               </div>
             )}
 
             {success && (
-              <div style={{ background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: "10px", padding: "10px 12px", display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                <CheckCircle2 size={16} className="text-green-500 shrink-0 mt-0.5" />
-                <p style={{ fontSize: "11px", color: "#15803D", fontWeight: "500" }}>Password Anda berhasil diperbarui!</p>
+              <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-start gap-2">
+                <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                <p className="text-xs font-bold text-emerald-600">Password Anda berhasil diperbarui!</p>
               </div>
             )}
 
             <div>
-              <label style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", display: "block", marginBottom: "4px" }}>Password Baru</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Password Baru</label>
               <input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Minimal 6 karakter"
-                style={{
-                  width: "100%",
-                  height: "40px",
-                  borderRadius: "10px",
-                  border: "1px solid #E2E8F0",
-                  padding: "0 12px",
-                  fontSize: "13px",
-                  fontWeight: "600",
-                  outline: "none",
-                  background: "#F8FAFC"
-                }}
+                className="w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-black text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-slate-900/20"
                 required
               />
             </div>
 
             <div>
-              <label style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", display: "block", marginBottom: "4px" }}>Konfirmasi Password Baru</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Konfirmasi Password Baru</label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Ulangi password baru"
-                style={{
-                  width: "100%",
-                  height: "40px",
-                  borderRadius: "10px",
-                  border: "1px solid #E2E8F0",
-                  padding: "0 12px",
-                  fontSize: "13px",
-                  fontWeight: "600",
-                  outline: "none",
-                  background: "#F8FAFC"
-                }}
+                className="w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-black text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-slate-900/20"
                 required
               />
             </div>
@@ -137,51 +123,23 @@ export default function CrewSettingsPage() {
             <button
               type="submit"
               disabled={submitting}
-              style={{
-                width: "100%",
-                height: "40px",
-                borderRadius: "12px",
-                background: "linear-gradient(135deg,#E85D8C,#C94A73)",
-                color: "#fff",
-                fontSize: "13px",
-                fontWeight: "700",
-                border: "none",
-                cursor: submitting ? "default" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "6px"
-              }}
-              className="tap-target"
+              className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md disabled:opacity-50 mt-2"
             >
               {submitting ? <Loader2 size={16} className="animate-spin" /> : "Simpan Password Baru"}
             </button>
           </form>
         </div>
-
-        <div className="mt-4" style={{ background: "#fff", borderRadius: "16px", padding: "20px", border: "1px solid #F1F5F9", boxShadow: "0 4px 12px rgba(0,0,0,0.02)" }}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p style={{ fontSize: "14px", fontWeight: "700", color: "#1C1C1E" }}>Logout Akun</p>
-              <p style={{ fontSize: "11px", color: "#94A3B8" }}>Keluar dari sesi aplikasi di perangkat ini</p>
-            </div>
-            <button
-              onClick={logout}
-              className="tap-target"
-              style={{
-                padding: "8px 16px",
-                borderRadius: "10px",
-                background: "#FEF2F2",
-                color: "#DC2626",
-                border: "1px solid #FEE2E2",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: "700"
-              }}
-            >
-              Keluar
-            </button>
+        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm font-black text-slate-800">Logout Akun</p>
+            <p className="text-[11px] font-semibold text-slate-400">Keluar dari perangkat ini</p>
           </div>
+          <button
+            onClick={logout}
+            className="px-5 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-black text-xs uppercase tracking-wider transition-all active:scale-95"
+          >
+            Keluar
+          </button>
         </div>
       </div>
     </div>

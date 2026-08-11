@@ -21,21 +21,20 @@ function fmtRupiah(n: number) {
 }
 
 export default function OwnerInventoryPage() {
-  const { getToken } = useAuth();
+  const { fetchWithAuth } = useAuth();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  const fetchWithAuth = useCallback(async () => {
-    const token = await getToken();
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/ingredients", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetchWithAuth("/api/ingredients");
       if (res.ok) setIngredients(await res.json());
     } finally { setLoading(false); }
-  }, [getToken]);
+  }, [fetchWithAuth]);
 
-  useEffect(() => { fetchWithAuth(); }, [fetchWithAuth]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const filtered = (search
     ? ingredients.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()))
@@ -64,7 +63,7 @@ export default function OwnerInventoryPage() {
                 <p className="text-xs text-slate-400">{totalItems} item • Nilai: {fmtRupiah(totalValue)}</p>
               </div>
             </div>
-            <button onClick={fetchWithAuth} className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600">
+            <button onClick={fetchData} className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600">
               <RefreshCw size={16} className={loading ? "animate-spin text-primary" : ""} />
             </button>
           </div>

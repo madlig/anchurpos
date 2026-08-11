@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Loader2, User, Mail, Shield, LogOut, Key } from "lucide-react";
 
 export default function ManagerProfilePage() {
-  const { user, role, logout, getToken } = useAuth();
+  const { user, role, logout, fetchWithAuth } = useAuth();
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -30,11 +30,9 @@ export default function ManagerProfilePage() {
 
     setSubmitting(true);
     try {
-      const token = await getToken();
-      const res = await fetch("/api/auth/change-password", {
+      const res = await fetchWithAuth("/api/auth/change-password", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ oldPassword, newPassword }),

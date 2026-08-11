@@ -31,22 +31,21 @@ function fmt(n: number) {
 }
 
 export default function OwnerOrdersPage() {
-  const { getToken } = useAuth();
+  const { fetchWithAuth } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const fetchWithAuth = useCallback(async () => {
-    const token = await getToken();
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/orders", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetchWithAuth("/api/orders");
       if (res.ok) setOrders(await res.json());
     } finally { setLoading(false); }
-  }, [getToken]);
+  }, [fetchWithAuth]);
 
-  useEffect(() => { fetchWithAuth(); }, [fetchWithAuth]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const filtered = useMemo(() => {
     return orders
@@ -75,7 +74,7 @@ export default function OwnerOrdersPage() {
                 <p className="text-xs text-slate-400">{filtered.length} pesanan • Total: {fmt(totalOmzet)}</p>
               </div>
             </div>
-            <button onClick={fetchWithAuth} className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600">
+            <button onClick={fetchData} className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600">
               <RefreshCw size={16} className={loading ? "animate-spin text-primary" : ""} />
             </button>
           </div>

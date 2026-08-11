@@ -18,7 +18,7 @@ export async function POST(
   try {
     const body = await req.json();
     const { action, currentStep, nextStep, subBatchVal, loyangCount, goodPcs, goodPacks, packSize, scrapPcs, prepackOutputs, durationMinutes, notes, pausedReason, variantId } = body as {
-      action: "START" | "SUB_BATCH" | "STEP_TRANSITION" | "SCRAP" | "PAUSE" | "RESUME" | "MIXING_SUB_BATCH" | "TRAY_MOLDING" | "PARTIAL_PREPACK" | "CUT_TRAY" | "CLOSE_WO";
+      action: "START" | "SUB_BATCH" | "STEP_TRANSITION" | "SCRAP" | "PAUSE" | "RESUME" | "MIXING_SUB_BATCH" | "TRAY_MOLDING" | "FINISH_MOLDING" | "PARTIAL_PREPACK" | "CUT_TRAY" | "CLOSE_WO";
       currentStep: string;
       nextStep?: string;
       subBatchVal?: number;
@@ -255,7 +255,7 @@ export async function POST(
     // Create Task Log Record
     const logRef = adminDb.collection("workOrderLogs").doc();
     const logData: any = {
-      workOrderId: id,
+      workOrderId: workOrderId,
       stage: targetStage,
       step: (action === "TRAY_MOLDING" || action === "FINISH_MOLDING") ? "TRAY_MOLDING" : (action === "SUB_BATCH" ? "DOUGH_COOKING" : (action === "MIXING_SUB_BATCH" ? "MIXING_EGG" : "FREEZER_CHECKPOINT")),
       action: action || "STEP_TRANSITION",

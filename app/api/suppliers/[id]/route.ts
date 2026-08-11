@@ -26,7 +26,7 @@ export async function PATCH(
     }
 
     const updates: Record<string, unknown> = {};
-    const { name, code, category, contactPerson, phoneNumber, email, address, bankName, bankAccount, notes, isActive } = parseResult.data;
+    const { name, code, category, contactPerson, phoneNumber, email, address, bankName, bankAccount, notes, paymentTerms, isActive } = parseResult.data;
     
     if (name !== undefined) updates.name = name.trim();
     if (code !== undefined) updates.code = code;
@@ -38,8 +38,8 @@ export async function PATCH(
     if (bankName !== undefined) updates.bankName = bankName;
     if (bankAccount !== undefined) updates.bankAccount = bankAccount;
     if (notes !== undefined) updates.notes = notes;
+    if (paymentTerms !== undefined) updates.paymentTerms = paymentTerms;
     if (isActive !== undefined) updates.isActive = isActive;
-    if (body.paymentTerms !== undefined) updates.paymentTerms = body.paymentTerms;
 
     await supplierRef.update(updates);
     return NextResponse.json({ id, ...updates });

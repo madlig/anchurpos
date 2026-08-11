@@ -36,18 +36,17 @@ function fmt(n: number) {
 }
 
 export default function OwnerEmployeesPage() {
-  const { getToken } = useAuth();
+  const { fetchWithAuth } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payroll, setPayroll] = useState<PayrollItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchWithAuth = useCallback(async () => {
-    const token = await getToken();
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [empRes, payRes] = await Promise.all([
-        fetch("/api/employees", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`/api/payroll?month=${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetchWithAuth("/api/employees"),
+        fetchWithAuth(`/api/payroll?month=${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`),
       ]);
       if (empRes.ok) setEmployees(await empRes.json());
       if (payRes.ok) {
@@ -55,9 +54,9 @@ export default function OwnerEmployeesPage() {
         setPayroll(Array.isArray(payData) ? payData : []);
       }
     } finally { setLoading(false); }
-  }, [getToken]);
+  }, [fetchWithAuth]);
 
-  useEffect(() => { fetchWithAuth(); }, [fetchWithAuth]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const crewList = employees.filter((e) => e.role !== "owner");
   const totalPayroll = payroll.reduce((s, p) => s + (p.totalPaid ?? 0), 0);
@@ -78,7 +77,7 @@ export default function OwnerEmployeesPage() {
                 <p className="text-xs text-slate-400">{crewList.length} karyawan aktif</p>
               </div>
             </div>
-            <button onClick={fetchWithAuth} className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600">
+            <button onClick={fetchData} className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600">
               <RefreshCw size={16} className={loading ? "animate-spin text-primary" : ""} />
             </button>
           </div>

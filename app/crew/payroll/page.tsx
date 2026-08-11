@@ -48,81 +48,97 @@ export default function CrewPayrollPage() {
   }, [loadData]);
 
   return (
-    <div className="page-enter min-h-screen pb-24 md:pb-6" style={{ background: "#F8FAFC" }}>
-      <div className="px-5 pt-6 pb-6 bg-white/90 backdrop-blur-xl border-b border-slate-200 shadow-sm sticky top-0 z-20">
-        <h1 className="text-2xl font-black mb-1" style={{ color: "#1E293B" }}>Slip Gaji Digital</h1>
-        <p className="text-sm font-semibold text-slate-500">Akses rincian gaji Anda secara transparan.</p>
+    <div className="min-h-screen bg-slate-50/80 pb-28 px-4 pt-4 max-w-xl mx-auto space-y-4 page-enter">
+      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
+            <ReceiptText size={22} />
+          </div>
+          <div>
+            <h1 className="text-base font-black text-slate-800">Slip Gaji</h1>
+            <p className="text-xs font-semibold text-slate-400">Rincian gaji transparan</p>
+          </div>
+        </div>
       </div>
 
-      <div className="p-4 md:p-6 max-w-lg mx-auto">
-        <div style={{ background: "#fff", padding: "16px", borderRadius: "16px", border: "1px solid #E2E8F0", marginBottom: "20px", boxShadow: "0 2px 10px rgba(0,0,0,0.02)" }}>
-          <label className="text-xs font-bold text-slate-500 block mb-2">PILIH BULAN PENGGAJIAN</label>
-          <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid #E2E8F0", fontSize: "14px", fontWeight: "700", color: "#334155", outline: "none", background: "#F8FAFC" }} />
+      <div className="space-y-4">
+        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm">
+          <label className="text-xs font-bold text-slate-400 block mb-2 uppercase tracking-wider">Pilih Bulan Penggajian</label>
+          <input 
+            type="month" 
+            value={selectedMonth} 
+            onChange={e => setSelectedMonth(e.target.value)} 
+            className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-black text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-slate-900/20"
+          />
         </div>
 
         {loading ? (
           <div className="space-y-4">
-            <Skeleton className="h-96 w-full rounded-[20px]" />
+            <Skeleton className="h-96 w-full rounded-3xl" />
           </div>
         ) : !payroll ? (
-          <div style={{ background: "#fff", borderRadius: "16px", padding: "32px 16px", textAlign: "center", border: "1px dashed #CBD5E1" }}>
-            <ReceiptText size={32} className="mx-auto text-slate-300 mb-3" />
-            <p style={{ fontSize: "14px", fontWeight: "700", color: "#64748B" }}>Belum ada slip gaji</p>
-            <p style={{ fontSize: "12px", color: "#94A3B8", marginTop: "4px" }}>Gaji bulan ini mungkin belum di-generate atau belum dikunci oleh manager.</p>
+          <div className="bg-white rounded-3xl p-10 text-center border border-slate-200/80 shadow-sm space-y-3">
+            <div className="w-16 h-16 rounded-3xl bg-slate-50 border border-slate-100 flex items-center justify-center mx-auto mb-2">
+              <ReceiptText size={28} className="text-slate-300" />
+            </div>
+            <p className="text-sm font-black text-slate-700">Belum ada slip gaji</p>
+            <p className="text-[11px] font-semibold text-slate-400 max-w-[250px] mx-auto leading-relaxed">
+              Gaji bulan ini mungkin belum di-generate atau belum dikunci oleh manager.
+            </p>
           </div>
         ) : (
-          <div className="animate-in slide-in-from-bottom-4" style={{ background: "#fff", borderRadius: "20px", overflow: "hidden", border: "1px solid #E2E8F0", boxShadow: "0 10px 30px rgba(0,0,0,0.03)" }}>
-            <div style={{ background: "#10B981", padding: "24px 20px", color: "#fff", textAlign: "center", position: "relative" }}>
+          <div className="bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-lg shadow-slate-200/50 animate-in slide-in-from-bottom-4">
+            <div className="bg-emerald-500 p-6 text-center relative text-white">
               <ShieldCheck size={40} className="mx-auto mb-2 opacity-90" />
-              <h2 style={{ fontSize: "18px", fontWeight: "900", letterSpacing: "1px", textTransform: "uppercase" }}>SLIP GAJI RESMI</h2>
-              <p style={{ fontSize: "13px", fontWeight: "600", opacity: 0.9 }}>Periode: {payroll.workPeriod}</p>
+              <h2 className="text-lg font-black tracking-widest uppercase">Slip Gaji Resmi</h2>
+              <p className="text-xs font-bold opacity-90 mt-1">Periode: {payroll.workPeriod}</p>
             </div>
             
-            <div className="p-5">
+            <div className="p-6">
               <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
                 <div>
-                  <p style={{ fontSize: "11px", fontWeight: "800", color: "#94A3B8" }}>NAMA CREW</p>
-                  <p style={{ fontSize: "15px", fontWeight: "800", color: "#1E293B" }}>{payroll.employeeName}</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Nama Crew</p>
+                  <p className="text-sm font-black text-slate-800">{payroll.employeeName}</p>
                 </div>
                 <div className="text-right">
-                  <p style={{ fontSize: "11px", fontWeight: "800", color: "#94A3B8" }}>BULAN</p>
-                  <p style={{ fontSize: "15px", fontWeight: "800", color: "#1E293B" }}>{payroll.month}</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Bulan</p>
+                  <p className="text-sm font-black text-slate-800">{payroll.month}</p>
                 </div>
               </div>
 
               <div className="flex flex-col gap-4 mb-6">
                 <div className="flex justify-between items-center">
-                  <p style={{ fontSize: "13px", fontWeight: "600", color: "#64748B" }}>Gaji Pokok ({payroll.workDays} shift)</p>
-                  <p style={{ fontSize: "14px", fontWeight: "800", color: "#334155" }}>{fmtRupiah(payroll.totalRegularPay)}</p>
+                  <p className="text-xs font-bold text-slate-500">Gaji Pokok ({payroll.workDays} shift)</p>
+                  <p className="text-sm font-black text-slate-800">{fmtRupiah(payroll.totalRegularPay)}</p>
                 </div>
                 <div className="flex justify-between items-center">
-                  <p style={{ fontSize: "13px", fontWeight: "600", color: "#64748B" }}>Bonus Lemburan</p>
-                  <p style={{ fontSize: "14px", fontWeight: "800", color: "#334155" }}>{fmtRupiah(payroll.totalOvertimeBonus)}</p>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p style={{ fontSize: "13px", fontWeight: "600", color: "#059669" }}>Bonus Performa</p>
-                    {payroll.performanceBonusNote && <p style={{ fontSize: "10px", color: "#059669" }}>Catatan: {payroll.performanceBonusNote}</p>}
-                  </div>
-                  <p style={{ fontSize: "14px", fontWeight: "800", color: "#059669" }}>+{fmtRupiah(payroll.performanceBonus || 0)}</p>
+                  <p className="text-xs font-bold text-slate-500">Bonus Lemburan</p>
+                  <p className="text-sm font-black text-slate-800">{fmtRupiah(payroll.totalOvertimeBonus)}</p>
                 </div>
                 <div className="flex justify-between items-center">
                   <div>
-                    <p style={{ fontSize: "13px", fontWeight: "600", color: "#DC2626" }}>Potongan / Kasbon</p>
-                    {payroll.deductionNote && <p style={{ fontSize: "10px", color: "#DC2626" }}>Catatan: {payroll.deductionNote}</p>}
+                    <p className="text-xs font-bold text-emerald-600">Bonus Performa</p>
+                    {payroll.performanceBonusNote && <p className="text-[10px] font-semibold text-emerald-600/80">Catatan: {payroll.performanceBonusNote}</p>}
                   </div>
-                  <p style={{ fontSize: "14px", fontWeight: "800", color: "#DC2626" }}>-{fmtRupiah(payroll.deductions || 0)}</p>
+                  <p className="text-sm font-black text-emerald-600">+{fmtRupiah(payroll.performanceBonus || 0)}</p>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-xs font-bold text-red-500">Potongan / Kasbon</p>
+                    {payroll.deductionNote && <p className="text-[10px] font-semibold text-red-500/80">Catatan: {payroll.deductionNote}</p>}
+                  </div>
+                  <p className="text-sm font-black text-red-500">-{fmtRupiah(payroll.deductions || 0)}</p>
                 </div>
               </div>
 
-              <div style={{ background: "#F8FAFC", padding: "16px", borderRadius: "12px", border: "1px dashed #CBD5E1" }}>
-                <p style={{ fontSize: "12px", fontWeight: "800", color: "#64748B", marginBottom: "4px" }}>TOTAL DITERIMA (TAKE HOME PAY)</p>
-                <p style={{ fontSize: "28px", fontWeight: "900", color: "#10B981" }}>{fmtRupiah(payroll.totalPaid)}</p>
+              <div className="bg-slate-50 p-5 rounded-2xl border border-dashed border-slate-200">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Total Diterima (Take Home Pay)</p>
+                <p className="text-3xl font-black text-emerald-500">{fmtRupiah(payroll.totalPaid)}</p>
               </div>
 
               <button 
                 onClick={() => window.print()}
-                style={{ width: "100%", padding: "14px", borderRadius: "12px", background: "#1E293B", color: "#fff", border: "none", fontWeight: "800", fontSize: "13px", marginTop: "20px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer" }}
+                className="w-full py-4 rounded-2xl bg-slate-900 text-white font-black text-xs uppercase tracking-wider mt-5 flex items-center justify-center gap-2 hover:bg-slate-800 active:scale-95 transition-all shadow-md"
               >
                 <Download size={16} /> Simpan PDF / Cetak
               </button>

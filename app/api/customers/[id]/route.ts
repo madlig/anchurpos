@@ -20,21 +20,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Pelanggan tidak ditemukan" }, { status: 404 });
 
-    const updates: Record<string, unknown> = {};
-    const { name, code, customerType, channel, phoneNumber, email, address, creditLimit, poNumber, notes, discountPerUnit, isActive } = parseResult.data;
-
-    if (name !== undefined) updates.name = name.trim();
-    if (code !== undefined) updates.code = code;
-    if (customerType !== undefined) updates.customerType = customerType;
-    if (channel !== undefined) updates.channel = channel;
-    if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
-    if (email !== undefined) updates.email = email;
-    if (address !== undefined) updates.address = address;
-    if (creditLimit !== undefined) updates.creditLimit = creditLimit;
-    if (poNumber !== undefined) updates.poNumber = poNumber;
-    if (notes !== undefined) updates.notes = notes;
-    if (discountPerUnit !== undefined) updates.discountPerUnit = discountPerUnit;
-    if (isActive !== undefined) updates.isActive = isActive;
+    const updates = { ...parseResult.data };
+    if (updates.name) {
+      updates.name = updates.name.trim();
+    }
 
     await ref.update(updates);
     return NextResponse.json({ id, ...updates });

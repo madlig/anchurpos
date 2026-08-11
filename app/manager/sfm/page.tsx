@@ -185,8 +185,8 @@ export default function ManagerSFMPage() {
     });
   }, [getToken]);
 
-  const loadAllData = useCallback(async () => {
-    setLoading(true);
+  const loadAllData = useCallback(async (showSkeleton = false) => {
+    if (showSkeleton === true) setLoading(true);
     try {
       const dateParams = activeTab === "audit_ledger"
         ? `startDate=${startDate}&endDate=${endDate}`
@@ -216,7 +216,7 @@ export default function ManagerSFMPage() {
   }, [startDate, endDate, activeTab, searchQuery, fetchWithAuth]);
 
   useEffect(() => {
-    loadAllData();
+    loadAllData(workOrders.length === 0);
 
     const fetchInterval = setInterval(() => {
       if (document.visibilityState === "visible") loadAllData();
@@ -353,7 +353,7 @@ export default function ManagerSFMPage() {
           woType: "PRODUKSI", variantId: "", targetBatches: "3", targetPacks: "48", targetQty: "100", targetUom: "cup", notes: "",
           productionTargets: [], opnameScope: "Semua", opnameItems: [], sourceOrderId: "", assignedCrewId: "", assignedCrewName: "", assignedCrewIds: []
         });
-        await loadAllData();
+        await loadAllData(true);
       }
     } finally {
       setCreatingWo(false);
@@ -424,7 +424,7 @@ export default function ManagerSFMPage() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={loadAllData}
+                onClick={() => loadAllData(true)}
                 className="w-10 h-10 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-slate-200/80 flex items-center justify-center text-slate-700 transition-all active:scale-95"
               >
                 <RefreshCw size={16} className={loading ? "animate-spin" : ""} />

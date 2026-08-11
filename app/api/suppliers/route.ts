@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const supplierCode = body.code || `VEND-${Math.floor(1000 + Math.random() * 9000)}`;
+    const supplierCode = parseResult.data.code || `VEND-${Math.floor(1000 + Math.random() * 9000)}`;
     const supplierRef = adminDb.collection("suppliers").doc();
     await supplierRef.set({
       code: supplierCode,

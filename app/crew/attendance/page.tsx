@@ -196,47 +196,46 @@ export default function CrewAttendancePage() {
   })();
 
   if (loading) return (
-    <div className="page-enter min-h-screen">
-      <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200">
-        <Skeleton className="h-6 w-32 mb-2" />
-        <Skeleton className="h-4 w-48" />
-      </div>
-      <div className="px-4 pt-4 pb-4 md:px-8 md:max-w-2xl">
-        <Skeleton className="h-[120px] w-full rounded-2xl mb-[28px]" />
-        <div className="flex flex-col items-center gap-3" style={{ marginBottom: "20px" }}>
-          <Skeleton className="w-[120px] h-[120px] rounded-full" />
+    <div className="min-h-screen bg-slate-50/80 pb-28 px-4 pt-4 max-w-xl mx-auto space-y-4">
+      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-3">
+        <Skeleton className="h-12 w-12 rounded-2xl" />
+        <div>
+          <Skeleton className="h-5 w-32 mb-1" />
+          <Skeleton className="h-3 w-48" />
         </div>
+      </div>
+      <Skeleton className="h-32 w-full rounded-3xl" />
+      <div className="flex justify-center mt-6">
+        <Skeleton className="w-28 h-28 rounded-full" />
       </div>
     </div>
   );
 
   return (
-    <div className="page-enter min-h-screen" >
-
-      <div className="px-5 pt-5 pb-5 rounded-b-[24px] sticky top-0 z-30 bg-white/90 backdrop-blur-xl shadow-sm border-b border-pink-200">
-        <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">Absensi</h1>
-        <p className="text-[12px] font-medium mt-1 text-slate-500">
-          {user?.displayName?.split(" ")[0] ?? "Crew"} — {todayLabel}
-        </p>
+    <div className="min-h-screen bg-slate-50/80 pb-28 px-4 pt-4 max-w-xl mx-auto space-y-4 page-enter">
+      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-3">
+        <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
+          <Clock size={22} />
+        </div>
+        <div>
+          <h1 className="text-base font-black text-slate-800">Absensi Crew</h1>
+          <p className="text-xs font-semibold text-slate-400">
+            {user?.displayName?.split(" ")[0] ?? "Crew"} — {todayLabel}
+          </p>
+        </div>
       </div>
 
-      <div className="px-4 pt-4 pb-4 md:px-8 md:max-w-2xl">
-
+      <div className="space-y-6">
         <div
           data-testid="attendance-status-card"
-          style={{
-            padding: "18px 20px",
-            borderRadius: "16px",
-            background: statusCard.gradient,
-            textAlign: "center",
-            marginBottom: "28px",
-          }}
+          className="p-6 rounded-3xl text-center shadow-sm"
+          style={{ background: statusCard.gradient }}
         >
-          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)", fontWeight: "500" }}>Status Hari Ini</p>
-          <p style={{ fontSize: "24px", fontWeight: "700", color: "#fff", marginTop: "6px", marginBottom: "4px" }}>
+          <p className="text-xs text-white/80 font-semibold">Status Hari Ini</p>
+          <p className="text-3xl font-black text-white mt-1 mb-1 tracking-tight">
             {statusCard.label}
           </p>
-          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)" }}>{statusCard.sub}</p>
+          <p className="text-xs text-white/75 font-medium">{statusCard.sub}</p>
         </div>
 
         <input 
@@ -249,34 +248,31 @@ export default function CrewAttendancePage() {
         />
 
         {btnConfig && (
-          <div className="flex flex-col items-center gap-3" style={{ marginBottom: "20px" }}>
+          <div className="flex flex-col items-center gap-3">
             <button
               onClick={btnConfig.disabled ? undefined : btnConfig.action}
               disabled={submitting || btnConfig.disabled}
               data-testid={btnConfig.testId}
+              className={`w-32 h-32 rounded-[2rem] flex flex-col items-center justify-center tap-target shadow-lg transition-all ${submitting ? "opacity-70 scale-95" : "hover:scale-105 active:scale-95"}`}
               style={{
-                width: "120px", height: "120px", borderRadius: "50%",
-                background: btnConfig.bg, boxShadow: btnConfig.shadow,
-                border: "none", cursor: (submitting || btnConfig.disabled) ? "default" : "pointer",
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                opacity: submitting ? 0.7 : 1, transition: "transform 0.15s, opacity 0.15s",
+                background: btnConfig.bg,
+                cursor: (submitting || btnConfig.disabled) ? "default" : "pointer",
               }}
-              className="tap-target"
             >
               {submitting ? (
-                <Loader2 size={30} color="#fff" className="animate-spin" />
+                <Loader2 size={36} className="text-white animate-spin" />
               ) : (
                 <>
-                  <Camera size={30} color="#fff" />
-                  <span style={{ color: "#fff", fontWeight: "700", fontSize: "13px", marginTop: "6px", letterSpacing: "1px" }}>
+                  <Camera size={36} className="text-white mb-1" />
+                  <span className="text-white font-black text-sm uppercase tracking-wider">
                     {btnConfig.label}
                   </span>
                 </>
               )}
             </button>
-            <div className="flex items-center gap-1.5 text-center">
-              <MapPin size={12} style={{ color: "#94A3B8" }} />
-              <p style={{ fontSize: "11px", color: "#64748B" }}>
+            <div className="flex items-center gap-1.5 text-center mt-1">
+              <MapPin size={12} className="text-slate-400" />
+              <p className="text-[11px] font-semibold text-slate-400">
                 {btnConfig.subLabel || `Kamera & GPS diperlukan`}
               </p>
             </div>
@@ -284,62 +280,60 @@ export default function CrewAttendancePage() {
         )}
 
         {isDone && (
-          <div className="flex justify-center mb-4">
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 20px", borderRadius: "100px", background: "#fff", border: "1px solid #F1F5F9" }}>
-              <CheckCircle2 size={18} style={{ color: "#16A34A" }} />
-              <span style={{ fontSize: "13px", fontWeight: "600", color: "#16A34A" }}>Absensi hari ini selesai</span>
+          <div className="flex justify-center mt-2">
+            <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white border border-slate-200/80 shadow-sm">
+              <CheckCircle2 size={18} className="text-green-600" />
+              <span className="text-sm font-bold text-green-600">Absensi hari ini selesai</span>
             </div>
           </div>
         )}
 
         {error && (
-          <div style={{ padding: "12px 14px", borderRadius: "12px", background: "#FEF2F2", border: "1px solid #FECACA", marginBottom: "12px" }} data-testid="attendance-error">
-            <div className="flex items-center gap-2">
-              <AlertTriangle size={14} style={{ color: "#DC2626" }} />
-              <p style={{ fontSize: "13px", color: "#DC2626" }}>{error}</p>
-            </div>
+          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 flex items-center gap-2" data-testid="attendance-error">
+            <AlertTriangle size={16} className="text-red-600 shrink-0" />
+            <p className="text-sm font-bold text-red-600">{error}</p>
           </div>
         )}
 
         {today && (
-          <div style={{ marginBottom: "20px" }}>
-            <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "10px" }}>Log Hari Ini</p>
-            <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden", border: "1px solid #F1F5F9" }}>
-              <div className="flex items-center justify-between" style={{ padding: "12px 14px", borderBottom: "1px solid #F8FAFC" }}>
-                <span style={{ fontSize: "13px", color: "#64748B" }}>Absen Masuk</span>
-                <span style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{formatTime(today.checkIn.time)}</span>
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm">
+            <h2 className="text-sm font-black text-slate-800 mb-3">Log Hari Ini</h2>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <span className="text-xs font-semibold text-slate-400">Absen Masuk</span>
+                <span className="text-sm font-black text-slate-700">{formatTime(today.checkIn.time)}</span>
               </div>
               {today.checkOut && (
-                <div className="flex items-center justify-between" style={{ padding: "12px 14px", borderBottom: "1px solid #F8FAFC" }}>
-                  <span style={{ fontSize: "13px", color: "#64748B" }}>Absen Pulang</span>
-                  <span style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{formatTime(today.checkOut.time)}</span>
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <span className="text-xs font-semibold text-slate-400">Absen Pulang</span>
+                  <span className="text-sm font-black text-slate-700">{formatTime(today.checkOut.time)}</span>
                 </div>
               )}
               {today.totalHours !== null && (
-                <div className="flex items-center justify-between" style={{ padding: "12px 14px" }}>
-                  <span style={{ fontSize: "13px", color: "#64748B" }}>Total Jam</span>
-                  <span style={{ fontSize: "13px", fontWeight: "700", color: "#E85D8C" }}>{today.totalHours.toFixed(1)} jam</span>
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs font-semibold text-slate-400">Total Jam</span>
+                  <span className="text-base font-black text-primary">{today.totalHours.toFixed(1)} jam</span>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        <div>
-          <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E", marginBottom: "10px" }}>Riwayat Absensi Bulanan</p>
+        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm">
+          <h2 className="text-sm font-black text-slate-800 mb-3">Riwayat Bulanan</h2>
           
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-4 bg-slate-50 p-1.5 rounded-2xl">
             <button 
               onClick={() => { 
                 const d = new Date(attendanceMonth + "-01"); 
                 d.setMonth(d.getMonth() - 1); 
                 setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); 
               }}
-              style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}
+              className="w-10 h-10 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-all shadow-sm"
             >
               ◀
             </button>
-            <p style={{ flex: 1, textAlign: "center", fontSize: "13px", fontWeight: "700", color: "#1C1C1E" }}>
+            <p className="flex-1 text-center text-sm font-black text-slate-700">
               {new Date(attendanceMonth + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
             </p>
             <button 
@@ -348,41 +342,38 @@ export default function CrewAttendancePage() {
                 d.setMonth(d.getMonth() + 1); 
                 setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); 
               }}
-              style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#64748B" }}
+              className="w-10 h-10 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-all shadow-sm"
             >
               ▶
             </button>
           </div>
 
           {history.length === 0 ? (
-            <div style={{ background: "#fff", borderRadius: "14px", padding: "24px 16px", textAlign: "center", border: "1px solid #F1F5F9" }}>
-              <p style={{ fontSize: "13px", fontWeight: "600", color: "#94A3B8" }}>Tidak ada riwayat absensi di bulan ini</p>
+            <div className="py-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+              <p className="text-xs font-bold text-slate-400">Tidak ada riwayat absensi</p>
             </div>
           ) : (
-            <div style={{ background: "#fff", borderRadius: "14px", overflow: "hidden", border: "1px solid #F1F5F9" }}>
+            <div className="space-y-3">
               {history.map((h, i) => (
                 <div
                   key={h.id}
-                  className="flex items-center justify-between"
-                  style={{ padding: "12px 14px", borderBottom: i < history.length - 1 ? "1px solid #F8FAFC" : "none" }}
+                  className="flex items-center justify-between pb-3 border-b border-slate-100 last:border-0 last:pb-0"
                   data-testid={`history-item-${i}`}
                 >
                   <div>
-                    <p style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}>{formatDate(h.date)}</p>
-                    <p style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>
+                    <p className="text-xs font-black text-slate-700">{formatDate(h.date)}</p>
+                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">
                       {formatTime(h.checkIn.time)}{h.checkOut?.time ? ` — ${formatTime(h.checkOut.time)}` : " — belum pulang"}
                     </p>
                   </div>
                   <div className="text-right">
                     {h.totalHours !== null && (
-                      <p style={{ fontSize: "13px", fontWeight: "700", color: "#334155" }}>{h.totalHours.toFixed(1)}j</p>
+                      <p className="text-sm font-black text-slate-800">{h.totalHours.toFixed(1)}j</p>
                     )}
                     <span
-                      style={{
-                        fontSize: "10px", fontWeight: "600", padding: "2px 8px", borderRadius: "100px",
-                        color: h.status === "lengkap" ? "#16A34A" : h.status === "direview" ? "#D97706" : "#64748B",
-                        background: h.status === "lengkap" ? "#DCFCE7" : h.status === "direview" ? "#FEF3C7" : "#F1F5F9",
-                      }}
+                      className={`inline-block text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full mt-1 ${
+                        h.status === "lengkap" ? "bg-green-100 text-green-700" : h.status === "direview" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"
+                      }`}
                       data-testid={`history-status-${i}`}
                     >
                       {h.status === "lengkap" ? "Lengkap" : h.status === "direview" ? "Review" : h.status === "belum_lengkap" ? "Aktif" : h.status}

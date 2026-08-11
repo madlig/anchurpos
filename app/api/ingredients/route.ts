@@ -52,8 +52,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
   }
 
-  const { name, category, baseUnit, minStock, channels, unitAlternatives, defaultCostPerBaseUnit } = parseResult.data;
-  const netWeightGrams = body.netWeightGrams ? Number(body.netWeightGrams) : null;
+  const { name, category, baseUnit, minStock, channels, unitAlternatives, defaultCostPerBaseUnit, netWeightGrams } = parseResult.data;
 
   try {
     const ref = adminDb.collection("ingredients").doc();

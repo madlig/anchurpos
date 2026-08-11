@@ -78,8 +78,8 @@ export default function CrewSFMTerminal() {
     });
   }, [getToken]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (showSkeleton = false) => {
+    if (showSkeleton === true) setLoading(true);
     try {
       const res = await fetchWithAuth(`/api/sfm/work-orders`);
       if (res.ok) {
@@ -94,14 +94,14 @@ export default function CrewSFMTerminal() {
   }, [fetchWithAuth]);
 
   useEffect(() => {
-    loadData();
+    loadData(workOrders.length === 0);
     const fetchInterval = setInterval(() => {
-      if (document.visibilityState === "visible") loadData();
+      if (document.visibilityState === "visible") loadData(false);
     }, 30000);
-    const handleFCM = () => loadData();
+    const handleFCM = () => loadData(false);
     window.addEventListener("fcm_message", handleFCM);
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") loadData();
+      if (document.visibilityState === "visible") loadData(false);
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
@@ -119,7 +119,7 @@ export default function CrewSFMTerminal() {
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        await loadData();
+        await loadData(true);
         return true;
       } else {
         const errorData = await res.json();
@@ -216,7 +216,7 @@ export default function CrewSFMTerminal() {
             <p className="text-xs font-semibold text-slate-400">Paralel Lane Mode</p>
           </div>
         </div>
-        <button onClick={loadData} className="w-10 h-10 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-slate-200/80 flex items-center justify-center text-slate-700 active:scale-95 transition-all">
+        <button onClick={() => loadData(true)} className="w-10 h-10 rounded-2xl bg-slate-100 hover:bg-slate-200 border border-slate-200/80 flex items-center justify-center text-slate-700 active:scale-95 transition-all">
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
         </button>
       </div>

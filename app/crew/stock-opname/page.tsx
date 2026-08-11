@@ -174,63 +174,57 @@ export default function CrewStockOpnamePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/70 pb-32">
+    <div className="min-h-screen bg-slate-50/80 pb-28 px-4 pt-4 max-w-xl mx-auto space-y-4">
       
-      {/* Native App Header */}
-      <div className="bg-white sticky top-0 z-30 px-4 md:px-8 pt-4 pb-3 shadow-sm border-b border-slate-100">
-        <div className="max-w-4xl mx-auto space-y-3">
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-                <ClipboardList size={20} />
-              </div>
-              <div>
-                <h1 className="text-lg md:text-xl font-extrabold text-slate-800 tracking-tight">
-                  Stock Opname Crew
-                </h1>
-                <p className="text-xs font-semibold text-slate-400">Cek Fisik Produk, Bahan & Packaging</p>
-              </div>
+      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+        
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
+              <ClipboardList size={22} />
             </div>
-
-            <div className="text-right">
-              <span className="text-xs font-bold text-slate-400 block">Progres Audit</span>
-              <span className="text-xs font-black text-slate-800 tabular-nums">{filledCount} / {totalCount} ({progressPercent}%)</span>
+            <div>
+              <h1 className="text-base font-black text-slate-800">
+                Stock Opname
+              </h1>
+              <p className="text-xs font-semibold text-slate-400">Cek Fisik & Packaging</p>
             </div>
           </div>
 
-          {/* Progress Bar */}
-          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-            <div 
-              className="bg-indigo-600 h-full transition-all duration-300 rounded-full"
-              style={{ width: `${progressPercent}%` }}
-            />
+          <div className="text-right">
+            <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wide">Progres</span>
+            <span className="text-sm font-black text-slate-800 tabular-nums">{filledCount}/{totalCount} ({progressPercent}%)</span>
           </div>
-
-          {/* Horizontal Scroll Tabs */}
-          <div className="overflow-x-auto hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0 pt-1">
-            <div className="flex items-center gap-1.5 min-w-max">
-              {CATEGORY_TABS.map(t => (
-                <button
-                  key={t.key}
-                  onClick={() => setActiveTab(t.key)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap border ${
-                    activeTab === t.key 
-                      ? "bg-slate-900 text-white border-slate-900 shadow-sm" 
-                      : "bg-slate-100/80 text-slate-600 border-slate-200/80 hover:bg-slate-200/60"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
         </div>
+
+        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+          <div 
+            className="bg-slate-900 h-full transition-all duration-300 rounded-full"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+
+        <div className="overflow-x-auto hide-scrollbar -mx-5 px-5 pt-1">
+          <div className="flex items-center gap-2 min-w-max">
+            {CATEGORY_TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key)}
+                className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap ${
+                  activeTab === t.key 
+                    ? "bg-slate-900 text-white shadow-md shadow-slate-900/20" 
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
       </div>
 
-      {/* Main Content Area */}
-      <div className="px-4 md:px-8 max-w-4xl mx-auto space-y-4 pt-4">
+      <div className="space-y-4">
         
         {/* Search input */}
         <div className="relative">
@@ -344,21 +338,20 @@ export default function CrewStockOpnamePage() {
 
       </div>
 
-      {/* Sticky Bottom Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 p-4 shadow-xl">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+      <div className="fixed bottom-[72px] left-0 right-0 z-40 flex justify-center pointer-events-none px-4">
+        <div className="w-full max-w-xl bg-white border border-slate-200 p-4 rounded-3xl shadow-xl pointer-events-auto flex items-center justify-between gap-3">
           <div>
-            <span className="text-xs font-bold text-slate-400 block">Total Terisi</span>
+            <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wide">Total Terisi</span>
             <span className="text-sm font-black text-slate-800 tabular-nums">{filledCount} dari {totalCount} Item</span>
           </div>
 
           <button
             onClick={handleSubmit}
             disabled={submitting || filledCount === 0}
-            className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-xs transition-all shadow-md flex items-center gap-2"
+            className="px-6 py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-black text-xs transition-all shadow-md flex items-center gap-2 active:scale-95"
           >
             {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            Kirim Stock Opname
+            Kirim Opname
           </button>
         </div>
       </div>

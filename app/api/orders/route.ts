@@ -5,6 +5,7 @@ import { requireRole, verifyAuth } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
 import { orderSchema } from "@/lib/validations";
 import { calculateProductHPP, getLatestIngredientCosts } from "@/lib/business-logic";
+import { BusinessError } from "@/lib/errors";
 
 export async function GET(req: NextRequest) {
   const auth = await requireRole(req, ["owner", "manager", "crew"]);
@@ -80,11 +81,12 @@ export async function GET(req: NextRequest) {
 
 
 
-async function getApplicableTier(productId: string, qty: number): Promise<number> {
-  const tiersSnap = await adminDb
+async function getApplicableTier(productId: string, qty: number, tx?: FirebaseFirestore.Transaction): Promise<number> {
+  const query = adminDb
     .collection(`products/${productId}/priceTiers`)
-    .orderBy("minQty", "asc")
-    .get();
+    .orderBy("minQty", "asc");
+
+  const tiersSnap = tx ? await tx.get(query) : await query.get();
 
   let price = 0;
   for (const doc of tiersSnap.docs) {
@@ -133,10 +135,8 @@ export async function POST(req: NextRequest) {
     sauceDistribution,
     poNumber,
     secondaryPackagingIngId: rawSecPkgIngId,
+    customDate,
   } = parseResult.data;
-  
-  // customDate requires server override role check
-  const customDate = body.customDate;
   
   const secondaryPackagingIngId = rawSecPkgIngId === "none" ? null : rawSecPkgIngId;
 
@@ -178,61 +178,10 @@ export async function POST(req: NextRequest) {
     const dateToUse = customDate ? new Date(customDate) : new Date();
     // Maintain correct timezone date prefix
     const orderRef = adminDb.collection("orders").doc();
+    let orderNumber = "";
+    let processedItems: Record<string, unknown>[] = [];
     let needsProduction = false;
     let hasRainbow = false;
-
-    // Accumulate quantity per product to apply cumulative price tiers
-    const productQtyMap = new Map<string, number>();
-    for (const item of items) {
-      const current = productQtyMap.get(item.productId) ?? 0;
-      productQtyMap.set(item.productId, current + item.qty);
-    }
-
-    const processedItems: Record<string, unknown>[] = [];
-
-    for (const item of items) {
-      const productSnap = await adminDb.doc(`products/${item.productId}`).get();
-      const product = productSnap.data();
-
-      const variantSnap = await adminDb.doc(`variants/${item.variantId}`).get();
-      const variant = variantSnap.data();
-
-      const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
-
-      const totalProductQty = productQtyMap.get(item.productId) ?? item.qty;
-      const basePrice = await getApplicableTier(item.productId, totalProductQty);
-      const totalPrice = (basePrice - discountPerUnit) * item.qty;
-      
-      const packPerBatch = product?.packPerBatch || 1;
-      const hppPerUnit = await calculateProductHPP(item.productId, item.variantId, packPerBatch);
-      const totalHpp = hppPerUnit * item.qty;
-      const margin = totalPrice - totalHpp;
-
-      const itemData: Record<string, unknown> = {
-        productId: item.productId,
-        productName: product?.name ?? item.productId,
-        variantId: item.variantId,
-        variantName: variant?.name ?? item.variantId,
-        qty: item.qty,
-        basePrice,
-        appliedTier: `${totalProductQty} pcs`,
-        discountPerUnit,
-        totalPrice,
-        hppPerUnit,
-        totalHpp,
-        margin,
-        assemblyStatus: isRainbow ? "pending_approval" : null,
-        rainbowSourceBreakdown: null,
-        sauceId: item.sauceId ?? null,
-        sauceName: item.sauceName ?? null,
-      };
-
-      if (isRainbow) hasRainbow = true;
-
-      processedItems.push(itemData);
-    }
-
-    let orderNumber = "";
 
     await adminDb.runTransaction(async (tx) => {
       // Determine order channel
@@ -240,8 +189,58 @@ export async function POST(req: NextRequest) {
       const isImmediate = ["walkin", "tiktok", "shopee"].includes(finalOrderChannel);
 
       // --- ALL READS MUST HAPPEN BEFORE ANY WRITES ---
+
+      // 0. Process items and calculate HPP inside transaction
+      processedItems = [];
+      const productQtyMap = new Map<string, number>();
+      for (const item of items) {
+        const current = productQtyMap.get(item.productId) ?? 0;
+        productQtyMap.set(item.productId, current + item.qty);
+      }
+
+      for (const item of items) {
+        const productSnap = await tx.get(adminDb.doc(`products/${item.productId}`));
+        const product = productSnap.data();
+
+        const variantSnap = await tx.get(adminDb.doc(`variants/${item.variantId}`));
+        const variant = variantSnap.data();
+
+        const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
+
+        const totalProductQty = productQtyMap.get(item.productId) ?? item.qty;
+        const basePrice = await getApplicableTier(item.productId, totalProductQty, tx);
+        const totalPrice = (basePrice - discountPerUnit) * item.qty;
+        
+        const packPerBatch = product?.packPerBatch || 1;
+        const hppPerUnit = await calculateProductHPP(item.productId, item.variantId, packPerBatch, undefined, tx);
+        const totalHpp = hppPerUnit * item.qty;
+        const margin = totalPrice - totalHpp;
+
+        const itemData: Record<string, unknown> = {
+          productId: item.productId,
+          productName: product?.name ?? item.productId,
+          variantId: item.variantId,
+          variantName: variant?.name ?? item.variantId,
+          qty: item.qty,
+          basePrice,
+          appliedTier: `${totalProductQty} pcs`,
+          discountPerUnit,
+          totalPrice,
+          hppPerUnit,
+          totalHpp,
+          margin,
+          assemblyStatus: isRainbow ? "pending_approval" : null,
+          rainbowSourceBreakdown: null,
+          sauceId: item.sauceId ?? null,
+          sauceName: item.sauceName ?? null,
+        };
+
+        if (isRainbow) hasRainbow = true;
+
+        processedItems.push(itemData);
+      }
       
-      // 0. Generate Order Number
+      // 1. Generate Order Number
       const dateStr = dateToUse.toISOString().split("T")[0].replace(/-/g, "");
       const prefix = `ORD-${dateStr}-`;
       const snap = await tx.get(
@@ -424,7 +423,7 @@ export async function POST(req: NextRequest) {
 
         if (nextStock < 0) {
           const [prodId, varId] = [stockId.split("_")[0], stockId.split("_").slice(1).join("_")];
-          throw new Error(`Stok ${prodId} varian ${varId} tidak mencukupi (tersedia: ${currStock}, diminta: ${changeQty})`);
+          throw new BusinessError(`Stok ${prodId} varian ${varId} tidak mencukupi (tersedia: ${currStock}, diminta: ${changeQty})`, 400);
         }
 
         tx.set(stockRef, {
@@ -473,6 +472,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("POST /api/orders error:", err);
+    if (err instanceof BusinessError) {
+      return NextResponse.json({ error: err.message }, { status: err.statusCode });
+    }
     return NextResponse.json({ error: err.message || "Gagal membuat order", stack: err.stack }, { status: 500 });
   }
 }
