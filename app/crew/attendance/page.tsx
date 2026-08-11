@@ -74,43 +74,14 @@ export default function CrewAttendancePage() {
       );
       if (!confirmed) return;
     }
-    setPendingActionType(type);
-    fileInputRef.current?.click(); // Buka kamera
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !pendingActionType) return;
     
     setError(""); 
     setSubmitting(true);
 
     try {
-      // 1. Get GPS Location
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        });
-      }).catch(err => {
-        throw new Error("Akses lokasi (GPS) ditolak atau gagal. Izinkan akses GPS untuk absen.");
-      }) as GeolocationPosition;
-      
-      const { latitude, longitude } = position.coords;
-
-      // 2. Compress Photo using Canvas
-      const compressedBase64 = await compressImage(file);
-
-      // 3. Upload to Firebase Storage
-      const storageRef = ref(storage, `attendance/${attendanceMonth}/${user?.uid}_${Date.now()}.jpg`);
-      await uploadString(storageRef, compressedBase64, 'data_url');
-      const photoUrl = await getDownloadURL(storageRef);
-
-      // 4. Send to API
-      const res = await fetchWithAuth(`/api/attendance/${pendingActionType}`, { 
+      const res = await fetchWithAuth(`/api/attendance/${type}`, { 
          method: "POST",
-         body: JSON.stringify({ photoUrl, latitude, longitude })
+         body: JSON.stringify({ photoUrl: null, latitude: null, longitude: null })
       });
       const data = await res.json();
       if (!res.ok) { 
@@ -122,47 +93,7 @@ export default function CrewAttendancePage() {
       setError(err.message || "Gagal menghubungi server"); 
     } finally { 
       setSubmitting(false); 
-      setPendingActionType(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  };
-
-  // Helper untuk kompresi gambar
-  const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const MAX_WIDTH = 600;
-          const MAX_HEIGHT = 600;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/jpeg", 0.6)); // Kualitas 60% (~50kb)
-        };
-        img.onerror = (err) => reject(err);
-      };
-      reader.onerror = (err) => reject(err);
-    });
   };
 
   const todayLabel = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
@@ -238,14 +169,7 @@ export default function CrewAttendancePage() {
           <p className="text-xs text-white/75 font-medium">{statusCard.sub}</p>
         </div>
 
-        <input 
-          type="file" 
-          accept="image/*" 
-          capture="user" 
-          ref={fileInputRef} 
-          style={{ display: "none" }} 
-          onChange={handleFileChange} 
-        />
+
 
         {btnConfig && (
           <div className="flex flex-col items-center gap-3">
@@ -263,7 +187,7 @@ export default function CrewAttendancePage() {
                 <Loader2 size={36} className="text-white animate-spin" />
               ) : (
                 <>
-                  <Camera size={36} className="text-white mb-1" />
+                  <CheckCircle size={36} className="text-white mb-1" />
                   <span className="text-white font-black text-sm uppercase tracking-wider">
                     {btnConfig.label}
                   </span>
@@ -273,7 +197,7 @@ export default function CrewAttendancePage() {
             <div className="flex items-center gap-1.5 text-center mt-1">
               <MapPin size={12} className="text-slate-400" />
               <p className="text-[11px] font-semibold text-slate-400">
-                {btnConfig.subLabel || `Kamera & GPS diperlukan`}
+                {btnConfig.subLabel || `Ketuk tombol di atas untuk absen`}
               </p>
             </div>
           </div>

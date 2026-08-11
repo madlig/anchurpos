@@ -76,7 +76,6 @@ export default function CrewLayout({ children }: { children: React.ReactNode }) 
     { label: "Absen", href: "/crew/attendance", icon: Clock },
     ...(hasCheckedIn ? [
       { label: "SFM", href: "/crew/sfm", icon: ChefHat },
-      { label: "Opname", href: "/crew/stock-opname", icon: ClipboardList },
     ] : []),
     { label: "Gaji", href: "/crew/payroll", icon: ReceiptText },
     { label: "Profil", href: "/crew/settings", icon: User },

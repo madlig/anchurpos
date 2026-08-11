@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Check, ChefHat, Package, RefreshCw, Snowflake, Layers, X, Clock, Play, Plus, Box, PenLine, AlertTriangle, Pause, CheckCircle2 } from "lucide-react";
+import { Loader2, Check, ChefHat, Package, RefreshCw, Snowflake, Layers, X, Clock, Play, Plus, Box, PenLine, AlertTriangle, Pause, CheckCircle2, ChevronRight } from "lucide-react";
+import Link from "next/link";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { WorkOrder } from "@/types";
 
@@ -220,6 +221,21 @@ export default function CrewSFMTerminal() {
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
+
+      <Link href="/crew/stock-opname" className="w-full bg-slate-900 rounded-3xl p-5 flex items-center justify-between text-white shadow-md active:scale-95 transition-all block">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
+            <Package size={20} />
+          </div>
+          <div>
+            <h2 className="text-sm font-black">Lakukan Stock Opname</h2>
+            <p className="text-[11px] font-semibold text-slate-300">Hitung & sesuaikan sisa bahan</p>
+          </div>
+        </div>
+        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+          <ChevronRight size={16} />
+        </div>
+      </Link>
 
       {loading && workOrders.length === 0 ? (
         <div className="space-y-4">
