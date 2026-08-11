@@ -486,7 +486,7 @@ export default function CrewSFMTerminal() {
                           wo.woType === "PACKING_PESANAN" ? "text-orange-800 bg-orange-50" :
                           "text-emerald-800 bg-emerald-50"
                         }`}>
-                          {wo.woType.replace(/_/g, ' ')}
+                          {(wo.woType || "GENERAL_TASK").replace(/_/g, ' ')}
                         </span>
                         {wo.targetDate && wo.targetDate < new Date().toLocaleString("en-CA", { timeZone: "Asia/Jakarta" }).split(',')[0] && (
                           <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 rounded flex items-center gap-1"><AlertTriangle size={10}/> Tertunda</span>
@@ -500,7 +500,7 @@ export default function CrewSFMTerminal() {
                     </div>
                     <div>
                       <h2 className="text-lg font-black text-slate-800">{wo.productName || "Tugas Operasional"}</h2>
-                      {(wo.targetQty > 0 || wo.targetUom) && (
+                      {((wo.targetQty ?? 0) > 0 || wo.targetUom) && (
                         <p className="text-sm font-semibold text-slate-500 mt-1">Target: <span className="text-slate-700 font-bold">{wo.targetQty || "-"} {wo.targetUom}</span></p>
                       )}
                       {wo.notes && (
