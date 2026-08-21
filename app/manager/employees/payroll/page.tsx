@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Loader2, CalendarDays, Check, Search, Lock, Edit3, Save, X, FileText, LayoutList, Wallet, Settings2, ChevronDown, CheckCircle2 } from "lucide-react";
+import { Loader2, CalendarDays, Check, Search, Lock, Edit3, Save, X, FileText, LayoutList, Wallet, Settings2, ChevronDown, CheckCircle2, TrendingUp, Users, AlertTriangle } from "lucide-react";
 import { AttendanceRecord, Employee, PayrollRecord } from "../types";
 import { AdaptivePanel } from "@/components/shared/AdaptivePanel";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
@@ -22,7 +22,7 @@ export default function PayrollPage() {
   const { getToken } = useAuth();
   const { alert, confirm } = useAlertConfirm();
   
-  // Date states (Default: 26th of prev month to 25th of current month)
+  // Date states (Default: 29th of prev month to 28th of current month)
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
@@ -33,6 +33,9 @@ export default function PayrollPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [lockedPayrolls, setLockedPayrolls] = useState<PayrollRecord[]>([]);
+
+  // Search filter
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [expandedPayrollId, setExpandedPayrollId] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
@@ -57,7 +60,6 @@ export default function PayrollPage() {
     let prevYear = year;
     if (prevMonth === 0) { prevMonth = 12; prevYear = year - 1; }
     
-    // Perusahaan default cut-off: 29 (bulan lalu) sampai 28 (bulan ini)
     const sd = new Date(prevYear, prevMonth - 1, 29);
     const sYear = sd.getFullYear();
     const sMonth = String(sd.getMonth() + 1).padStart(2, "0");
@@ -105,47 +107,53 @@ export default function PayrollPage() {
   const livePayrolls = useMemo(() => {
     const periodStr = `${fmtDateFull(startDate)} - ${fmtDateFull(endDate)}`;
     
-    return employees.filter(e => e.isActive !== false && e.role === "crew").map(emp => {
-      const locked = lockedPayrolls.find(p => p.employeeId === emp.id);
-      if (locked && locked.isLocked) return locked; // Return locked if exists
+    return employees
+      .filter(e => e.isActive !== false && e.role === "crew")
+      .map(emp => {
+        const locked = lockedPayrolls.find(p => p.employeeId === emp.id);
+        if (locked && locked.isLocked) return locked; // Return locked if exists
 
-      const empAtt = attendance.filter(a => a.employeeId === emp.id);
-      const workDays = empAtt.length;
-      const dailyWage = emp.dailyWage || 60000;
-      const totalOvertimeBonus = empAtt.reduce((sum, a) => sum + (a.overtimeBonus || 0), 0);
-      
-      const pId = `${selectedMonth}_${emp.id}`;
-      const overrides = editedPayrolls[pId];
-      const isEditing = editingPayrollId === pId;
-      
-      const finalWorkDays = isEditing && editWorkDays !== "" ? Number(editWorkDays) : (overrides?.workDays ?? workDays);
-      const finalDailyWage = isEditing && editDailyWage !== "" ? Number(editDailyWage) : (overrides?.dailyWage ?? dailyWage);
-      const finalRegularPay = finalWorkDays * finalDailyWage;
-      
-      const finalBonus = isEditing && editPerformanceBonus !== "" ? Number(editPerformanceBonus) : (overrides?.performanceBonus ?? (locked?.performanceBonus || 0));
-      const finalDeduction = isEditing && editDeductions !== "" ? Number(editDeductions) : (overrides?.deductions ?? (locked?.deductions || 0));
-      
-      const totalPaid = finalRegularPay + totalOvertimeBonus + finalBonus - finalDeduction;
+        const empAtt = attendance.filter(a => a.employeeId === emp.id);
+        const workDays = empAtt.length;
+        const dailyWage = emp.dailyWage || 60000;
+        const totalOvertimeBonus = empAtt.reduce((sum, a) => sum + (a.overtimeBonus || 0), 0);
+        
+        const pId = `${selectedMonth}_${emp.id}`;
+        const overrides = editedPayrolls[pId];
+        const isEditing = editingPayrollId === pId;
+        
+        const finalWorkDays = isEditing && editWorkDays !== "" ? Number(editWorkDays) : (overrides?.workDays ?? workDays);
+        const finalDailyWage = isEditing && editDailyWage !== "" ? Number(editDailyWage) : (overrides?.dailyWage ?? dailyWage);
+        const finalRegularPay = finalWorkDays * finalDailyWage;
+        
+        const finalBonus = isEditing && editPerformanceBonus !== "" ? Number(editPerformanceBonus) : (overrides?.performanceBonus ?? (locked?.performanceBonus || 0));
+        const finalDeduction = isEditing && editDeductions !== "" ? Number(editDeductions) : (overrides?.deductions ?? (locked?.deductions || 0));
+        
+        const totalPaid = finalRegularPay + totalOvertimeBonus + finalBonus - finalDeduction;
 
-      return {
-        id: pId,
-        month: selectedMonth,
-        employeeId: emp.id,
-        employeeName: emp.name,
-        workDays: finalWorkDays,
-        dailyWage: finalDailyWage,
-        totalRegularPay: finalRegularPay,
-        totalOvertimeBonus,
-        performanceBonus: finalBonus,
-        performanceBonusNote: isEditing ? editPerformanceBonusNote : (overrides?.performanceBonusNote ?? (locked?.performanceBonusNote || "")),
-        deductions: finalDeduction,
-        deductionNote: isEditing ? editDeductionNote : (overrides?.deductionNote ?? (locked?.deductionNote || "")),
-        totalPaid,
-        isLocked: false,
-        workPeriod: periodStr
-      } as PayrollRecord;
-    });
+        return {
+          id: pId,
+          month: selectedMonth,
+          employeeId: emp.id,
+          employeeName: emp.name,
+          workDays: finalWorkDays,
+          dailyWage: finalDailyWage,
+          totalRegularPay: finalRegularPay,
+          totalOvertimeBonus,
+          performanceBonus: finalBonus,
+          performanceBonusNote: isEditing ? editPerformanceBonusNote : (overrides?.performanceBonusNote ?? (locked?.performanceBonusNote || "")),
+          deductions: finalDeduction,
+          deductionNote: isEditing ? editDeductionNote : (overrides?.deductionNote ?? (locked?.deductionNote || "")),
+          totalPaid,
+          isLocked: false,
+          workPeriod: periodStr
+        } as PayrollRecord;
+      });
   }, [employees, attendance, lockedPayrolls, selectedMonth, startDate, endDate, editingPayrollId, editedPayrolls, editWorkDays, editDailyWage, editPerformanceBonus, editPerformanceBonusNote, editDeductions, editDeductionNote]);
+
+  const filteredPayrolls = useMemo(() => {
+    return livePayrolls.filter(p => p.employeeName.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [livePayrolls, searchQuery]);
 
   const handleStartEdit = (p: PayrollRecord) => {
     setEditingPayrollId(p.id);
@@ -215,39 +223,77 @@ export default function PayrollPage() {
   };
 
   const unlockedCount = livePayrolls.filter(p => !p.isLocked).length;
+  const totalPayrollValue = livePayrolls.reduce((sum, p) => sum + p.totalPaid, 0);
+  const totalLockedValue = livePayrolls.filter(p => p.isLocked).reduce((sum, p) => sum + p.totalPaid, 0);
 
   return (
-    <div className="animate-in fade-in">
+    <div className="animate-in fade-in pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
         <div>
-          <h2 className="text-lg font-black text-slate-800">Sistem Penggajian</h2>
+          <h2 className="text-xl font-black text-slate-800 tracking-tight">Sistem Penggajian</h2>
           <p className="text-xs font-bold text-slate-500 mt-1">Kalkulasi gaji real-time berdasarkan absensi berjalan.</p>
         </div>
         <div className="flex items-center gap-2">
-          <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} style={{ padding: "8px 12px", borderRadius: "10px", border: "1px solid #E2E8F0", fontSize: "13px", fontWeight: "700", color: "#334155", outline: "none" }} />
+          <input 
+            type="month" 
+            value={selectedMonth} 
+            onChange={e => setSelectedMonth(e.target.value)} 
+            className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white shadow-sm"
+          />
         </div>
       </div>
 
-      <div style={{ background: "#F8FAFC", padding: "16px", borderRadius: "14px", border: "1px dashed #CBD5E1", marginBottom: "20px" }}>
-        <p style={{ fontSize: "11px", fontWeight: "800", color: "#64748B", marginBottom: "8px" }}>TENTUKAN RENTANG TANGGAL GAJI (DEFAULT 29 S/D 28)</p>
-        <div className="flex gap-3 items-center">
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ flex: 1, padding: "8px 12px", borderRadius: "8px", border: "1px solid #E2E8F0", fontSize: "13px" }} />
-          <span className="font-bold text-slate-400">s/d</span>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ flex: 1, padding: "8px 12px", borderRadius: "8px", border: "1px solid #E2E8F0", fontSize: "13px" }} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-extrabold text-slate-400 mb-1 tracking-wide">ESTIMASI TOTAL GAJI</p>
+            <h3 className="text-2xl font-black text-slate-800">{fmtRupiah(totalPayrollValue)}</h3>
+            <p className="text-xs font-bold text-slate-400 mt-1">
+              Terkunci: <span className="text-emerald-600">{fmtRupiah(totalLockedValue)}</span>
+            </p>
+          </div>
+          <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center">
+            <TrendingUp className="text-slate-400" size={24} />
+          </div>
         </div>
+        
+        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex flex-col justify-center">
+          <p className="text-[10px] font-extrabold text-slate-400 mb-2 tracking-wide">RENTANG TANGGAL (29 S/D 28)</p>
+          <div className="flex gap-2 items-center">
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white shadow-sm" />
+            <span className="font-bold text-slate-400 text-xs">s/d</span>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white shadow-sm" />
+          </div>
+        </div>
+      </div>
+
+      <div className="relative mb-6">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Search className="h-4 w-4 text-slate-400" />
+        </div>
+        <input
+          type="text"
+          placeholder="Cari nama karyawan..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm"
+        />
       </div>
 
       {/* Fitur Bayar Semua Karyawan (Batch Action) */}
-      {!loading && unlockedCount > 0 && (
-        <div className="mb-6 p-4 rounded-[16px] bg-emerald-50 border border-emerald-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {!loading && unlockedCount > 0 && !searchQuery && (
+        <div className="mb-6 p-5 rounded-2xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
           <div>
-            <h3 className="text-emerald-900 font-bold text-sm">Ada {unlockedCount} gaji yang belum dibayar</h3>
-            <p className="text-emerald-700 text-xs mt-1">Pastikan Anda sudah mengecek semua potongan atau bonus sebelum membayar sekaligus.</p>
+            <h3 className="text-emerald-900 font-extrabold text-sm flex items-center gap-2">
+              <AlertTriangle size={16} className="text-emerald-600" /> 
+              Ada {unlockedCount} gaji yang belum dibayar
+            </h3>
+            <p className="text-emerald-700/80 text-xs mt-1.5 font-semibold">Pastikan Anda sudah mengecek semua potongan atau bonus sebelum membayar sekaligus.</p>
           </div>
           <button 
             onClick={handlePayAll}
             disabled={isPayingAll}
-            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-colors shadow-sm shadow-emerald-200 tap-target"
+            className="flex-shrink-0 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-all shadow-md shadow-emerald-200/50 tap-target"
           >
             {isPayingAll ? <Loader2 size={16} className="animate-spin" /> : <Wallet size={16} />}
             Bayar & Kunci Semua
@@ -256,36 +302,42 @@ export default function PayrollPage() {
       )}
 
       {loading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-20 w-full rounded-2xl" />
-          <Skeleton className="h-20 w-full rounded-2xl" />
-          <Skeleton className="h-20 w-full rounded-2xl" />
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full rounded-2xl" />
+          <Skeleton className="h-32 w-full rounded-2xl" />
+          <Skeleton className="h-32 w-full rounded-2xl" />
         </div>
-      ) : livePayrolls.length === 0 ? (
-        <div className="text-center py-10 text-slate-500 font-bold">Tidak ada karyawan aktif untuk dihitung gajinya.</div>
+      ) : filteredPayrolls.length === 0 ? (
+        <div className="bg-white rounded-2xl py-12 px-6 text-center border border-slate-100 shadow-sm flex flex-col items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
+            <Users className="text-slate-400" size={24} />
+          </div>
+          <p className="text-sm font-bold text-slate-700">Tidak ada data gaji</p>
+          <p className="text-xs text-slate-500 mt-1">Belum ada data gaji yang cocok dengan filter atau karyawan aktif.</p>
+        </div>
       ) : (
-        <div className="flex flex-col gap-4">
-          {livePayrolls.map(p => {
+        <div className="flex flex-col gap-5">
+          {filteredPayrolls.map(p => {
             const empAtt = attendance.filter(a => a.employeeId === p.employeeId);
             const isExpanded = expandedPayrollId === p.id;
 
             return (
-              <div key={p.id} style={{ background: "#fff", borderRadius: "16px", overflow: "hidden", border: p.isLocked ? "2px solid #10B981" : "1px solid #E2E8F0", boxShadow: "0 4px 15px rgba(0,0,0,0.02)" }}>
+              <div key={p.id} className={`bg-white rounded-2xl overflow-hidden transition-all shadow-[0_4px_15px_rgba(0,0,0,0.02)] hover:shadow-md ${p.isLocked ? "border-2 border-emerald-400" : "border border-slate-200"}`}>
                 <div className="p-4 md:p-5">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 style={{ fontSize: "16px", fontWeight: "900", color: "#1C1C1E" }}>{p.employeeName}</h3>
-                      <p style={{ fontSize: "11px", color: "#64748B", fontWeight: "600", marginTop: "2px", background: "#F1F5F9", padding: "2px 8px", borderRadius: "100px", display: "inline-block" }}>
+                      <h3 className="text-base font-black text-slate-900 tracking-tight">{p.employeeName}</h3>
+                      <p className="text-[10px] text-slate-500 font-bold mt-1 bg-slate-100 px-2.5 py-0.5 rounded-full inline-block">
                         Periode: {p.workPeriod}
                       </p>
                     </div>
                     <div>
                       {p.isLocked ? (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", background: "#D1FAE5", color: "#065F46", padding: "4px 8px", borderRadius: "100px", fontSize: "10px", fontWeight: "800" }}>
+                        <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide border border-emerald-200">
                           <CheckCircle2 size={12} /> DIKUNCI
                         </span>
                       ) : (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", background: "#FEF3C7", color: "#D97706", padding: "4px 8px", borderRadius: "100px", fontSize: "10px", fontWeight: "800" }}>
+                        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide border border-amber-200">
                           LIVE
                         </span>
                       )}
@@ -293,45 +345,45 @@ export default function PayrollPage() {
                   </div>
 
                   {/* Compact Breakdown (Mobile First) */}
-                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mb-4 space-y-2">
+                  <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-100 mb-4 space-y-2.5">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500 font-semibold">Gaji Pokok ({p.workDays} hr)</span>
-                      <span className="text-slate-700 font-bold">{fmtRupiah(p.totalRegularPay)}</span>
+                      <span className="text-slate-500 font-bold">Gaji Pokok ({p.workDays} hr)</span>
+                      <span className="text-slate-800 font-black">{fmtRupiah(p.totalRegularPay)}</span>
                     </div>
                     {(p.totalOvertimeBonus > 0 || p.performanceBonus > 0) && (
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-emerald-600 font-semibold">Lembur + Bonus</span>
-                        <span className="text-emerald-700 font-bold">+{fmtRupiah(p.totalOvertimeBonus + p.performanceBonus)}</span>
+                        <span className="text-emerald-600 font-bold flex items-center gap-1">Lembur + Bonus</span>
+                        <span className="text-emerald-700 font-black">+{fmtRupiah(p.totalOvertimeBonus + p.performanceBonus)}</span>
                       </div>
                     )}
                     {(p.deductions || 0) > 0 && (
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-red-600 font-semibold">Potongan / Kasbon</span>
-                        <span className="text-red-700 font-bold">-{fmtRupiah(p.deductions || 0)}</span>
+                        <span className="text-rose-600 font-bold">Potongan / Kasbon</span>
+                        <span className="text-rose-700 font-black">-{fmtRupiah(p.deductions || 0)}</span>
                       </div>
                     )}
                   </div>
 
                   <div className="flex flex-col md:flex-row md:items-center justify-between pt-1 gap-2">
-                    <p style={{ fontSize: "12px", fontWeight: "800", color: "#94A3B8", letterSpacing: "0.5px" }}>TOTAL DITERIMA</p>
-                    <p style={{ fontSize: "28px", fontWeight: "900", color: p.isLocked ? "#10B981" : "#1E293B", lineHeight: "1" }}>
+                    <p className="text-[11px] font-extrabold text-slate-400 tracking-wide">TOTAL DITERIMA</p>
+                    <p className={`text-3xl font-black tracking-tight leading-none ${p.isLocked ? "text-emerald-600" : "text-slate-800"}`}>
                       {fmtRupiah(p.totalPaid)}
                     </p>
                   </div>
                 </div>
 
                 {/* Bottom Actions */}
-                <div className="flex border-t border-slate-100 bg-slate-50">
-                  <button onClick={() => setExpandedPayrollId(isExpanded ? null : p.id)} className="flex-1 py-3.5 text-xs font-bold text-slate-600 flex justify-center items-center gap-2 border-r border-slate-200 hover:bg-slate-200 transition-colors tap-target">
+                <div className="flex border-t border-slate-100 bg-slate-50/50">
+                  <button onClick={() => setExpandedPayrollId(isExpanded ? null : p.id)} className="flex-1 py-4 text-[11px] font-bold text-slate-600 flex justify-center items-center gap-2 border-r border-slate-100 hover:bg-slate-100 transition-colors tap-target">
                     {isExpanded ? <ChevronDown size={14} className="rotate-180" /> : <LayoutList size={14} />} 
                     {isExpanded ? "Tutup Rincian" : "Rincian"}
                   </button>
                   {!p.isLocked && (
                     <>
-                      <button onClick={() => handleStartEdit(p)} className="flex-1 py-3.5 text-xs font-bold text-blue-600 flex justify-center items-center gap-2 border-r border-slate-200 hover:bg-slate-200 transition-colors tap-target">
+                      <button onClick={() => handleStartEdit(p)} className="flex-1 py-4 text-[11px] font-bold text-blue-600 flex justify-center items-center gap-2 border-r border-slate-100 hover:bg-blue-50 transition-colors tap-target">
                         <Settings2 size={14} /> Koreksi
                       </button>
-                      <button onClick={() => handlePay(p)} disabled={payingId === p.id} className="flex-1 py-3.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 flex justify-center items-center gap-2 transition-colors tap-target">
+                      <button onClick={() => handlePay(p)} disabled={payingId === p.id} className="flex-1 py-4 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 flex justify-center items-center gap-2 transition-colors tap-target">
                         {payingId === p.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Kunci
                       </button>
                     </>
@@ -340,25 +392,25 @@ export default function PayrollPage() {
 
                 {/* Compact Rincian Shift List */}
                 {isExpanded && (
-                  <div className="p-4 bg-white border-t border-slate-200">
-                    <p className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wide">Rincian {empAtt.length} Shift Kerja</p>
+                  <div className="p-4 bg-white border-t border-slate-100 animate-in slide-in-from-top-2">
+                    <p className="text-[10px] font-extrabold text-slate-400 mb-3 tracking-wide">RINCIAN {empAtt.length} SHIFT KERJA</p>
                     {empAtt.length === 0 ? (
                       <p className="text-xs text-slate-400 italic">Tidak ada kehadiran.</p>
                     ) : (
-                      <div className="flex flex-col gap-0 border border-slate-100 rounded-xl overflow-hidden">
+                      <div className="flex flex-col gap-0 border border-slate-100 rounded-xl overflow-hidden shadow-sm">
                         {empAtt.map((a, i) => (
-                          <div key={a.id} className={`flex justify-between items-center p-3 ${i !== empAtt.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                          <div key={a.id} className={`flex justify-between items-center p-3.5 bg-slate-50/30 ${i !== empAtt.length - 1 ? 'border-b border-slate-100' : ''}`}>
                             <div>
-                              <p className="text-xs font-bold text-slate-700">{fmtDateFull(a.date)}</p>
-                              <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                              <p className="text-xs font-bold text-slate-800">{fmtDateFull(a.date)}</p>
+                              <p className="text-[10px] text-slate-500 font-semibold mt-1">
                                 Masuk: {a.checkIn ? new Date(a.checkIn.time).toLocaleTimeString("id-ID", {hour: '2-digit', minute:'2-digit'}) : "-"}
-                                {a.flaggedReason && <span className="text-red-500 ml-1">(! {a.flaggedReason})</span>}
+                                {a.flaggedReason && <span className="text-rose-500 ml-1">(! {a.flaggedReason})</span>}
                               </p>
                             </div>
                             <div className="text-right">
-                              <p className="text-xs font-bold text-slate-800">{a.totalHours} Jam</p>
+                              <p className="text-xs font-black text-slate-800">{a.totalHours} Jam</p>
                               {a.overtimeBonus ? (
-                                <p className="text-[10px] font-bold text-emerald-600">Lembur: {fmtRupiah(a.overtimeBonus)}</p>
+                                <p className="text-[10px] font-bold text-emerald-600 mt-1">Lembur: {fmtRupiah(a.overtimeBonus)}</p>
                               ) : null}
                             </div>
                           </div>
@@ -380,35 +432,35 @@ export default function PayrollPage() {
         title="Koreksi Penggajian"
         icon={<Settings2 size={18} />}
       >
-        <div className="p-4 md:p-6 space-y-4">
+        <div className="p-4 md:p-6 space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-bold text-slate-500 block mb-1">TOTAL HARI KERJA</label>
-              <input type="number" value={editWorkDays} onChange={e => setEditWorkDays(e.target.value)} className="w-full h-10 rounded-lg border border-slate-300 px-3 font-bold text-sm bg-slate-50" />
+              <label className="text-[10px] font-extrabold text-slate-400 block mb-1.5 tracking-wide">TOTAL HARI KERJA</label>
+              <input type="number" value={editWorkDays} onChange={e => setEditWorkDays(e.target.value)} className="w-full h-11 rounded-xl border border-slate-200 px-3 font-bold text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-500 block mb-1">TARIF GAJI / HARI (Rp)</label>
-              <input type="number" value={editDailyWage} onChange={e => setEditDailyWage(e.target.value)} className="w-full h-10 rounded-lg border border-slate-300 px-3 font-bold text-sm bg-slate-50" />
+              <label className="text-[10px] font-extrabold text-slate-400 block mb-1.5 tracking-wide">TARIF GAJI / HARI (Rp)</label>
+              <input type="number" value={editDailyWage} onChange={e => setEditDailyWage(e.target.value)} className="w-full h-11 rounded-xl border border-slate-200 px-3 font-bold text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
             </div>
           </div>
           
-          <div className="pt-2 border-t border-slate-100">
-            <label className="text-[10px] font-bold text-emerald-600 block mb-1">TAMBAHAN BONUS PERFORMA (Rp)</label>
-            <input type="number" value={editPerformanceBonus} onChange={e => setEditPerformanceBonus(e.target.value)} className="w-full h-10 rounded-lg border border-emerald-300 px-3 font-bold text-sm text-emerald-700 bg-emerald-50 mb-2" />
-            <input type="text" placeholder="Catatan bonus (Opsional)..." value={editPerformanceBonusNote} onChange={e => setEditPerformanceBonusNote(e.target.value)} className="w-full h-9 rounded-lg border border-slate-200 px-3 text-xs" />
+          <div className="pt-3 border-t border-slate-100">
+            <label className="text-[10px] font-extrabold text-emerald-600 block mb-1.5 tracking-wide">TAMBAHAN BONUS PERFORMA (Rp)</label>
+            <input type="number" value={editPerformanceBonus} onChange={e => setEditPerformanceBonus(e.target.value)} className="w-full h-11 rounded-xl border border-emerald-200 px-3 font-bold text-sm text-emerald-800 bg-emerald-50 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 mb-3" />
+            <input type="text" placeholder="Catatan bonus (Opsional)..." value={editPerformanceBonusNote} onChange={e => setEditPerformanceBonusNote(e.target.value)} className="w-full h-10 rounded-xl border border-slate-200 px-3 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
           </div>
 
-          <div className="pt-2 border-t border-slate-100">
-            <label className="text-[10px] font-bold text-red-600 block mb-1">POTONGAN / KASBON (Rp)</label>
-            <input type="number" value={editDeductions} onChange={e => setEditDeductions(e.target.value)} className="w-full h-10 rounded-lg border border-red-300 px-3 font-bold text-sm text-red-700 bg-red-50 mb-2" />
-            <input type="text" placeholder="Catatan potongan (Opsional)..." value={editDeductionNote} onChange={e => setEditDeductionNote(e.target.value)} className="w-full h-9 rounded-lg border border-slate-200 px-3 text-xs" />
+          <div className="pt-3 border-t border-slate-100">
+            <label className="text-[10px] font-extrabold text-rose-600 block mb-1.5 tracking-wide">POTONGAN / KASBON (Rp)</label>
+            <input type="number" value={editDeductions} onChange={e => setEditDeductions(e.target.value)} className="w-full h-11 rounded-xl border border-rose-200 px-3 font-bold text-sm text-rose-800 bg-rose-50 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 mb-3" />
+            <input type="text" placeholder="Catatan potongan (Opsional)..." value={editDeductionNote} onChange={e => setEditDeductionNote(e.target.value)} className="w-full h-10 rounded-xl border border-slate-200 px-3 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
           </div>
 
           <div className="pt-6">
-            <button onClick={handleSaveEdit} className="w-full h-12 rounded-xl bg-slate-900 text-white font-bold text-sm shadow-lg shadow-slate-200 tap-target">
+            <button onClick={handleSaveEdit} className="w-full h-12 rounded-xl bg-slate-900 text-white font-bold text-sm shadow-md tap-target hover:bg-slate-800 transition-colors">
               Terapkan Perubahan
             </button>
-            <button onClick={() => setEditingPayrollId(null)} className="w-full h-12 mt-2 rounded-xl text-slate-500 font-bold text-sm tap-target">
+            <button onClick={() => setEditingPayrollId(null)} className="w-full h-12 mt-3 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold text-sm tap-target hover:bg-slate-50 transition-colors">
               Batal
             </button>
           </div>
