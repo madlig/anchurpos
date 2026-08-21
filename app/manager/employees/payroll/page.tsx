@@ -114,9 +114,10 @@ export default function PayrollPage() {
         if (locked && locked.isLocked) return locked; // Return locked if exists
 
         const empAtt = attendance.filter(a => a.employeeId === emp.id);
-        const workDays = empAtt.length;
+        const validEmpAtt = empAtt.filter(a => (a.totalHours || 0) > 0);
+        const workDays = validEmpAtt.length;
         const dailyWage = emp.dailyWage || 60000;
-        const totalOvertimeBonus = empAtt.reduce((sum, a) => sum + (a.overtimeBonus || 0), 0);
+        const totalOvertimeBonus = validEmpAtt.reduce((sum, a) => sum + (a.overtimeBonus || 0), 0);
         
         const pId = `${selectedMonth}_${emp.id}`;
         const overrides = editedPayrolls[pId];

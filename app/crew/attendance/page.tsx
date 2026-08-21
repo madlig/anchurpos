@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { LogIn, LogOut, CheckCircle, CheckCircle2, UploadCloud, ChevronRight, MessageSquareX, Clock, Loader2, Camera, MapPin, AlertTriangle } from "lucide-react";
+import { LogIn, LogOut, CheckCircle, CheckCircle2, UploadCloud, ChevronRight, MessageSquareX, Clock, Loader2, Camera, MapPin, AlertTriangle, RefreshCw, X, Image as ImageIcon, CalendarDays } from "lucide-react";
 import imageCompression from 'browser-image-compression';
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
@@ -19,15 +19,15 @@ interface TodayStatus {
 }
 interface HistoryItem {
   id: string; date: string;
-  checkIn: { time: string };
-  checkOut: { time: string } | null;
+  checkIn: { time: string; photoUrl?: string | null };
+  checkOut: { time: string; photoUrl?: string | null } | null;
   totalHours: number | null;
   status: string;
 }
 
 export default function CrewAttendancePage() {
   const { user, getToken } = useAuth();
-  const { confirm } = useAlertConfirm();
+  const { confirm, alert } = useAlertConfirm();
   const [today, setToday] = useState<TodayStatus | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +39,7 @@ export default function CrewAttendancePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingActionType, setPendingActionType] = useState<"check-in" | "check-out" | null>(null);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
@@ -64,8 +65,10 @@ export default function CrewAttendancePage() {
   const hasCheckedIn = !!today;
   const hasCheckedOut = !!today?.checkOut?.time;
   const isDone = hasCheckedIn && hasCheckedOut;
+  const checkInTime = today?.checkIn?.time ? new Date(today.checkIn.time).getTime() : null;
+  const hoursWorked = checkInTime ? (Date.now() - checkInTime) / (1000 * 60 * 60) : 0;
 
-  const handleBtnClick = async (type: "check-in" | "check-out") => {
+  const initiateAbsen = async (type: "check-in" | "check-out") => {
     if (type === "check-out" && hoursWorked < 8) {
       const confirmed = await confirm(
         "Anda baru bekerja kurang dari 8 jam. Apakah Anda yakin ingin checkout sekarang?",
@@ -74,19 +77,81 @@ export default function CrewAttendancePage() {
       );
       if (!confirmed) return;
     }
+    setPendingActionType(type);
+    setCapturedPhoto(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
     
-    setError(""); 
     setSubmitting(true);
+    setError("");
 
     try {
-      const res = await fetchWithAuth(`/api/attendance/${type}`, { 
+      const options = {
+        maxSizeMB: 0.5,
+        maxWidthOrHeight: 1080,
+        useWebWorker: true
+      };
+      const compressedFile = await imageCompression(file, options);
+      
+      const reader = new FileReader();
+      reader.readAsDataURL(compressedFile);
+      reader.onloadend = async () => {
+        const base64data = reader.result as string;
+        setCapturedPhoto(base64data);
+        setSubmitting(false);
+      };
+    } catch (err) {
+      setSubmitting(false);
+      alert("Gagal memproses foto. Silakan coba lagi.");
+    }
+  };
+
+  const submitAbsen = async () => {
+    if (!pendingActionType || !capturedPhoto) return;
+    
+    setSubmitting(true);
+    setError("");
+
+    try {
+      let latitude: number | null = null;
+      let longitude: number | null = null;
+      
+      if (navigator.geolocation) {
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000, enableHighAccuracy: true });
+          });
+          latitude = position.coords.latitude;
+          longitude = position.coords.longitude;
+        } catch (geoErr) {
+          console.warn("Geolocation failed or denied", geoErr);
+        }
+      }
+
+      const dateStr = new Date().toISOString().split("T")[0];
+      const timeMs = Date.now();
+      const imageRef = ref(storage, `attendance/${user?.uid}/${dateStr}_${pendingActionType}_${timeMs}.jpg`);
+      
+      await uploadString(imageRef, capturedPhoto, 'data_url');
+      const photoUrl = await getDownloadURL(imageRef);
+
+      const res = await fetchWithAuth(`/api/attendance/${pendingActionType}`, { 
          method: "POST",
-         body: JSON.stringify({ photoUrl: null, latitude: null, longitude: null })
+         body: JSON.stringify({ photoUrl, latitude, longitude })
       });
       const data = await res.json();
+      
       if (!res.ok) { 
         setError(data.error ?? "Gagal memproses absen."); 
       } else {
+        setPendingActionType(null);
+        setCapturedPhoto(null);
         await loadStatus();
       }
     } catch (err: any) { 
@@ -98,216 +163,240 @@ export default function CrewAttendancePage() {
 
   const todayLabel = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
 
-  const checkInTime = today?.checkIn?.time ? new Date(today.checkIn.time).getTime() : null;
-  const hoursWorked = checkInTime ? (Date.now() - checkInTime) / (1000 * 60 * 60) : 0;
-
   const statusCard = (() => {
-    if (!hasCheckedIn) return { label: "Belum Absen", sub: "Tap tombol di bawah untuk absen masuk", gradient: "linear-gradient(135deg,#E85D8C,#F2A0B7)" };
+    if (!hasCheckedIn) return { label: "Belum Absen", sub: "Siapkan kamera Anda untuk absen masuk", gradient: "linear-gradient(135deg,#E85D8C,#F2A0B7)" };
     if (!hasCheckedOut) return {
       label: "Sedang Bekerja",
       sub: `Masuk pukul ${formatTime(today!.checkIn.time)} · ${hoursWorked.toFixed(1)} jam`,
       gradient: "linear-gradient(135deg,#3B82F6,#2563EB)",
     };
     if (today!.status === "direview") return { label: "Perlu Review", sub: today!.flaggedReason ?? "Hubungi Manager", gradient: "linear-gradient(135deg,#F59E0B,#D97706)" };
-    return { label: "Sudah Pulang", sub: today!.totalHours ? `Total ${today!.totalHours.toFixed(1)} jam` : "Terima kasih!", gradient: "linear-gradient(135deg,#22C55E,#16A34A)" };
+    return { label: "Selesai", sub: today!.totalHours ? `Total ${today!.totalHours.toFixed(1)} jam` : "Terima kasih!", gradient: "linear-gradient(135deg,#10B981,#34D399)" };
   })();
 
   const btnConfig = (() => {
-    if (!hasCheckedIn) return { label: "MASUK", action: () => handleBtnClick("check-in"), bg: "linear-gradient(135deg,#E85D8C,#C94A73)", shadow: "0 10px 40px rgba(232,93,140,0.4)", testId: "attendance-check-in-btn", disabled: false, subLabel: "" };
-    if (!hasCheckedOut) return {
-      label: "PULANG",
-      action: () => handleBtnClick("check-out"),
-      bg: "linear-gradient(135deg,#EF4444,#DC2626)",
-      shadow: "0 10px 40px rgba(220,38,38,0.35)",
-      testId: "attendance-check-out-btn",
-      disabled: false,
-      subLabel: hoursWorked < 8 ? `Shift berjalan: ${hoursWorked.toFixed(1)} jam (Kurang dari 8 jam)` : `Shift berjalan: ${hoursWorked.toFixed(1)} jam`,
-    };
+    if (!hasCheckedIn) return { label: "ABSEN MASUK", action: () => initiateAbsen("check-in"), bg: "linear-gradient(135deg,#0F172A,#334155)", icon: <LogIn size={32} /> };
+    if (!hasCheckedOut) return { label: "ABSEN PULANG", action: () => initiateAbsen("check-out"), bg: "linear-gradient(135deg,#EF4444,#DC2626)", icon: <LogOut size={32} /> };
     return null;
   })();
 
   if (loading) return (
-    <div className="min-h-screen bg-slate-50/80 pb-28 px-4 pt-4 max-w-xl mx-auto space-y-4">
-      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-3">
-        <Skeleton className="h-12 w-12 rounded-2xl" />
-        <div>
-          <Skeleton className="h-5 w-32 mb-1" />
-          <Skeleton className="h-3 w-48" />
-        </div>
-      </div>
-      <Skeleton className="h-32 w-full rounded-3xl" />
-      <div className="flex justify-center mt-6">
-        <Skeleton className="w-28 h-28 rounded-full" />
-      </div>
+    <div className="min-h-screen bg-slate-50 pb-28 px-4 pt-4 max-w-xl mx-auto space-y-4">
+      <Skeleton className="h-20 w-full rounded-[20px]" />
+      <Skeleton className="h-40 w-full rounded-[24px]" />
+      <Skeleton className="h-20 w-full rounded-[20px]" />
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50/80 pb-28 px-4 pt-4 max-w-xl mx-auto space-y-4 page-enter">
-      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
-          <Clock size={22} />
+    <div className="min-h-screen bg-slate-50 pb-28 px-4 pt-6 max-w-xl mx-auto space-y-6">
+      <input 
+        type="file" 
+        accept="image/*" 
+        capture="environment" 
+        ref={fileInputRef} 
+        onChange={handlePhotoCapture} 
+        className="hidden" 
+      />
+
+      <div className="flex items-center gap-4">
+        <div className="w-14 h-14 rounded-[18px] bg-white border border-slate-200 text-slate-800 flex items-center justify-center font-black shadow-sm">
+          <Clock size={26} />
         </div>
         <div>
-          <h1 className="text-base font-black text-slate-800">Absensi Crew</h1>
-          <p className="text-xs font-semibold text-slate-400">
+          <h1 className="text-xl font-black text-slate-900 tracking-tight">Absensi Harian</h1>
+          <p className="text-sm font-bold text-slate-500 mt-0.5">
             {user?.displayName?.split(" ")[0] ?? "Crew"} — {todayLabel}
           </p>
         </div>
       </div>
 
-      <div className="space-y-6">
-        <div
-          data-testid="attendance-status-card"
-          className="p-6 rounded-3xl text-center shadow-sm"
+      {error && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3 shadow-sm">
+          <AlertTriangle size={18} className="text-rose-600 mt-0.5 shrink-0" />
+          <p className="text-sm font-bold text-rose-700 leading-snug">{error}</p>
+        </div>
+      )}
+
+      {capturedPhoto ? (
+        <div className="bg-white rounded-[24px] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col items-center animate-in zoom-in-95 duration-300">
+          <p className="text-xs font-extrabold text-slate-400 mb-4 tracking-wider uppercase">Pratinjau Foto Bukti</p>
+          <div className="relative w-full aspect-[3/4] max-h-[400px] bg-slate-100 rounded-2xl overflow-hidden mb-5 border border-slate-200">
+            <img src={capturedPhoto} alt="Preview" className="w-full h-full object-cover" />
+            <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+              <div className="flex items-center gap-2 text-white/90">
+                <MapPin size={14} />
+                <span className="text-[10px] font-bold tracking-wide">Merekam Lokasi...</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex w-full gap-3">
+            <button 
+              onClick={() => { setCapturedPhoto(null); setPendingActionType(null); }} 
+              disabled={submitting}
+              className="flex-1 py-4 rounded-xl font-bold text-sm bg-slate-100 text-slate-600 tap-target"
+            >
+              Ulangi Foto
+            </button>
+            <button 
+              onClick={submitAbsen} 
+              disabled={submitting}
+              className="flex-[2] py-4 rounded-xl font-black text-sm bg-blue-600 text-white tap-target shadow-lg shadow-blue-200 flex justify-center items-center gap-2"
+            >
+              {submitting ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />} 
+              Kirim Absen {pendingActionType === "check-in" ? "Masuk" : "Pulang"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div 
+          className="p-7 rounded-[24px] text-center shadow-[0_8px_30px_rgb(0,0,0,0.06)] relative overflow-hidden"
           style={{ background: statusCard.gradient }}
         >
-          <p className="text-xs text-white/80 font-semibold">Status Hari Ini</p>
-          <p className="text-3xl font-black text-white mt-1 mb-1 tracking-tight">
-            {statusCard.label}
-          </p>
-          <p className="text-xs text-white/75 font-medium">{statusCard.sub}</p>
-        </div>
-
-
-
-        {btnConfig && (
-          <div className="flex flex-col items-center gap-3">
-            <button
-              onClick={btnConfig.disabled ? undefined : btnConfig.action}
-              disabled={submitting || btnConfig.disabled}
-              data-testid={btnConfig.testId}
-              className={`w-32 h-32 rounded-[2rem] flex flex-col items-center justify-center tap-target shadow-lg transition-all ${submitting ? "opacity-70 scale-95" : "hover:scale-105 active:scale-95"}`}
-              style={{
-                background: btnConfig.bg,
-                cursor: (submitting || btnConfig.disabled) ? "default" : "pointer",
-              }}
-            >
-              {submitting ? (
-                <Loader2 size={36} className="text-white animate-spin" />
-              ) : (
-                <>
-                  <CheckCircle size={36} className="text-white mb-1" />
-                  <span className="text-white font-black text-sm uppercase tracking-wider">
-                    {btnConfig.label}
-                  </span>
-                </>
-              )}
-            </button>
-            <div className="flex items-center gap-1.5 text-center mt-1">
-              <MapPin size={12} className="text-slate-400" />
-              <p className="text-[11px] font-semibold text-slate-400">
-                {btnConfig.subLabel || `Ketuk tombol di atas untuk absen`}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {isDone && (
-          <div className="flex justify-center mt-2">
-            <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white border border-slate-200/80 shadow-sm">
-              <CheckCircle2 size={18} className="text-green-600" />
-              <span className="text-sm font-bold text-green-600">Absensi hari ini selesai</span>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 flex items-center gap-2" data-testid="attendance-error">
-            <AlertTriangle size={16} className="text-red-600 shrink-0" />
-            <p className="text-sm font-bold text-red-600">{error}</p>
-          </div>
-        )}
-
-        {today && (
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm">
-            <h2 className="text-sm font-black text-slate-800 mb-3">Log Hari Ini</h2>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <span className="text-xs font-semibold text-slate-400">Absen Masuk</span>
-                <span className="text-sm font-black text-slate-700">{formatTime(today.checkIn.time)}</span>
-              </div>
-              {today.checkOut && (
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <span className="text-xs font-semibold text-slate-400">Absen Pulang</span>
-                  <span className="text-sm font-black text-slate-700">{formatTime(today.checkOut.time)}</span>
-                </div>
-              )}
-              {today.totalHours !== null && (
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs font-semibold text-slate-400">Total Jam</span>
-                  <span className="text-base font-black text-primary">{today.totalHours.toFixed(1)} jam</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm">
-          <h2 className="text-sm font-black text-slate-800 mb-3">Riwayat Bulanan</h2>
-          
-          <div className="flex items-center gap-2 mb-4 bg-slate-50 p-1.5 rounded-2xl">
-            <button 
-              onClick={() => { 
-                const d = new Date(attendanceMonth + "-01"); 
-                d.setMonth(d.getMonth() - 1); 
-                setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); 
-              }}
-              className="w-10 h-10 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-all shadow-sm"
-            >
-              ◀
-            </button>
-            <p className="flex-1 text-center text-sm font-black text-slate-700">
-              {new Date(attendanceMonth + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
+          <div className="relative z-10">
+            <p className="text-[11px] text-white/80 font-extrabold tracking-widest uppercase mb-2">Status Saat Ini</p>
+            <p className="text-3xl font-black text-white mb-2 tracking-tight">
+              {statusCard.label}
             </p>
-            <button 
-              onClick={() => { 
-                const d = new Date(attendanceMonth + "-01"); 
-                d.setMonth(d.getMonth() + 1); 
-                setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); 
-              }}
-              className="w-10 h-10 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-all shadow-sm"
-            >
-              ▶
-            </button>
+            <p className="text-sm text-white/90 font-medium">{statusCard.sub}</p>
           </div>
 
-          {history.length === 0 ? (
-            <div className="py-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-              <p className="text-xs font-bold text-slate-400">Tidak ada riwayat absensi</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {history.map((h, i) => (
-                <div
-                  key={h.id}
-                  className="flex items-center justify-between pb-3 border-b border-slate-100 last:border-0 last:pb-0"
-                  data-testid={`history-item-${i}`}
-                >
-                  <div>
-                    <p className="text-xs font-black text-slate-700">{formatDate(h.date)}</p>
-                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">
-                      {formatTime(h.checkIn.time)}{h.checkOut?.time ? ` — ${formatTime(h.checkOut.time)}` : " — belum pulang"}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    {h.totalHours !== null && (
-                      <p className="text-sm font-black text-slate-800">{h.totalHours.toFixed(1)}j</p>
-                    )}
-                    <span
-                      className={`inline-block text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full mt-1 ${
-                        h.status === "lengkap" ? "bg-green-100 text-green-700" : h.status === "direview" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"
-                      }`}
-                      data-testid={`history-status-${i}`}
-                    >
-                      {h.status === "lengkap" ? "Lengkap" : h.status === "direview" ? "Review" : h.status === "belum_lengkap" ? "Aktif" : h.status}
+          {btnConfig && (
+            <div className="mt-8 relative z-10 flex flex-col items-center">
+              <button
+                onClick={btnConfig.action}
+                disabled={submitting}
+                className="w-full h-16 rounded-2xl flex items-center justify-center gap-3 tap-target shadow-xl transition-transform active:scale-95 hover:scale-[1.02]"
+                style={{ background: btnConfig.bg }}
+              >
+                {submitting ? (
+                  <Loader2 size={24} className="text-white animate-spin" />
+                ) : (
+                  <>
+                    <Camera size={22} className="text-white" />
+                    <span className="text-white font-black text-base tracking-wide">
+                      {btnConfig.label}
                     </span>
-                  </div>
-                </div>
-              ))}
+                  </>
+                )}
+              </button>
+              <p className="text-[10px] font-bold text-white/60 mt-3 text-center">
+                Wajib melampirkan foto selfie secara real-time.
+              </p>
             </div>
           )}
         </div>
+      )}
+
+      {isDone && !capturedPhoto && (
+        <div className="flex justify-center mt-2">
+          <div className="flex items-center gap-2.5 px-6 py-4 rounded-2xl bg-emerald-50 border border-emerald-100 shadow-sm">
+            <CheckCircle2 size={20} className="text-emerald-600" />
+            <span className="text-sm font-black text-emerald-700">Absensi hari ini telah lengkap</span>
+          </div>
+        </div>
+      )}
+
+      {today && (
+        <div className="bg-white rounded-[24px] p-5 border border-slate-200/60 shadow-[0_4px_20px_rgb(0,0,0,0.03)]">
+          <h2 className="text-sm font-black text-slate-800 mb-4 flex items-center gap-2">
+            <CheckCircle size={16} className="text-slate-400" /> Bukti Kehadiran Hari Ini
+          </h2>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 pb-4 border-b border-slate-100">
+              <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center text-slate-300">
+                {today.checkIn.photoUrl ? (
+                  <img src={today.checkIn.photoUrl} alt="Check In" className="w-full h-full object-cover" />
+                ) : <ImageIcon size={20} />}
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Masuk</p>
+                <p className="text-base font-black text-slate-800">{formatTime(today.checkIn.time)}</p>
+              </div>
+            </div>
+            {today.checkOut && (
+              <div className="flex items-center gap-4 pb-2">
+                <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center text-slate-300">
+                  {today.checkOut.photoUrl ? (
+                    <img src={today.checkOut.photoUrl} alt="Check Out" className="w-full h-full object-cover" />
+                  ) : <ImageIcon size={20} />}
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Pulang</p>
+                  <p className="text-base font-black text-slate-800">{formatTime(today.checkOut.time)}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-[24px] p-5 border border-slate-200/60 shadow-[0_4px_20px_rgb(0,0,0,0.03)]">
+        <h2 className="text-sm font-black text-slate-800 mb-4 flex items-center gap-2">
+          <CalendarDays size={16} className="text-slate-400" /> Riwayat Bulanan
+        </h2>
+        
+        <div className="flex items-center gap-2 mb-5 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+          <button 
+            onClick={() => { 
+              const d = new Date(attendanceMonth + "-01"); d.setMonth(d.getMonth() - 1); 
+              setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); 
+            }}
+            className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 tap-target shadow-sm"
+          >
+            ◀
+          </button>
+          <p className="flex-1 text-center text-sm font-black text-slate-700 tracking-wide">
+            {new Date(attendanceMonth + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
+          </p>
+          <button 
+            onClick={() => { 
+              const d = new Date(attendanceMonth + "-01"); d.setMonth(d.getMonth() + 1); 
+              setAttendanceMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); 
+            }}
+            className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 tap-target shadow-sm"
+          >
+            ▶
+          </button>
+        </div>
+
+        {history.length === 0 ? (
+          <div className="py-10 text-center flex flex-col items-center justify-center">
+            <CalendarDays size={32} className="text-slate-200 mb-3" />
+            <p className="text-sm font-bold text-slate-500">Belum ada riwayat</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {history.map((h, i) => (
+              <div key={h.id} className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 overflow-hidden shrink-0">
+                    {h.checkIn.photoUrl ? (
+                      <img src={h.checkIn.photoUrl} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-300"><ImageIcon size={14}/></div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-slate-800">{formatDate(h.date)}</p>
+                    <p className="text-[10px] font-bold text-slate-500 mt-0.5">
+                      {formatTime(h.checkIn.time)}{h.checkOut?.time ? ` — ${formatTime(h.checkOut.time)}` : " — berjalan"}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  {h.totalHours !== null ? (
+                    <p className="text-sm font-black text-slate-800">{h.totalHours.toFixed(1)}j</p>
+                  ) : (
+                    <span className="inline-block text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full mt-1 bg-amber-100 text-amber-700">
+                      LIVE
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

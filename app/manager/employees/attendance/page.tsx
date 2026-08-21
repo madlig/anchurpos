@@ -36,6 +36,7 @@ export default function AttendancePage() {
   const [editOvertimeHours, setEditOvertimeHours] = useState("");
   const [editOvertimeBonus, setEditOvertimeBonus] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
@@ -97,6 +98,27 @@ export default function AttendancePage() {
       alert("Error jaringan");
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const handleDeleteAtt = async (a: AttendanceRecord) => {
+    if (!window.confirm(`Yakin ingin MENGHAPUS PERMANEN absen anomali ${a.employeeName} tanggal ${fmtDateFull(a.date)}? Data yang dihapus tidak bisa dikembalikan.`)) return;
+    
+    setDeletingId(a.id);
+    try {
+      const res = await fetchWithAuth(`/api/attendance/${a.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setExpandedAttId(null);
+        loadData();
+      } else {
+        alert("Gagal menghapus absensi");
+      }
+    } catch (e) {
+      alert("Error jaringan");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -250,13 +272,18 @@ export default function AttendancePage() {
                         <input type="number" step="1000" value={editOvertimeBonus} onChange={(e) => setEditOvertimeBonus(e.target.value)} className="w-full h-10 rounded-xl border border-emerald-200 px-3 font-bold text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-emerald-800 bg-emerald-50/50" />
                       </div>
                     </div>
-                    <div className="flex justify-end gap-2">
-                      <button onClick={() => setExpandedAttId(null)} className="px-4 py-2.5 rounded-xl bg-white text-slate-600 font-bold text-xs border border-slate-200 hover:bg-slate-50 tap-target">
-                        Batal
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+                      <button onClick={() => handleDeleteAtt(a)} disabled={deletingId === a.id} className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors tap-target">
+                        {deletingId === a.id ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />} Hapus Absen
                       </button>
-                      <button onClick={() => handleSaveCorrection(a)} disabled={savingId === a.id} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white border-none cursor-pointer text-xs font-bold flex items-center gap-2 tap-target shadow-sm shadow-emerald-200 transition-colors">
-                        {savingId === a.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Simpan Koreksi
-                      </button>
+                      <div className="flex w-full sm:w-auto gap-2">
+                        <button onClick={() => setExpandedAttId(null)} className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-white text-slate-600 font-bold text-xs border border-slate-200 hover:bg-slate-50 tap-target">
+                          Batal
+                        </button>
+                        <button onClick={() => handleSaveCorrection(a)} disabled={savingId === a.id} className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white border-none cursor-pointer text-xs font-bold flex items-center justify-center gap-2 tap-target shadow-sm shadow-emerald-200 transition-colors">
+                          {savingId === a.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Simpan Koreksi
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
