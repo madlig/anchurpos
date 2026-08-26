@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { LogIn, LogOut, CheckCircle, CheckCircle2, UploadCloud, ChevronRight, MessageSquareX, Clock, Loader2, Camera, MapPin, AlertTriangle, RefreshCw, X, Image as ImageIcon, CalendarDays } from "lucide-react";
-import imageCompression from 'browser-image-compression';
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
@@ -92,24 +91,53 @@ export default function CrewAttendancePage() {
     setError("");
 
     try {
-      const options = {
-        maxSizeMB: 0.5,
-        maxWidthOrHeight: 1080,
-        useWebWorker: false // Dimatikan agar tidak menyebabkan infinite loading di HP/WebView tertentu
-      };
-      const compressedFile = await imageCompression(file, options);
-      
       const reader = new FileReader();
-      reader.readAsDataURL(compressedFile);
-      reader.onloadend = async () => {
+      reader.onloadend = () => {
         const base64data = reader.result as string;
-        setCapturedPhoto(base64data);
-        setSubmitting(false);
+        
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 1080;
+          const MAX_HEIGHT = 1080;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const resizedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+            setCapturedPhoto(resizedBase64);
+          } else {
+            setCapturedPhoto(base64data);
+          }
+          setSubmitting(false);
+        };
+        img.onerror = () => {
+          setCapturedPhoto(base64data);
+          setSubmitting(false);
+        };
+        img.src = base64data;
       };
       reader.onerror = () => {
         setSubmitting(false);
         alert("Gagal membaca file foto.");
       };
+      reader.readAsDataURL(file);
     } catch (err) {
       console.error(err);
       setSubmitting(false);
