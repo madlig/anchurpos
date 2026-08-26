@@ -20,8 +20,6 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { storage } from "@/lib/firebase-client";
 
 interface TodayStatus {
   id: string;
@@ -224,19 +222,19 @@ export default function CrewAttendancePage() {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          const MAX_WIDTH = 1080;
-          const MAX_HEIGHT = 1080;
+          const MAX_WIDTH = 720;
+          const MAX_HEIGHT = 720;
           let width = img.width;
           let height = img.height;
 
           if (width > height) {
             if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
+              height = Math.round((height * MAX_WIDTH) / width);
               width = MAX_WIDTH;
             }
           } else {
             if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
+              width = Math.round((width * MAX_HEIGHT) / height);
               height = MAX_HEIGHT;
             }
           }
@@ -246,7 +244,7 @@ export default function CrewAttendancePage() {
           const ctx = canvas.getContext("2d");
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            const resizedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+            const resizedBase64 = canvas.toDataURL("image/jpeg", 0.65);
             setCapturedPhoto(resizedBase64);
           } else {
             setCapturedPhoto(base64data);
@@ -313,25 +311,10 @@ export default function CrewAttendancePage() {
         }
       }
 
-      setSubmitStep("Mengunggah foto bukti...");
-      const dateStr = new Date().toISOString().split("T")[0];
-      const timeMs = Date.now();
-      const imageRef = ref(storage, `attendance/${user?.uid}/${dateStr}_${pendingActionType}_${timeMs}.jpg`);
-
-      // Upload with 12s timeout guard
-      await Promise.race([
-        uploadString(imageRef, capturedPhoto, "data_url"),
-        new Promise<never>((_, rej) =>
-          setTimeout(() => rej(new Error("Batas waktu unggah foto habis. Periksa koneksi internet.")), 12000)
-        ),
-      ]);
-
-      const photoUrl = await getDownloadURL(imageRef);
-
       setSubmitStep("Mencatat absensi...");
       const res = await fetchWithAuth(`/api/attendance/${pendingActionType}`, {
         method: "POST",
-        body: JSON.stringify({ photoUrl, latitude, longitude }),
+        body: JSON.stringify({ photoData: capturedPhoto, latitude, longitude }),
       });
       const data = await res.json();
 

@@ -1,8 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb, adminStorage } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
+
+async function uploadAttendancePhoto(
+  userId: string,
+  dateStr: string,
+  type: string,
+  base64Data: string
+): Promise<string> {
+  if (!base64Data) return "";
+  if (!base64Data.startsWith("data:image")) {
+    return base64Data;
+  }
+
+  try {
+    const bucketName =
+      process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+      process.env.FIREBASE_STORAGE_BUCKET ||
+      (process.env.FIREBASE_PROJECT_ID ? `${process.env.FIREBASE_PROJECT_ID}.appspot.com` : undefined);
+
+    const bucket = bucketName ? adminStorage.bucket(bucketName) : adminStorage.bucket();
+    const base64Clean = base64Data.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Clean, "base64");
+    const filename = `attendance/${userId}/${dateStr}_${type}_${Date.now()}.jpg`;
+    const file = bucket.file(filename);
+
+    await file.save(buffer, {
+      metadata: { contentType: "image/jpeg" },
+      public: true,
+      resumable: false,
+    });
+
+    return `https://storage.googleapis.com/${bucket.name}/${filename}`;
+  } catch (err) {
+    console.warn("adminStorage upload failed, fallback to base64 DataURL:", err);
+    return base64Data;
+  }
+}
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371e3; // metres
@@ -23,9 +59,9 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const user = auth as AuthUser;
 
-  let payload: { photoUrl?: string, latitude?: number, longitude?: number } = {};
+  let payload: { photoUrl?: string; photoData?: string; latitude?: number; longitude?: number } = {};
   try { payload = await req.json(); } catch(e) {}
-  const { photoUrl = null, latitude = null, longitude = null } = payload;
+  let { photoUrl = null, photoData = null, latitude = null, longitude = null } = payload;
 
   try {
     const configSnap = await adminDb.doc("settings/attendanceConfig").get();
@@ -61,6 +97,10 @@ export async function POST(req: NextRequest) {
         { error: "Sudah absen masuk dan pulang hari ini" },
         { status: 400 }
       );
+    }
+
+    if (!photoUrl && photoData) {
+      photoUrl = await uploadAttendancePhoto(user.uid, today, "checkin", photoData);
     }
 
     const userSnap = await adminDb.doc(`users/${user.uid}`).get();
