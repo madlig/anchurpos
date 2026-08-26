@@ -95,7 +95,7 @@ export default function CrewAttendancePage() {
       const options = {
         maxSizeMB: 0.5,
         maxWidthOrHeight: 1080,
-        useWebWorker: true
+        useWebWorker: false // Dimatikan agar tidak menyebabkan infinite loading di HP/WebView tertentu
       };
       const compressedFile = await imageCompression(file, options);
       
@@ -106,7 +106,12 @@ export default function CrewAttendancePage() {
         setCapturedPhoto(base64data);
         setSubmitting(false);
       };
+      reader.onerror = () => {
+        setSubmitting(false);
+        alert("Gagal membaca file foto.");
+      };
     } catch (err) {
+      console.error(err);
       setSubmitting(false);
       alert("Gagal memproses foto. Silakan coba lagi.");
     }
