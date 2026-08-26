@@ -46,18 +46,20 @@ export async function GET(req: NextRequest) {
         }
 
         batch.update(doc.ref, {
-          status: "lengkap",
+          status: "direview",
           checkOut: {
             time: autoCheckOutTime,
             ipAddress: "auto-checkout",
-            ipValid: false
+            ipValid: false,
+            photoUrl: null,
+            locationValid: false,
           },
-          totalHours: totalHours,
-          regularHours: Math.min(totalHours, 8),
+          totalHours: 8,
+          regularHours: 8,
           overtimeHours: 0,
           overtimeBlocks: 0,
           overtimeBonus: 0,
-          flaggedReason: "Auto-Checkout",
+          flaggedReason: "Auto-Checkout (Lupa Absen Pulang)",
           updatedAt: FieldValue.serverTimestamp(),
         });
       });

@@ -4,6 +4,35 @@ import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
 
+function getPayrollPeriod(dateStr: string) {
+  const [year, month, day] = dateStr.split("-").map(Number);
+
+  let payrollYear = year;
+  let payrollMonth = month;
+
+  if (day >= 29) {
+    payrollMonth += 1;
+    if (payrollMonth > 12) {
+      payrollMonth = 1;
+      payrollYear += 1;
+    }
+  }
+
+  const payrollMonthStr = `${payrollYear}-${String(payrollMonth).padStart(2, "0")}`;
+
+  let prevMonth = payrollMonth - 1;
+  let prevYear = payrollYear;
+  if (prevMonth === 0) {
+    prevMonth = 12;
+    prevYear -= 1;
+  }
+
+  const startDate = `${prevYear}-${String(prevMonth).padStart(2, "0")}-29`;
+  const endDate = `${payrollYear}-${String(payrollMonth).padStart(2, "0")}-28`;
+
+  return { payrollMonth: payrollMonthStr, startDate, endDate };
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -65,26 +94,21 @@ export async function PATCH(
 
     await attRef.update(updates);
 
-    // Automatic payroll sync for crew
+    // Automatic payroll sync for crew based on 29-28 cutoff cycle
     const attData = snap.data()!;
     const employeeId = attData.employeeId;
     const date = attData.date;
-    const month = date.substring(0, 7);
+    const { payrollMonth, startDate, endDate } = getPayrollPeriod(date);
 
     const userSnap = await adminDb.doc(`users/${employeeId}`).get();
     if (userSnap.exists && userSnap.data()?.role === "crew") {
       const userData = userSnap.data()!;
-      const [year, mon] = month.split("-").map(Number);
-      const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
-      const endMonth = mon === 12 ? 1 : mon + 1;
-      const endYear = mon === 12 ? year + 1 : year;
-      const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
 
       const lengkapSnap = await adminDb
         .collection("attendance")
         .where("employeeId", "==", employeeId)
         .where("date", ">=", startDate)
-        .where("date", "<", endDate)
+        .where("date", "<=", endDate)
         .where("status", "==", "lengkap")
         .get();
 
@@ -92,7 +116,7 @@ export async function PATCH(
         .collection("attendance")
         .where("employeeId", "==", employeeId)
         .where("date", ">=", startDate)
-        .where("date", "<", endDate)
+        .where("date", "<=", endDate)
         .where("status", "==", "direview")
         .get();
 
@@ -107,7 +131,7 @@ export async function PATCH(
         totalOvertimeBonus += doc.data().overtimeBonus ?? 0;
       }
 
-      const payrollId = `${month}_${employeeId}`;
+      const payrollId = `${payrollMonth}_${employeeId}`;
       const existingSnap = await adminDb.doc(`payroll/${payrollId}`).get();
       if (!existingSnap.exists || !existingSnap.data()?.isLocked) {
         const existingBonus = existingSnap.exists
@@ -120,7 +144,7 @@ export async function PATCH(
 
         await adminDb.doc(`payroll/${payrollId}`).set(
           {
-            month,
+            month: payrollMonth,
             employeeId,
             employeeName: userData.name ?? employeeId,
             workDays,
@@ -194,22 +218,17 @@ export async function DELETE(
     // Automatic payroll sync for crew after deletion
     const employeeId = attData.employeeId;
     const date = attData.date;
-    const month = date.substring(0, 7);
+    const { payrollMonth, startDate, endDate } = getPayrollPeriod(date);
 
     const userSnap = await adminDb.doc(`users/${employeeId}`).get();
     if (userSnap.exists && userSnap.data()?.role === "crew") {
       const userData = userSnap.data()!;
-      const [year, mon] = month.split("-").map(Number);
-      const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
-      const endMonth = mon === 12 ? 1 : mon + 1;
-      const endYear = mon === 12 ? year + 1 : year;
-      const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
 
       const lengkapSnap = await adminDb
         .collection("attendance")
         .where("employeeId", "==", employeeId)
         .where("date", ">=", startDate)
-        .where("date", "<", endDate)
+        .where("date", "<=", endDate)
         .where("status", "==", "lengkap")
         .get();
 
@@ -217,7 +236,7 @@ export async function DELETE(
         .collection("attendance")
         .where("employeeId", "==", employeeId)
         .where("date", ">=", startDate)
-        .where("date", "<", endDate)
+        .where("date", "<=", endDate)
         .where("status", "==", "direview")
         .get();
 
@@ -231,7 +250,7 @@ export async function DELETE(
         totalOvertimeBonus += doc.data().overtimeBonus ?? 0;
       }
 
-      const payrollId = `${month}_${employeeId}`;
+      const payrollId = `${payrollMonth}_${employeeId}`;
       const existingSnap = await adminDb.doc(`payroll/${payrollId}`).get();
       
       if (!existingSnap.exists || !existingSnap.data()?.isLocked) {
@@ -245,7 +264,7 @@ export async function DELETE(
 
         await adminDb.doc(`payroll/${payrollId}`).set(
           {
-            month,
+            month: payrollMonth,
             employeeId,
             employeeName: userData.name ?? employeeId,
             workDays,
