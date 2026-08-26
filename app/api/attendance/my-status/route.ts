@@ -6,7 +6,7 @@ import type { AuthUser } from "@/lib/auth-middleware";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(req, ["crew"]);
+  const auth = await requireRole(req, ["owner", "manager", "crew"]);
   if (auth instanceof NextResponse) return auth;
   const user = auth as AuthUser;
 

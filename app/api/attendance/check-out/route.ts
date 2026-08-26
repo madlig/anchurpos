@@ -56,7 +56,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireRole(req, ["crew"]);
+  const auth = await requireRole(req, ["owner", "manager", "crew"]);
   if (auth instanceof NextResponse) return auth;
   const user = auth as AuthUser;
 
