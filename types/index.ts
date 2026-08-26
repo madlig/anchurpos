@@ -305,8 +305,12 @@ export interface Attendance {
 // --- 9c. settings/attendanceConfig ---
 export interface AttendanceConfig {
   whitelistedIps: string[];
+  whitelistedSsid?: string | null;
   lastDetectedIp: string | null;
   lastDetectedAt: string | null;
+  storeLat?: number | null;
+  storeLng?: number | null;
+  radiusMeter?: number | null;
   updatedBy: string;
   updatedAt: string;
 }

@@ -75,12 +75,18 @@ export async function POST(req: NextRequest) {
 
     // Build list of anomalies
     const anomalies: string[] = [];
-    if (data.checkIn?.locationValid === false) {
+    if (data.checkIn?.latitude === null || data.checkIn?.latitude === undefined) {
+      anomalies.push("Check-in tanpa GPS");
+    } else if (data.checkIn?.locationValid === false) {
       anomalies.push(`Check-in di luar radius (${Math.round(data.checkIn.distance || 0)}m)`);
     }
-    if (locationValid === false && latitude !== null) {
+
+    if (latitude === null || longitude === null) {
+      anomalies.push("Check-out tanpa GPS");
+    } else if (locationValid === false) {
       anomalies.push(`Check-out di luar radius (${Math.round(distance || 0)}m)`);
     }
+
     if (totalHours < 8) {
       anomalies.push("Check-out awal (<8 jam)");
     }

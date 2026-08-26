@@ -27,6 +27,9 @@ export async function GET(req: NextRequest) {
       whitelistedSsid: d.whitelistedSsid ?? null,
       lastDetectedIp: d.lastDetectedIp ?? null,
       lastDetectedAt: d.lastDetectedAt?.toDate?.().toISOString() ?? d.lastDetectedAt ?? null,
+      storeLat: d.storeLat ?? null,
+      storeLng: d.storeLng ?? null,
+      radiusMeter: d.radiusMeter ?? null,
       updatedBy: d.updatedBy ?? null,
       updatedAt: d.updatedAt?.toDate?.().toISOString() ?? d.updatedAt ?? null,
     });
@@ -42,17 +45,28 @@ export async function POST(req: NextRequest) {
   const user = auth as AuthUser;
 
   try {
-    const { whitelistedSsid } = await req.json();
+    const { whitelistedSsid, storeLat, storeLng, radiusMeter } = await req.json();
     const configRef = adminDb.doc("settings/attendanceConfig");
 
-    await configRef.set(
-      {
-        whitelistedSsid: whitelistedSsid !== undefined ? String(whitelistedSsid).trim() : null,
-        updatedBy: user.uid,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
+    const updates: Record<string, any> = {
+      updatedBy: user.uid,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    if (whitelistedSsid !== undefined) {
+      updates.whitelistedSsid = whitelistedSsid !== null ? String(whitelistedSsid).trim() : null;
+    }
+    if (storeLat !== undefined) {
+      updates.storeLat = storeLat !== null ? Number(storeLat) : null;
+    }
+    if (storeLng !== undefined) {
+      updates.storeLng = storeLng !== null ? Number(storeLng) : null;
+    }
+    if (radiusMeter !== undefined) {
+      updates.radiusMeter = radiusMeter !== null ? Number(radiusMeter) : null;
+    }
+
+    await configRef.set(updates, { merge: true });
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
