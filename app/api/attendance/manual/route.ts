@@ -58,11 +58,15 @@ export async function POST(req: NextRequest) {
       status: "lengkap",
       checkIn: {
         time: ci.toISOString(),
-        ipValid: true
+        ipValid: true,
+        photoUrl: null,
+        locationValid: true,
       },
       checkOut: {
         time: co.toISOString(),
-        ipValid: true
+        ipValid: true,
+        photoUrl: null,
+        locationValid: true,
       },
       totalHours,
       regularHours,
@@ -73,6 +77,61 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+
+    // Sync to payroll
+    if (empDoc.data()?.role === "crew") {
+      const [year, month, day] = date.split("-").map(Number);
+      let payrollYear = year;
+      let payrollMonth = month;
+      if (day >= 29) {
+        payrollMonth += 1;
+        if (payrollMonth > 12) { payrollMonth = 1; payrollYear += 1; }
+      }
+      const payrollMonthStr = `${payrollYear}-${String(payrollMonth).padStart(2, "0")}`;
+      let prevMonth = payrollMonth - 1;
+      let prevYear = payrollYear;
+      if (prevMonth === 0) { prevMonth = 12; prevYear -= 1; }
+      const startDate = `${prevYear}-${String(prevMonth).padStart(2, "0")}-29`;
+      const endDate = `${payrollYear}-${String(payrollMonth).padStart(2, "0")}-28`;
+
+      const lengkapSnap = await adminDb.collection("attendance")
+        .where("employeeId", "==", employeeId)
+        .where("date", ">=", startDate)
+        .where("date", "<=", endDate)
+        .where("status", "==", "lengkap")
+        .get();
+
+      const validLengkapDocs = lengkapSnap.docs.filter(d => (d.data().totalHours || 0) > 0);
+      const workDays = validLengkapDocs.length;
+      const dailyWage = empDoc.data()?.dailyWage || 60000;
+      const totalRegularPay = workDays * dailyWage;
+      let totalOvertimeBonus = 0;
+      for (const doc of validLengkapDocs) {
+        totalOvertimeBonus += doc.data().overtimeBonus ?? 0;
+      }
+
+      const payrollId = `${payrollMonthStr}_${employeeId}`;
+      const existingSnap = await adminDb.doc(`payroll/${payrollId}`).get();
+      if (!existingSnap.exists || !existingSnap.data()?.isLocked) {
+        const existingBonus = existingSnap.exists ? (existingSnap.data()?.performanceBonus ?? 0) : 0;
+        await adminDb.doc(`payroll/${payrollId}`).set({
+          month: payrollMonthStr,
+          employeeId,
+          employeeName,
+          workDays,
+          dailyWage,
+          totalRegularPay,
+          totalOvertimeBonus,
+          performanceBonus: existingBonus,
+          totalPaid: totalRegularPay + totalOvertimeBonus + existingBonus,
+          pendingReview: 0,
+          dataStatus: "final",
+          status: "belum_dibayar",
+          isLocked: false,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      }
+    }
 
     return NextResponse.json({ success: true, docId });
   } catch (error: any) {

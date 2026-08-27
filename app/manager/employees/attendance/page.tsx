@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Loader2, ChevronDown, ChevronUp, Pencil, Check, CalendarDays, User, X, Search, Filter, AlertTriangle } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Pencil, Check, CalendarDays, User, X, Search, Filter, AlertTriangle, Plus, Clock } from "lucide-react";
 import { AttendanceRecord, Employee } from "../types";
 
 const fmtDateFull = (dStr: string) => {
@@ -22,6 +22,15 @@ export default function AttendancePage() {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Manual Attendance Modal state
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualEmpId, setManualEmpId] = useState("");
+  const [manualDate, setManualDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [manualCheckIn, setManualCheckIn] = useState("08:00");
+  const [manualCheckOut, setManualCheckOut] = useState("16:00");
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [manualError, setManualError] = useState("");
   
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -133,6 +142,37 @@ export default function AttendancePage() {
 
   const flaggedCount = attendance.filter(a => a.flaggedReason?.includes("Auto-Checkout") || a.status === "direview").length;
 
+  const handleManualSubmit = async () => {
+    if (!manualEmpId || !manualDate || !manualCheckIn || !manualCheckOut) {
+      setManualError("Semua field wajib diisi");
+      return;
+    }
+    setManualSubmitting(true);
+    setManualError("");
+    try {
+      const res = await fetchWithAuth("/api/attendance/manual", {
+        method: "POST",
+        body: JSON.stringify({
+          employeeId: manualEmpId,
+          date: manualDate,
+          checkInTime: manualCheckIn,
+          checkOutTime: manualCheckOut,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setManualError(data.error || "Gagal menyimpan absen manual");
+      } else {
+        setShowManualModal(false);
+        loadData();
+      }
+    } catch (e: any) {
+      setManualError("Kesalahan jaringan");
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
+
   return (
     <div className="animate-in fade-in pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
@@ -140,13 +180,23 @@ export default function AttendancePage() {
           <h2 className="text-xl font-black text-slate-800 tracking-tight">Pantauan Absensi</h2>
           <p className="text-xs font-bold text-slate-500 mt-1">Data absensi bulanan crew otomatis valid.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <input
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
             className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white shadow-sm"
           />
+          <button
+            onClick={() => {
+              setShowManualModal(true);
+              setManualError("");
+              if (employees.length > 0 && !manualEmpId) setManualEmpId(employees[0].id);
+            }}
+            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
+          >
+            <Plus size={15} /> Input Absen Manual
+          </button>
         </div>
       </div>
 
@@ -290,6 +340,102 @@ export default function AttendancePage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* MODAL INPUT ABSEN MANUAL */}
+      {showManualModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-black text-slate-800">Input Absen Manual</h3>
+                <p className="text-xs font-semibold text-slate-400">Tambahkan kehadiran kru yang lupa absen / maintenance.</p>
+              </div>
+              <button
+                onClick={() => setShowManualModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {manualError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-bold text-xs">
+                {manualError}
+              </div>
+            )}
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-500 block mb-1">Pilih Karyawan</label>
+                <select
+                  value={manualEmpId}
+                  onChange={(e) => setManualEmpId(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                >
+                  {employees.filter(e => e.isActive !== false).map(e => (
+                    <option key={e.id} value={e.id}>
+                      {e.name} ({e.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-500 block mb-1">Tanggal Absensi</label>
+                <input
+                  type="date"
+                  value={manualDate}
+                  onChange={(e) => setManualDate(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-500 block mb-1">Jam Masuk</label>
+                  <input
+                    type="time"
+                    value={manualCheckIn}
+                    onChange={(e) => setManualCheckIn(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-500 block mb-1">Jam Pulang</label>
+                  <input
+                    type="time"
+                    value={manualCheckOut}
+                    onChange={(e) => setManualCheckOut(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-emerald-800 text-[11px] font-semibold">
+                ✨ Absensi akan langsung tercatat sebagai <strong>Hadir Lengkap (8 Jam)</strong> dan tersinkronisasi ke slip gaji payroll.
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowManualModal(false)}
+                className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs hover:bg-slate-200"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleManualSubmit}
+                disabled={manualSubmitting}
+                className="flex-1 py-3 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-black flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
+              >
+                {manualSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Simpan Kehadiran
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
