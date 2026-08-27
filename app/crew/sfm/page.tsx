@@ -43,6 +43,7 @@ function LiveTimer({ startedAt }: { startedAt?: string }) {
 export default function CrewSFMTerminal() {
   const { getToken } = useAuth();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [hasCheckedInToday, setHasCheckedInToday] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -82,10 +83,19 @@ export default function CrewSFMTerminal() {
   const loadData = useCallback(async (showSkeleton = false) => {
     if (showSkeleton === true) setLoading(true);
     try {
-      const res = await fetchWithAuth(`/api/sfm/work-orders`);
-      if (res.ok) {
-        const data: WorkOrder[] = await res.json();
+      const [woRes, attRes] = await Promise.all([
+        fetchWithAuth(`/api/sfm/work-orders`),
+        fetchWithAuth(`/api/attendance/my-status`).catch(() => null),
+      ]);
+
+      if (woRes.ok) {
+        const data: WorkOrder[] = await woRes.json();
         setWorkOrders(data.filter(wo => wo.status !== "COMPLETED"));
+      }
+
+      if (attRes && attRes.ok) {
+        const attData = await attRes.json();
+        setHasCheckedInToday(!!attData?.today?.checkIn);
       }
     } catch (err) {
       console.error("Crew loadData error:", err);
@@ -113,6 +123,11 @@ export default function CrewSFMTerminal() {
   }, [loadData]);
 
   async function handleAction(woId: string, payload: any) {
+    if (hasCheckedInToday === false) {
+      alert("Silakan lakukan Absen Masuk terlebih dahulu sebelum memulai pekerjaan produksi.");
+      return false;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetchWithAuth(`/api/sfm/work-orders/${woId}/step`, {
@@ -226,6 +241,26 @@ export default function CrewSFMTerminal() {
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
+
+      {hasCheckedInToday === false && (
+        <div className="bg-amber-500/10 border-2 border-amber-500/30 rounded-3xl p-5 text-center space-y-3 animate-in fade-in">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center mx-auto shadow-md">
+            <AlertTriangle size={24} />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-amber-950">Gerbang Produksi Terkunci</h3>
+            <p className="text-xs font-semibold text-amber-800/90 mt-1 max-w-sm mx-auto leading-relaxed">
+              SOP mewajibkan Anda melakukan <strong>Absen Masuk</strong> terlebih dahulu sebelum memulai tahapan Work Order produksi churros.
+            </p>
+          </div>
+          <Link
+            href="/crew/attendance"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider hover:bg-black active:scale-95 transition-all shadow-md"
+          >
+            📷 Absen Masuk Sekarang <ChevronRight size={14} />
+          </Link>
+        </div>
+      )}
 
       {loading && workOrders.length === 0 ? (
         <div className="space-y-4">

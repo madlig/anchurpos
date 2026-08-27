@@ -107,6 +107,7 @@ export const employeeSchema = z.object({
   role: z.enum(["owner", "manager", "crew"]).default("crew"),
   phone: z.string().nullable().optional(),
   joinDate: z.string().nullable().optional(),
+  dailyWage: z.number().min(0, "Gaji harian tidak boleh negatif").optional(),
 });
 
 export const employeeUpdateSchema = employeeSchema.partial().omit({ username: true, password: true }).extend({

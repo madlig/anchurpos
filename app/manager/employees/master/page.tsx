@@ -140,11 +140,16 @@ export default function MasterEmployeePage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-slate-800">{emp.name}</p>
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap mt-0.5">
                           <span style={{ fontSize: "11px", fontFamily: "monospace", color: "#94A3B8" }}>@{emp.username}</span>
                           <span style={{ padding: "1px 7px", borderRadius: "100px", fontSize: "10px", fontWeight: "700", background: rc.bg, color: rc.color }}>
                             {ROLE_LABEL[emp.role]}
                           </span>
+                          {emp.role === "crew" && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              Rp {(emp.dailyWage ?? 60000).toLocaleString("id-ID")}/shift
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

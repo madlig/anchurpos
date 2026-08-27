@@ -20,7 +20,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
   }
 
-  const { name, role, phone, joinDate } = parseResult.data;
+  const { name, role, phone, joinDate, dailyWage } = parseResult.data;
 
   try {
     const ref = adminDb.collection("users").doc(id);
@@ -32,6 +32,7 @@ export async function PATCH(
     if (role !== undefined) updates.role = role;
     if (phone !== undefined) updates.phone = phone;
     if (joinDate !== undefined) updates.joinDate = joinDate;
+    if (dailyWage !== undefined) updates.dailyWage = dailyWage;
 
     await ref.update(updates);
 
@@ -82,7 +83,7 @@ export async function GET(
     const snap = await adminDb.collection("users").doc(id).get();
     if (!snap.exists) return NextResponse.json({ error: "Tidak ditemukan" }, { status: 404 });
     const d = snap.data()!;
-    return NextResponse.json({ id: snap.id, name: d.name, username: d.username, role: d.role, phone: d.phone, isActive: d.isActive });
+    return NextResponse.json({ id: snap.id, name: d.name, username: d.username, role: d.role, phone: d.phone, joinDate: d.joinDate, dailyWage: d.dailyWage ?? 60000, isActive: d.isActive });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

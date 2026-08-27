@@ -67,11 +67,10 @@ export async function POST(req: NextRequest) {
     const configSnap = await adminDb.doc("settings/attendanceConfig").get();
     const config = configSnap.data() || {};
     
-    // Titik pusat toko default (Jika belum di set, set di titik 0,0 atau titik spesifik agar tidak error)
-    // Sebaiknya defaultkan ke titik spesifik jika diperlukan
-    const storeLat = config.storeLat ?? -6.200000; 
-    const storeLng = config.storeLng ?? 106.816666;
-    const allowedRadius = config.radiusMeter ?? 50; 
+    // Titik pusat toko default (Ciwastra, Bandung)
+    const storeLat = config.storeLat ?? -6.953500; 
+    const storeLng = config.storeLng ?? 107.671000;
+    const allowedRadius = config.radiusMeter ?? 100; 
 
     let distance = null;
     let locationValid = false;

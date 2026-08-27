@@ -17,6 +17,7 @@ export function EmployeeForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
     role: initial?.role ?? "crew" as Role,
     phone: initial?.phone ?? "",
     joinDate: initial?.joinDate ?? "",
+    dailyWage: initial?.dailyWage ?? 60000,
   });
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -30,7 +31,13 @@ export function EmployeeForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
     try {
       const url = isEdit ? `/api/employees/${initial!.id}` : "/api/employees";
       const method = isEdit ? "PATCH" : "POST";
-      const body: Record<string, unknown> = { name: form.name.trim(), role: form.role, phone: form.phone || null, joinDate: form.joinDate || null };
+      const body: Record<string, unknown> = {
+        name: form.name.trim(),
+        role: form.role,
+        phone: form.phone || null,
+        joinDate: form.joinDate || null,
+        dailyWage: Number(form.dailyWage) || 60000,
+      };
       if (!isEdit) { body.username = form.username.trim(); body.password = password; }
       const res = await fetchWithAuth(url, { method, body: JSON.stringify(body) });
       if (!res.ok) { setErr((await res.json()).error ?? "Gagal"); return; }
@@ -80,6 +87,18 @@ export function EmployeeForm({ initial, fetchWithAuth, onSuccess, onCancel }: {
             className="flex-1 h-10 rounded-xl border-slate-200 text-sm" data-testid="emp-phone-input" />
           <Input type="date" value={form.joinDate ?? ""} onChange={e => setForm(p => ({ ...p, joinDate: e.target.value }))}
             className="flex-1 h-10 rounded-xl border-slate-200 text-sm" title="Tanggal bergabung" />
+        </div>
+
+        <div>
+          <label className="text-[11px] font-bold text-slate-500 mb-1 block">Gaji Pokok per Shift / Hari (Rp)</label>
+          <Input
+            type="number"
+            placeholder="Contoh: 60000"
+            value={form.dailyWage}
+            onChange={e => setForm(p => ({ ...p, dailyWage: Number(e.target.value) }))}
+            className="h-10 rounded-xl border-slate-200 text-sm font-bold"
+            data-testid="emp-daily-wage-input"
+          />
         </div>
 
         {!isEdit && (

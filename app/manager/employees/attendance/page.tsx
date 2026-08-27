@@ -81,7 +81,7 @@ export default function AttendancePage() {
       const res = await fetchWithAuth(`/api/attendance/${a.id}`, {
         method: "PATCH",
         body: JSON.stringify({
-          status: "completed",
+          status: "lengkap",
           totalHours: Number(editTotalHours),
           overtimeHours: Number(editOvertimeHours),
           overtimeBonus: Number(editOvertimeBonus),

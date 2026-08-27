@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
           role: d.role ?? "crew",
           phone: d.phone ?? null,
           joinDate: d.joinDate ?? null,
+          dailyWage: d.dailyWage ?? 60000,
           isActive: d.isActive !== false,
         };
       })
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
   }
 
-  const { name, username, password, role, phone, joinDate } = parseResult.data;
+  const { name, username, password, role, phone, joinDate, dailyWage } = parseResult.data;
 
   const uname = username.toLowerCase().trim().replace(/[^a-z0-9_]/g, "");
   const email = `${uname}@${EMAIL_DOMAIN}`;
@@ -71,11 +72,12 @@ export async function POST(req: NextRequest) {
       role,
       phone,
       joinDate,
+      dailyWage: dailyWage ?? 60000,
       isActive: true,
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    return NextResponse.json({ id: userRecord.uid, name: name.trim(), username: uname, role }, { status: 201 });
+    return NextResponse.json({ id: userRecord.uid, name: name.trim(), username: uname, role, dailyWage: dailyWage ?? 60000 }, { status: 201 });
   } catch (err: unknown) {
     const msg = (err as { code?: string })?.code === "auth/email-already-exists"
       ? "Username sudah digunakan"

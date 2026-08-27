@@ -42,6 +42,46 @@ interface HistoryItem {
 
 type GeoStatus = "idle" | "locating" | "ready" | "low_accuracy" | "denied" | "timeout" | "unavailable";
 
+function LiveShiftTimer({ checkInTime }: { checkInTime: string }) {
+  const [elapsed, setElapsed] = useState("");
+  const [hoursFraction, setHoursFraction] = useState(0);
+
+  useEffect(() => {
+    const update = () => {
+      const start = new Date(checkInTime).getTime();
+      const now = Date.now();
+      const diffSec = Math.max(0, Math.floor((now - start) / 1000));
+      const hrs = Math.floor(diffSec / 3600);
+      const mins = Math.floor((diffSec % 3600) / 60);
+      const secs = diffSec % 60;
+      setElapsed(`${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`);
+      setHoursFraction(Math.min(100, Math.round((diffSec / (8 * 3600)) * 100)));
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [checkInTime]);
+
+  return (
+    <div className="mt-4 p-3.5 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/15 text-white text-center space-y-2">
+      <div className="flex items-center justify-between text-xs font-bold text-white/80 px-1">
+        <span>Durasi Shift Berjalan</span>
+        <span className="font-mono text-emerald-300 font-extrabold text-sm">{elapsed}</span>
+      </div>
+      <div className="w-full bg-white/20 h-2 rounded-full overflow-hidden">
+        <div
+          className={`h-full transition-all duration-500 rounded-full ${hoursFraction >= 100 ? "bg-emerald-400" : "bg-blue-400"}`}
+          style={{ width: `${hoursFraction}%` }}
+        />
+      </div>
+      <div className="flex justify-between text-[10px] font-semibold text-white/60 px-1">
+        <span>Target: 8 Jam Kerja</span>
+        <span>{hoursFraction >= 100 ? "✅ Siap Absen Pulang" : `${hoursFraction}% Selesai`}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function CrewAttendancePage() {
   const { user, getToken } = useAuth();
   const { confirm, alert } = useAlertConfirm();
@@ -525,6 +565,9 @@ export default function CrewAttendancePage() {
             <p className="text-[11px] text-white/80 font-extrabold tracking-widest uppercase mb-2">Status Saat Ini</p>
             <p className="text-3xl font-black text-white mb-2 tracking-tight">{statusCard.label}</p>
             <p className="text-sm text-white/90 font-medium">{statusCard.sub}</p>
+            {hasCheckedIn && !hasCheckedOut && today?.checkIn?.time && (
+              <LiveShiftTimer checkInTime={today.checkIn.time} />
+            )}
           </div>
 
           {btnConfig && (
