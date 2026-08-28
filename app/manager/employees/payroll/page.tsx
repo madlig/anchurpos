@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Loader2, CalendarDays, Check, Search, Lock, Edit3, Save, X, FileText, LayoutList, Wallet, Settings2, ChevronDown, CheckCircle2, TrendingUp, Users, AlertTriangle } from "lucide-react";
+import { Loader2, CalendarDays, Check, Search, Lock, Edit3, Save, X, FileText, LayoutList, Wallet, Settings2, ChevronDown, CheckCircle2, TrendingUp, Users, AlertTriangle, Printer, Download, ShieldCheck } from "lucide-react";
 import { AttendanceRecord, Employee, PayrollRecord } from "../types";
 import { AdaptivePanel } from "@/components/shared/AdaptivePanel";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
@@ -33,6 +33,7 @@ export default function PayrollPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [lockedPayrolls, setLockedPayrolls] = useState<PayrollRecord[]>([]);
+  const [printPayroll, setPrintPayroll] = useState<PayrollRecord | null>(null);
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState("");
@@ -375,16 +376,19 @@ export default function PayrollPage() {
 
                 {/* Bottom Actions */}
                 <div className="flex border-t border-slate-100 bg-slate-50/50">
-                  <button onClick={() => setExpandedPayrollId(isExpanded ? null : p.id)} className="flex-1 py-4 text-[11px] font-bold text-slate-600 flex justify-center items-center gap-2 border-r border-slate-100 hover:bg-slate-100 transition-colors tap-target">
+                  <button onClick={() => setExpandedPayrollId(isExpanded ? null : p.id)} className="flex-1 py-4 text-[11px] font-bold text-slate-600 flex justify-center items-center gap-1.5 border-r border-slate-100 hover:bg-slate-100 transition-colors tap-target">
                     {isExpanded ? <ChevronDown size={14} className="rotate-180" /> : <LayoutList size={14} />} 
-                    {isExpanded ? "Tutup Rincian" : "Rincian"}
+                    {isExpanded ? "Tutup" : "Rincian"}
+                  </button>
+                  <button onClick={() => setPrintPayroll(p)} className="flex-1 py-4 text-[11px] font-bold text-slate-700 hover:bg-slate-100 flex justify-center items-center gap-1.5 border-r border-slate-100 transition-colors tap-target">
+                    <Printer size={14} /> Cetak Slip
                   </button>
                   {!p.isLocked && (
                     <>
-                      <button onClick={() => handleStartEdit(p)} className="flex-1 py-4 text-[11px] font-bold text-blue-600 flex justify-center items-center gap-2 border-r border-slate-100 hover:bg-blue-50 transition-colors tap-target">
+                      <button onClick={() => handleStartEdit(p)} className="flex-1 py-4 text-[11px] font-bold text-blue-600 flex justify-center items-center gap-1.5 border-r border-slate-100 hover:bg-blue-50 transition-colors tap-target">
                         <Settings2 size={14} /> Koreksi
                       </button>
-                      <button onClick={() => handlePay(p)} disabled={payingId === p.id} className="flex-1 py-4 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 flex justify-center items-center gap-2 transition-colors tap-target">
+                      <button onClick={() => handlePay(p)} disabled={payingId === p.id} className="flex-1 py-4 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 flex justify-center items-center gap-1.5 transition-colors tap-target">
                         {payingId === p.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Kunci
                       </button>
                     </>
@@ -467,6 +471,114 @@ export default function PayrollPage() {
           </div>
         </div>
       </AdaptivePanel>
+
+      {/* MODAL CETAK SLIP GAJI */}
+      {printPayroll && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto print:p-0 print:bg-white animate-in fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden print:border-none print:shadow-none print:max-w-none print:rounded-none">
+            {/* Top action bar - Hidden during print */}
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between print:hidden">
+              <div className="flex items-center gap-2">
+                <FileText size={18} className="text-emerald-400" />
+                <span className="text-sm font-bold">Pratinjau Slip Gaji</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
+                >
+                  <Printer size={14} /> Cetak / Simpan PDF
+                </button>
+                <button
+                  onClick={() => setPrintPayroll(null)}
+                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Slip Content */}
+            <div className="p-6 md:p-8 space-y-6 text-slate-800 bg-white">
+              <div className="text-center border-b border-slate-200 pb-4">
+                <h2 className="text-xl font-black tracking-widest text-slate-900 uppercase">ANCHUR CHURROS</h2>
+                <p className="text-xs font-bold text-slate-500 tracking-wider uppercase mt-0.5">SLIP GAJI RESMI KARYAWAN</p>
+                <p className="text-[11px] font-semibold text-slate-400 mt-1">Periode: {printPayroll.workPeriod}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nama Karyawan</p>
+                  <p className="font-extrabold text-slate-900 text-sm mt-0.5">{printPayroll.employeeName}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bulan Penggajian</p>
+                  <p className="font-extrabold text-slate-900 text-sm mt-0.5">{printPayroll.month}</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 border-t border-b border-slate-100 py-4 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-slate-600">Gaji Pokok ({printPayroll.workDays} Hari × {fmtRupiah(printPayroll.dailyWage)})</span>
+                  <span className="font-extrabold text-slate-900">{fmtRupiah(printPayroll.totalRegularPay)}</span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-slate-600">Bonus Lemburan</span>
+                  <span className="font-extrabold text-slate-900">{fmtRupiah(printPayroll.totalOvertimeBonus)}</span>
+                </div>
+
+                {printPayroll.performanceBonus > 0 && (
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="font-semibold text-emerald-700">Bonus Performa / Kerajinan</span>
+                      {printPayroll.performanceBonusNote && (
+                        <p className="text-[10px] text-emerald-600/80 font-medium">Catatan: {printPayroll.performanceBonusNote}</p>
+                      )}
+                    </div>
+                    <span className="font-extrabold text-emerald-700">+{fmtRupiah(printPayroll.performanceBonus)}</span>
+                  </div>
+                )}
+
+                {(printPayroll.deductions || 0) > 0 && (
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="font-semibold text-rose-600">Potongan / Kasbon</span>
+                      {printPayroll.deductionNote && (
+                        <p className="text-[10px] text-rose-500/80 font-medium">Catatan: {printPayroll.deductionNote}</p>
+                      )}
+                    </div>
+                    <span className="font-extrabold text-rose-600">-{fmtRupiah(printPayroll.deductions || 0)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-2xl border border-dashed border-slate-300 flex justify-between items-center">
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">TOTAL GAJI BERSIH (TAKE HOME PAY)</p>
+                  <p className="text-2xl font-black text-emerald-600 mt-0.5">{fmtRupiah(printPayroll.totalPaid)}</p>
+                </div>
+                {printPayroll.isLocked && (
+                  <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-black uppercase border border-emerald-200">
+                    DIKUNCI / RESMI
+                  </span>
+                )}
+              </div>
+
+              <div className="pt-6 grid grid-cols-2 gap-8 text-center text-xs">
+                <div>
+                  <p className="text-slate-400 font-semibold mb-12">Penerima (Karyawan)</p>
+                  <p className="font-bold text-slate-800 border-t border-slate-300 pt-1.5">{printPayroll.employeeName}</p>
+                </div>
+                <div>
+                  <p className="text-slate-400 font-semibold mb-12">Diserahkan Oleh</p>
+                  <p className="font-bold text-slate-800 border-t border-slate-300 pt-1.5">Manager / Owner</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
