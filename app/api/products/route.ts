@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
         id: doc.id,
         code: data.code,
         name: data.name,
+        category: data.category ?? "frozen",
         description: data.description ?? "",
         packPerBatch: data.packPerBatch ?? 1,
         isActive: data.isActive ?? true,
@@ -75,13 +76,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
   }
 
-  const { code, name, description, packPerBatch, isActive, channels, freeSauceAllowance, priceTiers = [] } = parseResult.data;
+  const { code, name, category, description, packPerBatch, isActive, channels, freeSauceAllowance, priceTiers = [] } = parseResult.data;
 
   try {
     const ref = adminDb.collection("products").doc();
     await ref.set({
       code: code.trim(),
       name: name.trim(),
+      category: category || "frozen",
       description: description.trim(),
       packPerBatch,
       isActive,

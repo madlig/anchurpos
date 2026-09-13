@@ -378,7 +378,7 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <p className="text-sm font-bold text-slate-800">{item.productName}</p>
-                  {item.variantName && (
+                  {item.variantName && !["none", "Tanpa Varian", "Jasa"].includes(item.variantName) && (
                     <p className="text-xs font-semibold text-primary mt-0.5 bg-brand-50 inline-block px-2 py-0.5 rounded-md">
                       Varian: {item.variantName}
                     </p>

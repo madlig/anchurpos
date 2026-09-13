@@ -15,11 +15,14 @@ export function AddItemForm({ products, variants, addOns, onAddItem, getPrice }:
   const [newSauceId, setNewSauceId] = useState("");
   const [newQty, setNewQty] = useState(1);
 
-  const allowedVariants = useMemo(() => variants, [variants]);
+  const allowedVariants = useMemo(() => {
+    return newProdId ? variants.filter(v => v.productId === newProdId) : [];
+  }, [variants, newProdId]);
   
   useEffect(() => {
     if (newProdId) {
-      setNewVarId(allowedVariants[0]?.id || "");
+      const pVars = variants.filter(v => v.productId === newProdId);
+      setNewVarId(pVars.length > 0 ? pVars[0].id : "none");
       const hasSauce = newProdId.toLowerCase().includes("churros");
       if (hasSauce && addOns.length > 0) {
         const tiramisu = addOns.find(a => a.name.toLowerCase().includes("tiramisu") || a.id === "saus-tiramisu") || addOns[0];
@@ -27,27 +30,34 @@ export function AddItemForm({ products, variants, addOns, onAddItem, getPrice }:
       } else {
         setNewSauceId("");
       }
+    } else {
+      setNewVarId("");
     }
-  }, [newProdId, allowedVariants, addOns]);
+  }, [newProdId, variants, addOns]);
 
   function handleAddItem() {
-    if (!newProdId || !newVarId) {
-      alert("Pilih produk dan varian rasa terlebih dahulu!");
+    if (!newProdId) {
+      alert("Pilih produk terlebih dahulu!");
+      return;
+    }
+    if (allowedVariants.length > 0 && (!newVarId || newVarId === "none")) {
+      alert("Pilih varian rasa terlebih dahulu!");
       return;
     }
     const product = products.find(p => p.id === newProdId);
     const variant = variants.find(v => v.id === newVarId);
-    if (!product || !variant) return;
+    if (!product) return;
 
     const hasSauce = product.id.toLowerCase().includes("churros");
     const sId = hasSauce ? newSauceId : undefined;
     const sName = sId ? (addOns.find(a => a.id === sId)?.name || sId) : undefined;
 
+    const isService = (product as any).category === "service";
     const newItem: EditCartItem = {
       productId: product.id,
       productName: product.name,
-      variantId: variant.id,
-      variantName: variant.name,
+      variantId: variant?.id ?? "none",
+      variantName: variant?.name ?? (isService ? "Jasa" : "Tanpa Varian"),
       qty: newQty,
       price: getPrice(product, newQty),
       sauceId: sId,
@@ -85,13 +95,19 @@ export function AddItemForm({ products, variants, addOns, onAddItem, getPrice }:
           <select
             value={newVarId}
             onChange={e => setNewVarId(e.target.value)}
-            disabled={!newProdId}
+            disabled={!newProdId || allowedVariants.length === 0}
             className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white outline-none disabled:bg-slate-100 disabled:cursor-not-allowed"
           >
-            <option value="">-- Pilih Rasa --</option>
-            {allowedVariants.map(v => (
-              <option key={v.id} value={v.id}>{v.name}</option>
-            ))}
+            {allowedVariants.length === 0 ? (
+              <option value="none">-- Tanpa Varian (Layanan / Standar) --</option>
+            ) : (
+              <>
+                <option value="">-- Pilih Rasa --</option>
+                {allowedVariants.map(v => (
+                  <option key={v.id} value={v.id}>{v.name}</option>
+                ))}
+              </>
+            )}
           </select>
         </div>
       </div>

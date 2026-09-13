@@ -1,6 +1,6 @@
 export interface PriceTier { id: string; minQty: number; maxQty: number | null; price: number; }
 export interface ProductItem {
-  id: string; code: string; name: string; description: string;
+  id: string; code: string; name: string; category?: string; description: string;
   packPerBatch: number; isActive: boolean; priceTiers: PriceTier[]; channels?: string[];
   freeSauceAllowance?: number;
 }
@@ -12,7 +12,7 @@ export interface CustomerItem {
 }
 export interface CartItem {
   productId: string; productName: string;
-  variantId: string; variantName: string;
+  variantId?: string; variantName?: string;
   qty: number; price: number;
   basePrice: number; appliedTier: string; discountPerUnit: number; totalPrice: number;
   sauceId?: string;

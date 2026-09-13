@@ -198,12 +198,19 @@ export async function POST(req: NextRequest) {
         productQtyMap.set(item.productId, current + item.qty);
       }
 
+      const productSnaps: Record<string, FirebaseFirestore.DocumentSnapshot> = {};
       for (const item of items) {
-        const productSnap = await tx.get(adminDb.doc(`products/${item.productId}`));
-        const product = productSnap.data();
+        if (!productSnaps[item.productId]) {
+          productSnaps[item.productId] = await tx.get(adminDb.doc(`products/${item.productId}`));
+        }
+        const product = productSnaps[item.productId].data();
 
-        const variantSnap = await tx.get(adminDb.doc(`variants/${item.variantId}`));
-        const variant = variantSnap.data();
+        const hasVariant = item.variantId && item.variantId !== "none" && item.variantId !== "default";
+        let variant: FirebaseFirestore.DocumentData | undefined = undefined;
+        if (hasVariant) {
+          const variantSnap = await tx.get(adminDb.doc(`variants/${item.variantId}`));
+          variant = variantSnap.data();
+        }
 
         const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
 
@@ -212,15 +219,18 @@ export async function POST(req: NextRequest) {
         const totalPrice = (basePrice - discountPerUnit) * item.qty;
         
         const packPerBatch = product?.packPerBatch || 1;
-        const hppPerUnit = await calculateProductHPP(item.productId, item.variantId, packPerBatch, undefined, tx);
+        const hppPerUnit = hasVariant 
+          ? await calculateProductHPP(item.productId, item.variantId!, packPerBatch, undefined, tx)
+          : 0;
         const totalHpp = hppPerUnit * item.qty;
         const margin = totalPrice - totalHpp;
 
+        const defaultVariantName = product?.category === "service" ? "Jasa" : "Tanpa Varian";
         const itemData: Record<string, unknown> = {
           productId: item.productId,
           productName: product?.name ?? item.productId,
-          variantId: item.variantId,
-          variantName: variant?.name ?? item.variantId,
+          variantId: item.variantId || "none",
+          variantName: variant?.name ?? (item.variantName || defaultVariantName),
           qty: item.qty,
           basePrice,
           appliedTier: `${totalProductQty} pcs`,
@@ -268,11 +278,14 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // 2. Read Product Stocks
+      // 2. Read Product Stocks (hanya produk fisik dengan varian)
       const stockSnaps: Record<string, FirebaseFirestore.DocumentSnapshot> = {};
       for (const item of items) {
+        const product = productSnaps[item.productId]?.data();
+        const isService = product?.category === "service";
+        const isNoVariant = !item.variantId || item.variantId === "none";
         const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
-        if (!isRainbow) {
+        if (!isRainbow && !isService && !isNoVariant) {
           const stockId = `${item.productId}_${item.variantId}`;
           if (!stockSnaps[stockId]) {
             stockSnaps[stockId] = await tx.get(adminDb.collection("productStocks").doc(stockId));
@@ -405,11 +418,14 @@ export async function POST(req: NextRequest) {
         tx.set(itemRef, itemData);
       }
 
-      // Kurangi stok produk jadi untuk semua pesanan baru
+      // Kurangi stok produk jadi untuk semua pesanan baru (hanya produk fisik)
       const stockChanges: Record<string, number> = {};
       for (const item of items) {
+        const product = productSnaps[item.productId]?.data();
+        const isService = product?.category === "service";
+        const isNoVariant = !item.variantId || item.variantId === "none";
         const isRainbow = item.productId === "churros-rainbow" || item.variantId === "rainbow";
-        if (!isRainbow) {
+        if (!isRainbow && !isService && !isNoVariant) {
           const stockId = `${item.productId}_${item.variantId}`;
           stockChanges[stockId] = (stockChanges[stockId] ?? 0) + item.qty;
         }

@@ -20,7 +20,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
   }
 
-  const { name, code, description, packPerBatch, priceTiers, channels, freeSauceAllowance } = parseResult.data;
+  const { name, code, category, description, packPerBatch, priceTiers, channels, freeSauceAllowance } = parseResult.data;
 
   if (name !== undefined && !name.trim()) {
     return NextResponse.json({ error: "Nama wajib diisi" }, { status: 400 });
@@ -37,6 +37,7 @@ export async function PATCH(
     const updates: any = { updatedAt: FieldValue.serverTimestamp() };
     if (name !== undefined) updates.name = name.trim();
     if (code !== undefined) updates.code = code.trim().toUpperCase();
+    if (category !== undefined) updates.category = category;
     if (description !== undefined) updates.description = description;
     if (packPerBatch !== undefined) updates.packPerBatch = packPerBatch;
     if (channels !== undefined) updates.channels = channels;

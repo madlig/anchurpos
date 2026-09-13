@@ -21,6 +21,7 @@ export interface Product {
   id: string;
   code: string;
   name: string;
+  category?: string;
   description: string;
   packPerBatch: number;
   isActive: boolean;

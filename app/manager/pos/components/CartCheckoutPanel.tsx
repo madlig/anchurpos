@@ -246,7 +246,13 @@ export function CartCheckoutPanel({
                 <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center"><span className="text-xs font-bold text-primary">{item.qty}x</span></div>
                 <div>
                   <p className="text-xs font-semibold text-slate-800">{item.productName}</p>
-                  <p className="text-xs text-slate-400">{item.variantName}{item.sauceName ? ` · Saus: ${item.sauceName}` : ""}</p>
+                  {(item.variantName && !["none", "Tanpa Varian", "Jasa"].includes(item.variantName) || item.sauceName) && (
+                    <p className="text-xs text-slate-400">
+                      {item.variantName && !["none", "Tanpa Varian", "Jasa"].includes(item.variantName) ? item.variantName : ""}
+                      {item.variantName && !["none", "Tanpa Varian", "Jasa"].includes(item.variantName) && item.sauceName ? " · " : ""}
+                      {item.sauceName ? `Saus: ${item.sauceName}` : ""}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">

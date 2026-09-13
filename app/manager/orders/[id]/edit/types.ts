@@ -1,10 +1,10 @@
 export interface PriceTier { id: string; minQty: number; maxQty: number | null; price: number; }
 export interface ProductItem {
-  id: string; code: string; name: string; description: string;
+  id: string; code: string; name: string; category?: string; description: string;
   packPerBatch: number; isActive: boolean; priceTiers: PriceTier[]; channels?: string[];
 }
 export interface Variant {
-  id: string; name: string; currentStock: number; minStock: number; sortOrder: number;
+  id: string; productId?: string; name: string; currentStock: number; minStock: number; sortOrder: number;
 }
 export interface CustomerItem {
   id: string; name: string; channel: string; customerType: string; phoneNumber: string | null;

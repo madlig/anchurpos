@@ -14,7 +14,9 @@ export async function GET(req: NextRequest) {
       adminDb.collection("productStocks").get(),
     ]);
 
-    const products = productsSnap.docs.map((doc) => ({ id: doc.id, name: doc.data().name }));
+    const products = productsSnap.docs
+      .map((doc) => ({ id: doc.id, name: doc.data().name, category: doc.data().category }))
+      .filter((prod) => prod.category !== "service");
     const variants = variantsSnap.docs.map((doc) => ({ id: doc.id, productId: doc.data().productId ?? "", name: doc.data().name, minStock: doc.data().minStock ?? 10 }));
 
     const stocksMap = new Map<string, number>();
@@ -24,22 +26,37 @@ export async function GET(req: NextRequest) {
 
     const results: any[] = [];
     products.forEach((prod) => {
-      variants.forEach((v) => {
-        if (v.productId && v.productId !== prod.id) return; // Only pair with parent product!
-        const stockId = `${prod.id}_${v.id}`;
-        const currentStock = stocksMap.get(stockId) ?? 0;
+      const prodVariants = variants.filter((v) => v.productId === prod.id);
+      if (prodVariants.length > 0) {
+        prodVariants.forEach((v) => {
+          const stockId = `${prod.id}_${v.id}`;
+          const currentStock = stocksMap.get(stockId) ?? 0;
 
+          results.push({
+            id: stockId,
+            productId: prod.id,
+            productName: prod.name,
+            variantId: v.id,
+            variantName: v.name,
+            name: `${prod.name} - ${v.name}`,
+            currentStock,
+            minStock: v.minStock,
+          });
+        });
+      } else {
+        const stockId = `${prod.id}_none`;
+        const currentStock = stocksMap.get(stockId) ?? 0;
         results.push({
           id: stockId,
           productId: prod.id,
           productName: prod.name,
-          variantId: v.id,
-          variantName: v.name,
-          name: `${prod.name} - ${v.name}`,
+          variantId: "none",
+          variantName: "Tanpa Varian",
+          name: prod.name,
           currentStock,
-          minStock: v.minStock,
+          minStock: 0,
         });
-      });
+      }
     });
 
     return NextResponse.json(results);

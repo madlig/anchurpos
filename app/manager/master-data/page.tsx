@@ -31,6 +31,7 @@ const PRODUCT_CATEGORIES = [
   { id: "ready_to_eat", label: "Ready to Eat (Siap Saji)" },
   { id: "beverage", label: "Beverage (Minuman)" },
   { id: "bakery", label: "Pastry / Roti" },
+  { id: "service", label: "Jasa / Layanan" },
   { id: "other", label: "Lain-lain" },
 ];
 
@@ -509,7 +510,15 @@ function MasterDataContent() {
     try {
       const endpoint = deleteTarget.type === "variant" ? "variants" : deleteTarget.type === "ingredient" ? "ingredients" : "products";
       const res = await fetchWithAuth(`/api/${endpoint}/${deleteTarget.id}`, { method: "DELETE" });
-      if (res.ok) { setDeleteTarget(null); await loadAll(); }
+      if (res.ok) { 
+        setDeleteTarget(null); 
+        await loadAll(); 
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || "Gagal menghapus data");
+      }
+    } catch {
+      alert("Terjadi kesalahan koneksi saat menghapus data");
     } finally { setDeleting(false); }
   }
 
@@ -847,7 +856,7 @@ function MasterDataContent() {
                         </thead>
                         <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                           {filteredProducts.map((p) => {
-                            const productVariants = variants.filter(v => v.productId === p.id || !v.productId);
+                            const productVariants = variants.filter(v => v.productId === p.id || (!v.productId && p.category !== "service"));
 
                             return (
                               <tr key={p.id} className="hover:bg-slate-50/80 transition-colors group">
@@ -872,27 +881,43 @@ function MasterDataContent() {
                                   {p.freeSauceAllowance || 0} Pouch
                                 </td>
                                 <td className="py-3.5 px-4">
-                                  <div className="flex flex-wrap items-center gap-1">
-                                    {productVariants.map(v => (
-                                      <span key={v.id} className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 flex items-center gap-1">
-                                        {v.name}
-                                        <button
-                                          type="button"
-                                          onClick={() => { setEditVariantItem(v); setAddVariantForProductId(null); setShowAddForm(false); }}
-                                          className="text-amber-600 hover:text-amber-900"
-                                          title="Edit Varian"
-                                        >
-                                          <Pencil size={10} />
-                                        </button>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    {productVariants.length === 0 ? (
+                                      <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md border border-dashed border-slate-200">
+                                        {p.category === "service" ? "Jasa (Tanpa Varian)" : "Tanpa Varian"}
                                       </span>
-                                    ))}
-                                    <button
-                                      type="button"
-                                      onClick={() => { setAddVariantForProductId(p.id); setEditVariantItem(null); setShowAddForm(false); }}
-                                      className="text-[10px] font-extrabold text-indigo-600 hover:underline flex items-center gap-0.5 ml-1"
-                                    >
-                                      <Plus size={12} /> Varian
-                                    </button>
+                                    ) : (
+                                      productVariants.map(v => (
+                                        <span key={v.id} className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 flex items-center gap-1.5">
+                                          {v.name}
+                                          <button
+                                            type="button"
+                                            onClick={() => { setEditVariantItem(v); setAddVariantForProductId(null); setShowAddForm(false); }}
+                                            className="text-amber-600 hover:text-amber-900"
+                                            title="Edit Varian"
+                                          >
+                                            <Pencil size={10} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setDeleteTarget({ id: v.id, name: v.name, type: "variant" })}
+                                            className="text-rose-500 hover:text-rose-700"
+                                            title="Hapus Varian"
+                                          >
+                                            <Trash2 size={10} />
+                                          </button>
+                                        </span>
+                                      ))
+                                    )}
+                                    {p.category !== "service" && (
+                                      <button
+                                        type="button"
+                                        onClick={() => { setAddVariantForProductId(p.id); setEditVariantItem(null); setShowAddForm(false); }}
+                                        className="text-[10px] font-extrabold text-indigo-600 hover:underline flex items-center gap-0.5 ml-1"
+                                      >
+                                        <Plus size={12} /> Varian
+                                      </button>
+                                    )}
                                   </div>
                                 </td>
                                 <td className="py-3.5 px-4 text-center whitespace-nowrap">
@@ -929,12 +954,20 @@ function MasterDataContent() {
                         </tbody>
                       </table>
                     </div>
+
+                    {deleteTarget && viewMode === "table" && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+                        <div className="relative w-full max-w-sm">
+                          <ConfirmDelete label={deleteTarget.name} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} loading={deleting} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   /* Clean Grid View for Products */
                   <div className="space-y-4">
                     {filteredProducts.map(p => {
-                      const productVariants = variants.filter(v => v.productId === p.id || !v.productId);
+                      const productVariants = variants.filter(v => v.productId === p.id || (!v.productId && p.category !== "service"));
 
                       return (
                         <div key={p.id} className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm relative space-y-4">
@@ -987,18 +1020,22 @@ function MasterDataContent() {
                                 <Layers size={14} className="text-amber-500" /> Varian Rasa / Option ({productVariants.length})
                               </span>
                               
-                              <button
-                                type="button"
-                                onClick={() => { setAddVariantForProductId(p.id); setEditVariantItem(null); setShowAddForm(false); }}
-                                className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-                              >
-                                <Plus size={14} /> Tambah Varian Rasa
-                              </button>
+                              {p.category !== "service" && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setAddVariantForProductId(p.id); setEditVariantItem(null); setShowAddForm(false); }}
+                                  className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                                >
+                                  <Plus size={14} /> Tambah Varian Rasa
+                                </button>
+                              )}
                             </div>
 
                             {productVariants.length === 0 ? (
                               <div className="p-4 rounded-2xl bg-slate-50 text-center border border-dashed border-slate-200">
-                                <p className="text-xs font-bold text-slate-400">Belum ada varian rasa yang terikat pada produk ini.</p>
+                                <p className="text-xs font-bold text-slate-400">
+                                  {p.category === "service" ? "Produk Jasa / Layanan — Tidak memerlukan varian rasa." : "Belum ada varian rasa yang terikat pada produk ini."}
+                                </p>
                               </div>
                             ) : (
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
@@ -1036,8 +1073,8 @@ function MasterDataContent() {
                             )}
                           </div>
 
-                          {deleteTarget?.id === p.id && (
-                            <ConfirmDelete label={p.name} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} loading={deleting} />
+                          {deleteTarget && (deleteTarget.id === p.id || productVariants.some(v => v.id === deleteTarget.id)) && (
+                            <ConfirmDelete label={deleteTarget.name} onConfirm={handleDelete} onCancel={() => setDeleteTarget(null)} loading={deleting} />
                           )}
                         </div>
                       );

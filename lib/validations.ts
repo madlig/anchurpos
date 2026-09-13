@@ -5,8 +5,8 @@ import { CUSTOMER_TYPES, ORDER_CHANNELS } from "./constants";
 export const orderItemSchema = z.object({
   productId: z.string().min(1),
   productName: z.string().min(1),
-  variantId: z.string().min(1),
-  variantName: z.string().min(1),
+  variantId: z.string().optional().default("none"),
+  variantName: z.string().optional().default(""),
   qty: z.number().int().positive(),
   basePrice: z.number().min(0),
   appliedTier: z.string(),
@@ -123,6 +123,7 @@ export const priceTierSchema = z.object({
 export const productSchema = z.object({
   code: z.string().min(1, "Kode produk wajib diisi"),
   name: z.string().min(1, "Nama produk wajib diisi"),
+  category: z.string().default("frozen"),
   description: z.string().optional().default(""),
   packPerBatch: z.number().int().min(1).default(1),
   isActive: z.boolean().default(true),

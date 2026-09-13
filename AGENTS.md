@@ -14,6 +14,7 @@ Ordered by relevance. If a task touches a domain, read that knowledge file first
 
 | When task involves… | Read this knowledge file first |
 |---|---|
+| UI/UX design, completed features history, design system | `.antigravity/knowledge/project-overview-and-design.md` |
 | Any backend / API / data flow | `.antigravity/knowledge/architecture.md` |
 | Auth, tokens, 401/403 errors, fetch calls | `.antigravity/knowledge/api-and-auth.md` |
 | Form validation, zod, saving data | `.antigravity/knowledge/validation-contract.md` |
