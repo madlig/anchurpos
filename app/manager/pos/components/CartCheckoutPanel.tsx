@@ -176,6 +176,7 @@ export function CartCheckoutPanel({
           method: "POST",
           body: JSON.stringify({
             name: customerSearch.trim(), customerType: newCustomerType,
+            phoneNumber: null,
             poNumber: showPoNumber && poNumber.trim() ? poNumber.trim() : null,
             orderChannel: orderChannel,
             channel: orderChannel === "whatsapp" ? "whatsapp" : "walk_in",

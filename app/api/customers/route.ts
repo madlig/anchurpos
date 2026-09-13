@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       code: customerCode,
       channel,
       customerType,
-      phoneNumber,
+      phoneNumber: phoneNumber || null,
       email: email || null,
       address: address || null,
       notes: notes || "",

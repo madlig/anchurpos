@@ -32,6 +32,7 @@ function getAdminApp(): App {
 const app = getAdminApp();
 
 export const adminDb = getFirestore(app);
+adminDb.settings({ ignoreUndefinedProperties: true });
 export const adminAuth = getAuth(app);
 export const adminStorage = getStorage(app);
 export const adminMessaging = getMessaging(app);

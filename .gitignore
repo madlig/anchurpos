@@ -19,3 +19,4 @@ memory/
 CuanPOS_PRD.md
 scratch/
 *.js.tmp
+*.tsbuildinfo
