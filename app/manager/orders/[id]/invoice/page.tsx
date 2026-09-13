@@ -25,6 +25,20 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 }
 
+function terbilang(n: number): string {
+  const b = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
+  n = Math.floor(Math.abs(n));
+  if (n < 12) return b[n];
+  if (n < 20) return (terbilang(n - 10) + " Belas").trim();
+  if (n < 100) return (terbilang(Math.floor(n / 10)) + " Puluh " + terbilang(n % 10)).replace(/\s+/g, " ").trim();
+  if (n < 200) return ("Seratus " + terbilang(n - 100)).replace(/\s+/g, " ").trim();
+  if (n < 1000) return (terbilang(Math.floor(n / 100)) + " Ratus " + terbilang(n % 100)).replace(/\s+/g, " ").trim();
+  if (n < 2000) return ("Seribu " + terbilang(n - 1000)).replace(/\s+/g, " ").trim();
+  if (n < 1000000) return (terbilang(Math.floor(n / 1000)) + " Ribu " + terbilang(n % 1000)).replace(/\s+/g, " ").trim();
+  if (n < 1000000000) return (terbilang(Math.floor(n / 1000000)) + " Juta " + terbilang(n % 1000000)).replace(/\s+/g, " ").trim();
+  return (terbilang(Math.floor(n / 1000000000)) + " Miliar " + terbilang(n % 1000000000)).replace(/\s+/g, " ").trim();
+}
+
 export default function InvoicePage() {
   const { getToken } = useAuth();
   const params = useParams();
@@ -67,25 +81,75 @@ export default function InvoicePage() {
   );
   if (!order) return <div style={{ textAlign: "center", padding: "40px" }}>Dokumen tidak ditemukan</div>;
 
+  const [customDocTitle, setCustomDocTitle] = useState<string | null>(null);
+
   const subtotal = order.items.reduce((s, i) => s + i.totalPrice, 0);
   const shipping = order.shippingCost ?? 0;
   const total = subtotal + shipping;
   const isPaid = order.paymentStatus === "sudah_bayar";
   const isB2B = order.customerType === "b2b" || order.customerType === "reseller";
-  const docTitle = isPaid ? "KWITANSI" : (isB2B ? "INVOICE" : "NOTA");
+  const defaultDocTitle = isPaid ? "KWITANSI" : (isB2B ? "INVOICE" : "NOTA");
+  const docTitle = customDocTitle || defaultDocTitle;
+
+  // Urutkan item: Produk Churros di atas, disusul produk lain, lalu Jasa / Packing di bawah
+  const sortedItems = [...order.items].sort((a, b) => {
+    const aIsChurros = a.productName.toLowerCase().includes("churros");
+    const bIsChurros = b.productName.toLowerCase().includes("churros");
+    if (aIsChurros && !bIsChurros) return -1;
+    if (!aIsChurros && bIsChurros) return 1;
+
+    const aIsService = ["jasa", "packing", "kemasan"].some(k => a.productName.toLowerCase().includes(k));
+    const bIsService = ["jasa", "packing", "kemasan"].some(k => b.productName.toLowerCase().includes(k));
+    if (!aIsService && bIsService) return -1;
+    if (aIsService && !bIsService) return 1;
+
+    return a.productName.localeCompare(b.productName);
+  });
+
+  const firstChurrosIdx = sortedItems.findIndex(i => i.productName.toLowerCase().includes("churros"));
+  const sauceTargetIdx = firstChurrosIdx >= 0 ? firstChurrosIdx : 0;
+
+  const isGenericVariant = (name?: string | null) => {
+    if (!name) return true;
+    const lower = name.toLowerCase().trim();
+    return ["none", "tanpa varian", "jasa", "default", "-", ""].includes(lower);
+  };
 
   return (
     <>
-      {/* Print button — tersembunyi saat print */}
-      <div className="no-print" style={{ padding: "16px", display: "flex", justifyContent: "flex-end", gap: "8px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
-        <button onClick={() => window.print()}
-          style={{ padding: "8px 20px", borderRadius: "10px", background: "#E85D8C", color: "#fff", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "700" }}>
-          Cetak {docTitle}
-        </button>
-        <button onClick={() => window.close()}
-          style={{ padding: "8px 20px", borderRadius: "10px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "13px" }}>
-          Tutup
-        </button>
+      {/* Print button & Doc title selector — tersembunyi saat print */}
+      <div className="no-print" style={{ padding: "12px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontSize: "12px", fontWeight: "700", color: "#64748B" }}>Tipe Dokumen:</span>
+          {(["INVOICE", "KWITANSI", "NOTA"] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => setCustomDocTitle(t)}
+              style={{
+                padding: "5px 12px",
+                borderRadius: "6px",
+                border: docTitle === t ? "1px solid #E85D8C" : "1px solid #CBD5E1",
+                background: docTitle === t ? "#FFF1F5" : "#FFFFFF",
+                color: docTitle === t ? "#E85D8C" : "#475569",
+                fontSize: "11px",
+                fontWeight: "700",
+                cursor: "pointer"
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button onClick={() => window.print()}
+            style={{ padding: "8px 20px", borderRadius: "10px", background: "#E85D8C", color: "#fff", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "700" }}>
+            Cetak {docTitle}
+          </button>
+          <button onClick={() => window.close()}
+            style={{ padding: "8px 20px", borderRadius: "10px", background: "#F1F5F9", color: "#64748B", border: "none", cursor: "pointer", fontSize: "13px" }}>
+            Tutup
+          </button>
+        </div>
       </div>
 
       {/* Invoice document */}
@@ -151,13 +215,15 @@ export default function InvoicePage() {
             </tr>
           </thead>
           <tbody>
-            {order.items.map((item, i) => {
-              const hasSauces = i === 0 && order.sauceDistribution && Object.values(order.sauceDistribution).some(q => q > 0);
+            {sortedItems.map((item, i) => {
+              const hasSauces = i === sauceTargetIdx && order.sauceDistribution && Object.values(order.sauceDistribution).some(q => q > 0);
               return (
                 <tr key={i} style={{ borderBottom: "1px solid #F1F5F9" }}>
                   <td style={{ padding: "12px", fontSize: "13px", verticalAlign: "top" }}>
                     <p style={{ fontWeight: "600", color: "#1C1C1E", margin: "0 0 2px" }}>{item.productName}</p>
-                    {item.variantName && <p style={{ fontSize: "11px", color: "#94A3B8", margin: 0 }}>Varian: {item.variantName}</p>}
+                    {!isGenericVariant(item.variantName) && (
+                      <p style={{ fontSize: "11px", color: "#94A3B8", margin: 0 }}>Varian: {item.variantName}</p>
+                    )}
                     
                     {hasSauces && (
                       <div style={{ marginTop: "8px", background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "6px 10px", borderRadius: "6px", display: "inline-block" }}>

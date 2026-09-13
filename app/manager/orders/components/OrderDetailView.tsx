@@ -189,7 +189,7 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
           <table class="item-table">
             ${order.items.map(item => `
               <tr>
-                <td colspan="3" class="item-name bold">${item.productName} ${item.variantName ? `- ${item.variantName}` : ""}</td>
+                <td colspan="3" class="item-name bold">${item.productName} ${item.variantName && !["none", "Tanpa Varian", "Jasa", "default"].includes(item.variantName) ? `- ${item.variantName}` : ""}</td>
               </tr>
               <tr>
                 <td class="item-qty">${item.qty}x</td>
