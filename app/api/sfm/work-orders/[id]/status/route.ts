@@ -38,25 +38,76 @@ export async function PATCH(
 
     // Restore BOM raw materials if Work Order is CANCELLED
     if (status === "CANCELLED" && oldStatus !== "CANCELLED") {
-      try {
-        const recipeSnap = await adminDb.collection("recipes").where("productId", "==", woData.productId || "churros-frozen-food").get();
-        if (!recipeSnap.empty) {
-          const recipeData = recipeSnap.docs[0].data();
-          const ingredientsToRestore = recipeData.ingredients || [];
-          const numBatches = woData.targetBatches || 1;
+      if (woData.woType === "PRODUKSI" || !woData.woType) {
+        try {
+          const ingredientRestores = new Map<string, number>();
 
-          for (const ing of ingredientsToRestore) {
-            const qtyToRestore = (ing.amount || 0) * numBatches;
-            if (ing.ingredientId && qtyToRestore > 0) {
-              const ingRef = adminDb.collection("ingredients").doc(ing.ingredientId);
-              await ingRef.update({
-                stock: FieldValue.increment(qtyToRestore),
-              });
+          if (woData.productionTargets && Array.isArray(woData.productionTargets) && woData.productionTargets.length > 0) {
+            const totalBatches = woData.productionTargets.reduce((sum: number, t: any) => sum + (Number(t.targetBatches) || 0), 0);
+            if (totalBatches > 0) {
+              const baseRecipesSnap = await adminDb.collection("recipes").where("variantId", "==", "all").get();
+              for (const doc of baseRecipesSnap.docs) {
+                const r = doc.data();
+                if (r.ingredientId && r.qtyPerBatch) {
+                  const qty = Number(r.qtyPerBatch) * totalBatches;
+                  ingredientRestores.set(r.ingredientId, (ingredientRestores.get(r.ingredientId) || 0) + qty);
+                }
+              }
+            }
+
+            for (const target of woData.productionTargets) {
+              const tBatches = Number(target.targetBatches) || 0;
+              if (target.variantId && target.variantId !== "all" && tBatches > 0) {
+                const varRecipesSnap = await adminDb.collection("recipes").where("variantId", "==", target.variantId).get();
+                for (const doc of varRecipesSnap.docs) {
+                  const r = doc.data();
+                  if (r.ingredientId && r.qtyPerBatch) {
+                    const qty = Number(r.qtyPerBatch) * tBatches;
+                    ingredientRestores.set(r.ingredientId, (ingredientRestores.get(r.ingredientId) || 0) + qty);
+                  }
+                }
+              }
+            }
+          } else {
+            const effectiveBatches = Number(woData.targetBatches) || 1;
+            const vId = (Array.isArray(woData.variantIds) && woData.variantIds[0]) || "original";
+            const recipesSnap = await adminDb.collection("recipes").where("variantId", "in", ["all", vId]).get();
+            for (const doc of recipesSnap.docs) {
+              const r = doc.data();
+              if (r.ingredientId && r.qtyPerBatch) {
+                const qty = Number(r.qtyPerBatch) * effectiveBatches;
+                ingredientRestores.set(r.ingredientId, (ingredientRestores.get(r.ingredientId) || 0) + qty);
+              }
             }
           }
+
+          for (const [ingId, qtyToRestore] of ingredientRestores.entries()) {
+            if (qtyToRestore > 0) {
+              const ingRef = adminDb.collection("ingredients").doc(ingId);
+              const ingSnap = await ingRef.get();
+              if (ingSnap.exists) {
+                const curr = ingSnap.data()?.currentStock ?? 0;
+                const newStock = curr + qtyToRestore;
+                await ingRef.update({
+                  currentStock: FieldValue.increment(qtyToRestore),
+                });
+
+                await adminDb.collection("stockMovements").add({
+                  ingredientId: ingId,
+                  changeAmount: qtyToRestore,
+                  newStockAfter: newStock,
+                  sourceType: "production_reversal",
+                  sourceId: woRef.id,
+                  note: `Restorasi BOM WO #${woData.woNumber} (CANCELLED)`,
+                  createdBy: auth.uid,
+                  createdAt: FieldValue.serverTimestamp(),
+                });
+              }
+            }
+          }
+        } catch (restoreErr) {
+          console.warn("BOM Restoration notice:", restoreErr);
         }
-      } catch (restoreErr) {
-        console.warn("BOM Restoration notice:", restoreErr);
       }
     }
 

@@ -320,38 +320,112 @@ export async function POST(
     batch.update(woRef, updatePayload);
 
     // Phase 3 & 4: Inventory Integration per action
-    // frozenStocks collection logic was removed (Bug 1c)
-    
     if (action === "PARTIAL_PREPACK" && prepackOutputs && Object.keys(prepackOutputs).length > 0) {
-      // Multi-variant processing
+      let totalRegPacksAll = 0;
+      let totalFullPacksAll = 0;
+
       for (const [vId, outputs] of Object.entries(prepackOutputs)) {
         const regPacks = parseFloat(outputs.regular) || 0;
         const fullPacks = parseFloat(outputs.full) || 0;
-        
+
         if (regPacks > 0) {
-          const rRef = adminDb.collection("productStocks").doc(`${vId}_12`);
-          batch.set(rRef, { stock: FieldValue.increment(regPacks) }, { merge: true });
-          batch.set(adminDb.collection("stockMovements").doc(), { itemId: `${vId}_12`, type: "PRODUKSI_IN", qty: regPacks, refId: woData.woNumber, timestamp: FieldValue.serverTimestamp() });
+          totalRegPacksAll += regPacks;
+          const regStockId = `churros-frozen-regular_${vId}`;
+          const rRef = adminDb.collection("productStocks").doc(regStockId);
+          batch.set(
+            rRef,
+            {
+              productId: "churros-frozen-regular",
+              variantId: vId,
+              currentStock: FieldValue.increment(regPacks),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+          batch.set(adminDb.collection("stockMovements").doc(), {
+            ingredientId: `product:${regStockId}`,
+            changeAmount: regPacks,
+            sourceType: "production",
+            sourceId: woRef.id,
+            note: `Hasil pre-pack regular WO #${woData.woNumber}`,
+            createdBy: user.uid,
+            createdAt: FieldValue.serverTimestamp(),
+          });
         }
+
         if (fullPacks > 0) {
-          const fRef = adminDb.collection("productStocks").doc(`${vId}_16`);
-          batch.set(fRef, { stock: FieldValue.increment(fullPacks) }, { merge: true });
-          batch.set(adminDb.collection("stockMovements").doc(), { itemId: `${vId}_16`, type: "PRODUKSI_IN", qty: fullPacks, refId: woData.woNumber, timestamp: FieldValue.serverTimestamp() });
+          totalFullPacksAll += fullPacks;
+          const fullStockId = `churros-frozen-full_${vId}`;
+          const fRef = adminDb.collection("productStocks").doc(fullStockId);
+          batch.set(
+            fRef,
+            {
+              productId: "churros-frozen-full",
+              variantId: vId,
+              currentStock: FieldValue.increment(fullPacks),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+          batch.set(adminDb.collection("stockMovements").doc(), {
+            ingredientId: `product:${fullStockId}`,
+            changeAmount: fullPacks,
+            sourceType: "production",
+            sourceId: woRef.id,
+            note: `Hasil pre-pack full WO #${woData.woNumber}`,
+            createdBy: user.uid,
+            createdAt: FieldValue.serverTimestamp(),
+          });
         }
-        
-        const totalPacks = regPacks + fullPacks;
-        if (totalPacks > 0) {
-          // frozenStocks collection logic removed
-          // Kemasan deduct
-          const packagingRecipesSnap = await adminDb.collection("packagingRecipes").where("productId", "==", woData.productId || "churros-frozen-food").get();
-          if (!packagingRecipesSnap.empty) {
-            const packData = packagingRecipesSnap.docs[0].data();
-            for (const item of packData.items || []) {
-              const qtyNeeded = (item.amount || 1) * totalPacks;
-              if (item.ingredientId && qtyNeeded > 0) {
-                batch.update(adminDb.collection("ingredients").doc(item.ingredientId), { stock: FieldValue.increment(-qtyNeeded) });
-              }
-            }
+      }
+
+      // Deduct packaging materials from packagingRecipes
+      if (totalRegPacksAll > 0) {
+        const regPkgSnap = await adminDb
+          .collection("packagingRecipes")
+          .where("productId", "==", "churros-frozen-regular")
+          .get();
+        for (const doc of regPkgSnap.docs) {
+          const packData = doc.data();
+          const qtyNeeded = (Number(packData.qtyPerPack) || 1) * totalRegPacksAll;
+          if (packData.ingredientId && qtyNeeded > 0) {
+            batch.update(adminDb.collection("ingredients").doc(packData.ingredientId), {
+              currentStock: FieldValue.increment(-qtyNeeded),
+            });
+            batch.set(adminDb.collection("stockMovements").doc(), {
+              ingredientId: packData.ingredientId,
+              changeAmount: -qtyNeeded,
+              sourceType: "production_packaging",
+              sourceId: woRef.id,
+              note: `Kemasan regular WO #${woData.woNumber}`,
+              createdBy: user.uid,
+              createdAt: FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      }
+
+      if (totalFullPacksAll > 0) {
+        const fullPkgSnap = await adminDb
+          .collection("packagingRecipes")
+          .where("productId", "==", "churros-frozen-full")
+          .get();
+        for (const doc of fullPkgSnap.docs) {
+          const packData = doc.data();
+          const qtyNeeded = (Number(packData.qtyPerPack) || 1) * totalFullPacksAll;
+          if (packData.ingredientId && qtyNeeded > 0) {
+            batch.update(adminDb.collection("ingredients").doc(packData.ingredientId), {
+              currentStock: FieldValue.increment(-qtyNeeded),
+            });
+            batch.set(adminDb.collection("stockMovements").doc(), {
+              ingredientId: packData.ingredientId,
+              changeAmount: -qtyNeeded,
+              sourceType: "production_packaging",
+              sourceId: woRef.id,
+              note: `Kemasan full WO #${woData.woNumber}`,
+              createdBy: user.uid,
+              createdAt: FieldValue.serverTimestamp(),
+            });
           }
         }
       }
@@ -360,43 +434,57 @@ export async function POST(
     if (nextStatus === "COMPLETED" && woData.status !== "COMPLETED") {
       if (woData.woType === "REPACK_SAOS" || woData.woType === "REPACK_GULA") {
         // Handle REPACK: Deduct bulk, Increment small packs (ingredients)
-        const targetId = woData.repackIngredientId || woData.productId; // The result of the repack
+        const targetId = woData.repackIngredientId || woData.productId;
         if (targetId && goodPcs && goodPcs > 0) {
-          batch.set(adminDb.collection("ingredients").doc(targetId), { stock: FieldValue.increment(goodPcs) }, { merge: true });
-          const mRef = adminDb.collection("stockMovements").doc();
-          batch.set(mRef, { itemId: targetId, type: "REPACK_IN", qty: goodPcs, refId: woData.woNumber, timestamp: FieldValue.serverTimestamp() });
-          
-          // Deduct from Repack BOM
-          const repackBomSnap = await adminDb.collection("recipes").where("category", "==", "prepack").where("productId", "==", targetId).get();
-          if (!repackBomSnap.empty) {
-            const recipeData = repackBomSnap.docs[0].data();
-            for (const ing of recipeData.ingredients || []) {
-              const qtyNeeded = (ing.amount || 1) * goodPcs;
-              if (ing.ingredientId && qtyNeeded > 0) {
-                batch.update(adminDb.collection("ingredients").doc(ing.ingredientId), { stock: FieldValue.increment(-qtyNeeded) });
-              }
+          batch.set(
+            adminDb.collection("ingredients").doc(targetId),
+            {
+              currentStock: FieldValue.increment(goodPcs),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+          batch.set(adminDb.collection("stockMovements").doc(), {
+            ingredientId: targetId,
+            changeAmount: goodPcs,
+            sourceType: "repack",
+            sourceId: woRef.id,
+            note: `Hasil repack WO #${woData.woNumber}`,
+            createdBy: user.uid,
+            createdAt: FieldValue.serverTimestamp(),
+          });
+
+          // Deduct from prepackRecipes
+          const repackBomSnap = await adminDb
+            .collection("prepackRecipes")
+            .where("targetItemId", "==", targetId)
+            .get();
+          for (const doc of repackBomSnap.docs) {
+            const recipeData = doc.data();
+            const yieldRatio = Number(recipeData.outputYieldQty) > 0 ? Number(recipeData.outputYieldQty) : 1;
+            const qtyNeeded = ((Number(recipeData.qtyPerPack) || 1) / yieldRatio) * goodPcs;
+            if (recipeData.ingredientId && qtyNeeded > 0) {
+              batch.update(adminDb.collection("ingredients").doc(recipeData.ingredientId), {
+                currentStock: FieldValue.increment(-qtyNeeded),
+              });
+              batch.set(adminDb.collection("stockMovements").doc(), {
+                ingredientId: recipeData.ingredientId,
+                changeAmount: -qtyNeeded,
+                sourceType: "repack",
+                sourceId: woRef.id,
+                note: `Bahan curah repack WO #${woData.woNumber}`,
+                createdBy: user.uid,
+                createdAt: FieldValue.serverTimestamp(),
+              });
             }
           }
         }
-
       } else if (woData.woType === "PACKING_PESANAN" && woData.sourceOrderId) {
-        // Handle PACKING: Complete Order and deduct Product Stocks
+        // Handle PACKING: Complete Order packing status (stok produk sudah dipotong saat order dibuat)
         const orderRef = adminDb.collection("orders").doc(woData.sourceOrderId);
         const orderSnap = await orderRef.get();
         if (orderSnap.exists) {
-          batch.update(orderRef, { status: "completed", packedAt: FieldValue.serverTimestamp() });
-          
-          const orderData = orderSnap.data();
-          for (const item of orderData?.items || []) {
-            if (item.type === "product") {
-              const stockId = item.productId === "churros-reguler" ? `${item.variantId}_12` : `${item.variantId}_16`;
-              batch.set(adminDb.collection("productStocks").doc(stockId), { stock: FieldValue.increment(-item.qty) }, { merge: true });
-              const mRef = adminDb.collection("stockMovements").doc();
-              batch.set(mRef, { itemId: stockId, type: "ORDER_OUT", qty: item.qty, refId: orderRef.id, timestamp: FieldValue.serverTimestamp() });
-            } else if (item.type === "addon") {
-              batch.update(adminDb.collection("ingredients").doc(item.addonId), { stock: FieldValue.increment(-item.qty) });
-            }
-          }
+          batch.update(orderRef, { packedAt: FieldValue.serverTimestamp() });
         }
       }
     }

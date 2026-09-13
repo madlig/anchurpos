@@ -22,6 +22,7 @@ interface OrderDetail {
   requestedDeliveryDate: string | null; orderNotes: string | null;
   voidReason: string | null; voidedAt: string | null;
   sauceDistribution?: Record<string, number> | null;
+  cashReceived?: number | null; changeAmount?: number | null;
   createdAt: string; completedAt: string | null; items: OrderItem[];
 }
 
@@ -275,6 +276,16 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
             <tr>
               <td class="summary-label">Metode Bayar</td>
               <td class="summary-value" style="font-weight: 700;">${order.paymentMethod.toUpperCase()}</td>
+            </tr>
+            ` : ""}
+            ${order.cashReceived ? `
+            <tr>
+              <td class="summary-label">Tunai</td>
+              <td class="summary-value">${fmt(order.cashReceived)}</td>
+            </tr>
+            <tr>
+              <td class="summary-label">Kembali</td>
+              <td class="summary-value" style="font-weight: 700;">${fmt(order.changeAmount ?? 0)}</td>
             </tr>
             ` : ""}
           </table>

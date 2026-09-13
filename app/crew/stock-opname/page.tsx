@@ -169,6 +169,8 @@ export default function CrewStockOpnamePage() {
           return {
             ingredientId: e.ingredientId,
             itemType: item.itemType,
+            name: item.name,
+            unit: item.baseUnit,
             inputMethod: item.opnameMethod ?? "manual",
             physicalStock: e.physicalStock ?? null,
             fullPackages: e.fullPackages ?? null,

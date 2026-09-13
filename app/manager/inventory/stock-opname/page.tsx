@@ -127,6 +127,8 @@ export default function StockOpnamePage() {
       return {
         ingredientId: i.id,
         itemType: i.itemType,
+        name: i.name,
+        unit: i.baseUnit,
         inputMethod: "manual",
         physicalStock: actualStock,
         physicalStockConverted: actualStock,

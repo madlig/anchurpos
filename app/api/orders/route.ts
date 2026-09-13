@@ -137,6 +137,8 @@ export async function POST(req: NextRequest) {
     poNumber,
     secondaryPackagingIngId: rawSecPkgIngId,
     customDate,
+    cashReceived,
+    changeAmount,
   } = parseResult.data;
   
   const secondaryPackagingIngId = rawSecPkgIngId === "none" ? null : rawSecPkgIngId;
@@ -322,6 +324,10 @@ export async function POST(req: NextRequest) {
         status: isImmediate ? "selesai" : (inputPaymentStatus === "sudah_bayar" ? "proses" : "pending"),
         paymentStatus: inputPaymentStatus ?? "sudah_bayar",
         paymentMethod: paymentMethod || (finalOrderChannel === "whatsapp" ? "transfer" : "cash"),
+        paidAt: (inputPaymentStatus ?? "sudah_bayar") === "sudah_bayar" ? dateToUse : null,
+        paidBy: (inputPaymentStatus ?? "sudah_bayar") === "sudah_bayar" ? ((user as AuthUser | null)?.uid ?? null) : null,
+        cashReceived: cashReceived ?? null,
+        changeAmount: changeAmount ?? null,
         platformFeePercent: finalFeePercent,
         platformFee: finalFeeAmount,
         totalOrderValue,

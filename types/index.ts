@@ -95,22 +95,27 @@ export interface Ingredient {
   price?: number;
 }
 
-// --- 4b. stockMovements/{movementId} ---
 export type StockMovementSource =
   | "expense"
   | "production"
+  | "production_reversal"
+  | "production_packaging"
+  | "repack"
+  | "sale"
   | "manual_edit"
+  | "opname"
+  | "opname_adjustment"
   | "stock_opname_adjustment";
 
 export interface StockMovement {
   id: string;
   ingredientId: string;
   changeAmount: number;
-  newStockAfter: number;
+  newStockAfter?: number;
   sourceType: StockMovementSource;
-  sourceId: string | null;
-  note: string | null;
-  createdBy: string;
+  sourceId?: string | null;
+  note?: string | null;
+  createdBy?: string;
   createdAt: string;
 }
 
@@ -241,19 +246,23 @@ export interface OpenPack {
 // --- 9. stockOpname/{opnameId} ---
 export interface StockOpnameItem {
   ingredientId: string;
-  inputMethod: OpnameMethod;
+  itemType?: "ingredient" | "variant";
+  name?: string;
+  unit?: string;
+  inputMethod: OpnameMethod | "manual";
   physicalStock: number | null;
   fullPackages: number | null;
   openPackageFullness: string | null;
   physicalStockConverted: number | null;
   systemStock: number;
   difference: number;
+  note?: string | null;
 }
 
 export interface StockOpname {
   id: string;
   date: string;
-  shiftType: "pagi" | "siang" | "malam";
+  shiftType?: "pagi" | "siang" | "malam";
   crewId: string;
   items: StockOpnameItem[];
   totalIngredientsChecked: number;
@@ -384,6 +393,15 @@ export interface Order {
   invoiceNumber: string | null;
   invoiceGeneratedAt: string | null;
   invoiceUrl: string | null;
+  cashReceived?: number | null;
+  changeAmount?: number | null;
+  paidAt?: string | null;
+  paidBy?: string | null;
+  sauceDistribution?: Record<string, number> | null;
+  secondaryPackagingIngId?: string | null;
+  poNumber?: string | null;
+  shippingBorneBy?: "seller" | "customer" | null;
+  deliveryMethod?: "pickup" | "delivery" | "self_delivery" | "courier" | null;
   items?: any[];
 }
 

@@ -11,6 +11,9 @@ import type { Ingredient } from "@/types";
 
 interface OpnameItem {
   ingredientId: string;
+  itemType?: string;
+  name?: string;
+  unit?: string;
   inputMethod: string;
   physicalStock: number | null;
   fullPackages: number | null;
@@ -206,8 +209,8 @@ export function OpnameReviewList({
                           <div className="space-y-2 text-xs">
                             {discrepancyItems.map((item) => {
                               const ingredient = ingredients.find(i => i.id === item.ingredientId);
-                              const name = ingredient?.name ?? item.ingredientId;
-                              const unit = ingredient?.baseUnit ?? "";
+                              const name = ingredient?.name ?? item.name ?? item.ingredientId;
+                              const unit = ingredient?.baseUnit ?? item.unit ?? "";
                               const isChecked = opnameAdj.get(item.ingredientId) ?? false;
                               const physicalVal = item.inputMethod === "packaged" ? item.physicalStockConverted : item.physicalStock;
 

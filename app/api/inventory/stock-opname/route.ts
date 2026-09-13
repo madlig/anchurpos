@@ -37,14 +37,14 @@ export async function POST(req: NextRequest) {
       // Jika tidak ada selisih, lewati
       if (diff === 0) continue;
 
-      const collectionName = itemType === "variant" ? "variants" : "ingredients";
+      const collectionName = itemType === "variant" ? "productStocks" : "ingredients";
       const itemRef = adminDb.collection(collectionName).doc(itemId);
       
       // 1. Update stok saat ini
-      batch.update(itemRef, {
+      batch.set(itemRef, {
         currentStock: actualStock,
         updatedAt: now,
-      });
+      }, { merge: true });
 
       // 2. Catat pergerakan (Movement)
       const movementRef = adminDb.collection("stockMovements").doc();

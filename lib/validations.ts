@@ -38,6 +38,8 @@ export const orderSchema = z.object({
   poNumber: z.string().nullable().optional(),
   customDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal YYYY-MM-DD").optional(),
   secondaryPackagingIngId: z.string().nullable().optional(),
+  cashReceived: z.number().nonnegative().nullable().optional(),
+  changeAmount: z.number().nonnegative().nullable().optional(),
 });
 
 export const publicOrderSchema = z.object({
@@ -184,4 +186,34 @@ export const variantSchema = z.object({
   sortOrder: z.number().optional().default(0),
   freeSauceAllowance: z.number().min(0).optional().default(0),
   isProductionVariant: z.boolean().optional().default(false),
+});
+
+export const stockOpnameItemSchema = z.object({
+  ingredientId: z.string().min(1),
+  itemType: z.enum(["ingredient", "variant"]).optional().default("ingredient"),
+  name: z.string().optional(),
+  unit: z.string().optional(),
+  inputMethod: z.string().optional().default("direct"),
+  physicalStock: z.number().nullable().optional(),
+  fullPackages: z.number().nullable().optional(),
+  openPackageFullness: z.string().nullable().optional(),
+  physicalStockConverted: z.number().nullable().optional(),
+  systemStock: z.number().optional(),
+  difference: z.number().optional(),
+  note: z.string().nullable().optional(),
+});
+
+export const stockOpnameSchema = z.object({
+  items: z.array(stockOpnameItemSchema).min(1, "Minimal 1 item opname harus diisi"),
+  woId: z.string().optional(),
+});
+
+export const stockOpnameReviewSchema = z.object({
+  reviewNote: z.string().optional(),
+  adjustments: z.array(
+    z.object({
+      ingredientId: z.string().min(1),
+      applyAdjustment: z.boolean(),
+    })
+  ).optional().default([]),
 });

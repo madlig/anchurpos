@@ -2,35 +2,42 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireRole, verifyAuth } from "@/lib/auth-middleware";
 import { FieldValue } from "firebase-admin/firestore";
+import { stockOpnameSchema } from "@/lib/validations";
 
 export async function POST(req: NextRequest) {
   const auth = await verifyAuth(req);
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (auth.role !== "crew") {
-    return NextResponse.json({ error: "Hanya crew yang bisa submit opname" }, { status: 403 });
+  if (!["owner", "manager", "crew"].includes(auth.role)) {
+    return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
   }
 
-  const { items, woId } = (await req.json()) as {
-    items: {
-      ingredientId: string;
-      physicalStock?: number | null;
-      fullPackages?: number | null;
-      openPackageFullness?: string | null;
-    }[];
-    woId?: string;
-  };
-
-  if (!items?.length) {
-    return NextResponse.json({ error: "Data opname tidak lengkap" }, { status: 400 });
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Payload tidak valid" }, { status: 400 });
   }
+
+  const parseResult = stockOpnameSchema.safeParse(body);
+  if (!parseResult.success) {
+    return NextResponse.json(
+      { error: "Data opname tidak valid", details: parseResult.error.format() },
+      { status: 400 }
+    );
+  }
+
+  const { items, woId } = parseResult.data;
 
   try {
-    const activeIngredientsSnap = await adminDb
-      .collection("ingredients")
-      .where("isActive", "==", true)
-      .get();
+    const [activeIngredientsSnap, productStocksSnap, productsSnap, variantsSnap] = await Promise.all([
+      adminDb.collection("ingredients").where("isActive", "==", true).get(),
+      adminDb.collection("productStocks").get(),
+      adminDb.collection("products").where("isActive", "==", true).get(),
+      adminDb.collection("variants").get(),
+    ]);
+
     const totalIngredientsAll = activeIngredientsSnap.size;
 
     const ingredientMap = new Map<string, FirebaseFirestore.DocumentData>();
@@ -38,15 +45,68 @@ export async function POST(req: NextRequest) {
       ingredientMap.set(doc.id, { id: doc.id, ...doc.data() });
     }
 
+    const productMap = new Map<string, FirebaseFirestore.DocumentData>();
+    for (const doc of productsSnap.docs) {
+      productMap.set(doc.id, doc.data());
+    }
+
+    const variantMap = new Map<string, FirebaseFirestore.DocumentData>();
+    for (const doc of variantsSnap.docs) {
+      variantMap.set(doc.id, doc.data());
+    }
+
+    const productStockMap = new Map<string, { currentStock: number; name: string; unit: string }>();
+    for (const doc of productStocksSnap.docs) {
+      const data = doc.data();
+      const currentStock = data.currentStock ?? 0;
+      const prod = productMap.get(data.productId);
+      const variant = variantMap.get(data.variantId);
+      const name = prod && variant ? `${prod.name} - ${variant.name}` : prod ? prod.name : doc.id;
+      productStockMap.set(doc.id, {
+        currentStock,
+        name,
+        unit: "pack",
+      });
+    }
+
     let hasDiscrepancy = false;
     const processedItems: Record<string, unknown>[] = [];
 
     for (const item of items) {
+      const isProductStock = item.itemType === "variant" || productStockMap.has(item.ingredientId);
+
+      if (isProductStock) {
+        const pStock = productStockMap.get(item.ingredientId);
+        const systemStock = pStock ? pStock.currentStock : (item.systemStock ?? 0);
+        const physicalStock = item.physicalStock ?? 0;
+        const diff = physicalStock - systemStock;
+
+        if (diff !== 0) {
+          hasDiscrepancy = true;
+        }
+
+        processedItems.push({
+          ingredientId: item.ingredientId,
+          itemType: "variant",
+          name: item.name || pStock?.name || item.ingredientId,
+          unit: item.unit || "pack",
+          inputMethod: "direct",
+          physicalStock,
+          fullPackages: null,
+          openPackageFullness: null,
+          physicalStockConverted: null,
+          systemStock,
+          difference: diff,
+          note: item.note || null,
+        });
+        continue;
+      }
+
       const ingredient = ingredientMap.get(item.ingredientId);
       if (!ingredient) continue;
 
       const systemStock = ingredient.currentStock ?? 0;
-      const inputMethod = ingredient.opnameMethod ?? "direct";
+      const inputMethod = item.inputMethod === "packaged" ? "packaged" : (ingredient.opnameMethod ?? "direct");
 
       let finalPhysical: number;
 
@@ -66,34 +126,46 @@ export async function POST(req: NextRequest) {
           fullPkgs * config.unitPerPackage + openRatio * config.unitPerPackage;
         finalPhysical = physicalStockConverted;
 
+        const diff = physicalStockConverted - systemStock;
+        if (diff !== 0) hasDiscrepancy = true;
+
         processedItems.push({
           ingredientId: item.ingredientId,
+          itemType: "ingredient",
+          name: item.name || ingredient.name,
+          unit: item.unit || ingredient.baseUnit || "pcs",
           inputMethod: "packaged",
           physicalStock: null,
           fullPackages: item.fullPackages ?? 0,
           openPackageFullness: item.openPackageFullness ?? null,
           physicalStockConverted,
           systemStock,
-          difference: physicalStockConverted - systemStock,
+          difference: diff,
+          note: item.note || null,
         });
       } else {
         const physicalStock = item.physicalStock ?? 0;
         finalPhysical = physicalStock;
+        const diff = physicalStock - systemStock;
+
+        if (diff !== 0) {
+          hasDiscrepancy = true;
+        }
 
         processedItems.push({
           ingredientId: item.ingredientId,
+          itemType: "ingredient",
+          name: item.name || ingredient.name,
+          unit: item.unit || ingredient.baseUnit || "pcs",
           inputMethod: "direct",
           physicalStock,
           fullPackages: null,
           openPackageFullness: null,
           physicalStockConverted: null,
           systemStock,
-          difference: physicalStock - systemStock,
+          difference: diff,
+          note: item.note || null,
         });
-      }
-
-      if (finalPhysical !== systemStock) {
-        hasDiscrepancy = true;
       }
     }
 
@@ -119,7 +191,7 @@ export async function POST(req: NextRequest) {
           type: "stock_opname_discrepancy",
           severity: "warning",
           title: "Selisih stok ditemukan",
-          message: `Stock opname oleh crew menemukan selisih (${processedItems.length} bahan dicek)`,
+          message: `Stock opname oleh ${auth.email || auth.role} menemukan selisih (${processedItems.length} item dicek)`,
           sourceCollection: "stockOpname",
           sourceId: opnameRef.id,
           isRead: false,

@@ -60,6 +60,7 @@ export function CartCheckoutPanel({
     setPayMethod(orderChannel === "walkin" ? "cash" : "transfer");
   }, [orderChannel]);
   const [isPaid, setIsPaid] = useState(true);
+  const [cashReceivedInput, setCashReceivedInput] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [poNumber, setPoNumber] = useState("");
   const [showPoNumber, setShowPoNumber] = useState(false);
@@ -165,6 +166,14 @@ export function CartCheckoutPanel({
 
   const feeAmount = useMemo(() => Math.round(cartTotal * activeFeePercent / 100), [cartTotal, activeFeePercent]);
 
+  const customerPayableTotal = useMemo(() => {
+    const shipping = (orderChannel === "whatsapp" && deliveryMethod !== "pickup" && shippingBorneBy === "customer") ? (parseInt(shippingCost) || 0) : 0;
+    return cartTotal + shipping;
+  }, [cartTotal, orderChannel, deliveryMethod, shippingBorneBy, shippingCost]);
+
+  const cashReceivedNum = useMemo(() => parseInt(cashReceivedInput) || 0, [cashReceivedInput]);
+  const changeAmount = useMemo(() => Math.max(0, cashReceivedNum - customerPayableTotal), [cashReceivedNum, customerPayableTotal]);
+
   async function handleCheckout() {
     if (!cart.length) { setError("Keranjang masih kosong"); return; }
     if (orderChannel === "whatsapp" && !finalCustomerName.trim()) { setError("Nama pelanggan wajib diisi"); return; }
@@ -236,6 +245,8 @@ export function CartCheckoutPanel({
           shippingBorneBy: orderChannel === "whatsapp" && deliveryMethod !== "pickup" ? shippingBorneBy : null,
           deliveryMethod: orderChannel === "whatsapp" ? deliveryMethod : null,
           sauceDistribution: totalSaucesNeeded > 0 ? sauceDist : undefined,
+          cashReceived: (payMethod === "cash" && isPaid && cashReceivedNum > 0) ? cashReceivedNum : null,
+          changeAmount: (payMethod === "cash" && isPaid && cashReceivedNum >= customerPayableTotal) ? changeAmount : null,
         }),
       });
       const data = await res.json();
@@ -397,6 +408,64 @@ export function CartCheckoutPanel({
                 {(configs?.paymentMethods || ["cash", "transfer", "qris"]).map(m => (
                   <button key={m} onClick={() => setPayMethod(m as any)} className={`flex-1 p-2 rounded-xl text-xs font-semibold ${payMethod === m ? "bg-primary/10 text-primary" : "bg-white text-slate-500"}`}>{m.charAt(0).toUpperCase() + m.slice(1)}</button>
                 ))}
+              </div>
+            )}
+
+            {/* Cash Tender & Change Calculator */}
+            {payMethod === "cash" && isPaid && (
+              <div className="mt-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Uang Tunai Diterima</label>
+                  {cashReceivedNum >= customerPayableTotal && cashReceivedNum > 0 && (
+                    <span className="text-[11px] font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                      Kembali: {fmt(changeAmount)}
+                    </span>
+                  )}
+                  {cashReceivedInput !== "" && cashReceivedNum < customerPayableTotal && (
+                    <span className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
+                      Kurang {fmt(customerPayableTotal - cashReceivedNum)}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-bold text-slate-400">Rp</span>
+                  <input
+                    type="number"
+                    placeholder={customerPayableTotal > 0 ? customerPayableTotal.toString() : "0"}
+                    value={cashReceivedInput}
+                    onChange={e => setCashReceivedInput(e.target.value)}
+                    className="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm font-bold text-slate-800 outline-none bg-white focus:border-primary"
+                  />
+                </div>
+
+                {/* Quick Cash Buttons */}
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setCashReceivedInput(customerPayableTotal.toString())}
+                    className="px-2 py-1 rounded-md text-[11px] font-bold bg-white border border-slate-200 hover:border-primary text-slate-700 shadow-sm"
+                  >
+                    Uang Pas
+                  </button>
+                  {[20000, 50000, 100000].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setCashReceivedInput(val.toString())}
+                      className="px-2 py-1 rounded-md text-[11px] font-bold bg-white border border-slate-200 hover:border-primary text-slate-700 shadow-sm"
+                    >
+                      {val / 1000}rb
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setCashReceivedInput("")}
+                    className="px-2 py-1 rounded-md text-[11px] font-semibold text-slate-400 hover:text-slate-600 ml-auto"
+                  >
+                    Reset
+                  </button>
+                </div>
               </div>
             )}
           </div>

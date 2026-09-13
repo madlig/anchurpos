@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireRole } from "@/lib/auth-middleware";
 import { FieldValue } from "firebase-admin/firestore";
+import { stockOpnameReviewSchema } from "@/lib/validations";
 
 export async function PATCH(
   req: NextRequest,
@@ -11,10 +12,22 @@ export async function PATCH(
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await params;
-  const { reviewNote, adjustments } = (await req.json()) as {
-    reviewNote?: string;
-    adjustments: { ingredientId: string; applyAdjustment: boolean }[];
-  };
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Payload tidak valid" }, { status: 400 });
+  }
+
+  const parseResult = stockOpnameReviewSchema.safeParse(body);
+  if (!parseResult.success) {
+    return NextResponse.json(
+      { error: "Data review tidak valid", details: parseResult.error.format() },
+      { status: 400 }
+    );
+  }
+
+  const { reviewNote, adjustments } = parseResult.data;
 
   try {
     const opnameSnap = await adminDb.doc(`stockOpname/${id}`).get();
@@ -27,8 +40,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Opname sudah direview" }, { status: 400 });
     }
 
-    const opnameItems = opnameData.items as {
+    const opnameItems = (opnameData.items || []) as {
       ingredientId: string;
+      itemType?: string;
+      name?: string;
+      unit?: string;
       inputMethod: string;
       physicalStock: number | null;
       physicalStockConverted: number | null;
@@ -54,28 +70,94 @@ export async function PATCH(
 
         if (physicalValue === null || physicalValue === undefined) continue;
 
-        const ingredientRef = adminDb.doc(`ingredients/${adj.ingredientId}`);
-        const ingredientSnap = await tx.get(ingredientRef);
-        if (!ingredientSnap.exists) continue;
+        const isVariant = opnameItem.itemType === "variant";
 
-        const currentStock = ingredientSnap.data()!.currentStock ?? 0;
-        const changeAmount = physicalValue - currentStock;
+        if (isVariant) {
+          const productStockRef = adminDb.collection("productStocks").doc(adj.ingredientId);
+          const pSnap = await tx.get(productStockRef);
+          const currentStock = pSnap.exists ? (pSnap.data()?.currentStock ?? 0) : 0;
+          const changeAmount = physicalValue - currentStock;
 
-        tx.update(ingredientRef, { currentStock: physicalValue });
+          tx.set(
+            productStockRef,
+            {
+              currentStock: physicalValue,
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
 
-        const movementRef = adminDb.collection("stockMovements").doc();
-        tx.set(movementRef, {
-          ingredientId: adj.ingredientId,
-          changeAmount,
-          newStockAfter: physicalValue,
-          sourceType: "stock_opname_adjustment",
-          sourceId: id,
-          note: reviewNote ?? "Penyesuaian dari review opname",
-          createdBy: auth.uid,
-          createdAt: FieldValue.serverTimestamp(),
-        });
+          const movementRef = adminDb.collection("stockMovements").doc();
+          tx.set(movementRef, {
+            ingredientId: `product:${adj.ingredientId}`,
+            changeAmount,
+            newStockAfter: physicalValue,
+            sourceType: "stock_opname_adjustment",
+            sourceId: id,
+            note: reviewNote ?? "Penyesuaian dari review opname produk jadi",
+            createdBy: auth.uid,
+            createdAt: FieldValue.serverTimestamp(),
+          });
 
-        adjustmentsApplied++;
+          adjustmentsApplied++;
+        } else {
+          const ingredientRef = adminDb.doc(`ingredients/${adj.ingredientId}`);
+          const ingredientSnap = await tx.get(ingredientRef);
+
+          if (!ingredientSnap.exists) {
+            // Fallback: check productStocks if itemType was omitted
+            const fallbackPRef = adminDb.collection("productStocks").doc(adj.ingredientId);
+            const fallbackPSnap = await tx.get(fallbackPRef);
+            if (fallbackPSnap.exists) {
+              const currentStock = fallbackPSnap.data()?.currentStock ?? 0;
+              const changeAmount = physicalValue - currentStock;
+
+              tx.set(
+                fallbackPRef,
+                {
+                  currentStock: physicalValue,
+                  updatedAt: FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+              );
+
+              const movementRef = adminDb.collection("stockMovements").doc();
+              tx.set(movementRef, {
+                ingredientId: `product:${adj.ingredientId}`,
+                changeAmount,
+                newStockAfter: physicalValue,
+                sourceType: "stock_opname_adjustment",
+                sourceId: id,
+                note: reviewNote ?? "Penyesuaian dari review opname produk jadi",
+                createdBy: auth.uid,
+                createdAt: FieldValue.serverTimestamp(),
+              });
+
+              adjustmentsApplied++;
+              continue;
+            }
+            continue;
+          }
+
+          const currentStock = ingredientSnap.data()!.currentStock ?? 0;
+          const changeAmount = physicalValue - currentStock;
+
+          tx.update(ingredientRef, { currentStock: physicalValue });
+
+          const movementRef = adminDb.collection("stockMovements").doc();
+          tx.set(movementRef, {
+            ingredientId: adj.ingredientId,
+            changeAmount,
+            newStockAfter: physicalValue,
+            sourceType: "stock_opname_adjustment",
+            sourceId: id,
+            note: reviewNote ?? "Penyesuaian dari review opname bahan",
+            createdBy: auth.uid,
+            createdAt: FieldValue.serverTimestamp(),
+          });
+
+          adjustmentsApplied++;
+        }
       }
 
       tx.update(opnameSnap.ref, {

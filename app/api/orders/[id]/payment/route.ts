@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireRole } from "@/lib/auth-middleware";
+import type { AuthUser } from "@/lib/auth-middleware";
 
 export async function PATCH(
   req: NextRequest,
@@ -24,6 +25,7 @@ export async function PATCH(
     if (!doc.exists) return NextResponse.json({ error: "Order tidak ditemukan" }, { status: 404 });
     const data = doc.data() as { status: string; orderChannel?: string; channel?: string; paymentMethod?: string };
 
+    const user = auth as AuthUser;
     const updates: Record<string, unknown> = { paymentStatus };
     if (paymentMethod) {
       updates.paymentMethod = paymentMethod;
@@ -32,8 +34,15 @@ export async function PATCH(
       updates.paymentMethod = (ch === "whatsapp" || ch === "wa_form") ? "transfer" : "cash";
     }
 
-    if (paymentStatus === "sudah_bayar" && data.status === "pending") {
-      updates.status = "proses";
+    if (paymentStatus === "sudah_bayar") {
+      updates.paidAt = new Date();
+      updates.paidBy = user.uid;
+      if (data.status === "pending") {
+        updates.status = "proses";
+      }
+    } else if (paymentStatus === "belum_bayar") {
+      updates.paidAt = null;
+      updates.paidBy = null;
     }
 
     await adminDb.doc(`orders/${id}`).update(updates);
