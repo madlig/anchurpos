@@ -21,6 +21,7 @@ interface OrderDetail {
   shippingBorneBy: string | null; deliveryMethod: string | null;
   requestedDeliveryDate: string | null; orderNotes: string | null;
   voidReason: string | null; voidedAt: string | null;
+  sauceDistribution?: Record<string, number> | null;
   createdAt: string; completedAt: string | null; items: OrderItem[];
 }
 
@@ -103,51 +104,83 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
   function printReceipt() {
     if (!order) return;
     
-    // Receipt format tailored for 58mm POS printer (Best Practice Professional Format)
+    // Receipt format tailored for 58mm / 80mm POS printer (Modern Cafe & Bakery Receipt Standard)
     const cashierName = user?.displayName || user?.email?.split('@')[0] || "Kasir";
     const subtotal = order.items.reduce((s, i) => s + i.totalPrice, 0);
     const ongkir = order.shippingCostConfirmed ? (order.shippingCost ?? 0) : 0;
     const grandTotal = subtotal + ongkir;
 
+    // Urutkan item: Produk Churros di atas, disusul Jasa / Packing
+    const sortedItems = [...order.items].sort((a, b) => {
+      const aIsChurros = a.productName.toLowerCase().includes("churros");
+      const bIsChurros = b.productName.toLowerCase().includes("churros");
+      if (aIsChurros && !bIsChurros) return -1;
+      if (!aIsChurros && bIsChurros) return 1;
+
+      const aIsService = ["jasa", "packing", "kemasan"].some(k => a.productName.toLowerCase().includes(k));
+      const bIsService = ["jasa", "packing", "kemasan"].some(k => b.productName.toLowerCase().includes(k));
+      if (!aIsService && bIsService) return -1;
+      if (aIsService && !bIsService) return 1;
+
+      return a.productName.localeCompare(b.productName);
+    });
+
+    const isGenericVariant = (name?: string | null) => {
+      if (!name) return true;
+      const lower = name.toLowerCase().trim();
+      return ["none", "tanpa varian", "jasa", "default", "-", ""].includes(lower);
+    };
+
+    const hasSauces = order.sauceDistribution && Object.values(order.sauceDistribution).some(q => q > 0);
+
     const html = `
       <html>
         <head>
-          <title>Receipt ${order.orderNumber}</title>
+          <title>Struk_${order.orderNumber}</title>
           <style>
+            @page { margin: 0; }
             body { 
-              font-family: 'Courier New', Courier, monospace; 
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", monospace; 
               font-size: 11px; 
-              line-height: 1.2;
-              margin: 0; 
-              padding: 0; 
+              line-height: 1.3;
+              margin: 0 auto; 
+              padding: 10px 8px; 
               width: 58mm; 
-              color: #000; 
+              color: #111; 
+              background: #fff;
             }
             .center { text-align: center; }
             .left { text-align: left; }
             .right { text-align: right; }
-            .bold { font-weight: bold; }
-            .divider { border-bottom: 1px dashed #000; margin: 5px 0; }
-            .header-title { font-size: 16px; font-weight: 900; margin-bottom: 3px; }
-            .info-table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
+            .bold { font-weight: 700; }
+            .divider { border-bottom: 1px dashed #475569; margin: 6px 0; }
+            .header-brand { font-size: 15px; font-weight: 900; letter-spacing: 0.05em; margin-bottom: 2px; }
+            .header-sub { font-size: 10px; color: #475569; margin-bottom: 2px; }
+            .info-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; font-size: 10px; }
             .info-table td { padding: 1px 0; vertical-align: top; }
-            .info-label { width: 40px; }
-            .info-value { width: calc(100% - 40px); }
+            .info-label { width: 38px; color: #475569; }
+            .info-value { width: calc(100% - 38px); font-weight: 600; }
             
             .item-table { width: 100%; border-collapse: collapse; }
-            .item-table td { padding: 1px 0; vertical-align: top; }
-            .item-name { padding-bottom: 2px; }
-            .item-qty { width: 20%; padding-left: 5px; }
-            .item-price { width: 40%; text-align: right; }
-            .item-total { width: 40%; text-align: right; font-weight: bold; }
+            .item-table td { padding: 2px 0; vertical-align: top; }
+            .item-name { font-size: 11px; font-weight: 700; }
+            .item-qty { width: 22%; font-size: 10px; color: #334155; }
+            .item-price { width: 38%; text-align: right; font-size: 10px; color: #475569; }
+            .item-total { width: 40%; text-align: right; font-size: 11px; font-weight: 700; }
+
+            .sauce-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px; margin: 4px 0; }
+            .sauce-title { font-size: 9px; font-weight: 800; text-transform: uppercase; color: #475569; margin-bottom: 2px; }
+            .sauce-item { font-size: 10px; display: flex; justify-content: space-between; margin-bottom: 1px; }
             
-            .summary-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+            .summary-table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px; }
             .summary-table td { padding: 2px 0; }
-            .summary-label { text-align: left; }
-            .summary-value { text-align: right; }
-            .grand-total { font-size: 14px; font-weight: bold; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 4px 0 !important; }
+            .summary-label { text-align: left; color: #475569; }
+            .summary-value { text-align: right; font-weight: 600; }
+            .grand-total { font-size: 13px; font-weight: 900; border-top: 1px dashed #111; border-bottom: 1px dashed #111; padding: 5px 0 !important; color: #000; }
             
-            .footer { margin-top: 10px; font-size: 10px; text-align: center; }
+            .badge-status { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; background: #e2e8f0; }
+            .notes-box { font-size: 10px; background: #f8fafc; border-left: 2px solid #e85d8c; padding: 3px 6px; margin: 4px 0; }
+            .footer { margin-top: 10px; font-size: 9px; text-align: center; color: #64748B; line-height: 1.4; }
             
             @media print {
               body { width: 100%; margin: 0; padding: 0; }
@@ -155,41 +188,43 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
           </style>
         </head>
         <body>
-          <div class="center header-title">ANCHUR BANDUNG</div>
-          <div class="center">Jl. Buah Batu No. 123</div>
-          <div class="center">IG: @anchur.id</div>
+          <div class="center header-brand">ANCHUR BANDUNG</div>
+          <div class="center header-sub">Spesialis Churros & Dipping Sauces</div>
+          <div class="center header-sub">IG: @anchur.id</div>
           
           <div class="divider"></div>
           
           <table class="info-table">
             <tr>
-              <td class="info-label">No</td>
+              <td class="info-label">No.</td>
               <td class="info-value">: ${order.orderNumber}</td>
             </tr>
             <tr>
-              <td class="info-label">Tgl</td>
-              <td class="info-value">: ${new Date(order.createdAt).toLocaleString('id-ID', {day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute:'2-digit'})}</td>
+              <td class="info-label">Tgl.</td>
+              <td class="info-value">: ${new Date(order.createdAt).toLocaleString('id-ID', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit'})}</td>
             </tr>
             <tr>
-              <td class="info-label">Plg</td>
-              <td class="info-value">: ${order.customerName || "Walk-in"}</td>
+              <td class="info-label">Plg.</td>
+              <td class="info-value">: ${order.customerName || "Walk-in"} ${order.customerPhone ? `(${order.customerPhone})` : ""}</td>
             </tr>
+            ${order.deliveryMethod === 'delivery' && order.shippingAddress ? `
             <tr>
-              <td class="info-label">Ksr</td>
-              <td class="info-value">: ${cashierName}</td>
+              <td class="info-label">Almt.</td>
+              <td class="info-value" style="word-break: break-word; font-size: 9px; line-height: 1.2;">: ${order.shippingAddress}</td>
             </tr>
+            ` : ""}
             <tr>
-              <td class="info-label">Tipe</td>
-              <td class="info-value">: ${order.channel.toUpperCase()}</td>
+              <td class="info-label">Ksr.</td>
+              <td class="info-value">: ${cashierName} · ${order.channel.toUpperCase()}</td>
             </tr>
           </table>
           
           <div class="divider"></div>
           
           <table class="item-table">
-            ${order.items.map(item => `
+            ${sortedItems.map(item => `
               <tr>
-                <td colspan="3" class="item-name bold">${item.productName} ${item.variantName && !["none", "Tanpa Varian", "Jasa", "default"].includes(item.variantName) ? `- ${item.variantName}` : ""}</td>
+                <td colspan="3" class="item-name">${item.productName} ${!isGenericVariant(item.variantName) ? `<span style="font-weight: normal; color: #475569;">(${item.variantName})</span>` : ""}</td>
               </tr>
               <tr>
                 <td class="item-qty">${item.qty}x</td>
@@ -198,6 +233,18 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
               </tr>
             `).join("")}
           </table>
+
+          ${hasSauces ? `
+            <div class="sauce-box">
+              <div class="sauce-title">Saus (Include):</div>
+              ${Object.entries(order.sauceDistribution!).filter(([_, q]) => q > 0).map(([sId, qty]) => `
+                <div class="sauce-item">
+                  <span>• ${sId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
+                  <span class="bold">${qty}x</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : ""}
           
           <div class="divider"></div>
           
@@ -206,9 +253,9 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
               <td class="summary-label">Subtotal</td>
               <td class="summary-value">${fmt(subtotal)}</td>
             </tr>
-            ${order.shippingCostConfirmed ? `
+            ${order.shippingCostConfirmed && ongkir > 0 ? `
             <tr>
-              <td class="summary-label">Ongkir</td>
+              <td class="summary-label">Ongkos Kirim</td>
               <td class="summary-value">${fmt(ongkir)}</td>
             </tr>
             ` : ""}
@@ -217,29 +264,39 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
               <td class="summary-value grand-total">${fmt(grandTotal)}</td>
             </tr>
             <tr>
-              <td class="summary-label">Status</td>
-              <td class="summary-value bold">${order.paymentStatus === "sudah_bayar" ? "LUNAS" : "BELUM BAYAR"}</td>
+              <td class="summary-label">Status Bayar</td>
+              <td class="summary-value">
+                <span class="badge-status" style="background: ${order.paymentStatus === 'sudah_bayar' ? '#DCFCE7' : '#FEE2E2'}; color: ${order.paymentStatus === 'sudah_bayar' ? '#16A34A' : '#DC2626'};">
+                  ${order.paymentStatus === "sudah_bayar" ? "LUNAS" : "BELUM BAYAR"}
+                </span>
+              </td>
             </tr>
             ${order.paymentMethod ? `
             <tr>
-              <td class="summary-label">Metode</td>
-              <td class="summary-value">${order.paymentMethod.toUpperCase()}</td>
+              <td class="summary-label">Metode Bayar</td>
+              <td class="summary-value" style="font-weight: 700;">${order.paymentMethod.toUpperCase()}</td>
             </tr>
             ` : ""}
           </table>
+
+          ${order.orderNotes ? `
+            <div class="notes-box">
+              <strong>Catatan:</strong> ${order.orderNotes}
+            </div>
+          ` : ""}
           
           <div class="divider"></div>
           
           <div class="footer">
-            <div class="bold">Terima Kasih!</div>
-            <div>Silakan datang kembali</div>
-            <div style="margin-top: 5px;">anchurpos.vercel.app</div>
+            <div class="bold" style="font-size: 10px; color: #1e293b;">Terima Kasih atas Kunjungan Anda!</div>
+            <div>Simpan struk ini sebagai bukti transaksi.</div>
+            <div style="margin-top: 3px; font-weight: 600;">@anchur.id</div>
           </div>
         </body>
       </html>
     `;
 
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    const printWindow = window.open('', '_blank', 'width=420,height=650');
     if (printWindow) {
       printWindow.document.write(html);
       printWindow.document.close();

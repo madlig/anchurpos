@@ -152,133 +152,221 @@ export default function InvoicePage() {
         </div>
       </div>
 
-      {/* Invoice document */}
-      <div id="invoice" style={{ maxWidth: "680px", margin: "0 auto", padding: "40px 32px", fontFamily: "'Segoe UI', Arial, sans-serif", color: "#1C1C1E" }}>
+      {/* Document Area */}
+      <div id="invoice" style={{ maxWidth: "720px", margin: "0 auto", padding: "40px 32px", fontFamily: "'Segoe UI', Arial, sans-serif", color: "#1C1C1E" }}>
 
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "32px", borderBottom: "2px solid #E85D8C", paddingBottom: "24px" }}>
-          <div>
-            <img src="/logo.png" alt="Anchur Logo" style={{ width: "auto", height: "64px", objectFit: "contain", marginBottom: "12px", borderRadius: "12px" }} />
-            <h1 style={{ fontSize: "22px", fontWeight: "800", color: "#E85D8C", margin: 0 }}>AnchurPOS</h1>
-            <p style={{ fontSize: "12px", color: "#94A3B8", margin: "2px 0 0" }}>Sistem Manajemen Produksi</p>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <h2 style={{ fontSize: "28px", fontWeight: "800", color: "#1C1C1E", margin: "0 0 6px" }}>{docTitle}</h2>
-            <p style={{ fontSize: "13px", fontFamily: "monospace", color: "#64748B", margin: "0 0 4px" }}>{order.orderNumber}</p>
-            {order.poNumber && <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 4px" }}>Referensi: <strong>{order.poNumber}</strong></p>}
-            <p style={{ fontSize: "12px", color: "#94A3B8", margin: 0 }}>Tanggal: {fmtDate(order.createdAt)}</p>
-            <div style={{ marginTop: "8px", display: "inline-block", padding: "4px 12px", borderRadius: "100px",
-              background: isPaid ? "#DCFCE7" : "#FEE2E2",
-              color: isPaid ? "#16A34A" : "#DC2626", fontSize: "11px", fontWeight: "700" }}>
-              {isPaid ? "SUDAH BAYAR" : "BELUM BAYAR"}
-            </div>
-          </div>
-        </div>
-
-        {/* Bill To */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: "28px" }}>
-          <div>
-            <p style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "6px" }}>Kepada</p>
-            <p style={{ fontSize: "15px", fontWeight: "700", color: "#1C1C1E", margin: "0 0 3px" }}>{order.customerName}</p>
-            {order.customerPhone && <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 2px" }}>{order.customerPhone}</p>}
-            {order.shippingAddress && <p style={{ fontSize: "12px", color: "#64748B", margin: 0 }}>{order.shippingAddress}</p>}
-          </div>
-          <div>
-            <p style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "6px" }}>Detail Pembayaran</p>
-            {isPaid ? (
-              <>
-                <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 2px" }}>
-                  Status: <strong style={{ color: "#16A34A" }}>LUNAS</strong>
-                </p>
-                {order.paymentMethod && <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 2px" }}>Metode: {order.paymentMethod.toUpperCase()}</p>}
-                {order.completedAt && <p style={{ fontSize: "12px", color: "#64748B", margin: 0 }}>Tgl. Lunas: {fmtDate(order.completedAt)}</p>}
-              </>
-            ) : (
-              <div style={{ background: "#F1F5F9", padding: "10px", borderRadius: "8px", borderLeft: "3px solid #E85D8C" }}>
-                <p style={{ fontSize: "11px", color: "#475569", margin: "0 0 4px", fontWeight: "600" }}>Instruksi Pembayaran</p>
-                <p style={{ fontSize: "11px", color: "#64748B", margin: 0, lineHeight: "1.4" }}>
-                  Mohon lakukan pembayaran sesuai nominal tagihan melalui metode yang telah disepakati sebelum pesanan dikirim/diambil.
-                </p>
+        {docTitle === "KWITANSI" ? (
+          /* ── BLANGKO KWITANSI RESMI INDONESIA ── */
+          <div style={{ border: "2px solid #0F172A", borderRadius: "14px", padding: "32px", background: "#ffffff", position: "relative" }}>
+            {/* Header Kwitansi */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid #0F172A", paddingBottom: "18px", marginBottom: "24px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                <img src="/logo.png" alt="Anchur Logo" style={{ width: "52px", height: "52px", objectFit: "contain", borderRadius: "10px" }} />
+                <div>
+                  <h1 style={{ fontSize: "20px", fontWeight: "900", color: "#0F172A", margin: 0, letterSpacing: "0.04em" }}>ANCHUR BANDUNG</h1>
+                  <p style={{ fontSize: "11px", color: "#64748B", margin: "2px 0 0" }}>Spesialis Churros & Dips · Operasional Kasir & Penjualan</p>
+                </div>
               </div>
-            )}
-          </div>
-        </div>
+              <div style={{ textAlign: "right" }}>
+                <h2 style={{ fontSize: "24px", fontWeight: "900", color: "#0F172A", margin: 0, letterSpacing: "0.12em" }}>KWITANSI</h2>
+                <p style={{ fontSize: "12px", fontFamily: "monospace", color: "#475569", margin: "3px 0 0" }}>NO: KW-{order.orderNumber.replace(/^ORD-/, "")}</p>
+                <p style={{ fontSize: "11px", color: "#94A3B8", margin: "2px 0 0" }}>Tgl: {fmtDate(order.createdAt)}</p>
+              </div>
+            </div>
 
-        {/* Items table */}
-        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px" }}>
-          <thead>
-            <tr style={{ background: "#F8FAFC" }}>
-              <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em" }}>Produk</th>
-              <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", width: "60px" }}>Qty</th>
-              <th style={{ padding: "10px 12px", textAlign: "right", fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em" }}>Harga</th>
-              <th style={{ padding: "10px 12px", textAlign: "right", fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em" }}>Subtotal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedItems.map((item, i) => {
-              const hasSauces = i === sauceTargetIdx && order.sauceDistribution && Object.values(order.sauceDistribution).some(q => q > 0);
-              return (
-                <tr key={i} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                  <td style={{ padding: "12px", fontSize: "13px", verticalAlign: "top" }}>
-                    <p style={{ fontWeight: "600", color: "#1C1C1E", margin: "0 0 2px" }}>{item.productName}</p>
-                    {!isGenericVariant(item.variantName) && (
-                      <p style={{ fontSize: "11px", color: "#94A3B8", margin: 0 }}>Varian: {item.variantName}</p>
-                    )}
-                    
-                    {hasSauces && (
-                      <div style={{ marginTop: "8px", background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "6px 10px", borderRadius: "6px", display: "inline-block" }}>
-                        <p style={{ fontSize: "10px", fontWeight: "700", color: "#64748B", margin: "0 0 4px", textTransform: "uppercase" }}>Saus (Include):</p>
-                        {Object.entries(order.sauceDistribution!).map(([sauceId, qty], idx) => qty > 0 && (
-                          <p key={`s-${idx}`} style={{ fontSize: "11px", color: "#475569", margin: "0 0 2px" }}>
-                            • {qty}x {sauceId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ padding: "12px", textAlign: "center", fontSize: "13px", color: "#64748B", verticalAlign: "top" }}>{item.qty}</td>
-                  <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", color: "#64748B", verticalAlign: "top" }}>{fmt(item.basePrice)}</td>
-                  <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", fontWeight: "600", color: "#1C1C1E", verticalAlign: "top" }}>{fmt(item.totalPrice)}</td>
+            {/* Isi Formulir Kwitansi */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "18px", fontSize: "13px", color: "#1E293B" }}>
+              {/* Telah Terima Dari */}
+              <div style={{ display: "flex", alignItems: "baseline" }}>
+                <span style={{ width: "170px", fontWeight: "700", color: "#475569", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.06em" }}>Telah Terima Dari</span>
+                <span style={{ marginRight: "12px", fontWeight: "700" }}>:</span>
+                <span style={{ flex: 1, fontWeight: "800", fontSize: "15px", borderBottom: "1px dotted #94A3B8", paddingBottom: "3px" }}>
+                  {order.customerName} {order.customerPhone ? `(${order.customerPhone})` : ""}
+                </span>
+              </div>
+
+              {/* Uang Sejumlah */}
+              <div style={{ display: "flex", alignItems: "baseline" }}>
+                <span style={{ width: "170px", fontWeight: "700", color: "#475569", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.06em" }}>Uang Sejumlah</span>
+                <span style={{ marginRight: "12px", fontWeight: "700" }}>:</span>
+                <div style={{ flex: 1, background: "#F1F5F9", padding: "8px 12px", borderRadius: "8px", border: "1px solid #CBD5E1", fontStyle: "italic", fontWeight: "700", color: "#0F172A", letterSpacing: "0.02em" }}>
+                  # {terbilang(total)} Rupiah #
+                </div>
+              </div>
+
+              {/* Untuk Pembayaran */}
+              <div style={{ display: "flex", alignItems: "baseline" }}>
+                <span style={{ width: "170px", fontWeight: "700", color: "#475569", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.06em" }}>Untuk Pembayaran</span>
+                <span style={{ marginRight: "12px", fontWeight: "700" }}>:</span>
+                <div style={{ flex: 1, borderBottom: "1px dotted #94A3B8", paddingBottom: "6px" }}>
+                  <p style={{ margin: 0, fontWeight: "700", fontSize: "13px" }}>
+                    Pelunasan Pesanan {order.orderNumber} ({sortedItems.reduce((s, i) => s + i.qty, 0)} item{shipping > 0 ? " + Ongkos Kirim" : ""})
+                  </p>
+                  <p style={{ margin: "4px 0 0", fontSize: "11px", color: "#64748B", lineHeight: "1.4" }}>
+                    {sortedItems.map(i => `${i.qty}x ${i.productName}${!isGenericVariant(i.variantName) ? ` (${i.variantName})` : ''}`).join(", ")}
+                    {order.shippingAddress ? ` · Tujuan: ${order.shippingAddress}` : ""}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Kwitansi: Kotak Nominal & Tanda Tangan */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: "36px", paddingTop: "24px", borderTop: "1px solid #E2E8F0" }}>
+              {/* Kotak Jumlah & Status */}
+              <div>
+                <div style={{ display: "inline-block", border: "3px double #0F172A", padding: "10px 24px", background: "#F8FAFC", borderRadius: "10px" }}>
+                  <span style={{ fontSize: "10px", fontWeight: "800", color: "#64748B", display: "block", textTransform: "uppercase", letterSpacing: "0.05em" }}>Jumlah Terbilang</span>
+                  <span style={{ fontSize: "24px", fontWeight: "900", color: "#0F172A", letterSpacing: "0.02em" }}>{fmt(total)}</span>
+                </div>
+                <div style={{ marginTop: "10px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: "800", padding: "4px 10px", borderRadius: "6px", background: isPaid ? "#DCFCE7" : "#FEE2E2", color: isPaid ? "#16A34A" : "#DC2626" }}>
+                    {isPaid ? `STATUS: LUNAS (${(order.paymentMethod || "TRANSFER").toUpperCase()})` : "STATUS: BELUM BAYAR"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Kolom Pengesahan */}
+              <div style={{ textAlign: "center", minWidth: "190px" }}>
+                <p style={{ fontSize: "12px", color: "#475569", margin: "0 0 50px" }}>
+                  Bandung, {fmtDate(order.completedAt || order.createdAt)}
+                </p>
+                <div style={{ borderBottom: "1px solid #0F172A", margin: "0 auto", width: "160px" }}></div>
+                <p style={{ fontSize: "11px", fontWeight: "800", color: "#0F172A", margin: "5px 0 0" }}>Anchur POS / Kasir</p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: "10px", color: "#94A3B8", textAlign: "center", margin: "24px 0 0", borderTop: "1px dashed #CBD5E1", paddingTop: "8px" }}>
+              Kwitansi ini adalah bukti penerimaan pembayaran yang sah yang diterbitkan otomatis oleh sistem AnchurPOS.
+            </p>
+          </div>
+        ) : (
+          /* ── INVOICE / NOTA KOMERSIAL DETAIL ── */
+          <div>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "32px", borderBottom: "2px solid #E85D8C", paddingBottom: "24px" }}>
+              <div>
+                <img src="/logo.png" alt="Anchur Logo" style={{ width: "auto", height: "64px", objectFit: "contain", marginBottom: "12px", borderRadius: "12px" }} />
+                <h1 style={{ fontSize: "22px", fontWeight: "800", color: "#E85D8C", margin: 0 }}>AnchurPOS</h1>
+                <p style={{ fontSize: "12px", color: "#94A3B8", margin: "2px 0 0" }}>Sistem Manajemen Produksi</p>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <h2 style={{ fontSize: "28px", fontWeight: "800", color: "#1C1C1E", margin: "0 0 6px" }}>{docTitle}</h2>
+                <p style={{ fontSize: "13px", fontFamily: "monospace", color: "#64748B", margin: "0 0 4px" }}>{order.orderNumber}</p>
+                {order.poNumber && <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 4px" }}>Referensi: <strong>{order.poNumber}</strong></p>}
+                <p style={{ fontSize: "12px", color: "#94A3B8", margin: 0 }}>Tanggal: {fmtDate(order.createdAt)}</p>
+                <div style={{ marginTop: "8px", display: "inline-block", padding: "4px 12px", borderRadius: "100px",
+                  background: isPaid ? "#DCFCE7" : "#FEE2E2",
+                  color: isPaid ? "#16A34A" : "#DC2626", fontSize: "11px", fontWeight: "700" }}>
+                  {isPaid ? "SUDAH BAYAR" : "BELUM BAYAR"}
+                </div>
+              </div>
+            </div>
+
+            {/* Bill To */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: "28px" }}>
+              <div>
+                <p style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "6px" }}>Kepada</p>
+                <p style={{ fontSize: "15px", fontWeight: "700", color: "#1C1C1E", margin: "0 0 3px" }}>{order.customerName}</p>
+                {order.customerPhone && <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 2px" }}>{order.customerPhone}</p>}
+                {order.shippingAddress && <p style={{ fontSize: "12px", color: "#64748B", margin: 0 }}>{order.shippingAddress}</p>}
+              </div>
+              <div>
+                <p style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "6px" }}>Detail Pembayaran</p>
+                {isPaid ? (
+                  <>
+                    <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 2px" }}>
+                      Status: <strong style={{ color: "#16A34A" }}>LUNAS</strong>
+                    </p>
+                    {order.paymentMethod && <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 2px" }}>Metode: {order.paymentMethod.toUpperCase()}</p>}
+                    {order.completedAt && <p style={{ fontSize: "12px", color: "#64748B", margin: 0 }}>Tgl. Lunas: {fmtDate(order.completedAt)}</p>}
+                  </>
+                ) : (
+                  <div style={{ background: "#F1F5F9", padding: "10px", borderRadius: "8px", borderLeft: "3px solid #E85D8C" }}>
+                    <p style={{ fontSize: "11px", color: "#475569", margin: "0 0 4px", fontWeight: "600" }}>Instruksi Pembayaran</p>
+                    <p style={{ fontSize: "11px", color: "#64748B", margin: 0, lineHeight: "1.4" }}>
+                      Mohon lakukan pembayaran sesuai nominal tagihan melalui metode yang telah disepakati sebelum pesanan dikirim/diambil.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Items table */}
+            <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px" }}>
+              <thead>
+                <tr style={{ background: "#F8FAFC" }}>
+                  <th style={{ padding: "10px 12px", textAlign: "left", fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em" }}>Produk</th>
+                  <th style={{ padding: "10px 12px", textAlign: "center", fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", width: "60px" }}>Qty</th>
+                  <th style={{ padding: "10px 12px", textAlign: "right", fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em" }}>Harga</th>
+                  <th style={{ padding: "10px 12px", textAlign: "right", fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em" }}>Subtotal</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {sortedItems.map((item, i) => {
+                  const hasSauces = i === sauceTargetIdx && order.sauceDistribution && Object.values(order.sauceDistribution).some(q => q > 0);
+                  return (
+                    <tr key={i} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                      <td style={{ padding: "12px", fontSize: "13px", verticalAlign: "top" }}>
+                        <p style={{ fontWeight: "600", color: "#1C1C1E", margin: "0 0 2px" }}>{item.productName}</p>
+                        {!isGenericVariant(item.variantName) && (
+                          <p style={{ fontSize: "11px", color: "#94A3B8", margin: 0 }}>Varian: {item.variantName}</p>
+                        )}
+                        
+                        {hasSauces && (
+                          <div style={{ marginTop: "8px", background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "6px 10px", borderRadius: "6px", display: "inline-block" }}>
+                            <p style={{ fontSize: "10px", fontWeight: "700", color: "#64748B", margin: "0 0 4px", textTransform: "uppercase" }}>Saus (Include):</p>
+                            {Object.entries(order.sauceDistribution!).map(([sauceId, qty], idx) => qty > 0 && (
+                              <p key={`s-${idx}`} style={{ fontSize: "11px", color: "#475569", margin: "0 0 2px" }}>
+                                • {qty}x {sauceId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: "12px", textAlign: "center", fontSize: "13px", color: "#64748B", verticalAlign: "top" }}>{item.qty}</td>
+                      <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", color: "#64748B", verticalAlign: "top" }}>{fmt(item.basePrice)}</td>
+                      <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", fontWeight: "600", color: "#1C1C1E", verticalAlign: "top" }}>{fmt(item.totalPrice)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
 
-        {/* Totals */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "32px" }}>
-          <div style={{ minWidth: "240px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
-              <span style={{ fontSize: "13px", color: "#64748B" }}>Subtotal</span>
-              <span style={{ fontSize: "13px", color: "#64748B" }}>{fmt(subtotal)}</span>
+            {/* Totals */}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "32px" }}>
+              <div style={{ minWidth: "240px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+                  <span style={{ fontSize: "13px", color: "#64748B" }}>Subtotal</span>
+                  <span style={{ fontSize: "13px", color: "#64748B" }}>{fmt(subtotal)}</span>
+                </div>
+                {shipping > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+                    <span style={{ fontSize: "13px", color: "#64748B" }}>Ongkos Kirim</span>
+                    <span style={{ fontSize: "13px", color: "#64748B" }}>{fmt(shipping)}</span>
+                  </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: "2px solid #E85D8C", marginTop: "6px" }}>
+                  <span style={{ fontSize: "16px", fontWeight: "700", color: "#1C1C1E" }}>Total</span>
+                  <span style={{ fontSize: "18px", fontWeight: "800", color: "#E85D8C" }}>{fmt(total)}</span>
+                </div>
+              </div>
             </div>
-            {shipping > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
-                <span style={{ fontSize: "13px", color: "#64748B" }}>Ongkos Kirim</span>
-                <span style={{ fontSize: "13px", color: "#64748B" }}>{fmt(shipping)}</span>
+
+            {/* Notes */}
+            {order.orderNotes && (
+              <div style={{ padding: "12px", borderRadius: "10px", background: "#F8FAFC", border: "1px solid #E2E8F0", marginBottom: "24px" }}>
+                <p style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", margin: "0 0 4px" }}>Catatan</p>
+                <p style={{ fontSize: "13px", color: "#64748B", margin: 0 }}>{order.orderNotes}</p>
               </div>
             )}
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: "2px solid #E85D8C", marginTop: "6px" }}>
-              <span style={{ fontSize: "16px", fontWeight: "700", color: "#1C1C1E" }}>Total</span>
-              <span style={{ fontSize: "18px", fontWeight: "800", color: "#E85D8C" }}>{fmt(total)}</span>
+
+            {/* Footer */}
+            <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: "20px", textAlign: "center" }}>
+              <p style={{ fontSize: "12px", color: "#94A3B8", margin: "0 0 4px" }}>Terima kasih atas kepercayaan Anda.</p>
+              <p style={{ fontSize: "12px", color: "#94A3B8", margin: 0 }}>Dokumen ini dibuat secara otomatis oleh AnchurPOS</p>
             </div>
-
-          </div>
-        </div>
-
-        {/* Notes */}
-        {order.orderNotes && (
-          <div style={{ padding: "12px", borderRadius: "10px", background: "#F8FAFC", border: "1px solid #E2E8F0", marginBottom: "24px" }}>
-            <p style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", margin: "0 0 4px" }}>Catatan</p>
-            <p style={{ fontSize: "13px", color: "#64748B", margin: 0 }}>{order.orderNotes}</p>
           </div>
         )}
-
-        {/* Footer */}
-        <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: "20px", textAlign: "center" }}>
-          <p style={{ fontSize: "12px", color: "#94A3B8", margin: "0 0 4px" }}>Terima kasih atas kepercayaan Anda.</p>
-          <p style={{ fontSize: "12px", color: "#94A3B8", margin: 0 }}>Dokumen ini dibuat secara otomatis oleh AnchurPOS</p>
-        </div>
       </div>
 
       <style>{`
