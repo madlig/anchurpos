@@ -48,6 +48,8 @@ export function CartCheckoutPanel({
   // Internal states
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [shippingAddress, setShippingAddress] = useState("");
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [saveNewCustomer, setSaveNewCustomer] = useState(false);
   const [newCustomerType, setNewCustomerType] = useState<"reguler" | "b2b" | "reseller">("reguler");
@@ -166,6 +168,10 @@ export function CartCheckoutPanel({
   async function handleCheckout() {
     if (!cart.length) { setError("Keranjang masih kosong"); return; }
     if (orderChannel === "whatsapp" && !finalCustomerName.trim()) { setError("Nama pelanggan wajib diisi"); return; }
+    if (orderChannel === "whatsapp" && deliveryMethod !== "pickup" && !shippingAddress.trim() && !selectedCustomer?.address) {
+      setError("Alamat pengiriman wajib diisi untuk pesanan delivery");
+      return;
+    }
     if (!payMethod) { setError("Metode bayar wajib dipilih"); return; }
 
     setError(""); setSubmitting(true);
@@ -176,7 +182,8 @@ export function CartCheckoutPanel({
           method: "POST",
           body: JSON.stringify({
             name: customerSearch.trim(), customerType: newCustomerType,
-            phoneNumber: null,
+            phoneNumber: customerPhone.trim() || null,
+            address: shippingAddress.trim() || null,
             poNumber: showPoNumber && poNumber.trim() ? poNumber.trim() : null,
             orderChannel: orderChannel,
             channel: orderChannel === "whatsapp" ? "whatsapp" : "walk_in",
@@ -186,14 +193,25 @@ export function CartCheckoutPanel({
         if (saveRes.ok) {
           const newC = await saveRes.json();
           customerId = newC.id;
-          setCustomers(prev => [...prev, { id: newC.id, name: customerSearch.trim(), channel: "whatsapp", customerType: newCustomerType, phoneNumber: null }]);
+          setCustomers(prev => [...prev, {
+            id: newC.id,
+            name: customerSearch.trim(),
+            channel: "whatsapp",
+            customerType: newCustomerType,
+            phoneNumber: customerPhone.trim() || null,
+            address: shippingAddress.trim() || null
+          }]);
         }
       }
 
       const res = await fetchWithAuth("/api/orders", {
         method: "POST",
         body: JSON.stringify({
-          customerName: finalCustomerName, customerId, customerType: isNewCustomer ? newCustomerType : (selectedCustomer?.customerType ?? null),
+          customerName: finalCustomerName,
+          customerId,
+          customerType: isNewCustomer ? newCustomerType : (selectedCustomer?.customerType ?? null),
+          customerPhone: customerPhone.trim() || selectedCustomer?.phoneNumber || null,
+          shippingAddress: (orderChannel === "whatsapp" && deliveryMethod !== "pickup") ? (shippingAddress.trim() || selectedCustomer?.address || null) : (shippingAddress.trim() || null),
           source: orderChannel === "walkin" ? "walk_in" : orderChannel === "whatsapp" ? "wa_form" : "marketplace_manual",
           orderChannel, items: cart.map(c => ({ 
             productId: c.productId, 
@@ -275,7 +293,7 @@ export function CartCheckoutPanel({
                     <p className="text-sm font-bold text-slate-800">{selectedCustomer.name}</p>
                     <p className="text-xs text-primary uppercase">{selectedCustomer.customerType}</p>
                   </div>
-                  <button onClick={() => { setSelectedCustomer(null); setCustomerSearch(""); }} className="w-6 h-6 rounded-md bg-red-100 flex items-center justify-center"><X size={12} className="text-red-600" /></button>
+                  <button onClick={() => { setSelectedCustomer(null); setCustomerSearch(""); setCustomerPhone(""); setShippingAddress(""); }} className="w-6 h-6 rounded-md bg-red-100 flex items-center justify-center"><X size={12} className="text-red-600" /></button>
                 </div>
               ) : (
                 <>
@@ -283,7 +301,13 @@ export function CartCheckoutPanel({
                   {showCustomerDropdown && (filteredCustomers.length > 0 || isNewCustomer) && (
                     <div className="absolute top-[44px] left-0 right-0 bg-white rounded-xl border border-slate-200 shadow-lg z-10 overflow-hidden">
                       {filteredCustomers.map(c => (
-                        <button key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearch(c.name); setShowCustomerDropdown(false); }} className="w-full flex items-center justify-between p-2.5 border-b border-slate-50 text-left">
+                        <button key={c.id} onClick={() => {
+                          setSelectedCustomer(c);
+                          setCustomerSearch(c.name);
+                          if (c.phoneNumber) setCustomerPhone(c.phoneNumber);
+                          if (c.address) setShippingAddress(c.address);
+                          setShowCustomerDropdown(false);
+                        }} className="w-full flex items-center justify-between p-2.5 border-b border-slate-50 text-left">
                           <div>
                             <p className="text-sm font-semibold text-slate-800">{c.name}</p>
                             {c.phoneNumber && <p className="text-xs text-slate-400">{c.phoneNumber}</p>}
@@ -304,6 +328,18 @@ export function CartCheckoutPanel({
                   )}
                 </>
               )}
+            </div>
+
+            {/* Customer Phone */}
+            <div className="mt-2.5">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">No. WhatsApp / HP</label>
+              <input
+                type="tel"
+                placeholder="Contoh: 081287226433"
+                value={customerPhone}
+                onChange={e => setCustomerPhone(e.target.value)}
+                className="w-full p-2.5 rounded-xl border border-slate-200 text-sm outline-none bg-brand-50"
+              />
             </div>
             {isNewCustomer && !showCustomerDropdown && (
               <div className="mt-2">
@@ -382,10 +418,23 @@ export function CartCheckoutPanel({
                   <input type="number" placeholder="0" value={shippingCost} onChange={e => setShippingCost(e.target.value)} className="flex-1 p-2 rounded-lg border border-slate-200 text-sm outline-none" />
                 </div>
                 <p className="text-xs text-slate-400 mb-1">Ditanggung Oleh:</p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mb-2.5">
                   {(configs?.shippingBorneBy || ["seller", "customer"]).map(m => (
                     <button key={m} onClick={() => setShippingBorneBy(m as any)} className={`flex-1 p-1.5 rounded-lg text-xs font-semibold ${shippingBorneBy === m ? "bg-primary/10 text-primary" : "bg-white text-slate-500"}`}>{m === "customer" ? "Pembeli" : m === "seller" ? "Toko" : m}</button>
                   ))}
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                    Alamat Lengkap Pengiriman <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Alamat jalan, nomor, patokan/catatan kurir..."
+                    value={shippingAddress}
+                    onChange={e => setShippingAddress(e.target.value)}
+                    className="w-full p-2 rounded-xl border border-slate-200 text-xs outline-none bg-white resize-none"
+                  />
                 </div>
               </div>
             )}

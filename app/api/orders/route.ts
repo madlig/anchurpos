@@ -119,6 +119,7 @@ export async function POST(req: NextRequest) {
     customerId,
     customerName: directCustomerName,
     customerType: inputCustomerType,
+    customerPhone: inputCustomerPhone,
     source,
     orderChannel,
     items,
@@ -154,7 +155,7 @@ export async function POST(req: NextRequest) {
   try {
     // Resolve customer — either from Firestore or use direct name (walk-in)
     let resolvedCustomerName = directCustomerName?.trim() || "Walk-in";
-    let resolvedCustomerPhone: string | null = null;
+    let resolvedCustomerPhone: string | null = inputCustomerPhone?.trim() || null;
     let resolvedChannel = "walk_in";
     let resolvedCustomerId = customerId ?? null;
     let resolvedCustomerType = inputCustomerType ?? null;
@@ -166,7 +167,7 @@ export async function POST(req: NextRequest) {
       const customer = customerSnap.data();
       if (customer) {
         resolvedCustomerName = customer.name ?? resolvedCustomerName;
-        resolvedCustomerPhone = customer.phoneNumber ?? null;
+        resolvedCustomerPhone = customer.phoneNumber ?? resolvedCustomerPhone;
         resolvedCustomerType = customer.customerType ?? resolvedCustomerType;
         discountPerUnit = customer.discountPerUnit ?? 0;
         if (!resolvedCustomerAddress && customer.address) {
@@ -343,6 +344,7 @@ export async function POST(req: NextRequest) {
         invoiceUrl: null,
         sauceDistribution: sauceDistribution ?? null,
         poNumber: poNumber ?? null,
+        secondaryPackagingIngId,
         voidReason: null,
         voidedAt: null,
       });

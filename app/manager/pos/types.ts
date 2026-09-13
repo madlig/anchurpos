@@ -8,7 +8,7 @@ export interface Variant {
   id: string; productId?: string; name: string; currentStock: number; minStock: number; sortOrder: number; freeSauceAllowance?: number;
 }
 export interface CustomerItem {
-  id: string; name: string; channel: string; customerType: string; phoneNumber: string | null;
+  id: string; name: string; channel: string; customerType: string; phoneNumber: string | null; address?: string | null;
 }
 export interface CartItem {
   productId: string; productName: string;

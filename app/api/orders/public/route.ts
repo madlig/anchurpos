@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
         name,
         phoneNumber,
         address: address ?? "",
-        channel: "walk_in",
+        channel: "whatsapp",
         discountPerUnit: 0,
         notes: "",
         isActive: true,

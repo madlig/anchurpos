@@ -151,7 +151,7 @@ export const customerSchema = z.object({
   code: z.string().nullable().optional(),
   customerType: z.enum(CUSTOMER_TYPES).default("reguler"),
   phoneNumber: z.string().nullable().optional(),
-  email: z.string().email("Format email tidak valid").nullable().optional(),
+  email: z.union([z.string().email("Format email tidak valid"), z.string().length(0)]).nullable().optional(),
   address: z.string().nullable().optional(),
   creditLimit: z.number().min(0).nullable().optional(),
   poNumber: z.string().nullable().optional(),

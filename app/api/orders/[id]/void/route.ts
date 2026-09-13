@@ -111,19 +111,18 @@ export async function POST(
               }
             }
           }
-        } else if (order.status === "selesai") {
-          // Track for product_stock update
+        } else if (item.variantId && item.variantId !== "none" && item.variantName !== "Jasa") {
+          // Kembalikan stok fisik untuk semua pesanan (baik pending, proses, maupun selesai)
           stockReturned.push({
             variantId: item.variantId,
             qty: item.qty,
             source: "product_stock",
-            productId: item.productId, // We need this to update the stock
+            productId: item.productId,
           } as any);
         }
       }
 
-      // Revert product stocks (Wait, we also need to READ productStocks before we write them!)
-      // Wait, we didn't read product stocks. Let's do it via FieldValue.increment to avoid reading!
+      // Revert product stocks
       const productStockUpdates: Record<string, number> = {};
       for (const ret of stockReturned) {
         if (ret.source === "product_stock" && (ret as any).productId) {
@@ -135,6 +134,20 @@ export async function POST(
         tx.set(adminDb.collection("productStocks").doc(stockId), {
           currentStock: FieldValue.increment(qty)
         }, { merge: true });
+      }
+
+      // Revert secondary packaging (jika ada)
+      if (order.secondaryPackagingIngId) {
+        const secPkgRef = adminDb.collection("ingredients").doc(order.secondaryPackagingIngId);
+        tx.set(secPkgRef, { currentStock: FieldValue.increment(1) }, { merge: true });
+        const movRef = adminDb.collection("stockMovements").doc();
+        tx.set(movRef, {
+          ingredientId: order.secondaryPackagingIngId,
+          changeAmount: 1,
+          reason: `Revert void kemasan sekunder order #${order.orderNumber} — ${voidReason}`,
+          sourceType: "opname_adjustment",
+          createdAt: FieldValue.serverTimestamp(),
+        });
       }
 
       // Revert glaze/sauce stock
