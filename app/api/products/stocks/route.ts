@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     const results: any[] = [];
     products.forEach((prod) => {
-      const prodVariants = variants.filter((v) => v.productId === prod.id);
+      const prodVariants = variants.filter((v) => v.productId === prod.id || (!v.productId && prod.category !== "service"));
       if (prodVariants.length > 0) {
         prodVariants.forEach((v) => {
           const stockId = `${prod.id}_${v.id}`;

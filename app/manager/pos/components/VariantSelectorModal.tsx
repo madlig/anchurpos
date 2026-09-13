@@ -30,8 +30,8 @@ export function VariantSelectorModal({
 }: Props) {
   const isService = selectedProduct.category === "service";
   const productVariants = useMemo(() => {
-    return variants.filter(v => v.productId === selectedProduct.id);
-  }, [variants, selectedProduct]);
+    return variants.filter(v => v.productId === selectedProduct.id || (!v.productId && !isService));
+  }, [variants, selectedProduct, isService]);
 
   const [variantSelections, setVariantSelections] = useState<Record<string, number | "">>({});
   const [directQty, setDirectQty] = useState<number | "">(1);

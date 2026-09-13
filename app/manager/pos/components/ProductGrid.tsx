@@ -47,7 +47,10 @@ export function ProductGrid({ products, variants, variantCount, onAdd, loading }
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
       {products.map((product) => {
-        const pVarCount = variants ? variants.filter(v => v.productId === product.id).length : (variantCount ?? 0);
+        const isService = product.category === "service";
+        const pVarCount = variants
+          ? variants.filter(v => v.productId === product.id || (!v.productId && !isService)).length
+          : (variantCount ?? 0);
         return (
           <ProductCard key={product.id} product={product} variantCount={pVarCount} onAdd={() => onAdd(product)} />
         );

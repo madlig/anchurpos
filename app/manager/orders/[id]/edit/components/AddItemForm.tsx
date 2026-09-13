@@ -16,12 +16,17 @@ export function AddItemForm({ products, variants, addOns, onAddItem, getPrice }:
   const [newQty, setNewQty] = useState(1);
 
   const allowedVariants = useMemo(() => {
-    return newProdId ? variants.filter(v => v.productId === newProdId) : [];
-  }, [variants, newProdId]);
+    if (!newProdId) return [];
+    const prod = products.find(p => p.id === newProdId);
+    const isService = prod?.category === "service";
+    return variants.filter(v => v.productId === newProdId || (!v.productId && !isService));
+  }, [variants, newProdId, products]);
   
   useEffect(() => {
     if (newProdId) {
-      const pVars = variants.filter(v => v.productId === newProdId);
+      const prod = products.find(p => p.id === newProdId);
+      const isService = prod?.category === "service";
+      const pVars = variants.filter(v => v.productId === newProdId || (!v.productId && !isService));
       setNewVarId(pVars.length > 0 ? pVars[0].id : "none");
       const hasSauce = newProdId.toLowerCase().includes("churros");
       if (hasSauce && addOns.length > 0) {
