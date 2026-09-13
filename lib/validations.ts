@@ -146,6 +146,8 @@ export const ingredientSchema = z.object({
   })).default([]),
   defaultCostPerBaseUnit: z.number().min(0).default(0),
   netWeightGrams: z.number().nullable().optional(),
+  price: z.number().min(0).optional().default(0),
+  opnameMethod: z.string().optional().default("direct"),
 });
 
 export const customerSchema = z.object({

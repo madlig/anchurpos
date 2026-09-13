@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
+import { ingredientSchema } from "@/lib/validations";
 
 // PATCH /api/ingredients/[id] — edit bahan baku
 export async function PATCH(
@@ -13,16 +14,18 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
-  const { name, baseUnit, category, minStock, channels, unitAlternatives, defaultCostPerBaseUnit, price, netWeightGrams } = body as {
-    name?: string; baseUnit?: string; category?: string; minStock?: number; channels?: string[];
-    unitAlternatives?: { unit: string; conversionToBase: number }[];
-    defaultCostPerBaseUnit?: number;
-    price?: number;
-    netWeightGrams?: number;
-  };
+  const parseResult = ingredientSchema.partial().safeParse(body);
+  if (!parseResult.success) {
+    return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
+  }
 
-  if (!name?.trim() || !baseUnit?.trim()) {
-    return NextResponse.json({ error: "Nama dan satuan wajib diisi" }, { status: 400 });
+  const { name, baseUnit, category, minStock, channels, unitAlternatives, defaultCostPerBaseUnit, price, netWeightGrams, opnameMethod } = parseResult.data;
+
+  if (name !== undefined && !name.trim()) {
+    return NextResponse.json({ error: "Nama bahan wajib diisi" }, { status: 400 });
+  }
+  if (baseUnit !== undefined && !baseUnit.trim()) {
+    return NextResponse.json({ error: "Satuan wajib diisi" }, { status: 400 });
   }
 
   try {
@@ -30,23 +33,26 @@ export async function PATCH(
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Bahan tidak ditemukan" }, { status: 404 });
 
-    await ref.update({
-      name: name.trim(),
-      baseUnit: baseUnit.trim(),
-      category: category ?? "bahan_baku",
-      minStock: minStock ?? 0,
-      channels: channels ?? [],
-      ...(unitAlternatives ? { unitAlternatives } : {}),
-      ...(typeof defaultCostPerBaseUnit === "number" ? { 
-        defaultCostPerBaseUnit,
-        lastHppUpdateDate: new Date().toISOString()
-      } : {}),
-      ...(typeof price === "number" ? { price } : {}),
-      ...(typeof netWeightGrams === "number" || netWeightGrams === null ? { netWeightGrams } : {}),
+    const updates: Record<string, any> = {
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    };
+    if (name !== undefined) updates.name = name.trim();
+    if (baseUnit !== undefined) updates.baseUnit = baseUnit.trim();
+    if (category !== undefined) updates.category = category;
+    if (minStock !== undefined) updates.minStock = minStock;
+    if (channels !== undefined) updates.channels = channels;
+    if (unitAlternatives !== undefined) updates.unitAlternatives = unitAlternatives;
+    if (defaultCostPerBaseUnit !== undefined) {
+      updates.defaultCostPerBaseUnit = defaultCostPerBaseUnit;
+      updates.lastHppUpdateDate = new Date().toISOString();
+    }
+    if (price !== undefined) updates.price = price;
+    if (netWeightGrams !== undefined) updates.netWeightGrams = netWeightGrams;
+    if (opnameMethod !== undefined) updates.opnameMethod = opnameMethod;
 
-    return NextResponse.json({ id, name: name.trim() });
+    await ref.update(updates);
+
+    return NextResponse.json({ id, name: name ? name.trim() : snap.data()?.name });
   } catch (err) {
     console.error("PATCH /api/ingredients/[id] error:", err);
     return NextResponse.json({ error: "Gagal mengubah bahan" }, { status: 500 });

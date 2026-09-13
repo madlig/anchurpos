@@ -97,6 +97,8 @@ export interface Ingredient {
 
 export type StockMovementSource =
   | "expense"
+  | "expense_revert"
+  | "purchase"
   | "production"
   | "production_reversal"
   | "production_packaging"
@@ -130,7 +132,7 @@ export interface Recipe {
 }
 
 // --- 6. customers/{customerId} ---
-export type CustomerChannel = OrderChannel | "b2b"; // Assuming they overlap based on the list
+export type CustomerChannel = OrderChannel | "b2b" | "walk_in" | "reseller";
 
 export interface Customer {
   id: string;
@@ -146,7 +148,7 @@ export interface Customer {
   poNumber: string | null;
   notes: string;
   isActive: boolean;
-  createdVia: "manual" | "wa_form";
+  createdVia: "manual" | "wa_form" | "pos";
 }
 
 // --- 6b. suppliers/{supplierId} ---
@@ -162,9 +164,10 @@ export interface Supplier {
   bankName?: string;
   bankAccount?: string;
   notes?: string;
+  paymentTerms?: string;
   isActive: boolean;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 // --- 7. expenses/{expenseId} ---

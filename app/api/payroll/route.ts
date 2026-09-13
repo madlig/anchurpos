@@ -20,9 +20,7 @@ export async function GET(req: NextRequest) {
       .where("month", "==", month);
       
     if (user.role === "crew") {
-       query = query.where("employeeId", "==", user.uid).where("isLocked", "==", true);
-    } else {
-       query = query.orderBy("employeeName", "asc");
+      query = query.where("employeeId", "==", user.uid).where("isLocked", "==", true);
     }
 
     const snap = await query.get();
@@ -44,10 +42,15 @@ export async function GET(req: NextRequest) {
         deductionNote: d.deductionNote ?? "",
         workPeriod: d.workPeriod ?? "",
         totalPaid: d.totalPaid,
-        paidAt: d.paidAt?.toDate?.().toISOString() ?? d.paidAt,
+        status: d.status ?? (d.isLocked ? "sudah_dibayar" : "belum_dibayar"),
+        paidAt: d.paidAt?.toDate?.().toISOString() ?? (typeof d.paidAt === "string" ? d.paidAt : null) ?? d.lockedAt ?? null,
+        paidBy: d.paidBy ?? null,
         isLocked: d.isLocked ?? false,
       };
     });
+
+    // In-memory sort by employeeName asc to avoid Firestore composite index requirement
+    records.sort((a, b) => (a.employeeName || "").localeCompare(b.employeeName || ""));
 
     return NextResponse.json(records);
   } catch (err) {

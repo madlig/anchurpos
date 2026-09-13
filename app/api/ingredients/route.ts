@@ -52,18 +52,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
   }
 
-  const { name, category, baseUnit, minStock, channels, unitAlternatives, defaultCostPerBaseUnit, netWeightGrams } = parseResult.data;
+  const { name, category, baseUnit, minStock, channels, unitAlternatives, defaultCostPerBaseUnit, netWeightGrams, price, opnameMethod } = parseResult.data;
 
   try {
     const ref = adminDb.collection("ingredients").doc();
     await ref.set({
       name: name.trim(), category, baseUnit: baseUnit.trim(),
       currentStock: 0, minStock,
-      unitAlternatives, opnameMethod: "direct",
+      unitAlternatives, opnameMethod: opnameMethod ?? "direct",
       packagedConfig: null,
       channels,
       defaultCostPerBaseUnit: defaultCostPerBaseUnit ?? 0,
-      netWeightGrams,
+      price: price ?? 0,
+      netWeightGrams: netWeightGrams ?? null,
       lastHppUpdateDate: new Date().toISOString(),
       createdAt: FieldValue.serverTimestamp(),
     });

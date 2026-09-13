@@ -26,10 +26,14 @@ export async function PUT(
       return NextResponse.json({ error: "Payroll sudah terkunci (sudah dibayar)" }, { status: 400 });
     }
 
-    // Pastikan diset locked true
+    // Pastikan diset locked true dan status sudah dibayar
+    const nowIso = new Date().toISOString();
     data.isLocked = true;
+    data.status = "sudah_dibayar";
+    data.paidAt = data.paidAt || nowIso;
+    data.paidBy = auth.uid;
     if (!data.lockedAt) {
-      data.lockedAt = new Date().toISOString();
+      data.lockedAt = nowIso;
     }
 
     await docRef.set(data, { merge: true });

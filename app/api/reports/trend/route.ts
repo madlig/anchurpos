@@ -75,7 +75,9 @@ export async function GET(req: NextRequest) {
 
       let gajiBonus = 0;
       for (const doc of payrollSnap.docs) {
-        gajiBonus += doc.data().totalPaid ?? 0;
+        const p = doc.data();
+        if (p.isLocked === false) continue;
+        gajiBonus += p.totalPaid ?? 0;
       }
 
       const labaKotor = pemasukan - hppProduk;

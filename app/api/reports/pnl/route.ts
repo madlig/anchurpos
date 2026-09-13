@@ -185,18 +185,28 @@ export async function GET(req: NextRequest) {
 
     for (const doc of payrollSnap.docs) {
       const p = doc.data();
+      // Only count finalized / locked payroll
+      if (p.isLocked === false) continue;
+
       const val = p.totalPaid ?? 0;
       gajiBonus += val;
       totalBankOut += val;
 
+      const dateIso =
+        p.paidAt?.toDate?.().toISOString() ??
+        (typeof p.paidAt === "string" ? p.paidAt : null) ??
+        p.lockedAt ??
+        p.createdAt?.toDate?.().toISOString() ??
+        startOfMonth.toISOString();
+
       cashJournal.push({
         id: "pay_" + doc.id,
-        date: p.createdAt?.toDate?.().toISOString() ?? startOfMonth.toISOString(),
+        date: dateIso,
         type: "payroll",
-        description: `Gaji & Payroll Karyawan`,
+        description: `Gaji & Payroll: ${p.employeeName || "Karyawan"}`,
         account: "bank",
         amount: -val,
-        notes: `Gaji ${month}`,
+        notes: `Periode: ${p.workPeriod || month}`,
       });
     }
 

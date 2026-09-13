@@ -3,6 +3,9 @@ import { adminDb } from "@/lib/firebase-admin";
 import { requireRole } from "@/lib/auth-middleware";
 
 export async function GET(req: NextRequest) {
+  const auth = await requireRole(req, ["owner", "manager", "crew"]);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const snap = await adminDb.collection("order_channels").get();
     const channels = snap.docs.map(doc => ({

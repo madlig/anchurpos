@@ -188,9 +188,10 @@ export default function PayrollPage() {
     if (!(await confirm("Kunci Data?", `Tandai gaji ${p.employeeName} sudah dibayar? Data ini akan dikunci.`))) return;
     setPayingId(p.id);
     try {
+      const nowIso = new Date().toISOString();
       const res = await fetchWithAuth(`/api/payroll/${p.id}`, {
         method: "PUT",
-        body: JSON.stringify({ ...p, isLocked: true, lockedAt: new Date().toISOString() })
+        body: JSON.stringify({ ...p, isLocked: true, status: "sudah_dibayar", paidAt: nowIso, lockedAt: nowIso })
       });
       if (res.ok) loadData();
       else alert("Gagal mengunci gaji");
@@ -209,10 +210,11 @@ export default function PayrollPage() {
     
     setIsPayingAll(true);
     try {
+      const nowIso = new Date().toISOString();
       const promises = unlocked.map(p => 
         fetchWithAuth(`/api/payroll/${p.id}`, {
           method: "PUT",
-          body: JSON.stringify({ ...p, isLocked: true, lockedAt: new Date().toISOString() })
+          body: JSON.stringify({ ...p, isLocked: true, status: "sudah_dibayar", paidAt: nowIso, lockedAt: nowIso })
         })
       );
       await Promise.all(promises);

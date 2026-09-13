@@ -26,11 +26,16 @@ export async function GET(req: NextRequest) {
       if (d.status === "void") continue;
       orderCount++;
 
-      const itemsSnap = await doc.ref.collection("items").get();
-      for (const itemDoc of itemsSnap.docs) {
-        const item = itemDoc.data();
-        omzet += item.totalPrice ?? 0;
-        hpp += item.totalHpp ?? 0;
+      if (typeof d.totalOrderValue === "number") {
+        omzet += d.totalOrderValue;
+        hpp += d.totalHpp ?? 0;
+      } else {
+        const itemsSnap = await doc.ref.collection("items").get();
+        for (const itemDoc of itemsSnap.docs) {
+          const item = itemDoc.data();
+          omzet += item.totalPrice ?? 0;
+          hpp += item.totalHpp ?? 0;
+        }
       }
     }
 
