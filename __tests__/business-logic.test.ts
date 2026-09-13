@@ -8,11 +8,13 @@ vi.mock('@/lib/firebase-admin', () => {
   const limitMock = vi.fn(() => ({ get: getMock }));
   const orderByMock = vi.fn(() => ({ limit: limitMock }));
   const whereMock = vi.fn(() => ({ orderBy: orderByMock, get: getMock, where: vi.fn(() => ({ get: getMock })) }));
+  const docMock = vi.fn(() => ({ get: getMock }));
   
   return {
     adminDb: {
       collection: vi.fn(() => ({
         where: whereMock,
+        doc: docMock,
       })),
     },
   };
@@ -29,30 +31,22 @@ describe('business-logic', () => {
       expect(result).toEqual({});
     });
 
-    it('returns 0 cost if no expense history is found', async () => {
-      const mockGet = vi.fn().mockResolvedValue({ empty: true, docs: [] });
-      const mockLimit = vi.fn().mockReturnValue({ get: mockGet });
-      const mockOrderBy = vi.fn().mockReturnValue({ limit: mockLimit });
-      const mockWhere = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
-      
-      (adminDb.collection as any).mockReturnValue({ where: mockWhere });
+    it('returns 0 cost if ingredient doc does not exist', async () => {
+      const mockGet = vi.fn().mockResolvedValue({ exists: false });
+      const mockDoc = vi.fn().mockReturnValue({ get: mockGet });
+      (adminDb.collection as any).mockReturnValue({ doc: mockDoc });
 
       const result = await getLatestIngredientCosts(['ing-1']);
       expect(result).toEqual({ 'ing-1': 0 });
     });
 
-    it('returns the latest cost if expense history is found', async () => {
+    it('returns defaultCostPerBaseUnit if ingredient doc exists', async () => {
       const mockGet = vi.fn().mockResolvedValue({
-        empty: false,
-        docs: [
-          { data: () => ({ pricePerBaseUnit: 1500 }) }
-        ]
+        exists: true,
+        data: () => ({ defaultCostPerBaseUnit: 1500 })
       });
-      const mockLimit = vi.fn().mockReturnValue({ get: mockGet });
-      const mockOrderBy = vi.fn().mockReturnValue({ limit: mockLimit });
-      const mockWhere = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
-      
-      (adminDb.collection as any).mockReturnValue({ where: mockWhere });
+      const mockDoc = vi.fn().mockReturnValue({ get: mockGet });
+      (adminDb.collection as any).mockReturnValue({ doc: mockDoc });
 
       const result = await getLatestIngredientCosts(['ing-1']);
       expect(result).toEqual({ 'ing-1': 1500 });
