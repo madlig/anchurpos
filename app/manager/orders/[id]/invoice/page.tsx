@@ -21,22 +21,30 @@ interface OrderDetail {
 function fmt(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 }
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+function fmtDate(iso?: string | null) {
+  if (!iso) return "-";
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "-";
+    return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  } catch {
+    return "-";
+  }
 }
 
 function terbilang(n: number): string {
+  if (n === 0) return "Nol";
   const b = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
   n = Math.floor(Math.abs(n));
   if (n < 12) return b[n];
   if (n < 20) return (terbilang(n - 10) + " Belas").trim();
-  if (n < 100) return (terbilang(Math.floor(n / 10)) + " Puluh " + terbilang(n % 10)).replace(/\s+/g, " ").trim();
-  if (n < 200) return ("Seratus " + terbilang(n - 100)).replace(/\s+/g, " ").trim();
-  if (n < 1000) return (terbilang(Math.floor(n / 100)) + " Ratus " + terbilang(n % 100)).replace(/\s+/g, " ").trim();
-  if (n < 2000) return ("Seribu " + terbilang(n - 1000)).replace(/\s+/g, " ").trim();
-  if (n < 1000000) return (terbilang(Math.floor(n / 1000)) + " Ribu " + terbilang(n % 1000)).replace(/\s+/g, " ").trim();
-  if (n < 1000000000) return (terbilang(Math.floor(n / 1000000)) + " Juta " + terbilang(n % 1000000)).replace(/\s+/g, " ").trim();
-  return (terbilang(Math.floor(n / 1000000000)) + " Miliar " + terbilang(n % 1000000000)).replace(/\s+/g, " ").trim();
+  if (n < 100) return (terbilang(Math.floor(n / 10)) + " Puluh " + (n % 10 > 0 ? terbilang(n % 10) : "")).replace(/\s+/g, " ").trim();
+  if (n < 200) return ("Seratus " + (n - 100 > 0 ? terbilang(n - 100) : "")).replace(/\s+/g, " ").trim();
+  if (n < 1000) return (terbilang(Math.floor(n / 100)) + " Ratus " + (n % 100 > 0 ? terbilang(n % 100) : "")).replace(/\s+/g, " ").trim();
+  if (n < 2000) return ("Seribu " + (n - 1000 > 0 ? terbilang(n - 1000) : "")).replace(/\s+/g, " ").trim();
+  if (n < 1000000) return (terbilang(Math.floor(n / 1000)) + " Ribu " + (n % 1000 > 0 ? terbilang(n % 1000) : "")).replace(/\s+/g, " ").trim();
+  if (n < 1000000000) return (terbilang(Math.floor(n / 1000000)) + " Juta " + (n % 1000000 > 0 ? terbilang(n % 1000000) : "")).replace(/\s+/g, " ").trim();
+  return (terbilang(Math.floor(n / 1000000000)) + " Miliar " + (n % 1000000000 > 0 ? terbilang(n % 1000000000) : "")).replace(/\s+/g, " ").trim();
 }
 
 export default function InvoicePage() {
@@ -45,6 +53,7 @@ export default function InvoicePage() {
   const orderId = params.id as string;
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [customDocTitle, setCustomDocTitle] = useState<string | null>(null);
 
   const fetchWithAuth = useCallback(async (url: string) => {
     const token = await getToken();
@@ -61,7 +70,7 @@ export default function InvoicePage() {
   useEffect(() => {
     if (!loading && order) {
       setTimeout(() => {
-        const orderDate = order.createdAt.split("T")[0];
+        const orderDate = order.createdAt ? order.createdAt.split("T")[0] : "";
         const safeCustomerName = (order.customerName || "Tanpa Nama").replace(/[^a-zA-Z0-9 -]/g, "").trim();
         document.title = `${orderDate}_${safeCustomerName}`;
         window.print();
@@ -81,9 +90,7 @@ export default function InvoicePage() {
   );
   if (!order) return <div style={{ textAlign: "center", padding: "40px" }}>Dokumen tidak ditemukan</div>;
 
-  const [customDocTitle, setCustomDocTitle] = useState<string | null>(null);
-
-  const subtotal = order.items.reduce((s, i) => s + i.totalPrice, 0);
+  const subtotal = (order.items || []).reduce((s, i) => s + i.totalPrice, 0);
   const shipping = order.shippingCost ?? 0;
   const total = subtotal + shipping;
   const isPaid = order.paymentStatus === "sudah_bayar";
@@ -92,7 +99,7 @@ export default function InvoicePage() {
   const docTitle = customDocTitle || defaultDocTitle;
 
   // Urutkan item: Produk Churros di atas, disusul produk lain, lalu Jasa / Packing di bawah
-  const sortedItems = [...order.items].sort((a, b) => {
+  const sortedItems = [...(order.items || [])].sort((a, b) => {
     const aIsChurros = a.productName.toLowerCase().includes("churros");
     const bIsChurros = b.productName.toLowerCase().includes("churros");
     if (aIsChurros && !bIsChurros) return -1;
