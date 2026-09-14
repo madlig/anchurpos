@@ -51,7 +51,7 @@ export default function KasirPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Semua");
-  const [orderChannel, setOrderChannel] = useState<"walkin" | "whatsapp" | "tiktok" | "shopee" | null>(null);
+  const [orderChannel, setOrderChannel] = useState<"walkin" | "whatsapp" | "tiktok" | "shopee">("walkin");
 
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
   const [addOns, setAddOns] = useState<AddonItem[]>([]);
@@ -185,36 +185,6 @@ export default function KasirPage() {
     </div>
   );
 
-  if (!orderChannel) {
-    return (
-      <div className="min-h-screen flex flex-col justify-center items-center px-6 bg-brand-50">
-        <div className="mb-10 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <h1 className="text-3xl font-black text-slate-800 mb-2">Pilih Channel</h1>
-          <p className="text-slate-500 text-sm font-medium">Dari mana pesanan ini berasal?</p>
-        </div>
-        <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-          {([
-            { key: "walkin", label: "Walk-in" },
-            { key: "whatsapp", label: "WhatsApp" },
-            { key: "tiktok", label: "TikTok" },
-            { key: "shopee", label: "Shopee" },
-          ] as const).map(ch => (
-            <button
-              key={ch.key}
-              onClick={() => { setOrderChannel(ch.key); setCart([]); }}
-              className="flex flex-col items-center justify-center p-6 bg-white rounded-3xl shadow-[0_0_15px_rgba(244,63,94,0.05)] border border-primary/20 hover:border-primary/50 hover:shadow-lg transition-all animate-in fade-in zoom-in-95 duration-300"
-            >
-              <div className="mb-3 p-4 bg-primary/10 rounded-full text-primary">
-                {getChannelIcon(ch.key, 28)}
-              </div>
-              <span className="font-bold text-slate-800">{ch.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-brand-50 flex flex-col md:flex-row">
       {/* LEFT PANEL: Menu & Product Grid */}
@@ -222,19 +192,27 @@ export default function KasirPage() {
         <div className="sticky top-0 z-30 pt-4 px-4 pb-4 bg-white/90 backdrop-blur-xl border-b border-primary/20 shadow-sm">
           <h1 className="text-lg font-extrabold text-slate-800">Input Pesanan</h1>
 
-          <div className="flex items-center justify-between mt-3 mb-2">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-xl">
-              <span className="text-primary font-bold text-xs flex items-center gap-1.5">
-                {getChannelIcon(orderChannel)}
-                {orderChannel.charAt(0).toUpperCase() + orderChannel.slice(1)}
-              </span>
-            </div>
-            <button 
-              onClick={() => { setOrderChannel(null); setCart([]); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-xl shadow-sm border border-slate-100 text-xs font-bold text-slate-800 hover:bg-brand-50 transition-colors"
-            >
-              <ArrowLeft size={14} /> Ganti Channel
-            </button>
+          <div className="flex items-center gap-1.5 mt-3 mb-2 p-1 bg-slate-100 rounded-xl overflow-x-auto">
+            {([
+              { key: "walkin", label: "Walk-in", icon: Store },
+              { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+              { key: "tiktok", label: "TikTok", icon: Smartphone },
+              { key: "shopee", label: "Shopee", icon: ShoppingBag },
+            ] as const).map(({ key, label, icon: Icon }) => (
+              <button 
+                key={key}
+                type="button"
+                onClick={() => setOrderChannel(key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                  orderChannel === key 
+                    ? "bg-white text-primary shadow-sm" 
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Icon size={14} />
+                <span>{label}</span>
+              </button>
+            ))}
           </div>
 
           <div className="flex items-center gap-2 mt-2 px-3 py-2.5 bg-brand-50 rounded-xl border border-primary/10">
@@ -278,6 +256,7 @@ export default function KasirPage() {
               cart={cart}
               cartTotal={cartTotal}
               orderChannel={orderChannel}
+              setOrderChannel={setOrderChannel}
               customers={customers}
               setCustomers={setCustomers}
               addOns={addOns}
@@ -314,6 +293,7 @@ export default function KasirPage() {
           cart={cart}
           cartTotal={cartTotal}
           orderChannel={orderChannel}
+          setOrderChannel={setOrderChannel}
           customers={customers}
           setCustomers={setCustomers}
           addOns={addOns}

@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { Printer } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 
-interface OrderItem { productName: string; variantName: string; qty: number; basePrice: number; totalPrice: number; }
+interface OrderItem { productName: string; variantName: string; qty: number; basePrice: number; discountPerUnit?: number; totalPrice: number; }
 interface OrderDetail {
   id: string; orderNumber: string; customerName: string; customerPhone: string | null;
   channel: string; orderChannel: string; customerType: string | null; poNumber: string | null;
@@ -320,7 +320,9 @@ export default function InvoicePage() {
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: "9px 12px", textAlign: "right", fontSize: "12px", color: "#475569", verticalAlign: "top" }}>{fmt(item.basePrice)}</td>
+                      <td style={{ padding: "9px 12px", textAlign: "right", fontSize: "12px", color: "#475569", verticalAlign: "top" }}>
+                        {fmt(Math.round(item.totalPrice / item.qty))}
+                      </td>
                       <td style={{ padding: "9px 12px", textAlign: "right", fontSize: "12px", fontWeight: "800", color: "#0F172A", verticalAlign: "top" }}>{fmt(item.totalPrice)}</td>
                     </tr>
                   );
@@ -489,7 +491,9 @@ export default function InvoicePage() {
                         )}
                       </td>
                       <td style={{ padding: "12px", textAlign: "center", fontSize: "13px", color: "#64748B", verticalAlign: "top" }}>{item.qty}</td>
-                      <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", color: "#64748B", verticalAlign: "top" }}>{fmt(item.basePrice)}</td>
+                      <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", color: "#64748B", verticalAlign: "top" }}>
+                        {fmt(Math.round(item.totalPrice / item.qty))}
+                      </td>
                       <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", fontWeight: "600", color: "#1C1C1E", verticalAlign: "top" }}>{fmt(item.totalPrice)}</td>
                     </tr>
                   );

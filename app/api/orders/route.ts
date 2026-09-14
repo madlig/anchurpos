@@ -158,10 +158,11 @@ export async function POST(req: NextRequest) {
     // Resolve customer — either from Firestore or use direct name (walk-in)
     let resolvedCustomerName = directCustomerName?.trim() || "Walk-in";
     let resolvedCustomerPhone: string | null = inputCustomerPhone?.trim() || null;
+    let resolvedCustomerAddress: string | null = shippingAddress?.trim() || null;
     let resolvedChannel = "walk_in";
     let resolvedCustomerId = customerId ?? null;
     let resolvedCustomerType = inputCustomerType ?? null;
-    let resolvedCustomerAddress = shippingAddress ?? null;
+    const isWhatsApp = (orderChannel ?? "walkin") === "whatsapp";
     let discountPerUnit = 0;
 
     if (customerId) {
@@ -171,7 +172,7 @@ export async function POST(req: NextRequest) {
         resolvedCustomerName = customer.name ?? resolvedCustomerName;
         resolvedCustomerPhone = customer.phoneNumber ?? resolvedCustomerPhone;
         resolvedCustomerType = customer.customerType ?? resolvedCustomerType;
-        discountPerUnit = customer.discountPerUnit ?? 0;
+        discountPerUnit = isWhatsApp ? (customer.discountPerUnit ?? 0) : 0;
         if (!resolvedCustomerAddress && customer.address) {
           resolvedCustomerAddress = customer.address;
         }
@@ -219,7 +220,9 @@ export async function POST(req: NextRequest) {
 
         const totalProductQty = productQtyMap.get(item.productId) ?? item.qty;
         const basePrice = await getApplicableTier(item.productId, totalProductQty, tx);
-        const totalPrice = (basePrice - discountPerUnit) * item.qty;
+        const effectiveDiscount = isWhatsApp ? (discountPerUnit > 0 ? discountPerUnit : (item.discountPerUnit ?? 0)) : 0;
+        const unitPrice = Math.max(0, basePrice - effectiveDiscount);
+        const totalPrice = unitPrice * item.qty;
         
         const packPerBatch = product?.packPerBatch || 1;
         const hppPerUnit = hasVariant 
@@ -237,7 +240,9 @@ export async function POST(req: NextRequest) {
           qty: item.qty,
           basePrice,
           appliedTier: `${totalProductQty} pcs`,
-          discountPerUnit,
+          discountPerUnit: effectiveDiscount,
+          price: unitPrice,
+          unitPrice,
           totalPrice,
           hppPerUnit,
           totalHpp,

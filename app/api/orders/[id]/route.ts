@@ -174,6 +174,8 @@ export async function PUT(
     let resolvedChannel = "walk_in";
     let resolvedCustomerId = customerId ?? null;
     let resolvedCustomerType = inputCustomerType ?? null;
+    const effectiveOrderChannel = orderChannel ?? oldOrder.orderChannel ?? "walkin";
+    const isWhatsApp = effectiveOrderChannel === "whatsapp";
     let discountPerUnit = 0;
 
     if (customerId) {
@@ -184,7 +186,7 @@ export async function PUT(
         resolvedCustomerPhone = customer.phoneNumber ?? null;
         resolvedChannel = customer.channel ?? "walk_in";
         resolvedCustomerType = customer.customerType ?? resolvedCustomerType;
-        discountPerUnit = customer.discountPerUnit ?? 0;
+        discountPerUnit = isWhatsApp ? (customer.discountPerUnit ?? 0) : 0;
       }
     }
 
@@ -210,7 +212,9 @@ export async function PUT(
 
       const totalProductQty = productQtyMap.get(item.productId) ?? item.qty;
       const basePrice = await getApplicableTier(item.productId, totalProductQty);
-      const totalPrice = (basePrice - discountPerUnit) * item.qty;
+      const effectiveDiscount = isWhatsApp ? (discountPerUnit > 0 ? discountPerUnit : (item.discountPerUnit ?? 0)) : 0;
+      const unitPrice = Math.max(0, basePrice - effectiveDiscount);
+      const totalPrice = unitPrice * item.qty;
       const packPerBatch = product?.packPerBatch || 1;
       const hppPerUnit = await calculateProductHPP(item.productId, item.variantId, packPerBatch);
       const totalHpp = hppPerUnit * item.qty;
@@ -224,7 +228,9 @@ export async function PUT(
         qty: item.qty,
         basePrice,
         appliedTier: `${totalProductQty} pcs`,
-        discountPerUnit,
+        discountPerUnit: effectiveDiscount,
+        price: unitPrice,
+        unitPrice,
         totalPrice,
         hppPerUnit,
         totalHpp,

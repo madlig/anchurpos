@@ -13,6 +13,7 @@ interface Props {
   cart: CartItem[];
   cartTotal: number;
   orderChannel: "walkin" | "whatsapp" | "tiktok" | "shopee";
+  setOrderChannel: (channel: "walkin" | "whatsapp" | "tiktok" | "shopee") => void;
   customers: CustomerItem[];
   setCustomers: React.Dispatch<React.SetStateAction<CustomerItem[]>>;
   addOns: any[];
@@ -38,7 +39,7 @@ function getChannelIcon(channel: string, size = 14) {
 }
 
 export function CartCheckoutPanel({
-  cart, cartTotal, orderChannel, customers, setCustomers,
+  cart, cartTotal, orderChannel, setOrderChannel, customers, setCustomers,
   addOns, marketplaceFees, onClose, onSuccess, removeFromCart, configs
 }: Props) {
   const { getToken, role, loading: authLoading } = useAuth();
@@ -153,9 +154,32 @@ export function CartCheckoutPanel({
   }, [customers, customerSearch]);
 
   const isNewCustomer = customerSearch.trim() && !selectedCustomer && !customers.some(c => c.name.toLowerCase() === customerSearch.toLowerCase().trim());
-  const finalCustomerName = selectedCustomer ? selectedCustomer.name : customerSearch.trim() || "Walk-in";
+  const finalCustomerName = selectedCustomer ? selectedCustomer.name : customerSearch.trim() || (orderChannel === "walkin" ? "Walk-in" : "");
   const effectiveCustomerType = selectedCustomer?.customerType ?? (isNewCustomer ? newCustomerType : "reguler");
   const isB2B = effectiveCustomerType === "b2b" || effectiveCustomerType === "reseller";
+  const isWhatsApp = orderChannel === "whatsapp";
+  const customerDiscountPerUnit = isWhatsApp ? (selectedCustomer?.discountPerUnit ?? 0) : 0;
+
+  const discountedCart = useMemo(() => {
+    return cart.map(item => {
+      const discount = isWhatsApp ? Math.min(item.basePrice, customerDiscountPerUnit) : 0;
+      const unitPrice = Math.max(0, item.basePrice - discount);
+      return {
+        ...item,
+        discountPerUnit: discount,
+        price: unitPrice,
+        totalPrice: unitPrice * item.qty,
+      };
+    });
+  }, [cart, customerDiscountPerUnit, isWhatsApp]);
+
+  const effectiveCartTotal = useMemo(() => {
+    return discountedCart.reduce((sum, item) => sum + item.totalPrice, 0);
+  }, [discountedCart]);
+
+  const totalDiscountSavings = useMemo(() => {
+    return discountedCart.reduce((sum, item) => sum + (item.discountPerUnit * item.qty), 0);
+  }, [discountedCart]);
 
   const activeFeePercent = useMemo(() => {
     if (platformFeeOverride !== "") return parseFloat(platformFeeOverride) || 0;
@@ -164,19 +188,19 @@ export function CartCheckoutPanel({
     return 0;
   }, [orderChannel, marketplaceFees, platformFeeOverride]);
 
-  const feeAmount = useMemo(() => Math.round(cartTotal * activeFeePercent / 100), [cartTotal, activeFeePercent]);
+  const feeAmount = useMemo(() => Math.round(effectiveCartTotal * activeFeePercent / 100), [effectiveCartTotal, activeFeePercent]);
 
   const customerPayableTotal = useMemo(() => {
     const shipping = (orderChannel === "whatsapp" && deliveryMethod !== "pickup" && shippingBorneBy === "customer") ? (parseInt(shippingCost) || 0) : 0;
-    return cartTotal + shipping;
-  }, [cartTotal, orderChannel, deliveryMethod, shippingBorneBy, shippingCost]);
+    return effectiveCartTotal + shipping;
+  }, [effectiveCartTotal, orderChannel, deliveryMethod, shippingBorneBy, shippingCost]);
 
   const cashReceivedNum = useMemo(() => parseInt(cashReceivedInput) || 0, [cashReceivedInput]);
   const changeAmount = useMemo(() => Math.max(0, cashReceivedNum - customerPayableTotal), [cashReceivedNum, customerPayableTotal]);
 
   async function handleCheckout() {
     if (!cart.length) { setError("Keranjang masih kosong"); return; }
-    if (orderChannel === "whatsapp" && !finalCustomerName.trim()) { setError("Nama pelanggan wajib diisi"); return; }
+    if (!finalCustomerName.trim()) { setError("Nama pelanggan wajib diisi"); return; }
     if (orderChannel === "whatsapp" && deliveryMethod !== "pickup" && !shippingAddress.trim() && !selectedCustomer?.address) {
       setError("Alamat pengiriman wajib diisi untuk pesanan delivery");
       return;
@@ -205,10 +229,11 @@ export function CartCheckoutPanel({
           setCustomers(prev => [...prev, {
             id: newC.id,
             name: customerSearch.trim(),
-            channel: "whatsapp",
+            channel: orderChannel === "whatsapp" ? "whatsapp" : "walk_in",
             customerType: newCustomerType,
             phoneNumber: customerPhone.trim() || null,
-            address: shippingAddress.trim() || null
+            address: shippingAddress.trim() || null,
+            discountPerUnit: 0
           }]);
         }
       }
@@ -222,7 +247,7 @@ export function CartCheckoutPanel({
           customerPhone: customerPhone.trim() || selectedCustomer?.phoneNumber || null,
           shippingAddress: (orderChannel === "whatsapp" && deliveryMethod !== "pickup") ? (shippingAddress.trim() || selectedCustomer?.address || null) : (shippingAddress.trim() || null),
           source: orderChannel === "walkin" ? "walk_in" : orderChannel === "whatsapp" ? "wa_form" : "marketplace_manual",
-          orderChannel, items: cart.map(c => ({ 
+          orderChannel, items: discountedCart.map(c => ({ 
             productId: c.productId, 
             productName: c.productName,
             variantId: c.variantId, 
@@ -268,47 +293,110 @@ export function CartCheckoutPanel({
   return (
     <div className="flex flex-col h-full bg-white">
 
+        {/* Channel Selector */}
+        <div className="mb-3">
+          <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest block mb-1.5">
+            Channel Penjualan
+          </label>
+          <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-xl">
+            {([
+              { key: "walkin", label: "Walk-in", icon: Store },
+              { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+              { key: "tiktok", label: "TikTok", icon: Smartphone },
+              { key: "shopee", label: "Shopee", icon: ShoppingBag },
+            ] as const).map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setOrderChannel(key)}
+                className={`flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-lg text-xs font-bold transition-all ${
+                  orderChannel === key
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-slate-600 hover:bg-white/60"
+                }`}
+              >
+                <Icon size={14} />
+                <span className="text-[10px] sm:text-[11px]">{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Cart summary */}
         <div className="bg-brand-50 rounded-xl p-3 mb-4">
-          {cart.map((item, i) => (
-            <div key={i} className={`flex items-center justify-between ${i < cart.length - 1 ? "pb-2 mb-2 border-b border-slate-100" : ""}`}>
+          {discountedCart.map((item, i) => (
+            <div key={i} className={`flex items-center justify-between ${i < discountedCart.length - 1 ? "pb-2 mb-2 border-b border-slate-100" : ""}`}>
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center"><span className="text-xs font-bold text-primary">{item.qty}x</span></div>
                 <div>
                   <p className="text-xs font-semibold text-slate-800">{item.productName}</p>
-                  {(item.variantName && !["none", "Tanpa Varian", "Jasa"].includes(item.variantName) || item.sauceName) && (
+                  {((item.variantName && !["none", "Tanpa Varian", "Jasa"].includes(item.variantName)) || item.sauceName) && (
                     <p className="text-xs text-slate-400">
                       {item.variantName && !["none", "Tanpa Varian", "Jasa"].includes(item.variantName) ? item.variantName : ""}
                       {item.variantName && !["none", "Tanpa Varian", "Jasa"].includes(item.variantName) && item.sauceName ? " · " : ""}
                       {item.sauceName ? `Saus: ${item.sauceName}` : ""}
                     </p>
                   )}
+                  {isWhatsApp && item.discountPerUnit > 0 && (
+                    <p className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 mt-0.5">
+                      <span className="bg-emerald-100 px-1.5 py-0.5 rounded text-emerald-800 font-extrabold">-{fmt(item.discountPerUnit)}/pack</span>
+                      <span className="text-slate-600 font-medium">(@{fmt(item.price)})</span>
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-800">{fmt(item.price * item.qty)}</span>
+                <div className="text-right">
+                  <span className="text-xs font-bold text-slate-800">{fmt(item.totalPrice)}</span>
+                  {isWhatsApp && item.discountPerUnit > 0 && (
+                    <p className="text-[10px] text-slate-400 line-through">{fmt(item.basePrice * item.qty)}</p>
+                  )}
+                </div>
                 <button onClick={() => removeFromCart(i)} className="w-6 h-6 rounded-md bg-red-50 flex items-center justify-center"><X size={11} className="text-red-500" /></button>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Customer Picker */}
-        {orderChannel === "whatsapp" && (
+        {/* Customer Picker (Untuk WhatsApp & Walk-in / B2B) */}
+        {(orderChannel === "whatsapp" || orderChannel === "walkin") && (
           <div className="mb-3">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest block mb-1.5">Pelanggan</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+                Pelanggan {orderChannel === "walkin" && <span className="text-[10px] text-slate-400 font-normal lowercase">(opsional / default: Walk-in)</span>}
+              </label>
+              {selectedCustomer && isWhatsApp && selectedCustomer.discountPerUnit && selectedCustomer.discountPerUnit > 0 ? (
+                <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                  Diskon WhatsApp: -{fmt(selectedCustomer.discountPerUnit)}/pack
+                </span>
+              ) : null}
+            </div>
             <div className="relative">
               {selectedCustomer ? (
                 <div className="flex items-center justify-between p-2.5 rounded-xl border border-primary bg-primary/10">
                   <div>
                     <p className="text-sm font-bold text-slate-800">{selectedCustomer.name}</p>
-                    <p className="text-xs text-primary uppercase">{selectedCustomer.customerType}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[11px] font-bold text-primary uppercase">{selectedCustomer.customerType}</span>
+                      {isWhatsApp && selectedCustomer.discountPerUnit && selectedCustomer.discountPerUnit > 0 && (
+                        <span className="text-[10px] font-extrabold text-emerald-700 bg-white/80 px-1.5 py-0.2 rounded border border-emerald-200">
+                          -{fmt(selectedCustomer.discountPerUnit)}/pack
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <button onClick={() => { setSelectedCustomer(null); setCustomerSearch(""); setCustomerPhone(""); setShippingAddress(""); }} className="w-6 h-6 rounded-md bg-red-100 flex items-center justify-center"><X size={12} className="text-red-600" /></button>
                 </div>
               ) : (
                 <>
-                  <input type="text" placeholder="Cari atau ketik baru..." value={customerSearch} onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }} onFocus={() => setShowCustomerDropdown(true)} className="w-full p-2.5 rounded-xl border border-slate-200 text-sm outline-none bg-brand-50" />
+                  <input
+                    type="text"
+                    placeholder={orderChannel === "walkin" ? "Ketik nama pelanggan/B2B (atau kosongkan untuk Walk-in)..." : "Cari pelanggan atau ketik baru..."}
+                    value={customerSearch}
+                    onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
+                    onFocus={() => setShowCustomerDropdown(true)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-sm outline-none bg-brand-50"
+                  />
                   {showCustomerDropdown && (filteredCustomers.length > 0 || isNewCustomer) && (
                     <div className="absolute top-[44px] left-0 right-0 bg-white rounded-xl border border-slate-200 shadow-lg z-10 overflow-hidden">
                       {filteredCustomers.map(c => (
@@ -318,10 +406,17 @@ export function CartCheckoutPanel({
                           if (c.phoneNumber) setCustomerPhone(c.phoneNumber);
                           if (c.address) setShippingAddress(c.address);
                           setShowCustomerDropdown(false);
-                        }} className="w-full flex items-center justify-between p-2.5 border-b border-slate-50 text-left">
+                        }} className="w-full flex items-center justify-between p-2.5 border-b border-slate-50 text-left hover:bg-slate-50 transition-colors">
                           <div>
                             <p className="text-sm font-semibold text-slate-800">{c.name}</p>
-                            {c.phoneNumber && <p className="text-xs text-slate-400">{c.phoneNumber}</p>}
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {c.phoneNumber && <span className="text-xs text-slate-400">{c.phoneNumber}</span>}
+                              {isWhatsApp && c.discountPerUnit && c.discountPerUnit > 0 ? (
+                                <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded">
+                                  Diskon WA: {fmt(c.discountPerUnit)}/pack
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
                           <span className="px-2 py-0.5 rounded-md bg-brand-50 border border-slate-200 text-xs font-semibold text-slate-500">{c.customerType?.toUpperCase()}</span>
                         </button>
@@ -341,22 +436,27 @@ export function CartCheckoutPanel({
               )}
             </div>
 
-            {/* Customer Phone */}
-            <div className="mt-2.5">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">No. WhatsApp / HP</label>
-              <input
-                type="tel"
-                placeholder="Contoh: 081287226433"
-                value={customerPhone}
-                onChange={e => setCustomerPhone(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-slate-200 text-sm outline-none bg-brand-50"
-              />
-            </div>
+            {/* Customer Phone (Opsional) */}
+            {(orderChannel === "whatsapp" || selectedCustomer || isNewCustomer) && (
+              <div className="mt-2.5">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                  No. WhatsApp / HP <span className="text-[10px] text-slate-400 font-normal lowercase">(opsional)</span>
+                </label>
+                <input
+                  type="tel"
+                  placeholder="Contoh: 081287226433 (bisa dikosongkan)"
+                  value={customerPhone}
+                  onChange={e => setCustomerPhone(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-sm outline-none bg-brand-50"
+                />
+              </div>
+            )}
+
             {isNewCustomer && !showCustomerDropdown && (
               <div className="mt-2">
                 <label className="flex items-center gap-2 cursor-pointer mb-1.5">
                   <input type="checkbox" checked={saveNewCustomer} onChange={e => setSaveNewCustomer(e.target.checked)} className="accent-primary" />
-                  <span className="text-xs text-slate-500">Simpan "{customerSearch.trim()}" ke master</span>
+                  <span className="text-xs text-slate-500">Simpan "{customerSearch.trim()}" ke master pelanggan</span>
                 </label>
                 {saveNewCustomer && (
                   <div className="flex gap-1.5">
@@ -570,15 +670,30 @@ export function CartCheckoutPanel({
         <input type="text" placeholder="Catatan (opsional)" value={orderNotes} onChange={e => setOrderNotes(e.target.value)} className="w-full mb-3 p-2.5 rounded-xl border border-slate-200 text-sm outline-none bg-brand-50" />
 
         {/* Total Price */}
-        <div className="p-3 rounded-xl bg-primary/10 border border-pink-200 mb-4">
-          <div className="flex justify-between items-center"><span className="text-[14px] font-semibold text-slate-500">Total Pesanan</span><span className="text-[18px] font-bold text-primary">{fmt(cartTotal)}</span></div>
+        <div className="p-3 rounded-xl bg-primary/10 border border-pink-200 mb-4 space-y-1.5">
+          {isWhatsApp && totalDiscountSavings > 0 && (
+            <>
+              <div className="flex justify-between items-center text-xs text-slate-500">
+                <span>Subtotal ({cart.reduce((s, i) => s + i.qty, 0)} pack)</span>
+                <span className="font-semibold line-through text-slate-400">{fmt(cartTotal)}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
+                <span>Diskon Khusus WhatsApp ({selectedCustomer?.name || "Pelanggan"})</span>
+                <span>- {fmt(totalDiscountSavings)}</span>
+              </div>
+            </>
+          )}
+          <div className="flex justify-between items-center">
+            <span className="text-[14px] font-semibold text-slate-600">Total Pesanan</span>
+            <span className="text-[18px] font-bold text-primary">{fmt(effectiveCartTotal)}</span>
+          </div>
           {orderChannel === "whatsapp" && deliveryMethod !== "pickup" && (parseInt(shippingCost) || 0) > 0 && (
             <div className="flex justify-between items-center mt-1"><span className="text-xs text-slate-400">Ongkir ({shippingBorneBy === "customer" ? "Ditanggung Pembeli" : "Ditanggung Kita"})</span><span className={`text-xs font-semibold ${shippingBorneBy === "customer" ? "text-green-600" : "text-red-600"}`}>{shippingBorneBy === "customer" ? "+" : "-"} {fmt(parseInt(shippingCost) || 0)}</span></div>
           )}
           {feeAmount > 0 && (
             <div className="flex justify-between items-center mt-1"><span className="text-xs text-slate-400">Fee {orderChannel} ({activeFeePercent}%)</span><span className="text-xs text-red-600">- {fmt(feeAmount)}</span></div>
           )}
-          <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-pink-200"><span className="text-sm font-bold text-slate-500">{deliveryMethod !== "pickup" && shippingBorneBy === "customer" && (parseInt(shippingCost) || 0) > 0 ? "Total Tagihan" : "Pendapatan Bersih"}</span><span className="text-[16px] font-bold text-green-600">{fmt((cartTotal - feeAmount) + (orderChannel === "whatsapp" && deliveryMethod !== "pickup" && shippingBorneBy === "customer" ? (parseInt(shippingCost) || 0) : 0))}</span></div>
+          <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-pink-200"><span className="text-sm font-bold text-slate-500">{deliveryMethod !== "pickup" && shippingBorneBy === "customer" && (parseInt(shippingCost) || 0) > 0 ? "Total Tagihan" : "Pendapatan Bersih"}</span><span className="text-[16px] font-bold text-green-600">{fmt((effectiveCartTotal - feeAmount) + (orderChannel === "whatsapp" && deliveryMethod !== "pickup" && shippingBorneBy === "customer" ? (parseInt(shippingCost) || 0) : 0))}</span></div>
         </div>
 
         {error && <p className="text-xs text-red-600 text-center mb-2">{error}</p>}

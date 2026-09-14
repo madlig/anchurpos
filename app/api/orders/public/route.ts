@@ -87,7 +87,9 @@ export async function POST(req: NextRequest) {
       if (isRainbow) hasRainbow = true;
 
       const basePrice = await getApplicableTier(item.productId, item.qty);
-      const totalPrice = (basePrice - discountPerUnit) * item.qty;
+      const effectiveDiscount = discountPerUnit > 0 ? discountPerUnit : 0;
+      const unitPrice = Math.max(0, basePrice - effectiveDiscount);
+      const totalPrice = unitPrice * item.qty;
 
       processedItems.push({
         productId: item.productId,
@@ -97,7 +99,9 @@ export async function POST(req: NextRequest) {
         qty: item.qty,
         basePrice,
         appliedTier: `${item.qty} pcs`,
-        discountPerUnit,
+        discountPerUnit: effectiveDiscount,
+        price: unitPrice,
+        unitPrice,
         totalPrice,
         hppPerUnit: 0,
         totalHpp: 0,

@@ -229,7 +229,7 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
               </tr>
               <tr>
                 <td class="item-qty">${item.qty}x</td>
-                <td class="item-price">@${item.basePrice.toLocaleString('id-ID')}</td>
+                <td class="item-price">@${Math.round(item.totalPrice / item.qty).toLocaleString('id-ID')}</td>
                 <td class="item-total">${item.totalPrice.toLocaleString('id-ID')}</td>
               </tr>
             `).join("")}
@@ -455,7 +455,7 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
                 <div className="text-right">
                   <p className="text-sm font-bold text-slate-800">{fmt(item.totalPrice)}</p>
                   <p className="text-xs font-medium text-slate-400 mt-0.5">
-                    {item.qty} x {fmt(item.basePrice - item.discountPerUnit)}
+                    {item.qty} x {fmt(Math.round(item.totalPrice / item.qty))}
                   </p>
                 </div>
               </div>
