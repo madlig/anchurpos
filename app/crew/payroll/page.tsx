@@ -6,7 +6,6 @@ import { ReceiptText, ShieldCheck, Download, Printer, FileText, ChevronRight, Ey
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PayrollRecord } from "../../manager/employees/types";
 import { SalarySlipDocument } from "@/components/shared/SalarySlipDocument";
-import { printElement } from "@/lib/print-utils";
 
 const fmtRupiah = (num: number) => {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(num);
@@ -60,8 +59,8 @@ export default function CrewPayrollPage() {
 
   const handlePrint = () => {
     if (!payroll) return;
-    const cleanName = (payroll.employeeName || "Crew").replace(/[^a-zA-Z0-9]/g, "_");
-    printElement("crew-printable-slip", `Slip_Gaji_${payroll.month}_${cleanName}`);
+    const slipUrl = `/crew/payroll/slip?month=${encodeURIComponent(payroll.month)}&autoPrint=true`;
+    window.open(slipUrl, "_blank");
   };
 
   return (

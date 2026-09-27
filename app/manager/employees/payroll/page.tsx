@@ -8,7 +8,6 @@ import { AttendanceRecord, Employee, PayrollRecord } from "../types";
 import { AdaptivePanel } from "@/components/shared/AdaptivePanel";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 import { SalarySlipDocument } from "@/components/shared/SalarySlipDocument";
-import { printElement } from "@/lib/print-utils";
 import Link from "next/link";
 
 const fmtDateFull = (dStr: string) => {
@@ -500,8 +499,8 @@ export default function PayrollPage() {
                 </Link>
                 <button
                   onClick={() => {
-                    const cleanName = (printPayroll.employeeName || "Karyawan").replace(/[^a-zA-Z0-9]/g, "_");
-                    printElement("modal-slip-content", `Slip_Gaji_${printPayroll.month}_${cleanName}`);
+                    const slipUrl = `/manager/employees/payroll/slip?id=${encodeURIComponent(printPayroll.id)}&month=${encodeURIComponent(printPayroll.month)}&empId=${encodeURIComponent(printPayroll.employeeId)}&autoPrint=true`;
+                    window.open(slipUrl, "_blank");
                   }}
                   className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
                 >
@@ -518,63 +517,12 @@ export default function PayrollPage() {
             </div>
 
             {/* Printable Slip Content */}
-            <div id="modal-slip-content" className="p-4 sm:p-6 overflow-y-auto bg-slate-50 print:bg-white print:p-0">
+            <div className="p-4 sm:p-6 overflow-y-auto bg-slate-50">
               <SalarySlipDocument payroll={printPayroll} />
             </div>
           </div>
         </div>
       )}
-
-      {/* Isolasi Print CSS saat Modal Aktif (Fallback untuk Ctrl+P) */}
-      {printPayroll && (
-        <style>{`
-          @media print {
-            body * {
-              visibility: hidden !important;
-            }
-
-            #modal-slip-content, #modal-slip-content * {
-              visibility: visible !important;
-            }
-
-            #modal-slip-content {
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
-              width: 100% !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              background: #ffffff !important;
-              z-index: 99999 !important;
-            }
-
-            header, aside, nav, .no-print, [class*="NotificationBell"], .fixed.top-4 {
-              display: none !important;
-            }
-
-            html, body {
-              background: #ffffff !important;
-              margin: 0 !important;
-              padding: 0 !important;
-            }
-
-            .salary-slip-doc {
-              border: 2px solid #0f172a !important;
-              border-radius: 0 !important;
-              box-shadow: none !important;
-              width: 100% !important;
-              max-width: 100% !important;
-              page-break-inside: avoid;
-            }
-
-            @page {
-              size: A4 portrait;
-              margin: 10mm;
-            }
-          }
-        `}</style>
-      )}
     </div>
   );
-
 }

@@ -73,7 +73,7 @@ export function SalarySlipDocument({
               ANCHUR BANDUNG
             </h1>
             <p className="text-[11px] font-semibold text-slate-600 mt-1">
-              Spesialis Churros & Dips · Operasional Kasir & Penggajian
+              Operasional Kasir & Penggajian
             </p>
             <p className="text-[10px] font-extrabold text-brand-700 uppercase tracking-widest mt-1">
               SLIP GAJI RESMI KARYAWAN

@@ -46,6 +46,7 @@ function MobileBottomNav({ navItems }: { navItems: any[] }) {
 import { FCMProvider } from "@/components/shared/FCMProvider";
 
 export default function CrewLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const { getToken } = useAuth();
   const [hasCheckedIn, setHasCheckedIn] = useState(false);
   
@@ -80,6 +81,11 @@ export default function CrewLayout({ children }: { children: React.ReactNode }) 
     { label: "Gaji", href: "/crew/payroll", icon: ReceiptText },
     { label: "Profil", href: "/crew/settings", icon: User },
   ];
+
+  // Jika sedang di halaman cetak slip, bypass layout navigasi mobile
+  if (pathname.includes("/slip")) {
+    return <>{children}</>;
+  }
 
   return (
     <RoleGuard allowedRoles={["owner", "manager", "crew"]}>
