@@ -116,6 +116,26 @@ export const employeeUpdateSchema = employeeSchema.partial().omit({ username: tr
   isActive: z.boolean().optional(),
 });
 
+export const payrollLockSchema = z.object({
+  employeeId: z.string().min(1, "employeeId wajib diisi"),
+  employeeName: z.string().optional(),
+  month: z.string().regex(/^\d{4}-\d{2}$/, "Format bulan YYYY-MM"),
+  workDays: z.number().int().min(0, "Hari kerja tidak boleh negatif"),
+  dailyWage: z.number().min(0, "Gaji harian tidak boleh negatif"),
+  totalRegularPay: z.number().min(0, "Gaji reguler tidak boleh negatif"),
+  totalOvertimeBonus: z.number().min(0).optional().default(0),
+  performanceBonus: z.number().min(0).optional().default(0),
+  performanceBonusNote: z.string().nullable().optional(),
+  deductions: z.number().min(0).optional().default(0),
+  deductionNote: z.string().nullable().optional(),
+  totalPaid: z.number(),
+  workPeriod: z.string().optional(),
+  isLocked: z.boolean().optional().default(true),
+  status: z.string().optional().default("sudah_dibayar"),
+  paidAt: z.string().nullable().optional(),
+  lockedAt: z.string().nullable().optional(),
+});
+
 export const priceTierSchema = z.object({
   minQty: z.number().int().min(1),
   maxQty: z.number().int().nullable().optional(),

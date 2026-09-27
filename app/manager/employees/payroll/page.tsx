@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Loader2, CalendarDays, Check, Search, Lock, Edit3, Save, X, FileText, LayoutList, Wallet, Settings2, ChevronDown, CheckCircle2, TrendingUp, Users, AlertTriangle, Printer, Download, ShieldCheck } from "lucide-react";
+import { Loader2, CalendarDays, Check, Search, Lock, Edit3, Save, X, FileText, LayoutList, Wallet, Settings2, ChevronDown, CheckCircle2, TrendingUp, Users, AlertTriangle, Printer, Download, ShieldCheck, ExternalLink } from "lucide-react";
 import { AttendanceRecord, Employee, PayrollRecord } from "../types";
 import { AdaptivePanel } from "@/components/shared/AdaptivePanel";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
+import { SalarySlipDocument } from "@/components/shared/SalarySlipDocument";
+import Link from "next/link";
 
 const fmtDateFull = (dStr: string) => {
   const [y, m, d] = dStr.split("-");
@@ -476,24 +478,35 @@ export default function PayrollPage() {
 
       {/* MODAL CETAK SLIP GAJI */}
       {printPayroll && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto print:p-0 print:bg-white animate-in fade-in">
-          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden print:border-none print:shadow-none print:max-w-none print:rounded-none">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white animate-in fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:border-none print:shadow-none print:max-w-none print:rounded-none">
             {/* Top action bar - Hidden during print */}
-            <div className="p-4 bg-slate-900 text-white flex items-center justify-between print:hidden">
+            <div className="p-4 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-2 shrink-0 print:hidden border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <FileText size={18} className="text-emerald-400" />
-                <span className="text-sm font-bold">Pratinjau Slip Gaji</span>
+                <span className="text-sm font-bold">Pratinjau Slip Gaji Resmi</span>
+                <span className="text-xs text-slate-400 hidden sm:inline">({printPayroll.employeeName})</span>
               </div>
               <div className="flex items-center gap-2">
+                <Link
+                  href={`/manager/employees/payroll/slip?id=${encodeURIComponent(printPayroll.id)}&month=${encodeURIComponent(printPayroll.month)}&empId=${encodeURIComponent(printPayroll.employeeId)}`}
+                  target="_blank"
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-slate-700"
+                  title="Buka di halaman khusus tanpa sidebar/navbar"
+                >
+                  <ExternalLink size={13} />
+                  <span className="hidden sm:inline">Buka Halaman Penuh</span>
+                </Link>
                 <button
                   onClick={() => window.print()}
                   className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
                 >
-                  <Printer size={14} /> Cetak / Simpan PDF
+                  <Printer size={14} /> Cetak / PDF
                 </button>
                 <button
                   onClick={() => setPrintPayroll(null)}
                   className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 cursor-pointer"
+                  title="Tutup"
                 >
                   <X size={16} />
                 </button>
@@ -501,86 +514,64 @@ export default function PayrollPage() {
             </div>
 
             {/* Printable Slip Content */}
-            <div className="p-6 md:p-8 space-y-6 text-slate-800 bg-white">
-              <div className="text-center border-b border-slate-200 pb-4">
-                <h2 className="text-xl font-black tracking-widest text-slate-900 uppercase">ANCHUR CHURROS</h2>
-                <p className="text-xs font-bold text-slate-500 tracking-wider uppercase mt-0.5">SLIP GAJI RESMI KARYAWAN</p>
-                <p className="text-[11px] font-semibold text-slate-400 mt-1">Periode: {printPayroll.workPeriod}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nama Karyawan</p>
-                  <p className="font-extrabold text-slate-900 text-sm mt-0.5">{printPayroll.employeeName}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bulan Penggajian</p>
-                  <p className="font-extrabold text-slate-900 text-sm mt-0.5">{printPayroll.month}</p>
-                </div>
-              </div>
-
-              <div className="space-y-3 border-t border-b border-slate-100 py-4 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-slate-600">Gaji Pokok ({printPayroll.workDays} Hari × {fmtRupiah(printPayroll.dailyWage)})</span>
-                  <span className="font-extrabold text-slate-900">{fmtRupiah(printPayroll.totalRegularPay)}</span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-slate-600">Bonus Lemburan</span>
-                  <span className="font-extrabold text-slate-900">{fmtRupiah(printPayroll.totalOvertimeBonus)}</span>
-                </div>
-
-                {printPayroll.performanceBonus > 0 && (
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="font-semibold text-emerald-700">Bonus Performa / Kerajinan</span>
-                      {printPayroll.performanceBonusNote && (
-                        <p className="text-[10px] text-emerald-600/80 font-medium">Catatan: {printPayroll.performanceBonusNote}</p>
-                      )}
-                    </div>
-                    <span className="font-extrabold text-emerald-700">+{fmtRupiah(printPayroll.performanceBonus)}</span>
-                  </div>
-                )}
-
-                {(printPayroll.deductions || 0) > 0 && (
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="font-semibold text-rose-600">Potongan / Kasbon</span>
-                      {printPayroll.deductionNote && (
-                        <p className="text-[10px] text-rose-500/80 font-medium">Catatan: {printPayroll.deductionNote}</p>
-                      )}
-                    </div>
-                    <span className="font-extrabold text-rose-600">-{fmtRupiah(printPayroll.deductions || 0)}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-slate-50 p-4 rounded-2xl border border-dashed border-slate-300 flex justify-between items-center">
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">TOTAL GAJI BERSIH (TAKE HOME PAY)</p>
-                  <p className="text-2xl font-black text-emerald-600 mt-0.5">{fmtRupiah(printPayroll.totalPaid)}</p>
-                </div>
-                {printPayroll.isLocked && (
-                  <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-black uppercase border border-emerald-200">
-                    DIKUNCI / RESMI
-                  </span>
-                )}
-              </div>
-
-              <div className="pt-6 grid grid-cols-2 gap-8 text-center text-xs">
-                <div>
-                  <p className="text-slate-400 font-semibold mb-12">Penerima (Karyawan)</p>
-                  <p className="font-bold text-slate-800 border-t border-slate-300 pt-1.5">{printPayroll.employeeName}</p>
-                </div>
-                <div>
-                  <p className="text-slate-400 font-semibold mb-12">Diserahkan Oleh</p>
-                  <p className="font-bold text-slate-800 border-t border-slate-300 pt-1.5">Manager / Owner</p>
-                </div>
-              </div>
+            <div id="modal-slip-content" className="p-4 sm:p-6 overflow-y-auto bg-slate-50 print:bg-white print:p-0">
+              <SalarySlipDocument payroll={printPayroll} />
             </div>
           </div>
         </div>
       )}
+
+      {/* Isolasi Print CSS saat Modal Aktif */}
+      {printPayroll && (
+        <style>{`
+          @media print {
+            body {
+              background: #ffffff !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+
+            /* Sembunyikan semua elemen di luar modal slip */
+            header, aside, nav, .page-enter > div:not(.fixed), .tap-target, .no-print {
+              display: none !important;
+            }
+
+            /* Hilangkan background canvas pink */
+            div[class*="bg-brand-50"], div[style*="#FCABB4"], div[style*="rgb(252, 171, 180)"] {
+              background: #ffffff !important;
+            }
+
+            .fixed.inset-0 {
+              position: static !important;
+              display: block !important;
+              background: transparent !important;
+              padding: 0 !important;
+              overflow: visible !important;
+            }
+
+            #modal-slip-content {
+              padding: 0 !important;
+              background: transparent !important;
+              overflow: visible !important;
+            }
+
+            .salary-slip-doc {
+              border: 2px solid #0f172a !important;
+              border-radius: 0 !important;
+              box-shadow: none !important;
+              width: 100% !important;
+              max-width: 100% !important;
+              page-break-inside: avoid;
+            }
+
+            @page {
+              size: A4 portrait;
+              margin: 10mm;
+            }
+          }
+        `}</style>
+      )}
     </div>
   );
+
 }
