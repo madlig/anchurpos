@@ -7,6 +7,11 @@ import { Users, CalendarDays, Wallet } from "lucide-react";
 export default function EmployeesLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
+  // Jika sedang di halaman cetak slip khusus, bypass header dan tab navigasi
+  if (pathname.includes("/slip")) {
+    return <>{children}</>;
+  }
+
   const TABS = [
     { id: "master", label: "Data Karyawan", icon: Users, href: "/manager/employees/master" },
     { id: "attendance", label: "Absensi", icon: CalendarDays, href: "/manager/employees/attendance" },

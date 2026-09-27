@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { SalarySlipDocument } from "@/components/shared/SalarySlipDocument";
+import { printElement } from "@/lib/print-utils";
 import { PayrollRecord, Employee, AttendanceRecord } from "../../types";
 import { Printer, ArrowLeft, Loader2, AlertCircle, FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -215,7 +216,10 @@ function SlipContent() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => window.print()}
+            onClick={() => {
+              const cleanName = (payroll.employeeName || "Karyawan").replace(/[^a-zA-Z0-9]/g, "_");
+              printElement("slip-container", `Slip_Gaji_${payroll.month}_${cleanName}`);
+            }}
             className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs flex items-center gap-2 shadow-lg shadow-emerald-900/30 active:scale-95 transition-all cursor-pointer"
           >
             <Printer size={15} /> Cetak / Simpan PDF

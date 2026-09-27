@@ -206,7 +206,7 @@ export default function ManagerLayout({ children }: { children: React.ReactNode 
     <RoleGuard allowedRoles={["owner", "manager"]}>
       <FCMProvider />
       <div className="min-h-screen" style={{ background: "#FCABB4" }}>
-        <div className="fixed top-4 right-4 z-50 md:top-5 md:right-8">
+        <div className="fixed top-4 right-4 z-50 md:top-5 md:right-8 print:hidden no-print">
           <NotificationBell />
         </div>
         <DesktopSidebar />

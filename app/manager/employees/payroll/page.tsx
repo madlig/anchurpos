@@ -8,6 +8,7 @@ import { AttendanceRecord, Employee, PayrollRecord } from "../types";
 import { AdaptivePanel } from "@/components/shared/AdaptivePanel";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
 import { SalarySlipDocument } from "@/components/shared/SalarySlipDocument";
+import { printElement } from "@/lib/print-utils";
 import Link from "next/link";
 
 const fmtDateFull = (dStr: string) => {
@@ -498,7 +499,10 @@ export default function PayrollPage() {
                   <span className="hidden sm:inline">Buka Halaman Penuh</span>
                 </Link>
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    const cleanName = (printPayroll.employeeName || "Karyawan").replace(/[^a-zA-Z0-9]/g, "_");
+                    printElement("modal-slip-content", `Slip_Gaji_${printPayroll.month}_${cleanName}`);
+                  }}
                   className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
                 >
                   <Printer size={14} /> Cetak / PDF
@@ -521,38 +525,37 @@ export default function PayrollPage() {
         </div>
       )}
 
-      {/* Isolasi Print CSS saat Modal Aktif */}
+      {/* Isolasi Print CSS saat Modal Aktif (Fallback untuk Ctrl+P) */}
       {printPayroll && (
         <style>{`
           @media print {
-            body {
-              background: #ffffff !important;
-              margin: 0 !important;
-              padding: 0 !important;
+            body * {
+              visibility: hidden !important;
             }
 
-            /* Sembunyikan semua elemen di luar modal slip */
-            header, aside, nav, .page-enter > div:not(.fixed), .tap-target, .no-print {
-              display: none !important;
-            }
-
-            /* Hilangkan background canvas pink */
-            div[class*="bg-brand-50"], div[style*="#FCABB4"], div[style*="rgb(252, 171, 180)"] {
-              background: #ffffff !important;
-            }
-
-            .fixed.inset-0 {
-              position: static !important;
-              display: block !important;
-              background: transparent !important;
-              padding: 0 !important;
-              overflow: visible !important;
+            #modal-slip-content, #modal-slip-content * {
+              visibility: visible !important;
             }
 
             #modal-slip-content {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              margin: 0 !important;
               padding: 0 !important;
-              background: transparent !important;
-              overflow: visible !important;
+              background: #ffffff !important;
+              z-index: 99999 !important;
+            }
+
+            header, aside, nav, .no-print, [class*="NotificationBell"], .fixed.top-4 {
+              display: none !important;
+            }
+
+            html, body {
+              background: #ffffff !important;
+              margin: 0 !important;
+              padding: 0 !important;
             }
 
             .salary-slip-doc {
