@@ -35,10 +35,9 @@ export function NotificationBell() {
       const res = await fetchWithAuth("/api/alerts?unread=true");
       if (!res.ok) return;
       const data = await res.json();
-      if (data.alerts) {
-        setAlerts(data.alerts);
-        setUnreadCount(data.alerts.length);
-      }
+      const list = Array.isArray(data) ? data : data?.alerts || [];
+      setAlerts(list);
+      setUnreadCount(list.length);
     } catch (err) {
       console.error("Failed to fetch alerts:", err);
     }
@@ -104,9 +103,11 @@ export function NotificationBell() {
       
       // Navigate based on type
       if (alert.type.startsWith("sfm_")) {
-        // Based on user role from pathname (manager or owner)
         const isManager = window.location.pathname.startsWith("/manager");
         router.push(isManager ? "/manager/sfm" : "/owner/sfm");
+      } else if (alert.type.startsWith("attendance_") || alert.type === "attendance_review") {
+        const isManager = window.location.pathname.startsWith("/manager");
+        router.push(isManager ? "/manager/employees/attendance" : "/owner/employees?tab=attendance");
       }
       setIsOpen(false);
 

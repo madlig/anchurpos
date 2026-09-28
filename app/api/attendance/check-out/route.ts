@@ -4,6 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
 import { BUSINESS } from "@/lib/constants";
+import { sendAttendanceNotification } from "@/lib/attendance-notifications";
 
 async function uploadAttendancePhoto(
   userId: string,
@@ -154,22 +155,19 @@ export async function POST(req: NextRequest) {
       flaggedReason,
     });
 
-    // Alert created if there are flagged anomalies
-    if (anomalies.length > 0) {
-      const alertRef = adminDb.collection("alerts").doc();
-      await alertRef.set({
-        type: "attendance_review",
-        severity: "warning",
-        title: `Absen ${data.employeeName} perlu review`,
-        message: flaggedReason,
-        sourceCollection: "attendance",
-        sourceId: attendanceId,
-        isRead: false,
-        readBy: null,
-        readAt: null,
-        createdAt: FieldValue.serverTimestamp(),
-      });
-    }
+    // Trigger notifikasi absensi pulang ke Manager & Owner
+    const outTimeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    sendAttendanceNotification({
+      type: "checkout",
+      employeeId: user.uid,
+      employeeName: data.employeeName,
+      timeStr: outTimeStr,
+      locationValid,
+      distance,
+      totalHours: Math.round(totalHours * 100) / 100,
+      anomalies,
+      attendanceId,
+    }).catch((err) => console.error("Error triggering check-out notification:", err));
 
     return NextResponse.json({
       success: true,

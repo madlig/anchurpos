@@ -3,6 +3,7 @@ import { adminDb, adminStorage } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
+import { sendAttendanceNotification } from "@/lib/attendance-notifications";
 
 async function uploadAttendancePhoto(
   userId: string,
@@ -129,6 +130,20 @@ export async function POST(req: NextRequest) {
       reviewedAt: null,
       createdAt: FieldValue.serverTimestamp(),
     });
+
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
+    // Kirim notifikasi ke Manager & Owner secara asynchronous tanpa memblokir response
+    sendAttendanceNotification({
+      type: "checkin",
+      employeeId: user.uid,
+      employeeName: userName,
+      timeStr,
+      locationValid,
+      distance,
+      attendanceId,
+    }).catch((err) => console.error("Error triggering check-in notification:", err));
 
     return NextResponse.json({ success: true, attendanceId });
   } catch (err) {

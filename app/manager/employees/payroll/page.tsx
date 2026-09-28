@@ -53,8 +53,33 @@ export default function PayrollPage() {
   const [editPerformanceBonusNote, setEditPerformanceBonusNote] = useState("");
   const [editDeductions, setEditDeductions] = useState("");
   const [editDeductionNote, setEditDeductionNote] = useState("");
+  const [showCustomCutoff, setShowCustomCutoff] = useState(false);
 
   useEffect(() => {
+    if (!selectedMonth || showCustomCutoff) return;
+    const [yStr, mStr] = selectedMonth.split("-");
+    const year = parseInt(yStr);
+    const month = parseInt(mStr);
+    let prevMonth = month - 1;
+    let prevYear = year;
+    if (prevMonth === 0) { prevMonth = 12; prevYear = year - 1; }
+    
+    const sd = new Date(prevYear, prevMonth - 1, 29);
+    const sYear = sd.getFullYear();
+    const sMonth = String(sd.getMonth() + 1).padStart(2, "0");
+    const sDate = String(sd.getDate()).padStart(2, "0");
+    
+    const ed = new Date(year, month - 1, 28);
+    const eYear = ed.getFullYear();
+    const eMonth = String(ed.getMonth() + 1).padStart(2, "0");
+    const eDate = String(ed.getDate()).padStart(2, "0");
+    
+    setStartDate(`${sYear}-${sMonth}-${sDate}`);
+    setEndDate(`${eYear}-${eMonth}-${eDate}`);
+  }, [selectedMonth, showCustomCutoff]);
+
+  const resetToDefaultCutoff = () => {
+    setShowCustomCutoff(false);
     if (!selectedMonth) return;
     const [yStr, mStr] = selectedMonth.split("-");
     const year = parseInt(yStr);
@@ -75,7 +100,7 @@ export default function PayrollPage() {
     
     setStartDate(`${sYear}-${sMonth}-${sDate}`);
     setEndDate(`${eYear}-${eMonth}-${eDate}`);
-  }, [selectedMonth]);
+  };
 
   const fetchWithAuth = useCallback(async (url: string, opts?: RequestInit) => {
     const token = await getToken();
@@ -244,14 +269,75 @@ export default function PayrollPage() {
           <h2 className="text-xl font-black text-slate-800 tracking-tight">Sistem Penggajian</h2>
           <p className="text-xs font-bold text-slate-500 mt-1">Kalkulasi gaji real-time berdasarkan absensi berjalan.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <input 
             type="month" 
             value={selectedMonth} 
             onChange={e => setSelectedMonth(e.target.value)} 
-            className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white shadow-sm"
+            className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white shadow-xs"
           />
+          <button
+            type="button"
+            onClick={() => setShowCustomCutoff(prev => !prev)}
+            className={`px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+              showCustomCutoff
+                ? "bg-indigo-600 text-white shadow-xs"
+                : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-xs"
+            }`}
+          >
+            <CalendarDays size={14} />
+            {showCustomCutoff ? "Tutup Atur Cutoff" : "Sesuaikan Tanggal Cutoff"}
+          </button>
         </div>
+      </div>
+
+      {/* ── BAR INFORMASI & PENYESUAIAN CUTOFF GAJI FLEKSIBEL ── */}
+      <div className="mb-6 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+            <CalendarDays size={18} />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Periode Perhitungan Absensi</p>
+            <p className="text-xs font-extrabold text-slate-900 mt-0.5">
+              {startDate && endDate ? `${fmtDateFull(startDate)} - ${fmtDateFull(endDate)}` : "Memuat rentang..."}
+            </p>
+          </div>
+        </div>
+
+        {showCustomCutoff ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="text-[11px] font-bold text-slate-500">Dari:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="px-2.5 py-1.5 rounded-xl border border-slate-200 font-bold text-xs bg-slate-50 text-slate-800"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="text-[11px] font-bold text-slate-500">Sampai:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                className="px-2.5 py-1.5 rounded-xl border border-slate-200 font-bold text-xs bg-slate-50 text-slate-800"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={resetToDefaultCutoff}
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+            >
+              Reset Standar (29-28)
+            </button>
+          </div>
+        ) : (
+          <span className="text-[11px] font-bold text-slate-600 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/80">
+            Standar Toko (29 s/d 28)
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
