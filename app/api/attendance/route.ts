@@ -2,85 +2,119 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
+import type { AuthUser } from "@/lib/auth-middleware";
 
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(req, ["owner", "manager"]);
+  const auth = await requireRole(req, ["owner", "manager", "crew"]);
   if (auth instanceof NextResponse) return auth;
+  const user = auth as AuthUser;
 
   const { searchParams } = new URL(req.url);
   const month = searchParams.get("month");
   const reqStartDate = searchParams.get("startDate");
   const reqEndDate = searchParams.get("endDate");
-  const employeeId = searchParams.get("employeeId");
+  const employeeIdParam = searchParams.get("employeeId");
   const flagged = searchParams.get("flagged") === "true";
+
+  // Security guardrail: Crew cannot view flagged review queue of all employees
+  if (user.role === "crew" && flagged) {
+    return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
+  }
+
+  // Security guardrail: Crew is strictly locked to their own employee ID
+  const targetEmployeeId = user.role === "crew" ? user.uid : employeeIdParam;
 
   if (!month && !flagged && (!reqStartDate || !reqEndDate)) {
     return NextResponse.json({ error: "month atau startDate/endDate wajib diisi" }, { status: 400 });
   }
 
   try {
-    // ── AUTO-CHECKOUT ROUTINE ──
-    const today = new Date();
-    // Offset by UTC+7 for local Indonesian date
-    const offsetDate = new Date(today.getTime() + 7 * 60 * 60 * 1000);
-    const todayStr = offsetDate.toISOString().split("T")[0];
+    // ── AUTO-CHECKOUT ROUTINE (Hanya dijalankan untuk manager/owner untuk menghemat write op) ──
+    if (user.role !== "crew") {
+      const today = new Date();
+      // Offset by UTC+7 for local Indonesian date
+      const offsetDate = new Date(today.getTime() + 7 * 60 * 60 * 1000);
+      const todayStr = offsetDate.toISOString().split("T")[0];
 
-    const unclosedSnap = await adminDb.collection("attendance")
-      .where("status", "==", "belum_lengkap")
-      .where("date", "<", todayStr)
-      .get();
-    
-    if (!unclosedSnap.empty) {
-      const batch = adminDb.batch();
-      unclosedSnap.docs.forEach(doc => {
-        // Auto checkout at 23:59:59 local time of that date
-        const docDate = doc.data().date;
-        const autoCheckOutTime = new Date(`${docDate}T23:59:59+07:00`).toISOString();
-        const checkInTime = doc.data().checkIn?.time;
-        let totalHours = 0;
-        
-        if (checkInTime) {
-           const inDate = new Date(checkInTime);
-           const outDate = new Date(autoCheckOutTime);
-           totalHours = Math.round((outDate.getTime() - inDate.getTime()) / (1000 * 60 * 60) * 100) / 100;
-        }
+      const unclosedSnap = await adminDb.collection("attendance")
+        .where("status", "==", "belum_lengkap")
+        .where("date", "<", todayStr)
+        .get();
+      
+      if (!unclosedSnap.empty) {
+        const batch = adminDb.batch();
+        unclosedSnap.docs.forEach(doc => {
+          // Auto checkout at 23:59:59 local time of that date
+          const docDate = doc.data().date;
+          const autoCheckOutTime = new Date(`${docDate}T23:59:59+07:00`).toISOString();
+          const checkInTime = doc.data().checkIn?.time;
+          let totalHours = 0;
+          
+          if (checkInTime) {
+             const inDate = new Date(checkInTime);
+             const outDate = new Date(autoCheckOutTime);
+             totalHours = Math.round((outDate.getTime() - inDate.getTime()) / (1000 * 60 * 60) * 100) / 100;
+          }
 
-        batch.update(doc.ref, {
-          status: "direview",
-          checkOut: {
-            time: autoCheckOutTime,
-            ipAddress: "auto-checkout",
-            ipValid: false,
-            photoUrl: null,
-            locationValid: false,
-          },
-          totalHours: 8,
-          regularHours: 8,
-          overtimeHours: 0,
-          overtimeBlocks: 0,
-          overtimeBonus: 0,
-          flaggedReason: "Auto-Checkout (Lupa Absen Pulang)",
-          updatedAt: FieldValue.serverTimestamp(),
+          batch.update(doc.ref, {
+            status: "direview",
+            checkOut: {
+              time: autoCheckOutTime,
+              ipAddress: "auto-checkout",
+              ipValid: false,
+              photoUrl: null,
+              locationValid: false,
+            },
+            totalHours: 8,
+            regularHours: 8,
+            overtimeHours: 0,
+            overtimeBlocks: 0,
+            overtimeBonus: 0,
+            flaggedReason: "Auto-Checkout (Lupa Absen Pulang)",
+            updatedAt: FieldValue.serverTimestamp(),
+          });
         });
-      });
-      await batch.commit();
+        await batch.commit();
+      }
     }
     // ───────────────────────────
 
-    const query = adminDb.collection("attendance");
-    let snap;
+    let docs: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>[] = [];
 
     if (flagged) {
       // Query all records requiring review (status == "direview")
-      snap = await query.where("status", "==", "direview").get();
+      const snap = await adminDb.collection("attendance").where("status", "==", "direview").get();
+      docs = snap.docs;
+    } else if (targetEmployeeId) {
+      // Query single employee (single field index built-in) lalu filter tanggal di memori
+      // Menghindari kebutuhan composite index di Firestore
+      const snap = await adminDb.collection("attendance").where("employeeId", "==", targetEmployeeId).get();
+      
+      let qStartDate = "";
+      let qEndDate = "";
+      if (reqStartDate && reqEndDate) {
+        qStartDate = reqStartDate;
+        qEndDate = reqEndDate;
+        docs = snap.docs.filter((d) => {
+          const dt = d.data().date;
+          return dt && dt >= qStartDate && dt <= qEndDate;
+        });
+      } else if (month) {
+        docs = snap.docs.filter((d) => {
+          const dt = d.data().date;
+          return dt && dt.startsWith(month);
+        });
+      } else {
+        docs = snap.docs;
+      }
     } else {
+      // Owner/Manager query seluruh karyawan dalam rentang tanggal
       let qStartDate = "";
       let qEndDate = "";
 
       if (reqStartDate && reqEndDate) {
         qStartDate = reqStartDate;
-        qEndDate = reqEndDate; // inclusive if we use <=, but the original logic uses < endDate. If it's a specific date range (like 29 to 28), it should be <=.
-        // Wait, the payroll route uses <= finalEndDate. So let's use <= here too for consistency if reqStartDate is provided.
+        qEndDate = reqEndDate;
       } else {
         const [year, mon] = month!.split("-").map(Number);
         qStartDate = `${year}-${String(mon).padStart(2, "0")}-01`;
@@ -89,20 +123,18 @@ export async function GET(req: NextRequest) {
         qEndDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
       }
 
-      let q = query.where("date", ">=", qStartDate);
+      let q = adminDb.collection("attendance").where("date", ">=", qStartDate);
       if (reqStartDate && reqEndDate) {
         q = q.where("date", "<=", qEndDate);
       } else {
         q = q.where("date", "<", qEndDate);
       }
 
-      if (employeeId) {
-        q = q.where("employeeId", "==", employeeId);
-      }
-      snap = await q.get();
+      const snap = await q.get();
+      docs = snap.docs;
     }
 
-    const records = snap.docs.map((doc) => {
+    const records = docs.map((doc) => {
       const d = doc.data();
       return {
         id: doc.id,
@@ -118,14 +150,14 @@ export async function GET(req: NextRequest) {
         overtimeBonus: d.overtimeBonus,
         status: d.status,
         flaggedReason: d.flaggedReason,
-        issue: d.flaggedReason ?? "Perlu review", // Map flaggedReason to issue for owner approval page
+        issue: d.flaggedReason ?? "Perlu review",
         reviewedBy: d.reviewedBy,
         reviewedAt: d.reviewedAt?.toDate?.().toISOString() ?? d.reviewedAt,
         createdAt: d.createdAt?.toDate?.().toISOString() ?? d.createdAt,
       };
     });
 
-    // Sort by date desc safely in-memory (avoids missing composite index errors in Firestore)
+    // Sort by date desc safely in-memory
     records.sort((a, b) => b.date.localeCompare(a.date));
 
     return NextResponse.json(records);
