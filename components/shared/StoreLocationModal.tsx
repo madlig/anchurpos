@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { MapPin, Navigation, Save, X, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
@@ -12,6 +13,7 @@ interface StoreLocationModalProps {
 
 export function StoreLocationModal({ isOpen, onClose, onSaved }: StoreLocationModalProps) {
   const { getToken } = useAuth();
+  const [mounted, setMounted] = useState(false);
   const [storeLat, setStoreLat] = useState<string>("");
   const [storeLng, setStoreLng] = useState<string>("");
   const [radiusMeter, setRadiusMeter] = useState<string>("100");
@@ -22,7 +24,14 @@ export function StoreLocationModal({ isOpen, onClose, onSaved }: StoreLocationMo
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     if (!isOpen) return;
+
+    // Prevent body scroll when modal is open
+    document.body.style.overflow = "hidden";
 
     let isMounted = true;
     const fetchConfig = async () => {
@@ -51,6 +60,7 @@ export function StoreLocationModal({ isOpen, onClose, onSaved }: StoreLocationMo
     fetchConfig();
     return () => {
       isMounted = false;
+      document.body.style.overflow = "unset";
     };
   }, [isOpen, getToken]);
 
@@ -70,7 +80,7 @@ export function StoreLocationModal({ isOpen, onClose, onSaved }: StoreLocationMo
         setDetecting(false);
         setFeedback({
           type: "success",
-          message: `Berhasil mendeteksi titik koordinat perangkat Anda (Akurasi: ±${Math.round(pos.coords.accuracy)}m).`,
+          message: `Berhasil mendeteksi koordinat perangkat Anda (Akurasi: ±${Math.round(pos.coords.accuracy)}m).`,
         });
       },
       (err) => {
@@ -125,7 +135,7 @@ export function StoreLocationModal({ isOpen, onClose, onSaved }: StoreLocationMo
         if (onSaved) onSaved();
         setTimeout(() => {
           onClose();
-        }, 900);
+        }, 800);
       } else {
         const errData = await res.json().catch(() => ({}));
         setFeedback({ type: "error", message: errData.error || "Gagal menyimpan lokasi toko." });
@@ -137,11 +147,11 @@ export function StoreLocationModal({ isOpen, onClose, onSaved }: StoreLocationMo
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden flex flex-col animate-in zoom-in-95">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden flex flex-col my-auto animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="p-4 sm:p-5 bg-slate-900 text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -150,7 +160,7 @@ export function StoreLocationModal({ isOpen, onClose, onSaved }: StoreLocationMo
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-white">Atur Titik Lokasi & Radius Toko</h3>
-              <p className="text-[11px] text-slate-400">Pusat absensi masuk & pulang crew</p>
+              <p className="text-[11px] text-slate-400">Pusat validasi absensi masuk & pulang crew</p>
             </div>
           </div>
           <button
@@ -288,7 +298,7 @@ export function StoreLocationModal({ isOpen, onClose, onSaved }: StoreLocationMo
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs tap-target transition-all"
+                  className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs tap-target transition-all cursor-pointer"
                 >
                   Batal
                 </button>
@@ -312,6 +322,7 @@ export function StoreLocationModal({ isOpen, onClose, onSaved }: StoreLocationMo
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

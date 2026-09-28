@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/Skeleton";
 import {
@@ -13,17 +14,13 @@ import {
   User,
   X,
   Search,
-  Filter,
   AlertTriangle,
   Plus,
   Clock,
   MapPin,
   Camera,
   CheckCircle2,
-  ExternalLink,
   Users,
-  Radio,
-  Sparkles,
 } from "lucide-react";
 import { AttendanceRecord, Employee } from "@/app/manager/employees/types";
 import { StoreLocationModal } from "@/components/shared/StoreLocationModal";
@@ -55,7 +52,7 @@ function LiveShiftTimer({ checkInTime }: { checkInTime: string }) {
       setElapsed(`${hrs}j ${mins}m`);
     };
     update();
-    const interval = setInterval(update, 30000); // Update every 30s
+    const interval = setInterval(update, 30000);
     return () => clearInterval(interval);
   }, [checkInTime]);
 
@@ -68,6 +65,7 @@ interface AttendanceMonitoringViewProps {
 
 export function AttendanceMonitoringView({ hideHeaderTitle = false }: AttendanceMonitoringViewProps) {
   const { getToken } = useAuth();
+  const [mounted, setMounted] = useState(false);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +83,9 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [manualError, setManualError] = useState("");
 
+  // Roster section: toggle unclocked crew list
+  const [showUnclockedCrew, setShowUnclockedCrew] = useState(false);
+
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -101,6 +102,10 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
   const [savingId, setSavingId] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchWithAuth = useCallback(
     async (url: string, opts?: RequestInit) => {
@@ -158,7 +163,7 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
     return todayAttendances.filter((a) => a.checkOut?.time && a.status !== "belum_lengkap");
   }, [todayAttendances]);
 
-  const absentTodayCrew = useMemo(() => {
+  const unclockedCrew = useMemo(() => {
     const attendedEmpIds = new Set(todayAttendances.map((a) => a.employeeId));
     return activeCrews.filter((c) => !attendedEmpIds.has(c.id));
   }, [activeCrews, todayAttendances]);
@@ -347,27 +352,27 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
         </div>
       </div>
 
-      {/* ── WIDGET REAL-TIME HARI INI (LIVE ROSTER) ── */}
+      {/* ── WIDGET REAL-TIME HARI INI (LIVE SHIFT ROSTER) ── */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 rounded-3xl p-5 text-white shadow-xl border border-slate-800 space-y-4">
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
             <h3 className="text-sm font-black uppercase tracking-wider text-slate-200">
-              Live Roster Toko Hari Ini ({fmtDateFull(todayStr)})
+              Live Shift Toko Hari Ini ({fmtDateFull(todayStr)})
             </h3>
           </div>
           <span className="text-[11px] font-bold text-slate-400">
-            Total {activeCrews.length} Crew Terdaftar
+            Total {todayAttendances.length} Shift Tercatat
           </span>
         </div>
 
-        {/* 3 Metric Cards */}
+        {/* 3 Metric Cards disesuaikan dengan sistem kerja Shift */}
         <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
           {/* On-Duty */}
           <div className="bg-white/10 rounded-2xl p-3.5 border border-white/10 text-center">
             <p className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider">Sedang Shift</p>
             <p className="text-2xl font-black text-white mt-1">{onDutyCrew.length}</p>
-            <p className="text-[10px] text-white/60 mt-0.5">On-Duty Aktif</p>
+            <p className="text-[10px] text-white/60 mt-0.5">On-Duty di Toko</p>
           </div>
 
           {/* Selesai */}
@@ -377,19 +382,19 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
             <p className="text-[10px] text-white/60 mt-0.5">Sudah Checkout</p>
           </div>
 
-          {/* Belum Hadir */}
+          {/* Total Hadir */}
           <div className="bg-white/10 rounded-2xl p-3.5 border border-white/10 text-center">
-            <p className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">Belum Hadir</p>
-            <p className="text-2xl font-black text-white mt-1">{absentTodayCrew.length}</p>
-            <p className="text-[10px] text-white/60 mt-0.5">Belum Clock-in</p>
+            <p className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Total Hadir</p>
+            <p className="text-2xl font-black text-white mt-1">{todayAttendances.length}</p>
+            <p className="text-[10px] text-white/60 mt-0.5">Crew Bertugas</p>
           </div>
         </div>
 
         {/* List of On-Duty Crew right now */}
-        {onDutyCrew.length > 0 && (
+        {onDutyCrew.length > 0 ? (
           <div className="pt-2">
             <p className="text-[10px] font-black uppercase tracking-wider text-emerald-400 mb-2">
-              Crew Sedang Bertugas:
+              Crew Sedang Bertugas Saat Ini:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {onDutyCrew.map((c) => (
@@ -446,6 +451,45 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
                 </div>
               ))}
             </div>
+          </div>
+        ) : todayAttendances.length === 0 ? (
+          <p className="text-xs text-slate-400 text-center py-2 italic">
+            Belum ada crew yang melakukan absen shift hari ini.
+          </p>
+        ) : null}
+
+        {/* Collapsible untuk melihat crew yang belum ada absen hari ini (off-duty / jadwal shift nanti) */}
+        {unclockedCrew.length > 0 && (
+          <div className="pt-1 border-t border-white/5">
+            <button
+              type="button"
+              onClick={() => setShowUnclockedCrew((prev) => !prev)}
+              className="text-[11px] font-bold text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Users size={13} />
+              <span>
+                Lihat Crew yang Belum Absen Hari Ini ({unclockedCrew.length} crew)
+              </span>
+              <ChevronDown
+                size={14}
+                className={`transition-transform duration-200 ${showUnclockedCrew ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {showUnclockedCrew && (
+              <div className="mt-2.5 p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-wrap gap-2 animate-in fade-in">
+                {unclockedCrew.map((c) => (
+                  <span
+                    key={c.id}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-700"
+                  >
+                    <User size={12} className="text-slate-400" />
+                    <span>{c.name}</span>
+                    <span className="text-[10px] text-slate-500 font-medium">({c.role})</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -836,10 +880,10 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
         </div>
       )}
 
-      {/* ── MODAL INPUT ABSEN MANUAL ── */}
-      {showManualModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95">
+      {/* ── MODAL INPUT ABSEN MANUAL (PORTAL KE BODY) ── */}
+      {showManualModal && mounted && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100 space-y-4 my-auto animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <Plus className="text-slate-900" size={18} />
@@ -919,7 +963,7 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
               <button
                 type="button"
                 onClick={() => setShowManualModal(false)}
-                className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs tap-target"
+                className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs tap-target cursor-pointer"
               >
                 Batal
               </button>
@@ -933,7 +977,8 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── MODAL ATUR LOKASI TOKO ── */}

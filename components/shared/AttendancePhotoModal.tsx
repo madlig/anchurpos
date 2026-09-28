@@ -1,6 +1,8 @@
 "use client";
 
-import { X, MapPin, Calendar, Clock, ExternalLink, User } from "lucide-react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { X, MapPin, Clock, ExternalLink, User } from "lucide-react";
 
 export interface AttendancePhotoModalData {
   isOpen: boolean;
@@ -21,14 +23,32 @@ interface AttendancePhotoModalProps {
 }
 
 export function AttendancePhotoModal({ data, onClose }: AttendancePhotoModalProps) {
-  if (!data || !data.isOpen) return null;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (data?.isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [data?.isOpen]);
+
+  if (!data || !data.isOpen || !mounted) return null;
 
   const isCheckIn = data.type === "checkin";
-  const hasCoordinates = data.latitude !== null && data.latitude !== undefined && data.longitude !== null && data.longitude !== undefined;
+  const hasCoordinates =
+    data.latitude !== null && data.latitude !== undefined && data.longitude !== null && data.longitude !== undefined;
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-800 overflow-hidden flex flex-col animate-in zoom-in-95">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-800 overflow-hidden flex flex-col my-auto animate-in fade-in zoom-in-95 duration-200">
         {/* Top Header */}
         <div className="p-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
@@ -51,7 +71,7 @@ export function AttendancePhotoModal({ data, onClose }: AttendancePhotoModalProp
         </div>
 
         {/* Big Photo Preview */}
-        <div className="relative bg-slate-950 flex items-center justify-center min-h-[320px] max-h-[55vh] overflow-hidden">
+        <div className="relative bg-slate-950 flex items-center justify-center min-h-[300px] max-h-[55vh] overflow-hidden">
           {data.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -84,19 +104,19 @@ export function AttendancePhotoModal({ data, onClose }: AttendancePhotoModalProp
 
           {/* Location Badge & Maps Link */}
           <div className="p-3 rounded-2xl bg-white border border-slate-200/80 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <MapPin
                 size={16}
-                className={
+                className={`shrink-0 ${
                   data.locationValid
                     ? "text-emerald-600"
                     : data.distance !== null && data.distance !== undefined
                     ? "text-rose-600"
                     : "text-amber-500"
-                }
+                }`}
               />
-              <div>
-                <p className="text-xs font-black text-slate-800">
+              <div className="min-w-0">
+                <p className="text-xs font-black text-slate-800 truncate">
                   {data.locationValid
                     ? `Di Toko (${Math.round(data.distance || 0)}m)`
                     : data.distance !== null && data.distance !== undefined
@@ -104,7 +124,7 @@ export function AttendancePhotoModal({ data, onClose }: AttendancePhotoModalProp
                     : "Tanpa Koordinat GPS"}
                 </p>
                 {hasCoordinates ? (
-                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
                     {data.latitude?.toFixed(5)}, {data.longitude?.toFixed(5)}
                   </p>
                 ) : (
@@ -126,6 +146,7 @@ export function AttendancePhotoModal({ data, onClose }: AttendancePhotoModalProp
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
