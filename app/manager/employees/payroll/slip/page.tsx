@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { SalarySlipDocument } from "@/components/shared/SalarySlipDocument";
+import { SalarySlipDocument, formatSlipWorkPeriod } from "@/components/shared/SalarySlipDocument";
 import { PayrollRecord, Employee, AttendanceRecord } from "../../types";
 import { Printer, ArrowLeft, Loader2, AlertCircle, FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -49,7 +49,10 @@ function SlipContent() {
         const res = await fetchWithAuth(`/api/payroll/${id}`);
         if (res.ok) {
           const data: PayrollRecord = await res.json();
-          setPayroll(data);
+          setPayroll({
+            ...data,
+            workPeriod: formatSlipWorkPeriod(data.workPeriod, data.month),
+          });
           setLoading(false);
           return;
         }
@@ -65,7 +68,7 @@ function SlipContent() {
         return;
       }
 
-      // Hitung rentang cutoff 29 s/d 28
+      // Hitung rentang 29 s/d 28
       const [yStr, mStr] = month.split("-");
       const year = parseInt(yStr);
       const mNum = parseInt(mStr);
@@ -109,7 +112,10 @@ function SlipContent() {
 
       const locked = lockedPayrolls.find((p) => p.employeeId === empId);
       if (locked) {
-        setPayroll(locked);
+        setPayroll({
+          ...locked,
+          workPeriod: formatSlipWorkPeriod(locked.workPeriod, locked.month),
+        });
         setLoading(false);
         return;
       }
@@ -161,10 +167,20 @@ function SlipContent() {
       document.title = `Slip Gaji_${cleanName}_${cleanPeriod}`;
 
       if (autoPrint) {
-        const timer = setTimeout(() => {
-          window.print();
-        }, 500);
-        return () => clearTimeout(timer);
+        let isMounted = true;
+        const triggerPrint = async () => {
+          try {
+            if (typeof document !== "undefined" && document.fonts) {
+              await document.fonts.ready;
+            }
+          } catch {}
+          if (!isMounted) return;
+          setTimeout(() => {
+            if (isMounted) window.print();
+          }, 600);
+        };
+        triggerPrint();
+        return () => { isMounted = false; };
       }
     }
   }, [loading, payroll, autoPrint]);
@@ -244,7 +260,6 @@ function SlipContent() {
 
       {/* ── OVERRIDE CSS FOR CLEAN PRINT ── */}
       <style>{`
-        /* Matikan styling canvas pink & tata letak sidebar manager */
         html, body {
           background-color: #ffffff !important;
           background: #ffffff !important;
@@ -254,45 +269,40 @@ function SlipContent() {
           display: none !important;
         }
 
-        div[class*="md:ml-60"] {
-          margin-left: 0 !important;
-          padding-bottom: 0 !important;
-        }
-
-        div[style*="#FCABB4"], div[style*="rgb(252, 171, 180)"] {
-          background: #ffffff !important;
-        }
-
         @media print {
-          .no-print {
+          .no-print, nav, aside, header {
             display: none !important;
           }
 
-          body {
+          html, body {
+            background-color: #ffffff !important;
             background: #ffffff !important;
             margin: 0 !important;
             padding: 0 !important;
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
           }
 
           @page {
             size: A4 portrait;
-            margin: 10mm;
+            margin: 8mm 6mm;
           }
 
           #slip-container {
             padding: 0 !important;
             margin: 0 !important;
             width: 100% !important;
-            max-width: none !important;
+            max-width: 100% !important;
           }
 
           .salary-slip-doc {
             border: 2px solid #0f172a !important;
             box-shadow: none !important;
             border-radius: 0 !important;
-            page-break-inside: avoid;
             width: 100% !important;
             max-width: 100% !important;
+            padding: 16px !important;
           }
         }
       `}</style>

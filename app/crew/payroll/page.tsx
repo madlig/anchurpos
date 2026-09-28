@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { AttendanceRecord, PayrollRecord } from "../../manager/employees/types";
-import { SalarySlipDocument } from "@/components/shared/SalarySlipDocument";
+import { SalarySlipDocument, formatSlipWorkPeriod } from "@/components/shared/SalarySlipDocument";
 
 const fmtRupiah = (num: number) => {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(num);
@@ -102,7 +102,10 @@ export default function CrewPayrollPage() {
       if (payRes.ok) {
         const data: PayrollRecord[] = await payRes.json();
         if (data.length > 0) {
-          setPayroll(data[0]);
+          setPayroll({
+            ...data[0],
+            workPeriod: formatSlipWorkPeriod(data[0].workPeriod, data[0].month),
+          });
         }
       }
 
@@ -193,7 +196,7 @@ export default function CrewPayrollPage() {
               <div className="bg-slate-900 p-6 text-center relative text-white">
                 <ShieldCheck size={36} className="mx-auto mb-2 text-emerald-400" />
                 <h2 className="text-base font-black tracking-widest uppercase">Slip Gaji Resmi</h2>
-                <p className="text-xs font-semibold text-slate-300 mt-1">Periode: {payroll.workPeriod || "Cutoff 29 - 28"}</p>
+                <p className="text-xs font-semibold text-slate-300 mt-1">Periode: {formatSlipWorkPeriod(payroll.workPeriod, payroll.month)}</p>
                 <div className="mt-2 inline-block">
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                     {payroll.isLocked ? "SUDAH DIBAYAR" : "DRAFT BERJALAN"}
@@ -269,7 +272,7 @@ export default function CrewPayrollPage() {
                           </span>
                         </div>
                         <p className="text-[10px] font-medium text-slate-500 mt-0.5">
-                          Ketuk untuk validasi daftar tanggal & jam kerja cutoff
+                          Ketuk untuk validasi daftar tanggal & jam kerja periode ini
                         </p>
                       </div>
                     </div>
@@ -303,7 +306,7 @@ export default function CrewPayrollPage() {
                       {attendances.length === 0 ? (
                         <div className="p-4 rounded-2xl bg-slate-50 text-center border border-slate-100">
                           <AlertCircle size={20} className="mx-auto text-slate-300 mb-1" />
-                          <p className="text-xs font-bold text-slate-500">Tidak ada riwayat absensi pada periode cutoff ini</p>
+                          <p className="text-xs font-bold text-slate-500">Tidak ada riwayat absensi pada periode penggajian ini</p>
                         </div>
                       ) : (
                         <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
@@ -423,9 +426,13 @@ export default function CrewPayrollPage() {
           }
 
           html, body {
+            background-color: #ffffff !important;
             background: #ffffff !important;
             margin: 0 !important;
             padding: 0 !important;
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
           }
 
           /* Tampilkan HANYA area cetak resmi */
@@ -442,12 +449,12 @@ export default function CrewPayrollPage() {
             box-shadow: none !important;
             width: 100% !important;
             max-width: 100% !important;
-            page-break-inside: avoid;
+            padding: 16px !important;
           }
 
           @page {
             size: A4 portrait;
-            margin: 10mm;
+            margin: 8mm 6mm;
           }
         }
       `}</style>

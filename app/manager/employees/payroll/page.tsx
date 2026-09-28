@@ -7,7 +7,7 @@ import { Loader2, CalendarDays, Check, Search, Lock, Edit3, Save, X, FileText, L
 import { AttendanceRecord, Employee, PayrollRecord } from "../types";
 import { AdaptivePanel } from "@/components/shared/AdaptivePanel";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
-import { SalarySlipDocument } from "@/components/shared/SalarySlipDocument";
+import { SalarySlipDocument, formatSlipWorkPeriod } from "@/components/shared/SalarySlipDocument";
 import Link from "next/link";
 
 const fmtDateFull = (dStr: string) => {
@@ -114,7 +114,12 @@ export default function PayrollPage() {
       .filter(e => e.isActive !== false && e.role === "crew")
       .map(emp => {
         const locked = lockedPayrolls.find(p => p.employeeId === emp.id);
-        if (locked && locked.isLocked) return locked; // Return locked if exists
+        if (locked && locked.isLocked) {
+          return {
+            ...locked,
+            workPeriod: formatSlipWorkPeriod(locked.workPeriod, locked.month),
+          };
+        }
 
         const empAtt = attendance.filter(a => a.employeeId === emp.id);
         const validEmpAtt = empAtt.filter(a => (a.totalHours || 0) > 0);

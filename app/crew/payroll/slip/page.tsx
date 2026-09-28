@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { SalarySlipDocument } from "@/components/shared/SalarySlipDocument";
+import { SalarySlipDocument, formatSlipWorkPeriod } from "@/components/shared/SalarySlipDocument";
 import { PayrollRecord } from "@/app/manager/employees/types";
 import { Printer, ArrowLeft, AlertCircle, FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -40,7 +40,10 @@ function CrewSlipContent() {
       if (payRes.ok) {
         const data: PayrollRecord[] = await payRes.json();
         if (data.length > 0) {
-          setPayroll(data[0]);
+          setPayroll({
+            ...data[0],
+            workPeriod: formatSlipWorkPeriod(data[0].workPeriod, data[0].month),
+          });
         } else {
           setError("Data slip gaji bulan ini belum tersedia atau belum dikunci resmi oleh manager.");
         }
@@ -67,10 +70,20 @@ function CrewSlipContent() {
       document.title = `Slip Gaji_${cleanName}_${cleanPeriod}`;
 
       if (autoPrint) {
-        const timer = setTimeout(() => {
-          window.print();
-        }, 500);
-        return () => clearTimeout(timer);
+        let isMounted = true;
+        const triggerPrint = async () => {
+          try {
+            if (typeof document !== "undefined" && document.fonts) {
+              await document.fonts.ready;
+            }
+          } catch {}
+          if (!isMounted) return;
+          setTimeout(() => {
+            if (isMounted) window.print();
+          }, 600);
+        };
+        triggerPrint();
+        return () => { isMounted = false; };
       }
     }
   }, [loading, payroll, autoPrint]);
@@ -160,35 +173,39 @@ function CrewSlipContent() {
         }
 
         @media print {
-          .no-print {
+          .no-print, nav, aside, header {
             display: none !important;
           }
 
-          body {
+          html, body {
+            background-color: #ffffff !important;
             background: #ffffff !important;
             margin: 0 !important;
             padding: 0 !important;
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
           }
 
           @page {
             size: A4 portrait;
-            margin: 10mm;
+            margin: 8mm 6mm;
           }
 
           #crew-slip-container {
             padding: 0 !important;
             margin: 0 !important;
             width: 100% !important;
-            max-width: none !important;
+            max-width: 100% !important;
           }
 
           .salary-slip-doc {
             border: 2px solid #0f172a !important;
             box-shadow: none !important;
             border-radius: 0 !important;
-            page-break-inside: avoid;
             width: 100% !important;
             max-width: 100% !important;
+            padding: 16px !important;
           }
         }
       `}</style>

@@ -39,6 +39,28 @@ function fmtDateIndo(d: Date): string {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+export function formatSlipWorkPeriod(workPeriod?: string | null, month?: string | null): string {
+  // Jika sudah berformat tanggal bersih dan tidak mengandung kata 'cutoff', gunakan langsung
+  if (workPeriod && !workPeriod.toLowerCase().includes("cutoff") && workPeriod.trim() !== "") {
+    return workPeriod;
+  }
+  // Jika belum, bentuk tanggal formal 29 s/d 28 berdasarkan month (YYYY-MM)
+  if (month && month.includes("-")) {
+    const [yStr, mStr] = month.split("-");
+    const year = parseInt(yStr, 10);
+    const mNum = parseInt(mStr, 10);
+    let prevMonth = mNum - 1;
+    let prevYear = year;
+    if (prevMonth === 0) {
+      prevMonth = 12;
+      prevYear = year - 1;
+    }
+    const mos = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+    return `29 ${mos[prevMonth - 1]} ${prevYear} - 28 ${mos[mNum - 1]} ${year}`;
+  }
+  return "-";
+}
+
 export function SalarySlipDocument({
   payroll,
   employeeRole = "Crew Operasional & Produksi",
@@ -57,7 +79,7 @@ export function SalarySlipDocument({
 
   return (
     <div
-      className={`salary-slip-doc bg-white text-slate-900 border-2 border-slate-900 rounded-2xl p-6 md:p-8 max-w-3xl mx-auto shadow-sm print:shadow-none print:border-slate-800 print:rounded-none print:p-6 ${className}`}
+      className={`salary-slip-doc bg-white text-slate-900 border-2 border-slate-900 rounded-2xl p-6 md:p-8 max-w-3xl mx-auto shadow-sm print:shadow-none print:border-slate-800 print:rounded-none print:p-5 print:max-w-none print:w-full ${className}`}
       style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
     >
       {/* ── HEADER KOP DOKUMEN RESMI ── */}
@@ -70,7 +92,7 @@ export function SalarySlipDocument({
           </div>
           <div>
             <h1 className="text-xl font-black text-slate-950 tracking-wider uppercase leading-none">
-              ANCHUR BANDUNG
+              ANCHUR.US
             </h1>
             <p className="text-[11px] font-semibold text-slate-600 mt-1">
               Operasional Kasir & Penggajian
@@ -120,7 +142,7 @@ export function SalarySlipDocument({
         <div>
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Periode Kehadiran</span>
           <span className="font-bold text-slate-800 mt-0.5 block truncate">
-            {payroll.workPeriod || "Cutoff 29 - 28"}
+            {formatSlipWorkPeriod(payroll.workPeriod, payroll.month)}
           </span>
         </div>
         <div>
@@ -238,14 +260,14 @@ export function SalarySlipDocument({
       </div>
 
       {/* ── PENGESAHAN TANDA TANGAN ── */}
-      <div className="pt-2 grid grid-cols-2 gap-8 text-center text-xs border-t border-slate-200">
+      <div className="pt-2 grid grid-cols-2 gap-8 text-center text-xs border-t border-slate-200 break-inside-avoid print:pt-1">
         <div>
-          <p className="text-slate-500 font-semibold mb-14">Penerima (Karyawan),</p>
+          <p className="text-slate-500 font-semibold mb-14 print:mb-10">Penerima (Karyawan),</p>
           <div className="border-b border-slate-800 w-3/4 mx-auto"></div>
           <p className="font-bold text-slate-900 mt-1.5">{payroll.employeeName}</p>
         </div>
         <div>
-          <p className="text-slate-500 font-semibold mb-14">
+          <p className="text-slate-500 font-semibold mb-14 print:mb-10">
             Bandung, {nowFormatted}<br />
             <span className="text-slate-600 font-bold">Diserahkan Oleh (Management),</span>
           </p>

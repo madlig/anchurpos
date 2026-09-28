@@ -202,6 +202,17 @@ function MobileBottomNav() {
 }
 
 export default function ManagerLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  // Jika sedang di halaman cetak slip atau invoice, bypass sidebar & background pink agar print bersih
+  if (pathname?.includes("/slip") || pathname?.includes("/invoice")) {
+    return (
+      <RoleGuard allowedRoles={["owner", "manager"]}>
+        {children}
+      </RoleGuard>
+    );
+  }
+
   return (
     <RoleGuard allowedRoles={["owner", "manager"]}>
       <FCMProvider />
