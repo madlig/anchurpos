@@ -4,7 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import { employeeUpdateSchema } from "@/lib/validations";
 
-// PATCH /api/employees/[id] — edit info karyawan
+// PATCH /api/employees/[id] — edit info karyawan & reaktivasi
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -12,6 +12,7 @@ export async function PATCH(
   const { id } = await params;
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
+  const currentUser = auth;
 
   const body = await req.json();
   const parseResult = employeeUpdateSchema.safeParse(body);
@@ -20,12 +21,24 @@ export async function PATCH(
     return NextResponse.json({ error: "Data tidak valid", details: parseResult.error.format() }, { status: 400 });
   }
 
-  const { name, role, phone, joinDate, dailyWage } = parseResult.data;
+  const { name, role, phone, joinDate, dailyWage, isActive } = parseResult.data;
 
   try {
     const ref = adminDb.collection("users").doc(id);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Karyawan tidak ditemukan" }, { status: 404 });
+
+    const targetUser = snap.data();
+
+    // Proteksi Hirarki: Manager tidak boleh mengubah data Owner
+    if (targetUser?.role === "owner" && currentUser.role !== "owner") {
+      return NextResponse.json({ error: "Akses ditolak. Hanya Owner yang dapat mengubah data akun Owner." }, { status: 403 });
+    }
+
+    // Proteksi: Manager tidak boleh menetapkan role Owner
+    if (role === "owner" && currentUser.role !== "owner") {
+      return NextResponse.json({ error: "Hanya Owner yang dapat menetapkan hak akses Owner." }, { status: 403 });
+    }
 
     const updates: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() };
     if (name !== undefined) updates.name = name.trim();
@@ -33,12 +46,14 @@ export async function PATCH(
     if (phone !== undefined) updates.phone = phone;
     if (joinDate !== undefined) updates.joinDate = joinDate;
     if (dailyWage !== undefined) updates.dailyWage = dailyWage;
+    if (isActive !== undefined) updates.isActive = isActive;
 
     await ref.update(updates);
 
-    // Update Firebase Auth jika ada perubahan nama atau role
+    // Update Firebase Auth jika ada perubahan nama, status aktif, atau role
     const authUpdates: Record<string, unknown> = {};
     if (name !== undefined) authUpdates.displayName = name.trim();
+    if (isActive !== undefined) authUpdates.disabled = !isActive;
     if (Object.keys(authUpdates).length) await adminAuth.updateUser(id, authUpdates);
     if (role !== undefined) await adminAuth.setCustomUserClaims(id, { role });
 
@@ -57,11 +72,29 @@ export async function DELETE(
   const { id } = await params;
   const auth = await requireRole(req, ["owner", "manager"]);
   if (auth instanceof NextResponse) return auth;
+  const currentUser = auth;
+
+  // Proteksi: Tidak boleh menonaktifkan akun sendiri
+  if (id === currentUser.uid) {
+    return NextResponse.json({ error: "Anda tidak dapat menonaktifkan akun Anda sendiri." }, { status: 400 });
+  }
 
   try {
     const ref = adminDb.collection("users").doc(id);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: "Karyawan tidak ditemukan" }, { status: 404 });
+
+    const targetUser = snap.data();
+
+    // Proteksi: Akun Owner tidak boleh dinonaktifkan
+    if (targetUser?.role === "owner") {
+      return NextResponse.json({ error: "Akun Owner tidak dapat dinonaktifkan." }, { status: 403 });
+    }
+
+    // Proteksi: Manager tidak boleh menonaktifkan Manager lain
+    if (currentUser.role === "manager" && targetUser?.role === "manager") {
+      return NextResponse.json({ error: "Hanya Owner yang dapat menonaktifkan sesama Manager." }, { status: 403 });
+    }
 
     await ref.update({ isActive: false, updatedAt: FieldValue.serverTimestamp() });
     await adminAuth.updateUser(id, { disabled: true });
