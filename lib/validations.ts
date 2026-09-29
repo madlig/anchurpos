@@ -278,12 +278,32 @@ export const shiftReportSchema = z.object({
         ingredientId: z.string().min(1),
         ingredientName: z.string().min(1),
         outputPcs: z.number().min(0),
+        cupSize: z.string().optional(),
+        durationMinutes: z.number().optional().default(0),
+      })),
+      durationMinutes: z.number().optional().default(0),
+    }).optional(),
+    sugarRepack: z.object({
+      items: z.array(z.object({
+        ingredientId: z.string().min(1),
+        sugarType: z.string().min(1),
+        outputPacks: z.number().min(0),
+        weightPerPack: z.string().optional(),
+        durationMinutes: z.number().optional().default(0),
       })),
       durationMinutes: z.number().optional().default(0),
     }).optional(),
     orderPacking: z.object({
       totalPackagesPacked: z.number().min(0),
+      breakdown: z.object({
+        shopee: z.number().optional().default(0),
+        tiktok: z.number().optional().default(0),
+        whatsappB2b: z.number().optional().default(0),
+        other: z.number().optional().default(0),
+      }).optional(),
+      expeditions: z.array(z.string()).optional().default([]),
       notes: z.string().optional(),
+      durationMinutes: z.number().optional().default(0),
     }).optional(),
     deepCleaningAndExtra: z.object({
       isDeepCleaning: z.boolean().default(false),

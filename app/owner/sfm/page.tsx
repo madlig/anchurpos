@@ -338,6 +338,9 @@ export default function OwnerSFMPage() {
                 const ot = r.overtimeClaim;
                 const cooking = r.activities?.cookingAndMolding;
                 const prepack = r.activities?.thinwallPrepack;
+                const sauce = r.activities?.sauceRepack;
+                const sugar = r.activities?.sugarRepack;
+                const packOrder = r.activities?.orderPacking;
 
                 return (
                   <div key={r.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
@@ -369,7 +372,7 @@ export default function OwnerSFMPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                       <div className="bg-slate-50 p-2 rounded-xl">
                         <span className="text-[10px] text-slate-400 block font-bold">Masak Adonan:</span>
                         <span className="font-black text-slate-800">
@@ -379,13 +382,19 @@ export default function OwnerSFMPage() {
                       <div className="bg-slate-50 p-2 rounded-xl">
                         <span className="text-[10px] text-slate-400 block font-bold">Prepack Thinwall:</span>
                         <span className="font-black text-slate-800">
-                          {prepack ? `Reg: ${prepack.packRegular || 0} | Full: ${prepack.packFull || 0} pack` : "-"}
+                          {prepack ? `Reg: ${prepack.items?.reduce((s: number, i: any) => s + (i.regularPacks || 0), 0) || 0} | Full: ${prepack.items?.reduce((s: number, i: any) => s + (i.fullPacks || 0), 0) || 0}` : "-"}
                         </span>
                       </div>
-                      <div className="col-span-2 md:col-span-1 bg-slate-50 p-2 rounded-xl">
+                      <div className="bg-slate-50 p-2 rounded-xl">
+                        <span className="text-[10px] text-slate-400 block font-bold">Repack & Packing:</span>
+                        <span className="font-black text-slate-800 text-[11px] block">
+                          Saus: {sauce?.items?.reduce((s: number, i: any) => s + (i.outputPcs || 0), 0) || 0}c | Gula: {sugar?.items?.reduce((s: number, i: any) => s + (i.outputPacks || 0), 0) || 0}p | Paket: {packOrder?.totalPackagesPacked || 0}
+                        </span>
+                      </div>
+                      <div className="bg-slate-50 p-2 rounded-xl">
                         <span className="text-[10px] text-slate-400 block font-bold">Sisa Bahan:</span>
                         <span className="font-bold text-slate-700 text-[11px] truncate block">
-                          {r.rawMaterialRemaining?.map((m: any) => `${m.name}: ${m.remainingQty}${m.uom}`).join(" | ") || "Sesuai"}
+                          {r.rawMaterialRemaining?.map((m: any) => `${m.name}: ${m.physicalStock}${m.unit}`).join(" | ") || "Sesuai"}
                         </span>
                       </div>
                     </div>

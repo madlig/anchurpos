@@ -715,8 +715,9 @@ export default function ManagerSFMPage() {
                   const cooking = report.activities?.cookingAndMolding;
                   const prepack = report.activities?.thinwallPrepack;
                   const sauce = report.activities?.sauceRepack;
+                  const sugar = report.activities?.sugarRepack;
                   const packOrder = report.activities?.orderPacking;
-                  const cleaning = report.activities?.deepCleaning;
+                  const cleaning = report.activities?.deepCleaningAndExtra;
                   const ot = report.overtimeClaim;
 
                   return (
@@ -817,7 +818,7 @@ export default function ManagerSFMPage() {
                           )}
                         </div>
 
-                        {/* Sauce & Order Packing */}
+                        {/* Sauce, Sugar & Order Packing */}
                         <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-1">
                           <div className="flex items-center gap-1.5 text-xs font-black text-blue-700">
                             <Layers size={14} />
@@ -826,14 +827,22 @@ export default function ManagerSFMPage() {
                           <div className="space-y-1 text-xs">
                             <div className="flex justify-between text-slate-700">
                               <span>Repack Saus:</span>
-                              <span className="font-bold">{sauce?.cupFilled ? `${sauce.cupFilled} cup` : "0"}</span>
+                              <span className="font-bold">
+                                {sauce?.items?.reduce((sum: number, s: any) => sum + (s.outputPcs || 0), 0) || 0} cup
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-slate-700">
+                              <span>Repack Gula:</span>
+                              <span className="font-bold">
+                                {sugar?.items?.reduce((sum: number, g: any) => sum + (g.outputPacks || 0), 0) || 0} pouch
+                              </span>
                             </div>
                             <div className="flex justify-between text-slate-700">
                               <span>Pack Ekspedisi:</span>
-                              <span className="font-bold">{packOrder?.packagesCompleted ? `${packOrder.packagesCompleted} paket` : "0"}</span>
+                              <span className="font-bold">{packOrder?.totalPackagesPacked || 0} paket</span>
                             </div>
-                            {cleaning?.carriedOut && (
-                              <div className="text-[10px] text-emerald-600 font-black flex items-center gap-1 pt-1">
+                            {cleaning?.isDeepCleaning && (
+                              <div className="text-[10px] text-emerald-600 font-black flex items-center gap-1 pt-0.5">
                                 <CheckCircle2 size={11} /> Deep Cleaning Selesai
                               </div>
                             )}

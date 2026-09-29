@@ -9,6 +9,7 @@ import { createSfmAlert } from "@/lib/sfm-notifications";
 const STD_COOKING_MIN_PER_BATCH = 45;
 const STD_PREPACK_MIN_PER_PACK = 1.5;
 const STD_SAUCE_MIN_PER_CUP = 0.6; // 30 min for 50 cups
+const STD_SUGAR_MIN_PER_PACK = 0.5; // 25 min for 50 packs
 const STD_ORDER_PACKING_MIN_PER_PKG = 3.0;
 
 export async function POST(req: NextRequest) {
@@ -80,9 +81,20 @@ export async function POST(req: NextRequest) {
       actualReportedMinutes += sauce.durationMinutes || 0;
     }
 
+    const sugar = data.activities.sugarRepack;
+    let totalSugarPacks = 0;
+    if (sugar && sugar.items && sugar.items.length > 0) {
+      sugar.items.forEach((sg) => {
+        totalSugarPacks += sg.outputPacks || 0;
+      });
+      stdTotalMinutes += totalSugarPacks * STD_SUGAR_MIN_PER_PACK;
+      actualReportedMinutes += sugar.durationMinutes || 0;
+    }
+
     const orderPacking = data.activities.orderPacking;
     if (orderPacking && orderPacking.totalPackagesPacked > 0) {
       stdTotalMinutes += orderPacking.totalPackagesPacked * STD_ORDER_PACKING_MIN_PER_PKG;
+      actualReportedMinutes += orderPacking.durationMinutes || 0;
     }
 
     const deepCleaning = data.activities.deepCleaningAndExtra;

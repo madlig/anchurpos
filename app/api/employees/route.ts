@@ -8,11 +8,12 @@ const EMAIL_DOMAIN = "anchur.internal";
 
 // GET /api/employees — daftar semua karyawan
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(req, ["owner", "manager"]);
+  const auth = await requireRole(req, ["owner", "manager", "crew"]);
   if (auth instanceof NextResponse) return auth;
 
   try {
     const snap = await adminDb.collection("users").get();
+    const isCrew = auth.role === "crew";
     const employees = snap.docs
       .map(doc => {
         const d = doc.data();
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
           role: d.role ?? "crew",
           phone: d.phone ?? null,
           joinDate: d.joinDate ?? null,
-          dailyWage: d.dailyWage ?? 60000,
+          dailyWage: isCrew ? undefined : (d.dailyWage ?? 60000),
           isActive: d.isActive !== false,
         };
       })

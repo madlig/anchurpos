@@ -650,11 +650,29 @@ export interface SauceRepackReport {
   ingredientId: string;
   ingredientName: string;
   outputPcs: number;
+  cupSize?: string;
+  durationMinutes?: number;
+}
+
+export interface SugarRepackReport {
+  ingredientId: string;
+  sugarType: string;
+  outputPacks: number;
+  weightPerPack?: string;
+  durationMinutes?: number;
 }
 
 export interface OrderPackingReport {
   totalPackagesPacked: number;
+  breakdown?: {
+    shopee?: number;
+    tiktok?: number;
+    whatsappB2b?: number;
+    other?: number;
+  };
+  expeditions?: string[];
   notes?: string;
+  durationMinutes?: number;
 }
 
 export interface DeepCleaningReport {
@@ -676,6 +694,10 @@ export interface ShiftReportActivities {
   };
   sauceRepack?: {
     items: SauceRepackReport[];
+    durationMinutes?: number;
+  };
+  sugarRepack?: {
+    items: SugarRepackReport[];
     durationMinutes?: number;
   };
   orderPacking?: OrderPackingReport;
