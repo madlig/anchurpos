@@ -25,8 +25,66 @@ export async function GET(req: NextRequest) {
 
     const snap = await query.get();
 
+    // Query shift reports for this month to provide production summary & overtime claims
+    let shiftReportsSnap: FirebaseFirestore.QuerySnapshot;
+    try {
+      shiftReportsSnap = await adminDb
+        .collection("shiftReports")
+        .where("date", ">=", `${month}-01`)
+        .where("date", "<=", `${month}-31`)
+        .get();
+    } catch {
+      shiftReportsSnap = { docs: [] } as any;
+    }
+
+    const shiftReportsByEmployee: Record<string, {
+      totalBatches: number;
+      totalPcs: number;
+      totalThinwalls: number;
+      overtimeClaimsCount: number;
+      speedScores: number[];
+      reportsCount: number;
+    }> = {};
+
+    shiftReportsSnap.docs.forEach((doc) => {
+      const rep = doc.data();
+      const crewIds: string[] = rep.crewIds || [];
+      const targets = rep.activities?.cookingAndMolding?.targets || [];
+      const batches = targets.reduce((sum: number, t: any) => sum + (Number(t.batches) || 0), 0);
+      const pcs = targets.reduce((sum: number, t: any) => sum + (Number(t.pcs) || 0), 0);
+      
+      const prepackItems = rep.activities?.thinwallPrepack?.items || [];
+      const thinwalls = prepackItems.reduce((sum: number, p: any) => sum + (Number(p.regularPacks) || 0) + (Number(p.fullPacks) || 0), 0);
+      const hasOvertime = !!rep.overtimeClaim?.isOvertimeEligible;
+      const speed = Number(rep.speedScore) || 100;
+
+      crewIds.forEach((cId) => {
+        if (!shiftReportsByEmployee[cId]) {
+          shiftReportsByEmployee[cId] = {
+            totalBatches: 0,
+            totalPcs: 0,
+            totalThinwalls: 0,
+            overtimeClaimsCount: 0,
+            speedScores: [],
+            reportsCount: 0,
+          };
+        }
+        shiftReportsByEmployee[cId].totalBatches += batches;
+        shiftReportsByEmployee[cId].totalPcs += pcs;
+        shiftReportsByEmployee[cId].totalThinwalls += thinwalls;
+        if (hasOvertime) shiftReportsByEmployee[cId].overtimeClaimsCount += 1;
+        shiftReportsByEmployee[cId].speedScores.push(speed);
+        shiftReportsByEmployee[cId].reportsCount += 1;
+      });
+    });
+
     const records = snap.docs.map((doc) => {
       const d = doc.data();
+      const empProd = shiftReportsByEmployee[d.employeeId];
+      const avgSpeed = empProd && empProd.speedScores.length > 0
+        ? Math.round(empProd.speedScores.reduce((a, b) => a + b, 0) / empProd.speedScores.length)
+        : 100;
+
       return {
         id: doc.id,
         month: d.month,
@@ -46,6 +104,14 @@ export async function GET(req: NextRequest) {
         paidAt: d.paidAt?.toDate?.().toISOString() ?? (typeof d.paidAt === "string" ? d.paidAt : null) ?? d.lockedAt ?? null,
         paidBy: d.paidBy ?? null,
         isLocked: d.isLocked ?? false,
+        productionSummary: empProd ? {
+          totalBatches: empProd.totalBatches,
+          totalPcs: empProd.totalPcs,
+          totalThinwalls: empProd.totalThinwalls,
+          overtimeClaimsCount: empProd.overtimeClaimsCount,
+          avgSpeedScore: avgSpeed,
+          reportsCount: empProd.reportsCount,
+        } : null,
       };
     });
 

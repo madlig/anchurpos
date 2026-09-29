@@ -6,7 +6,7 @@ import {
   Loader2, ChefHat, Package, Calendar, Table, LayoutGrid, Plus, Check, X,
   Snowflake, AlertTriangle, RefreshCw, Search, Award, CheckCircle2, Clock,
   Layers, Box, Users, TrendingDown, Timer, ClipboardList, ChevronRight,
-  ArrowDownToLine, Beaker, Palette, PlayCircle
+  ArrowDownToLine, Beaker, Palette, PlayCircle, Camera
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -131,7 +131,7 @@ function fmtTime(iso: string): string {
 // --- Main Component ---
 export default function ManagerSFMPage() {
   const { getToken } = useAuth();
-  const [activeTab, setActiveTab] = useState<"wo_active" | "audit_ledger">("wo_active");
+  const [activeTab, setActiveTab] = useState<"wo_active" | "audit_ledger" | "shift_reports">("wo_active");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -149,6 +149,10 @@ export default function ManagerSFMPage() {
   const [variants, setVariants] = useState<Variant[]>([]);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const [employees, setEmployees] = useState<{ id: string; name: string; role: string }[]>([]);
+  const [shiftReports, setShiftReports] = useState<any[]>([]);
+  const [freezerRakTotal, setFreezerRakTotal] = useState({ loyang: 0, pcs: 0 });
+  const [freezerPetiTotal, setFreezerPetiTotal] = useState({ regular: 0, full: 0 });
+  const [selectedReportPhoto, setSelectedReportPhoto] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Detail panel
@@ -194,11 +198,14 @@ export default function ManagerSFMPage() {
       const dateParams = activeTab === "audit_ledger"
         ? `startDate=${startDate}&endDate=${endDate}`
         : "";
-      const [woRes, varRes, ordersRes, empRes] = await Promise.all([
+      const [woRes, varRes, ordersRes, empRes, srRes, rakRes, petiRes] = await Promise.all([
         fetchWithAuth(`/api/sfm/work-orders?${dateParams}&search=${encodeURIComponent(searchQuery)}`),
         fetchWithAuth("/api/variants"),
         fetchWithAuth("/api/orders"),
         fetchWithAuth("/api/employees"),
+        fetchWithAuth("/api/sfm/shift-reports").catch(() => null),
+        fetchWithAuth("/api/sfm/freezer-rak").catch(() => null),
+        fetchWithAuth("/api/products/stocks").catch(() => null),
       ]);
 
       if (woRes.ok) setWorkOrders(await woRes.json());
@@ -211,12 +218,48 @@ export default function ManagerSFMPage() {
         const allEmp = await empRes.json();
         setEmployees(Array.isArray(allEmp) ? allEmp.filter((e: any) => e.isActive !== false) : []);
       }
+      if (srRes && srRes.ok) {
+        setShiftReports(await srRes.json());
+      }
+      if (rakRes && rakRes.ok) {
+        const rakData: any[] = await rakRes.json();
+        const lSum = rakData.reduce((s, r) => s + (Number(r.totalLoyang) || 0), 0);
+        const pSum = rakData.reduce((s, r) => s + (Number(r.totalPcs) || 0), 0);
+        setFreezerRakTotal({ loyang: lSum, pcs: pSum });
+      }
+      if (petiRes && petiRes.ok) {
+        const petiData: any[] = await petiRes.json();
+        let reg = 0;
+        let ful = 0;
+        petiData.forEach((p) => {
+          if (p.productId === "churros-frozen-regular") reg += Number(p.currentStock) || 0;
+          if (p.productId === "churros-frozen-full") ful += Number(p.currentStock) || 0;
+        });
+        setFreezerPetiTotal({ regular: reg, full: ful });
+      }
     } catch (err) {
       console.error("loadAllData error:", err);
     } finally {
       setLoading(false);
     }
   }, [startDate, endDate, activeTab, searchQuery, fetchWithAuth]);
+
+  const handleUpdateOvertime = async (reportId: string, overtimeStatus: "approved" | "rejected", ownerNote?: string) => {
+    try {
+      const res = await fetchWithAuth("/api/sfm/shift-reports", {
+        method: "PATCH",
+        body: JSON.stringify({ id: reportId, overtimeStatus, ownerNote }),
+      });
+      if (res.ok) {
+        await loadAllData(false);
+      } else {
+        alert("Gagal memperbarui status lembur");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat memperbarui status lembur");
+    }
+  };
 
   useEffect(() => {
     loadAllData(workOrders.length === 0);
@@ -248,6 +291,21 @@ export default function ManagerSFMPage() {
 
   // Crew list for filter
   const crewList = useMemo(() => employees.filter(e => e.role === "crew"), [employees]);
+
+  const filteredShiftReports = useMemo(() => {
+    return shiftReports.filter((r) => {
+      if (selectedCrewFilter !== "all") {
+        if (!r.crewIds?.includes(selectedCrewFilter)) return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchNum = r.reportNumber?.toLowerCase().includes(q);
+        const matchCrew = r.crewNames?.some((name: string) => name.toLowerCase().includes(q));
+        if (!matchNum && !matchCrew) return false;
+      }
+      return true;
+    });
+  }, [shiftReports, selectedCrewFilter, searchQuery]);
 
   const filteredWorkOrders = useMemo(() => {
     let list = workOrders.filter((w) => {
@@ -448,6 +506,7 @@ export default function ManagerSFMPage() {
             <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar">
               {[
                 { key: "wo_active", label: "Work Order Terpusat", icon: Layers },
+                { key: "shift_reports", label: `Laporan Shift Dapur (${shiftReports.length})`, icon: ClipboardList },
                 { key: "audit_ledger", label: "Laporan Audit", icon: Award },
               ].map((t) => {
                 const Icon = t.icon;
@@ -585,87 +644,382 @@ export default function ManagerSFMPage() {
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-6">
 
-        {/* --- Executive Metric Cards --- */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center"><Layers size={16} className="text-slate-600" /></div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">WO Aktif</p>
-            </div>
-            <p className="text-2xl font-black text-slate-900">{activeWos.length}</p>
-            <p className="text-[10px] font-bold text-slate-400 mt-0.5">dari {filteredWorkOrders.length} total</p>
-          </div>
-
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center"><ChefHat size={16} className="text-emerald-600" /></div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Produksi Dapur</p>
-            </div>
-            <p className="text-2xl font-black text-emerald-600">{producingWos.length}</p>
-            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{totalFrozenTrays} loyang beku di Freezer</p>
-          </div>
-
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center"><TrendingDown size={16} className="text-amber-600" /></div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Rata-rata Yield</p>
-            </div>
-            <p className={`text-2xl font-black ${avgYield >= 90 ? "text-emerald-600" : avgYield >= 80 ? "text-amber-600" : avgYield > 0 ? "text-red-600" : "text-slate-300"}`}>
-              {avgYield > 0 ? `${avgYield}%` : "-"}
-            </p>
-            <p className="text-[10px] font-bold text-slate-400 mt-0.5">good vs total output</p>
-          </div>
-
-          <div className={`p-4 rounded-2xl border shadow-sm ${stuckWos.length > 0 ? "bg-red-50 border-red-200" : "bg-white border-slate-200"}`}>
-            <div className="flex items-center gap-2 mb-1">
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${stuckWos.length > 0 ? "bg-red-100" : "bg-slate-100"}`}>
-                <AlertTriangle size={16} className={stuckWos.length > 0 ? "text-red-600" : "text-slate-400"} />
+        {/* --- 2-Freezer Inventory Status Pipeline --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-gradient-to-br from-sky-50 to-blue-50 border border-sky-200 rounded-2xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-white border border-sky-200 shadow-sm flex items-center justify-center text-sky-600">
+                <Snowflake size={24} />
               </div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Perlu Perhatian</p>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-sky-600 bg-sky-100/60 px-2 py-0.5 rounded-md">WIP (Bahan Setengah Jadi)</span>
+                <h4 className="text-base font-black text-slate-800">Freezer Rak Dapur</h4>
+                <p className="text-xs text-slate-500 font-medium">Stok loyang baru dicetak siap prepack</p>
+              </div>
             </div>
-            <p className={`text-2xl font-black ${stuckWos.length > 0 ? "text-red-600" : "text-slate-900"}`}>{stuckWos.length}</p>
-            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{stuckWos.length > 0 ? "WO stuck di tahap produksi" : "Semua berjalan normal"}</p>
+            <div className="text-right">
+              <div className="text-2xl font-black text-sky-700">{freezerRakTotal.loyang} <span className="text-xs font-bold text-sky-600">Loyang</span></div>
+              <div className="text-xs font-bold text-sky-600/80">≈ {freezerRakTotal.pcs} pcs churros</div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-white border border-emerald-200 shadow-sm flex items-center justify-center text-emerald-600">
+                <Package size={24} />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-100/60 px-2 py-0.5 rounded-md">Ready Stock (Siap Jual)</span>
+                <h4 className="text-base font-black text-slate-800">Freezer Peti Toko</h4>
+                <p className="text-xs text-slate-500 font-medium">Thinwall siap kirim kasir & packing ekspedisi</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xl font-black text-emerald-700">{freezerPetiTotal.regular + freezerPetiTotal.full} <span className="text-xs font-bold text-emerald-600">Pack</span></div>
+              <div className="text-xs font-bold text-emerald-600/80">Reg: {freezerPetiTotal.regular} | Full: {freezerPetiTotal.full}</div>
+            </div>
           </div>
         </div>
 
-        {/* --- Alert Banner --- */}
-        {stuckWos.length > 0 && (
-          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle size={16} className="text-amber-600" />
-              <span className="text-xs font-black text-amber-800 uppercase tracking-wider">WO Perlu Perhatian — Lewat 3.5 Jam di Tahap Produksi</span>
+        {activeTab === "shift_reports" ? (
+          /* --- Shift Reports Feed View --- */
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-black">
+                  <ClipboardList size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800">Umpan Laporan Shift Crew (Dua Arah)</h3>
+                  <p className="text-xs text-slate-400 font-medium">Laporan mandiri aktivitas dapur, timer kerja, dan klaim lembur dari crew</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                  Total: <strong className="text-slate-800">{filteredShiftReports.length}</strong> Laporan
+                </span>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {stuckWos.map(wo => {
-                const dur = Date.now() - new Date(wo.startedAt || wo.createdAt).getTime();
-                return (
-                  <button
-                    key={wo.id}
-                    type="button"
-                    onClick={() => openDetail(wo)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-amber-200 hover:bg-amber-100 transition-all text-xs font-bold text-amber-800 active:scale-95"
-                  >
-                    <Clock size={12} />
-                    {wo.woNumber}
-                    <span className="text-amber-500">({fmtTimerMs(dur)})</span>
-                    <span className="bg-amber-100 px-1.5 py-0.5 rounded text-[10px] font-black">{getStageInfo(wo.currentStage).label}</span>
-                    <ChevronRight size={12} className="text-amber-400" />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
-        {/* --- Work Orders List --- */}
-        {viewMode === "grid" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredWorkOrders.map((wo) => {
-              const stageInfo = getStageInfo(wo.currentStage);
-              const stuck = isStuck(wo);
-              const timerMs = getActiveTimerMs(wo);
-              const yieldPct = getYieldPct(wo);
-              const progressPct = getProgressPct(wo);
+            {filteredShiftReports.length === 0 ? (
+              <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm">
+                <Box size={40} className="mx-auto text-slate-300 mb-3" />
+                <p className="text-slate-600 font-bold text-sm">Belum ada laporan shift tercatat.</p>
+                <p className="text-xs text-slate-400 mt-1">Crew dapat mengirim laporan shift langsung melalui menu Crew SFM.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {filteredShiftReports.map((report) => {
+                  const score = report.speedScore ?? 100;
+                  const scoreColor = score >= 90 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : score >= 75 ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-amber-50 text-amber-700 border-amber-200";
+                  const cooking = report.activities?.cookingAndMolding;
+                  const prepack = report.activities?.thinwallPrepack;
+                  const sauce = report.activities?.sauceRepack;
+                  const packOrder = report.activities?.orderPacking;
+                  const cleaning = report.activities?.deepCleaning;
+                  const ot = report.overtimeClaim;
+
+                  return (
+                    <div key={report.id} className="bg-white rounded-3xl p-5 md:p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+                      {/* Top Bar: Number, Date, Shift Mode, Speed Score */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-mono text-xs font-black bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200">
+                            {report.reportNumber}
+                          </span>
+                          <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                            <Calendar size={13} className="text-slate-400" /> {fmtDate(report.date || report.createdAt)}
+                          </span>
+                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${report.shiftMode === "duo" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-slate-50 text-slate-700 border-slate-200"}`}>
+                            {report.shiftMode === "duo" ? "DUO (2 ORANG)" : "SOLO (1 ORANG)"}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black border ${scoreColor}`}>
+                            <Award size={14} />
+                            <span>Speed Score: {score}%</span>
+                          </div>
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200">
+                            <Clock size={13} className="text-slate-400" />
+                            <span>{report.totalDurationMinutes} Menit</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Crew Info */}
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
+                        <span className="text-slate-400 font-semibold">Petugas:</span>
+                        {report.crewNames?.map((name: string, idx: number) => (
+                          <span key={idx} className="bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 flex items-center gap-1">
+                            <Users size={12} className="text-slate-400" /> {name}
+                          </span>
+                        ))}
+                        {report.picDapurName && (
+                          <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md text-[10px] font-black">
+                            Dapur: {report.picDapurName}
+                          </span>
+                        )}
+                        {report.picPackingName && (
+                          <span className="bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-md text-[10px] font-black">
+                            Packing: {report.picPackingName}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Activities Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50/60 p-4 rounded-2xl border border-slate-100">
+                        {/* Cooking */}
+                        <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-amber-700">
+                            <ChefHat size={14} />
+                            <span>Masak Adonan</span>
+                          </div>
+                          {cooking?.targets && cooking.targets.length > 0 ? (
+                            <div className="space-y-1">
+                              {cooking.targets.map((tgt: any, idx: number) => (
+                                <div key={idx} className="text-xs text-slate-700 flex justify-between">
+                                  <span className="font-semibold truncate">{tgt.variantName || tgt.variantId}</span>
+                                  <span className="font-black text-slate-900">{tgt.batches} adonan ({tgt.loyang} loy / {tgt.pcs} pcs)</span>
+                                </div>
+                              ))}
+                              <div className="text-[10px] text-slate-400 font-bold border-t border-slate-100 pt-1">
+                                Durasi: {cooking.durationMinutes || 0}m {cooking.pauseMinutes ? `(Pause: ${cooking.pauseMinutes}m)` : ""}
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic">Tidak ada pengerjaan</p>
+                          )}
+                        </div>
+
+                        {/* Thinwall Prepack */}
+                        <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
+                            <Package size={14} />
+                            <span>Prepack Thinwall</span>
+                          </div>
+                          {prepack && (prepack.packRegular > 0 || prepack.packFull > 0) ? (
+                            <div className="space-y-1 text-xs">
+                              <div className="flex justify-between text-slate-700">
+                                <span>Regular (isi 12):</span>
+                                <span className="font-black text-emerald-700">{prepack.packRegular} pack</span>
+                              </div>
+                              <div className="flex justify-between text-slate-700">
+                                <span>Full (isi 16):</span>
+                                <span className="font-black text-emerald-700">{prepack.packFull} pack</span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-bold border-t border-slate-100 pt-1">
+                                Disimpan ke: Freezer Peti
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic">Tidak ada prepack</p>
+                          )}
+                        </div>
+
+                        {/* Sauce & Order Packing */}
+                        <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-blue-700">
+                            <Layers size={14} />
+                            <span>Repack & Ekspedisi</span>
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between text-slate-700">
+                              <span>Repack Saus:</span>
+                              <span className="font-bold">{sauce?.cupFilled ? `${sauce.cupFilled} cup` : "0"}</span>
+                            </div>
+                            <div className="flex justify-between text-slate-700">
+                              <span>Pack Ekspedisi:</span>
+                              <span className="font-bold">{packOrder?.packagesCompleted ? `${packOrder.packagesCompleted} paket` : "0"}</span>
+                            </div>
+                            {cleaning?.carriedOut && (
+                              <div className="text-[10px] text-emerald-600 font-black flex items-center gap-1 pt-1">
+                                <CheckCircle2 size={11} /> Deep Cleaning Selesai
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Photo Thumbnail */}
+                        <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-slate-700">
+                            <Camera size={14} />
+                            <span>Foto Bukti Fisik</span>
+                          </div>
+                          {report.photoUrls && report.photoUrls.length > 0 ? (
+                            <div className="mt-2 flex items-center gap-2">
+                              <img
+                                src={report.photoUrls[0]}
+                                alt="Bukti Shift"
+                                onClick={() => setSelectedReportPhoto(report.photoUrls[0])}
+                                className="w-16 h-16 rounded-xl object-cover cursor-pointer border border-slate-200 hover:scale-105 transition-all shadow-xs"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setSelectedReportPhoto(report.photoUrls[0])}
+                                className="text-xs font-bold text-blue-600 hover:underline"
+                              >
+                                Lihat Foto
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-slate-400 italic py-3 text-center">
+                              Tidak ada foto
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Raw Materials Opname & Critical Flavor Badges */}
+                      {(report.rawMaterialRemaining?.length > 0 || report.criticalFlavorsStatus?.length > 0) && (
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          {report.rawMaterialRemaining?.map((raw: any, idx: number) => (
+                            <span key={idx} className="text-[11px] font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200">
+                              {raw.name}: <strong className="text-slate-900">{raw.remainingQty} {raw.uom}</strong>
+                            </span>
+                          ))}
+                          {report.criticalFlavorsStatus?.map((flav: any, idx: number) => (
+                            <span
+                              key={idx}
+                              className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${
+                                flav.status === "habis" ? "bg-red-50 text-red-700 border-red-200 animate-pulse" : "bg-amber-50 text-amber-700 border-amber-200"
+                              }`}
+                            >
+                              Saus {flav.flavorName}: {flav.status === "habis" ? "HABIS" : "DIKIT LAGI"}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Overtime Claim Section */}
+                      {ot?.isOvertimeEligible && (
+                        <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-amber-900 uppercase tracking-wide">Pengajuan Lembur:</span>
+                              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                                ot.status === "approved" ? "bg-emerald-100 text-emerald-800 border-emerald-300" :
+                                ot.status === "rejected" ? "bg-red-100 text-red-800 border-red-300" :
+                                "bg-amber-100 text-amber-800 border-amber-300 animate-pulse"
+                              }`}>
+                                {ot.status === "approved" ? "Disetujui" : ot.status === "rejected" ? "Ditolak" : "Menunggu Review Owner"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-amber-800 font-medium">Alasan: {ot.reason || "Kapasitas kerja melebihi standar harian"}</p>
+                            {ot.ownerNote && <p className="text-[11px] text-amber-700 font-bold italic">Catatan Owner: {ot.ownerNote}</p>}
+                          </div>
+
+                          <div className="flex items-center gap-2 self-end sm:self-center">
+                            {ot.status !== "approved" && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateOvertime(report.id, "approved")}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+                              >
+                                <Check size={14} /> Setujui
+                              </button>
+                            )}
+                            {ot.status !== "rejected" && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateOvertime(report.id, "rejected")}
+                                className="px-3 py-1.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold border border-red-200 active:scale-95 transition-all"
+                              >
+                                Tolak
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* --- Executive Metric Cards --- */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center"><Layers size={16} className="text-slate-600" /></div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">WO Aktif</p>
+                </div>
+                <p className="text-2xl font-black text-slate-900">{activeWos.length}</p>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">dari {filteredWorkOrders.length} total</p>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center"><ChefHat size={16} className="text-emerald-600" /></div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Produksi Dapur</p>
+                </div>
+                <p className="text-2xl font-black text-emerald-600">{producingWos.length}</p>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">{totalFrozenTrays} loyang beku di Freezer</p>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center"><TrendingDown size={16} className="text-amber-600" /></div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Rata-rata Yield</p>
+                </div>
+                <p className={`text-2xl font-black ${avgYield >= 90 ? "text-emerald-600" : avgYield >= 80 ? "text-amber-600" : avgYield > 0 ? "text-red-600" : "text-slate-300"}`}>
+                  {avgYield > 0 ? `${avgYield}%` : "-"}
+                </p>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">good vs total output</p>
+              </div>
+
+              <div className={`p-4 rounded-2xl border shadow-sm ${stuckWos.length > 0 ? "bg-red-50 border-red-200" : "bg-white border-slate-200"}`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${stuckWos.length > 0 ? "bg-red-100" : "bg-slate-100"}`}>
+                    <AlertTriangle size={16} className={stuckWos.length > 0 ? "text-red-600" : "text-slate-400"} />
+                  </div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Perlu Perhatian</p>
+                </div>
+                <p className={`text-2xl font-black ${stuckWos.length > 0 ? "text-red-600" : "text-slate-900"}`}>{stuckWos.length}</p>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">{stuckWos.length > 0 ? "WO stuck di tahap produksi" : "Semua berjalan normal"}</p>
+              </div>
+            </div>
+
+            {/* --- Alert Banner --- */}
+            {stuckWos.length > 0 && (
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={16} className="text-amber-600" />
+                  <span className="text-xs font-black text-amber-800 uppercase tracking-wider">WO Perlu Perhatian — Lewat 3.5 Jam di Tahap Produksi</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {stuckWos.map(wo => {
+                    const dur = Date.now() - new Date(wo.startedAt || wo.createdAt).getTime();
+                    return (
+                      <button
+                        key={wo.id}
+                        type="button"
+                        onClick={() => openDetail(wo)}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-amber-200 hover:bg-amber-100 transition-all text-xs font-bold text-amber-800 active:scale-95"
+                      >
+                        <Clock size={12} />
+                        {wo.woNumber}
+                        <span className="text-amber-500">({fmtTimerMs(dur)})</span>
+                        <span className="bg-amber-100 px-1.5 py-0.5 rounded text-[10px] font-black">{getStageInfo(wo.currentStage).label}</span>
+                        <ChevronRight size={12} className="text-amber-400" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* --- Work Orders List --- */}
+            {viewMode === "grid" ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredWorkOrders.map((wo) => {
+                  const stageInfo = getStageInfo(wo.currentStage);
+                  const stuck = isStuck(wo);
+                  const timerMs = getActiveTimerMs(wo);
+                  const yieldPct = getYieldPct(wo);
+                  const progressPct = getProgressPct(wo);
 
               const isProduksi = wo.woType === "PRODUKSI" || !wo.woType;
 
@@ -896,6 +1250,8 @@ export default function ManagerSFMPage() {
               </table>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
 
@@ -1420,6 +1776,33 @@ export default function ManagerSFMPage() {
                 {creatingWo ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                 Terbitkan & Beri Notif
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== MODAL: Photo Lightbox Preview ========== */}
+      {selectedReportPhoto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
+          <div className="relative max-w-3xl max-h-[90vh] bg-white rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
+              <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <Camera size={14} className="text-slate-500" /> Foto Bukti Shift / Freezer / Kebersihan
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedReportPhoto(null)}
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-all"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-2 overflow-auto flex items-center justify-center bg-slate-950">
+              <img
+                src={selectedReportPhoto}
+                alt="Bukti Laporan Shift"
+                className="max-h-[75vh] w-auto object-contain rounded-xl"
+              />
             </div>
           </div>
         </div>

@@ -42,6 +42,14 @@ export interface PayrollRecord {
   isLocked: boolean;
   lockedAt?: string;
   workPeriod?: string;
+  productionSummary?: {
+    totalBatches: number;
+    totalPcs: number;
+    totalThinwalls: number;
+    overtimeClaimsCount: number;
+    avgSpeedScore: number;
+    reportsCount: number;
+  } | null;
 }
 
 export const ROLE_LABEL: Record<string, string> = { owner: "Owner", manager: "Manager", crew: "Crew" };

@@ -506,7 +506,7 @@ export interface OperationalConfig {
 
 // --- 13. Shop Floor Management (SFM) Types ---
 export type WorkOrderStatus = "PLANNED" | "RELEASED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
-export type SFMWorkOrderType = "PRODUKSI" | "REPACK_SAOS" | "REPACK_GULA" | "PACKING_PESANAN" | "STOCK_OPNAME" | "GENERAL_TASK";
+export type SFMWorkOrderType = "PRODUKSI" | "REPACK_SAOS" | "REPACK_GULA" | "PACKING_PESANAN" | "STOCK_OPNAME" | "GENERAL_TASK" | "SHIFT_REPORT";
 export type SFMTaskStep = "DOUGH_COOKING" | "MIXING_EGG" | "TRAY_MOLDING" | "FREEZER_CHECKPOINT" | "PRE_PACK" | "FINAL_PACK" | "PACKING" | "REPACKING" | "COUNTING" | "IN_PROGRESS" | "PENDING";
 export type SFMLogStage = "DOUGH_MIXING" | "TRAY_PRINTING" | "FREEZER_CHECKPOINT" | "FINAL_PACKING";
 
@@ -619,3 +619,112 @@ export interface CrewKpiLog {
   finalKpiScore: number;
   createdAt: string;
 }
+
+// --- 14. Two-Way SFM & Modular Shift Report Types ---
+export interface FreezerRakStock {
+  id: string; // e.g. "original" (variantId)
+  variantId: string;
+  variantName: string;
+  totalLoyang: number;
+  totalPcs: number;
+  updatedAt: string;
+}
+
+export interface CookingTargetReport {
+  variantId: string;
+  variantName: string;
+  batches: number;
+  loyang: number;
+  pcs: number;
+}
+
+export interface ThinwallPrepackReport {
+  variantId: string;
+  variantName: string;
+  regularPacks: number; // isi 12
+  fullPacks: number;    // isi 16
+  loyangUsed: number;
+}
+
+export interface SauceRepackReport {
+  ingredientId: string;
+  ingredientName: string;
+  outputPcs: number;
+}
+
+export interface OrderPackingReport {
+  totalPackagesPacked: number;
+  notes?: string;
+}
+
+export interface DeepCleaningReport {
+  isDeepCleaning: boolean;
+  description: string;
+  durationMinutes?: number;
+}
+
+export interface ShiftReportActivities {
+  cookingAndMolding?: {
+    targets: CookingTargetReport[];
+    durationMinutes?: number;
+    pauseMinutes?: number;
+    pauseReasons?: string[];
+  };
+  thinwallPrepack?: {
+    items: ThinwallPrepackReport[];
+    durationMinutes?: number;
+  };
+  sauceRepack?: {
+    items: SauceRepackReport[];
+    durationMinutes?: number;
+  };
+  orderPacking?: OrderPackingReport;
+  deepCleaningAndExtra?: DeepCleaningReport;
+}
+
+export interface ShiftReportRawMaterialRemaining {
+  ingredientId: string;
+  name: string;
+  physicalStock: number;
+  unit: string;
+}
+
+export interface ShiftReportCriticalFlavorStatus {
+  ingredientId: string;
+  name: string;
+  status: "aman" | "dikit_lagi" | "habis";
+}
+
+export interface ShiftReportOvertimeClaim {
+  isOvertimeEligible: boolean;
+  reason: string;
+  status: "pending_owner" | "approved" | "rejected";
+  bonusAmount?: number;
+}
+
+export interface ShiftReport {
+  id: string;
+  reportNumber: string;
+  date: string;
+  shiftMode: "solo" | "duo";
+  crewIds: string[];
+  crewNames: string[];
+  picDapurId?: string;
+  picDapurName?: string;
+  picPackingId?: string;
+  picPackingName?: string;
+  photoUrls: string[];
+  activities: ShiftReportActivities;
+  rawMaterialRemaining: ShiftReportRawMaterialRemaining[];
+  criticalFlavorsStatus: ShiftReportCriticalFlavorStatus[];
+  overtimeClaim: ShiftReportOvertimeClaim;
+  notes?: string;
+  sopChecklist?: {
+    openingSanitationDone: boolean;
+    closingSanitationDone: boolean;
+  };
+  speedScore?: number;
+  totalDurationMinutes?: number;
+  createdAt: string;
+}
+

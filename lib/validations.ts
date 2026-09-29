@@ -239,3 +239,79 @@ export const stockOpnameReviewSchema = z.object({
     })
   ).optional().default([]),
 });
+
+export const shiftReportSchema = z.object({
+  date: z.string().min(1, "Tanggal shift wajib diisi"),
+  shiftMode: z.enum(["solo", "duo"]).default("solo"),
+  crewIds: z.array(z.string()).min(1, "Minimal 1 kru harus dipilih"),
+  crewNames: z.array(z.string()).min(1),
+  picDapurId: z.string().optional(),
+  picDapurName: z.string().optional(),
+  picPackingId: z.string().optional(),
+  picPackingName: z.string().optional(),
+  photoUrls: z.array(z.string()).optional().default([]),
+  activities: z.object({
+    cookingAndMolding: z.object({
+      targets: z.array(z.object({
+        variantId: z.string().min(1),
+        variantName: z.string().min(1),
+        batches: z.number().min(0.1),
+        loyang: z.number().min(0),
+        pcs: z.number().min(0),
+      })),
+      durationMinutes: z.number().optional().default(0),
+      pauseMinutes: z.number().optional().default(0),
+      pauseReasons: z.array(z.string()).optional().default([]),
+    }).optional(),
+    thinwallPrepack: z.object({
+      items: z.array(z.object({
+        variantId: z.string().min(1),
+        variantName: z.string().min(1),
+        regularPacks: z.number().min(0),
+        fullPacks: z.number().min(0),
+        loyangUsed: z.number().min(0),
+      })),
+      durationMinutes: z.number().optional().default(0),
+    }).optional(),
+    sauceRepack: z.object({
+      items: z.array(z.object({
+        ingredientId: z.string().min(1),
+        ingredientName: z.string().min(1),
+        outputPcs: z.number().min(0),
+      })),
+      durationMinutes: z.number().optional().default(0),
+    }).optional(),
+    orderPacking: z.object({
+      totalPackagesPacked: z.number().min(0),
+      notes: z.string().optional(),
+    }).optional(),
+    deepCleaningAndExtra: z.object({
+      isDeepCleaning: z.boolean().default(false),
+      description: z.string(),
+      durationMinutes: z.number().optional().default(0),
+    }).optional(),
+  }),
+  rawMaterialRemaining: z.array(z.object({
+    ingredientId: z.string().min(1),
+    name: z.string().min(1),
+    physicalStock: z.number().min(0),
+    unit: z.string().min(1),
+  })).optional().default([]),
+  criticalFlavorsStatus: z.array(z.object({
+    ingredientId: z.string().min(1),
+    name: z.string().min(1),
+    status: z.enum(["aman", "dikit_lagi", "habis"]),
+  })).optional().default([]),
+  overtimeClaim: z.object({
+    isOvertimeEligible: z.boolean().default(false),
+    reason: z.string().optional().default(""),
+    status: z.enum(["pending_owner", "approved", "rejected"]).default("pending_owner"),
+    bonusAmount: z.number().optional(),
+  }).optional().default({ isOvertimeEligible: false, reason: "", status: "pending_owner" }),
+  notes: z.string().optional(),
+  sopChecklist: z.object({
+    openingSanitationDone: z.boolean().default(true),
+    closingSanitationDone: z.boolean().default(true),
+  }).optional(),
+});
+

@@ -72,6 +72,9 @@ export default function CrewSFMTerminal() {
 
   const [closeModalWo, setCloseModalWo] = useState<WorkOrder | null>(null);
 
+  const [freezerRakTotal, setFreezerRakTotal] = useState({ loyang: 0, pcs: 0 });
+  const [freezerPetiTotal, setFreezerPetiTotal] = useState({ regular: 0, full: 0 });
+
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
     return fetch(url, {
@@ -83,9 +86,11 @@ export default function CrewSFMTerminal() {
   const loadData = useCallback(async (showSkeleton = false) => {
     if (showSkeleton === true) setLoading(true);
     try {
-      const [woRes, attRes] = await Promise.all([
+      const [woRes, attRes, rakRes, petiRes] = await Promise.all([
         fetchWithAuth(`/api/sfm/work-orders`),
         fetchWithAuth(`/api/attendance/my-status`).catch(() => null),
+        fetchWithAuth(`/api/sfm/freezer-rak`).catch(() => null),
+        fetchWithAuth(`/api/products/stocks`).catch(() => null),
       ]);
 
       if (woRes.ok) {
@@ -96,6 +101,24 @@ export default function CrewSFMTerminal() {
       if (attRes && attRes.ok) {
         const attData = await attRes.json();
         setHasCheckedInToday(!!attData?.today?.checkIn);
+      }
+
+      if (rakRes && rakRes.ok) {
+        const rakData: any[] = await rakRes.json();
+        const lSum = rakData.reduce((s, r) => s + (Number(r.totalLoyang) || 0), 0);
+        const pSum = rakData.reduce((s, r) => s + (Number(r.totalPcs) || 0), 0);
+        setFreezerRakTotal({ loyang: lSum, pcs: pSum });
+      }
+
+      if (petiRes && petiRes.ok) {
+        const petiData: any[] = await petiRes.json();
+        let reg = 0;
+        let ful = 0;
+        petiData.forEach((p) => {
+          if (p.productId === "churros-frozen-regular") reg += Number(p.currentStock) || 0;
+          if (p.productId === "churros-frozen-full") ful += Number(p.currentStock) || 0;
+        });
+        setFreezerPetiTotal({ regular: reg, full: ful });
       }
     } catch (err) {
       console.error("Crew loadData error:", err);
@@ -241,6 +264,54 @@ export default function CrewSFMTerminal() {
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
+
+      {/* Banner Laporan Shift Mandiri */}
+      <Link
+        href="/crew/sfm/shift-report"
+        className="block p-4 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-md active:scale-98 transition-all hover:shadow-lg border border-slate-700/60"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-xl shrink-0 shadow-sm">
+              📝
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-sm font-black tracking-tight text-white">Lapor Hasil Shift Hari Ini</h3>
+                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                  Mandiri
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 font-medium">Input adonan, prepack thinwall, sisa bahan, & foto loyang</p>
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-slate-400 shrink-0" />
+        </div>
+      </Link>
+
+      {/* Widget Status 2 Freezer */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="bg-sky-50/80 border border-sky-200/80 rounded-2xl p-3 shadow-2xs">
+          <div className="flex items-center gap-1.5 text-sky-900 font-black text-xs mb-1">
+            <Snowflake size={14} className="text-sky-600" /> Freezer Rak (WIP)
+          </div>
+          <div className="text-lg font-black text-sky-950">
+            {freezerRakTotal.loyang} <span className="text-xs font-bold text-sky-700">Loyang</span>
+          </div>
+          <p className="text-[10px] font-semibold text-sky-600">~{freezerRakTotal.pcs} pcs beku siap potong</p>
+        </div>
+
+        <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-3 shadow-2xs">
+          <div className="flex items-center gap-1.5 text-emerald-900 font-black text-xs mb-1">
+            <Package size={14} className="text-emerald-600" /> Freezer Peti (Siap Jual)
+          </div>
+          <div className="text-lg font-black text-emerald-950">
+            {freezerPetiTotal.regular + freezerPetiTotal.full} <span className="text-xs font-bold text-emerald-700">Pack</span>
+          </div>
+          <p className="text-[10px] font-semibold text-emerald-600">{freezerPetiTotal.regular} reg • {freezerPetiTotal.full} full</p>
+        </div>
+      </div>
+
 
       {hasCheckedInToday === false && (
         <div className="bg-amber-500/10 border-2 border-amber-500/30 rounded-3xl p-5 text-center space-y-3 animate-in fade-in">

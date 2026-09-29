@@ -301,83 +301,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Auto-deduct raw material ingredients from BOM recipes upon Work Order release
-    if (woType === "PRODUKSI" || !woType) {
-      try {
-        const ingredientDeductions = new Map<string, number>();
+    // Catatan: Pemotongan bahan baku tidak lagi dilakukan saat tiket WO baru dibuat (draft),
+    // melainkan saat masak adonan benar-benar dilakukan (via step route atau Laporan Shift Mandiri).
 
-        if (productionTargets && Array.isArray(productionTargets) && productionTargets.length > 0) {
-          // 1. Deduct base ingredients (variantId == "all") for total batches across all targets
-          const totalBatches = productionTargets.reduce((sum: number, t: any) => sum + (Number(t.targetBatches) || 0), 0);
-          if (totalBatches > 0) {
-            const baseRecipesSnap = await adminDb.collection("recipes").where("variantId", "==", "all").get();
-            for (const doc of baseRecipesSnap.docs) {
-              const r = doc.data();
-              if (r.ingredientId && r.qtyPerBatch) {
-                const qty = Number(r.qtyPerBatch) * totalBatches;
-                ingredientDeductions.set(r.ingredientId, (ingredientDeductions.get(r.ingredientId) || 0) + qty);
-              }
-            }
-          }
-
-          // 2. Deduct variant-specific ingredients
-          for (const target of productionTargets) {
-            const tBatches = Number(target.targetBatches) || 0;
-            if (target.variantId && target.variantId !== "all" && tBatches > 0) {
-              const varRecipesSnap = await adminDb.collection("recipes").where("variantId", "==", target.variantId).get();
-              for (const doc of varRecipesSnap.docs) {
-                const r = doc.data();
-                if (r.ingredientId && r.qtyPerBatch) {
-                  const qty = Number(r.qtyPerBatch) * tBatches;
-                  ingredientDeductions.set(r.ingredientId, (ingredientDeductions.get(r.ingredientId) || 0) + qty);
-                }
-              }
-            }
-          }
-        } else {
-          // Single variant / default
-          const effectiveBatches = numBatches > 0 ? numBatches : 1;
-          const vId = (Array.isArray(variantIds) && variantIds[0]) || "original";
-
-          const recipesSnap = await adminDb.collection("recipes").where("variantId", "in", ["all", vId]).get();
-          for (const doc of recipesSnap.docs) {
-            const r = doc.data();
-            if (r.ingredientId && r.qtyPerBatch) {
-              const qty = Number(r.qtyPerBatch) * effectiveBatches;
-              ingredientDeductions.set(r.ingredientId, (ingredientDeductions.get(r.ingredientId) || 0) + qty);
-            }
-          }
-        }
-
-        // Apply deductions & record stockMovements
-        for (const [ingId, qtyNeeded] of ingredientDeductions.entries()) {
-          if (qtyNeeded > 0) {
-            const ingRef = adminDb.collection("ingredients").doc(ingId);
-            const ingSnap = await ingRef.get();
-            if (ingSnap.exists) {
-              const curr = ingSnap.data()?.currentStock ?? 0;
-              const newStock = curr - qtyNeeded;
-              await ingRef.update({
-                currentStock: FieldValue.increment(-qtyNeeded),
-              });
-
-              await adminDb.collection("stockMovements").add({
-                ingredientId: ingId,
-                changeAmount: -qtyNeeded,
-                newStockAfter: newStock,
-                sourceType: "production",
-                sourceId: woRef.id,
-                note: `Auto-deduct BOM WO #${woNumber}`,
-                createdBy: user.uid,
-                createdAt: FieldValue.serverTimestamp(),
-              });
-            }
-          }
-        }
-      } catch (recipeErr) {
-        console.warn("BOM Auto-deduction notice:", recipeErr);
-      }
-    }
 
     // --- PHASE 3: Trigger Notifications ---
     await createSfmAlert({

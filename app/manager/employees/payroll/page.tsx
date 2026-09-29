@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Loader2, CalendarDays, Check, Search, Lock, Edit3, Save, X, FileText, LayoutList, Wallet, Settings2, ChevronDown, CheckCircle2, TrendingUp, Users, AlertTriangle, Printer, Download, ShieldCheck, ExternalLink } from "lucide-react";
+import { Loader2, CalendarDays, Check, Search, Lock, Edit3, Save, X, FileText, LayoutList, Wallet, Settings2, ChevronDown, CheckCircle2, TrendingUp, Users, AlertTriangle, Printer, Download, ShieldCheck, ExternalLink, ChefHat } from "lucide-react";
 import { AttendanceRecord, Employee, PayrollRecord } from "../types";
 import { AdaptivePanel } from "@/components/shared/AdaptivePanel";
 import { useAlertConfirm } from "@/components/shared/AlertConfirmProvider";
@@ -440,6 +440,41 @@ export default function PayrollPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* SFM Kitchen Production Summary */}
+                  {p.productionSummary && p.productionSummary.reportsCount > 0 && (
+                    <div className="bg-purple-50/70 border border-purple-200/80 rounded-xl p-3 mb-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 flex items-center gap-1">
+                          <ChefHat size={12} /> Output Dapur & SFM ({p.productionSummary.reportsCount} Shift)
+                        </span>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                          p.productionSummary.avgSpeedScore >= 90
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                            : "bg-blue-100 text-blue-800 border-blue-300"
+                        }`}>
+                          Speed Score: {p.productionSummary.avgSpeedScore}%
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs pt-0.5">
+                        <div className="bg-white/90 p-2 rounded-lg border border-purple-100 text-center">
+                          <span className="text-[10px] text-slate-500 font-bold block">Masak</span>
+                          <span className="font-black text-purple-900">{p.productionSummary.totalBatches} adonan</span>
+                          <span className="text-[9px] text-slate-400 block font-semibold">({p.productionSummary.totalPcs} pcs)</span>
+                        </div>
+                        <div className="bg-white/90 p-2 rounded-lg border border-purple-100 text-center">
+                          <span className="text-[10px] text-slate-500 font-bold block">Prepack</span>
+                          <span className="font-black text-purple-900">{p.productionSummary.totalThinwalls} pack</span>
+                          <span className="text-[9px] text-slate-400 block font-semibold">Thinwall</span>
+                        </div>
+                        <div className="bg-white/90 p-2 rounded-lg border border-purple-100 text-center">
+                          <span className="text-[10px] text-slate-500 font-bold block">Klaim Lembur</span>
+                          <span className="font-black text-amber-700">{p.productionSummary.overtimeClaimsCount} shift</span>
+                          <span className="text-[9px] text-slate-400 block font-semibold">SFM</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Compact Breakdown (Mobile First) */}
                   <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-100 mb-4 space-y-2.5">

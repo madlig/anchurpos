@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   Loader2, ChefHat, Clock, AlertTriangle, Snowflake,
   CheckCircle2, Package, ArrowLeft, RefreshCw, ThermometerSnowflake,
+  ClipboardList, Users, Award, Calendar, Check, X, Camera
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 import Link from "next/link";
@@ -101,24 +102,73 @@ function elapsedShort(iso?: string) {
 export default function OwnerSFMPage() {
   const { getToken } = useAuth();
   const [data, setData] = useState<{ metrics: SfmMetrics; activeWorkOrders: ActiveWorkOrder[]; audit: AuditItem[] } | null>(null);
+  const [freezerRakTotal, setFreezerRakTotal] = useState({ loyang: 0, pcs: 0 });
+  const [freezerPetiTotal, setFreezerPetiTotal] = useState({ regular: 0, full: 0 });
+  const [shiftReports, setShiftReports] = useState<any[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchWithAuth = useCallback(async (url: string) => {
+  const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
-    return fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    return fetch(url, {
+      ...options,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options?.headers }
+    });
   }, [getToken]);
 
   const load = useCallback(async (showSkeleton = false) => {
     if (showSkeleton === true) setLoading(true);
     try {
-      const res = await fetchWithAuth("/api/owner/sfm-summary");
-      if (res.ok) setData(await res.json());
+      const [sfmRes, rakRes, petiRes, reportsRes] = await Promise.all([
+        fetchWithAuth("/api/owner/sfm-summary"),
+        fetchWithAuth("/api/sfm/freezer-rak").catch(() => null),
+        fetchWithAuth("/api/products/stocks").catch(() => null),
+        fetchWithAuth("/api/sfm/shift-reports").catch(() => null),
+      ]);
+
+      if (sfmRes.ok) setData(await sfmRes.json());
+      if (rakRes && rakRes.ok) {
+        const rakData: any[] = await rakRes.json();
+        const lSum = rakData.reduce((s, r) => s + (Number(r.totalLoyang) || 0), 0);
+        const pSum = rakData.reduce((s, r) => s + (Number(r.totalPcs) || 0), 0);
+        setFreezerRakTotal({ loyang: lSum, pcs: pSum });
+      }
+      if (petiRes && petiRes.ok) {
+        const petiData: any[] = await petiRes.json();
+        let reg = 0;
+        let ful = 0;
+        petiData.forEach((p) => {
+          if (p.productId === "churros-frozen-regular") reg += Number(p.currentStock) || 0;
+          if (p.productId === "churros-frozen-full") ful += Number(p.currentStock) || 0;
+        });
+        setFreezerPetiTotal({ regular: reg, full: ful });
+      }
+      if (reportsRes && reportsRes.ok) {
+        setShiftReports(await reportsRes.json());
+      }
     } catch (err) {
       console.error("SFM load error:", err);
     } finally {
       setLoading(false);
     }
   }, [fetchWithAuth]);
+
+  const handleUpdateOvertime = async (reportId: string, overtimeStatus: "approved" | "rejected") => {
+    try {
+      const res = await fetchWithAuth("/api/sfm/shift-reports", {
+        method: "PATCH",
+        body: JSON.stringify({ id: reportId, overtimeStatus }),
+      });
+      if (res.ok) {
+        load(false);
+      } else {
+        alert("Gagal memperbarui status lembur");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan");
+    }
+  };
 
   useEffect(() => {
     load(!data);
@@ -228,6 +278,163 @@ export default function OwnerSFMPage() {
       </div>
 
       <div className="px-4 md:px-8 max-w-5xl mx-auto space-y-5 pt-5">
+        {/* --- 2-Freezer Inventory Status Pipeline --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-gradient-to-br from-sky-50 to-blue-50 border border-sky-200 rounded-2xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-white border border-sky-200 shadow-sm flex items-center justify-center text-sky-600">
+                <Snowflake size={24} />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-sky-600 bg-sky-100/60 px-2 py-0.5 rounded-md">WIP (Bahan Setengah Jadi)</span>
+                <h4 className="text-base font-black text-slate-800">Freezer Rak Dapur</h4>
+                <p className="text-xs text-slate-500 font-medium">Stok loyang baru dicetak siap prepack</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-black text-sky-700">{freezerRakTotal.loyang} <span className="text-xs font-bold text-sky-600">Loyang</span></div>
+              <div className="text-xs font-bold text-sky-600/80">≈ {freezerRakTotal.pcs} pcs churros</div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-white border border-emerald-200 shadow-sm flex items-center justify-center text-emerald-600">
+                <Package size={24} />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-100/60 px-2 py-0.5 rounded-md">Ready Stock (Siap Jual)</span>
+                <h4 className="text-base font-black text-slate-800">Freezer Peti Toko</h4>
+                <p className="text-xs text-slate-500 font-medium">Thinwall siap kirim kasir & packing ekspedisi</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xl font-black text-emerald-700">{freezerPetiTotal.regular + freezerPetiTotal.full} <span className="text-xs font-bold text-emerald-600">Pack</span></div>
+              <div className="text-xs font-bold text-emerald-600/80">Reg: {freezerPetiTotal.regular} | Full: {freezerPetiTotal.full}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* --- Shift Reports & Overtime Claims Review --- */}
+        <div>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <ClipboardList size={14} /> Laporan Shift & Review Lembur Crew ({shiftReports.length})
+            </h2>
+            {shiftReports.some((r) => r.overtimeClaim?.isOvertimeEligible && r.overtimeClaim?.status === "pending_owner") && (
+              <span className="text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full animate-pulse">
+                Ada Lembur Perlu Persetujuan
+              </span>
+            )}
+          </div>
+
+          {shiftReports.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
+              <p className="text-xs text-slate-400">Belum ada laporan shift tercatat.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {shiftReports.slice(0, 5).map((r) => {
+                const ot = r.overtimeClaim;
+                const cooking = r.activities?.cookingAndMolding;
+                const prepack = r.activities?.thinwallPrepack;
+
+                return (
+                  <div key={r.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-black bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">
+                          {r.reportNumber}
+                        </span>
+                        <span className="text-xs font-bold text-slate-500">
+                          {r.date || r.createdAt?.split("T")[0]}
+                        </span>
+                        <span className="text-[10px] font-black uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                          {r.crewNames?.join(", ") || "Crew"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                          Speed: {r.speedScore ?? 100}% ({r.totalDurationMinutes}m)
+                        </span>
+                        {r.photoUrls && r.photoUrls.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPhoto(r.photoUrls[0])}
+                            className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <Camera size={13} /> Foto
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                      <div className="bg-slate-50 p-2 rounded-xl">
+                        <span className="text-[10px] text-slate-400 block font-bold">Masak Adonan:</span>
+                        <span className="font-black text-slate-800">
+                          {cooking?.targets?.map((t: any) => `${t.batches} adonan (${t.pcs} pcs)`).join(", ") || "-"}
+                        </span>
+                      </div>
+                      <div className="bg-slate-50 p-2 rounded-xl">
+                        <span className="text-[10px] text-slate-400 block font-bold">Prepack Thinwall:</span>
+                        <span className="font-black text-slate-800">
+                          {prepack ? `Reg: ${prepack.packRegular || 0} | Full: ${prepack.packFull || 0} pack` : "-"}
+                        </span>
+                      </div>
+                      <div className="col-span-2 md:col-span-1 bg-slate-50 p-2 rounded-xl">
+                        <span className="text-[10px] text-slate-400 block font-bold">Sisa Bahan:</span>
+                        <span className="font-bold text-slate-700 text-[11px] truncate block">
+                          {r.rawMaterialRemaining?.map((m: any) => `${m.name}: ${m.remainingQty}${m.uom}`).join(" | ") || "Sesuai"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Overtime Review Section */}
+                    {ot?.isOvertimeEligible && (
+                      <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-black text-amber-900">Klaim Lembur:</span>
+                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                              ot.status === "approved" ? "bg-emerald-100 text-emerald-800 border-emerald-300" :
+                              ot.status === "rejected" ? "bg-red-100 text-red-800 border-red-300" :
+                              "bg-amber-100 text-amber-800 border-amber-300 animate-pulse"
+                            }`}>
+                              {ot.status === "approved" ? "Disetujui" : ot.status === "rejected" ? "Ditolak" : "Perlu Persetujuan"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-amber-800 mt-0.5">{ot.reason}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 self-end sm:self-center">
+                          {ot.status !== "approved" && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateOvertime(r.id, "approved")}
+                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black flex items-center gap-1 active:scale-95"
+                            >
+                              <Check size={12} /> Setujui
+                            </button>
+                          )}
+                          {ot.status !== "rejected" && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateOvertime(r.id, "rejected")}
+                              className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-xs font-bold border border-red-200 active:scale-95"
+                            >
+                              Tolak
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* ── Active Work Orders ────────────────────────────────────── */}
         <div>
           <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3 px-1">
@@ -296,6 +503,33 @@ export default function OwnerSFMPage() {
           )}
         </div>
       </div>
+
+      {/* Lightbox Modal */}
+      {selectedPhoto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
+          <div className="relative max-w-3xl max-h-[90vh] bg-white rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
+              <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <Camera size={14} className="text-slate-500" /> Foto Bukti Shift / Freezer
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedPhoto(null)}
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-all"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-2 overflow-auto flex items-center justify-center bg-slate-950">
+              <img
+                src={selectedPhoto}
+                alt="Bukti Shift"
+                className="max-h-[75vh] w-auto object-contain rounded-xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
