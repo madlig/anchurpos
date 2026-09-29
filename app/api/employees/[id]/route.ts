@@ -96,13 +96,47 @@ export async function DELETE(
       return NextResponse.json({ error: "Hanya Owner yang dapat menonaktifkan sesama Manager." }, { status: 403 });
     }
 
+    const isPermanent = req.nextUrl.searchParams.get("permanent") === "true";
+
+    if (isPermanent) {
+      // Cek apakah karyawan memiliki riwayat absensi
+      const attSnap = await adminDb.collection("attendances").where("employeeId", "==", id).limit(1).get();
+      if (!attSnap.empty) {
+        return NextResponse.json(
+          { error: "Karyawan ini sudah memiliki riwayat absensi. Tidak dapat dihapus permanen demi integritas data laporan. Gunakan status Nonaktif." },
+          { status: 400 }
+        );
+      }
+
+      // Cek apakah karyawan memiliki riwayat payroll
+      const paySnap = await adminDb.collection("payrolls").where("employeeId", "==", id).limit(1).get();
+      if (!paySnap.empty) {
+        return NextResponse.json(
+          { error: "Karyawan ini sudah memiliki riwayat slip gaji/payroll. Tidak dapat dihapus permanen." },
+          { status: 400 }
+        );
+      }
+
+      // Hapus dokumen Firestore
+      await ref.delete();
+
+      // Hapus dari Firebase Auth
+      try {
+        await adminAuth.deleteUser(id);
+      } catch (authErr) {
+        console.warn("User Auth might already be deleted or not found:", authErr);
+      }
+
+      return NextResponse.json({ success: true, permanent: true });
+    }
+
     await ref.update({ isActive: false, updatedAt: FieldValue.serverTimestamp() });
     await adminAuth.updateUser(id, { disabled: true });
 
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("DELETE /api/employees/[id] error:", err);
-    return NextResponse.json({ error: "Gagal menonaktifkan karyawan" }, { status: 500 });
+    return NextResponse.json({ error: "Gagal memproses penghapusan karyawan" }, { status: 500 });
   }
 }
 

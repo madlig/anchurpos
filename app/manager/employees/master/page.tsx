@@ -5,7 +5,6 @@ import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/Skeleton";
 import {
   Search,
-  Plus,
   UserPlus,
   Pencil,
   KeyRound,
@@ -21,6 +20,7 @@ import {
   Loader2,
   Users,
   AlertTriangle,
+  Info,
 } from "lucide-react";
 import { Employee, Role, ROLE_LABEL } from "../types";
 import { EmployeeModal } from "@/components/shared/EmployeeModal";
@@ -70,6 +70,10 @@ export default function MasterEmployeePage() {
   // Deactivate confirmation state
   const [deactivatingEmp, setDeactivatingEmp] = useState<Employee | null>(null);
   const [deactivating, setDeactivating] = useState(false);
+
+  // Permanent Delete confirmation state
+  const [permanentDeleteEmp, setPermanentDeleteEmp] = useState<Employee | null>(null);
+  const [permanentlyDeleting, setPermanentlyDeleting] = useState(false);
 
   // Reactivate confirmation / loading state
   const [reactivatingEmpId, setReactivatingEmpId] = useState<string | null>(null);
@@ -121,6 +125,27 @@ export default function MasterEmployeePage() {
     }
   };
 
+  const handlePermanentDelete = async (emp: Employee) => {
+    setPermanentlyDeleting(true);
+    try {
+      const res = await fetchWithAuth(`/api/employees/${emp.id}?permanent=true`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        showToast(`Akun ${emp.name} (@${emp.username}) berhasil dihapus permanen`);
+        setPermanentDeleteEmp(null);
+        await loadEmployees();
+      } else {
+        alert(data.error || "Gagal menghapus permanen data karyawan");
+      }
+    } catch {
+      alert("Terjadi kesalahan jaringan saat menghapus permanen karyawan");
+    } finally {
+      setPermanentlyDeleting(false);
+    }
+  };
+
   const handleReactivate = async (emp: Employee) => {
     setReactivatingEmpId(emp.id);
     try {
@@ -144,19 +169,26 @@ export default function MasterEmployeePage() {
 
   // Filtered lists & counts
   const counts = useMemo(() => {
-    const total = employees.length;
+    const active = employees.filter((e) => e.isActive !== false).length;
     const crew = employees.filter((e) => e.isActive !== false && e.role === "crew").length;
     const manager = employees.filter((e) => e.isActive !== false && (e.role === "manager" || e.role === "owner")).length;
     const inactive = employees.filter((e) => e.isActive === false).length;
-    return { total, crew, manager, inactive };
+    return { active, crew, manager, inactive };
   }, [employees]);
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
-      // Role & status filter
-      if (activeTab === "crew" && (emp.isActive === false || emp.role !== "crew")) return false;
-      if (activeTab === "manager" && (emp.isActive === false || (emp.role !== "manager" && emp.role !== "owner"))) return false;
-      if (activeTab === "inactive" && emp.isActive !== false) return false;
+      const isInactive = emp.isActive === false;
+
+      // PENTING: Karyawan nonaktif TIDAK PERNAH dicampur dengan yang aktif.
+      // Hanya tampil jika user secara eksplisit membuka tab "inactive".
+      if (activeTab === "inactive") {
+        if (!isInactive) return false;
+      } else {
+        if (isInactive) return false;
+        if (activeTab === "crew" && emp.role !== "crew") return false;
+        if (activeTab === "manager" && emp.role !== "manager" && emp.role !== "owner") return false;
+      }
 
       // Search query
       if (searchQuery.trim()) {
@@ -195,7 +227,7 @@ export default function MasterEmployeePage() {
             setSelectedEmployeeForEdit(null);
             setIsEmployeeModalOpen(true);
           }}
-          className="tap-target inline-flex items-center justify-center gap-2 h-11 px-5 rounded-2xl bg-slate-900 text-white font-bold text-xs shadow-md hover:bg-black active:scale-95 transition-all"
+          className="tap-target inline-flex items-center justify-center gap-2 h-11 px-5 rounded-2xl bg-slate-900 text-white font-bold text-xs shadow-md hover:bg-black active:scale-95 transition-all cursor-pointer"
         >
           <UserPlus size={16} />
           <span>Tambah Karyawan</span>
@@ -225,7 +257,7 @@ export default function MasterEmployeePage() {
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
             >
               <X size={15} />
             </button>
@@ -235,62 +267,104 @@ export default function MasterEmployeePage() {
         {/* Tab Badges */}
         <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar pt-1">
           <button
-            onClick={() => setActiveTab("all")}
-            className={`tap-target px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            onClick={() => {
+              setActiveTab("all");
+              setDeactivatingEmp(null);
+              setPermanentDeleteEmp(null);
+            }}
+            className={`tap-target px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
               activeTab === "all"
                 ? "bg-slate-900 text-white shadow-xs"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
             }`}
           >
-            Semua
-            <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${activeTab === "all" ? "bg-white/20 text-white" : "bg-white text-slate-700"}`}>
-              {counts.total}
+            Semua Aktif
+            <span
+              className={`px-1.5 py-0.5 rounded-md text-[10px] ${
+                activeTab === "all" ? "bg-white/20 text-white" : "bg-white text-slate-700"
+              }`}
+            >
+              {counts.active}
             </span>
           </button>
 
           <button
-            onClick={() => setActiveTab("crew")}
-            className={`tap-target px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            onClick={() => {
+              setActiveTab("crew");
+              setDeactivatingEmp(null);
+              setPermanentDeleteEmp(null);
+            }}
+            className={`tap-target px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
               activeTab === "crew"
                 ? "bg-slate-900 text-white shadow-xs"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
             }`}
           >
             Crew
-            <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${activeTab === "crew" ? "bg-white/20 text-white" : "bg-white text-slate-700"}`}>
+            <span
+              className={`px-1.5 py-0.5 rounded-md text-[10px] ${
+                activeTab === "crew" ? "bg-white/20 text-white" : "bg-white text-slate-700"
+              }`}
+            >
               {counts.crew}
             </span>
           </button>
 
           <button
-            onClick={() => setActiveTab("manager")}
-            className={`tap-target px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            onClick={() => {
+              setActiveTab("manager");
+              setDeactivatingEmp(null);
+              setPermanentDeleteEmp(null);
+            }}
+            className={`tap-target px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
               activeTab === "manager"
                 ? "bg-slate-900 text-white shadow-xs"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
             }`}
           >
             Manager & Owner
-            <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${activeTab === "manager" ? "bg-white/20 text-white" : "bg-white text-slate-700"}`}>
+            <span
+              className={`px-1.5 py-0.5 rounded-md text-[10px] ${
+                activeTab === "manager" ? "bg-white/20 text-white" : "bg-white text-slate-700"
+              }`}
+            >
               {counts.manager}
             </span>
           </button>
 
           <button
-            onClick={() => setActiveTab("inactive")}
-            className={`tap-target px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            onClick={() => {
+              setActiveTab("inactive");
+              setDeactivatingEmp(null);
+              setPermanentDeleteEmp(null);
+            }}
+            className={`tap-target px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
               activeTab === "inactive"
                 ? "bg-rose-600 text-white shadow-xs"
                 : "bg-rose-50 text-rose-600 hover:bg-rose-100"
             }`}
           >
             Nonaktif
-            <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${activeTab === "inactive" ? "bg-white/20 text-white" : "bg-white text-rose-700"}`}>
+            <span
+              className={`px-1.5 py-0.5 rounded-md text-[10px] ${
+                activeTab === "inactive" ? "bg-white/20 text-white" : "bg-white text-rose-700"
+              }`}
+            >
               {counts.inactive}
             </span>
           </button>
         </div>
       </div>
+
+      {/* Banner informasi khusus saat di tab Nonaktif */}
+      {activeTab === "inactive" && counts.inactive > 0 && (
+        <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/70 text-amber-800 text-xs font-medium flex items-center gap-2.5">
+          <Info size={16} className="text-amber-600 flex-shrink-0" />
+          <span>
+            Karyawan di tab ini dinonaktifkan dari sistem. Anda dapat memulihkan akses mereka dengan tombol <strong>Aktifkan Kembali</strong>, atau menghapus permanen data yang dibuat karena salah input/duplikat dengan tombol <strong>Hapus Permanen</strong>.
+          </span>
+        </div>
+      )}
 
       {/* Main Content List */}
       {loading ? (
@@ -310,6 +384,8 @@ export default function MasterEmployeePage() {
           <p className="text-xs text-slate-400">
             {searchQuery
               ? `Tidak ada hasil untuk kata kunci "${searchQuery}"`
+              : activeTab === "inactive"
+              ? "Tidak ada data karyawan nonaktif saat ini."
               : "Belum ada data pada kategori ini."}
           </p>
           {searchQuery && (
@@ -330,22 +406,23 @@ export default function MasterEmployeePage() {
             const isManagerAccount = emp.role === "manager";
 
             // Permission hierarchy checks:
-            // Manager cannot edit/change pw for Owner
             const canEdit = currentUserRole === "owner" || !isOwnerAccount;
             const canChangePw =
               currentUserRole === "owner" ||
               (!isOwnerAccount && (!isManagerAccount || isSelf));
 
             // Deactivate hierarchy:
-            // Cannot deactivate self
-            // Manager cannot deactivate Owner or other Manager
             const canDeactivate =
               !isSelf &&
               (currentUserRole === "owner" || (!isOwnerAccount && !isManagerAccount));
 
             // Reactivate hierarchy:
-            // Manager can reactivate crew/manager, owner can reactivate all
             const canReactivate = currentUserRole === "owner" || !isOwnerAccount;
+
+            // Permanent delete hierarchy:
+            // Hanya Owner atau Manager (untuk akun crew nonaktif)
+            const canPermanentDelete =
+              currentUserRole === "owner" || (currentUserRole === "manager" && !isOwnerAccount && !isManagerAccount);
 
             // Role Badge styling
             const roleBadgeStyle =
@@ -364,6 +441,7 @@ export default function MasterEmployeePage() {
                 : "bg-slate-800 text-white";
 
             const isDeactivatingThis = deactivatingEmp?.id === emp.id;
+            const isPermanentlyDeletingThis = permanentDeleteEmp?.id === emp.id;
             const isReactivatingThis = reactivatingEmpId === emp.id;
 
             return (
@@ -371,7 +449,7 @@ export default function MasterEmployeePage() {
                 key={emp.id}
                 className={`bg-white rounded-3xl p-4 sm:p-5 border transition-all duration-200 ${
                   isInactive
-                    ? "border-slate-200/50 bg-slate-50/40 opacity-80"
+                    ? "border-slate-200/50 bg-slate-50/40"
                     : "border-slate-200/80 shadow-xs hover:border-slate-300 hover:shadow-sm"
                 }`}
               >
@@ -492,7 +570,7 @@ export default function MasterEmployeePage() {
                         setSelectedEmployeeForEdit(emp);
                         setIsEmployeeModalOpen(true);
                       }}
-                      className="tap-target inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="tap-target inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                     >
                       <Pencil size={13} className="text-slate-500" />
                       <span>Edit Data</span>
@@ -506,37 +584,58 @@ export default function MasterEmployeePage() {
                         setSelectedEmployeeForPassword(emp);
                         setIsPasswordModalOpen(true);
                       }}
-                      className="tap-target inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 hover:bg-amber-100 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="tap-target inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 hover:bg-amber-100 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                     >
                       <KeyRound size={13} className="text-amber-600" />
                       <span>Ganti Password</span>
                     </button>
                   </div>
 
-                  {/* Status Toggle Actions: Deactivate OR Reactivate */}
-                  <div>
+                  {/* Status Toggle Actions: Deactivate OR Reactivate + Permanent Delete */}
+                  <div className="flex items-center gap-2 flex-wrap">
                     {isInactive ? (
-                      /* Reactivate Button (Point 1 requirement) */
-                      <button
-                        type="button"
-                        disabled={!canReactivate || isReactivatingThis}
-                        onClick={() => handleReactivate(emp)}
-                        className="tap-target inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-40 shadow-xs"
-                      >
-                        {isReactivatingThis ? (
-                          <Loader2 size={13} className="animate-spin" />
-                        ) : (
-                          <RotateCcw size={13} />
+                      <>
+                        {/* Hapus Permanen Button (Khusus Data Salah/Dobel) */}
+                        {canPermanentDelete && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPermanentDeleteEmp(emp);
+                              setDeactivatingEmp(null);
+                            }}
+                            className="tap-target inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 active:scale-95 transition-all cursor-pointer"
+                            title="Hapus permanen akun (khusus data salah input / dobel)"
+                          >
+                            <Trash2 size={13} />
+                            <span>Hapus Permanen</span>
+                          </button>
                         )}
-                        <span>{isReactivatingThis ? "Mengaktifkan..." : "Aktifkan Kembali"}</span>
-                      </button>
+
+                        {/* Reactivate Button */}
+                        <button
+                          type="button"
+                          disabled={!canReactivate || isReactivatingThis}
+                          onClick={() => handleReactivate(emp)}
+                          className="tap-target inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-40 shadow-xs cursor-pointer"
+                        >
+                          {isReactivatingThis ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <RotateCcw size={13} />
+                          )}
+                          <span>{isReactivatingThis ? "Mengaktifkan..." : "Aktifkan Kembali"}</span>
+                        </button>
+                      </>
                     ) : (
                       /* Deactivate Button */
                       canDeactivate && (
                         <button
                           type="button"
-                          onClick={() => setDeactivatingEmp(emp)}
-                          className="tap-target inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 active:scale-95 transition-all"
+                          onClick={() => {
+                            setDeactivatingEmp(emp);
+                            setPermanentDeleteEmp(null);
+                          }}
+                          className="tap-target inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 active:scale-95 transition-all cursor-pointer"
                         >
                           <Trash2 size={13} className="text-rose-500" />
                           <span>Nonaktifkan</span>
@@ -556,7 +655,7 @@ export default function MasterEmployeePage() {
                           Nonaktifkan akun {emp.name}?
                         </p>
                         <p className="text-[11px] font-medium text-rose-700 mt-0.5">
-                          Karyawan ini tidak akan bisa login ke aplikasi absensi maupun POS kasir.
+                          Karyawan ini tidak akan bisa login ke aplikasi absensi maupun POS kasir. Akun akan dipindahkan ke tab Nonaktif.
                         </p>
                       </div>
                     </div>
@@ -564,7 +663,7 @@ export default function MasterEmployeePage() {
                       <button
                         type="button"
                         onClick={() => setDeactivatingEmp(null)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 cursor-pointer"
                       >
                         Batal
                       </button>
@@ -572,7 +671,7 @@ export default function MasterEmployeePage() {
                         type="button"
                         disabled={deactivating}
                         onClick={() => handleDeactivate(emp)}
-                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 shadow-xs"
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 shadow-xs cursor-pointer"
                       >
                         {deactivating ? (
                           <Loader2 size={13} className="animate-spin" />
@@ -580,6 +679,45 @@ export default function MasterEmployeePage() {
                           <Trash2 size={13} />
                         )}
                         <span>{deactivating ? "Memproses..." : "Ya, Nonaktifkan"}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Inline Permanent Delete Confirmation */}
+                {isPermanentlyDeletingThis && (
+                  <div className="mt-3 p-3.5 bg-rose-50 border border-rose-300 rounded-2xl animate-in fade-in duration-150 space-y-2.5">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle size={16} className="text-rose-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-black text-rose-900">
+                          Hapus permanen akun {emp.name} (@{emp.username})?
+                        </p>
+                        <p className="text-[11px] font-medium text-rose-700 mt-0.5">
+                          Tindakan ini akan menghapus akun dari database selamanya (khusus data ganda atau salah input). Akun yang sudah memiliki riwayat absensi atau transaksi penggajian tidak dapat dihapus permanen.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setPermanentDeleteEmp(null)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        disabled={permanentlyDeleting}
+                        onClick={() => handlePermanentDelete(emp)}
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-black bg-rose-700 text-white hover:bg-rose-800 disabled:opacity-50 shadow-xs cursor-pointer"
+                      >
+                        {permanentlyDeleting ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={13} />
+                        )}
+                        <span>{permanentlyDeleting ? "Menghapus..." : "Ya, Hapus Permanen"}</span>
                       </button>
                     </div>
                   </div>
