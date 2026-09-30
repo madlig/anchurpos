@@ -50,3 +50,16 @@ export function formatDateTime(dateString: string | undefined | null): string {
     return "-";
   }
 }
+
+/**
+ * Returns current date string formatted as YYYY-MM-DD in Asia/Jakarta (WIB) timezone.
+ * Prevents UTC timezone drift issues where shifts before 07:00 AM WIB are treated as previous day.
+ */
+export function getJakartaDate(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}

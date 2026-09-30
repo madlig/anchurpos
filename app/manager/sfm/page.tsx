@@ -198,23 +198,24 @@ export default function ManagerSFMPage() {
       const dateParams = activeTab === "audit_ledger"
         ? `startDate=${startDate}&endDate=${endDate}`
         : "";
+      const needStatic = showSkeleton || variants.length === 0 || employees.length === 0;
       const [woRes, varRes, ordersRes, empRes, srRes, rakRes, petiRes] = await Promise.all([
         fetchWithAuth(`/api/sfm/work-orders?${dateParams}&search=${encodeURIComponent(searchQuery)}`),
-        fetchWithAuth("/api/variants"),
-        fetchWithAuth("/api/orders"),
-        fetchWithAuth("/api/employees"),
+        needStatic ? fetchWithAuth("/api/variants").catch(() => null) : Promise.resolve(null),
+        needStatic ? fetchWithAuth("/api/orders").catch(() => null) : Promise.resolve(null),
+        needStatic ? fetchWithAuth("/api/employees").catch(() => null) : Promise.resolve(null),
         fetchWithAuth("/api/sfm/shift-reports").catch(() => null),
         fetchWithAuth("/api/sfm/freezer-rak").catch(() => null),
         fetchWithAuth("/api/products/stocks").catch(() => null),
       ]);
 
       if (woRes.ok) setWorkOrders(await woRes.json());
-      if (varRes.ok) setVariants(await varRes.json());
-      if (ordersRes.ok) {
+      if (varRes && varRes.ok) setVariants(await varRes.json());
+      if (ordersRes && ordersRes.ok) {
         const allOrders = await ordersRes.json();
         setPendingOrders(Array.isArray(allOrders) ? allOrders.filter((o: any) => o.status === "pending" && !o.hasWorkOrder) : []);
       }
-      if (empRes.ok) {
+      if (empRes && empRes.ok) {
         const allEmp = await empRes.json();
         setEmployees(Array.isArray(allEmp) ? allEmp.filter((e: any) => e.isActive !== false) : []);
       }
@@ -266,7 +267,7 @@ export default function ManagerSFMPage() {
 
     const fetchInterval = setInterval(() => {
       if (document.visibilityState === "visible") loadAllData();
-    }, 30000);
+    }, 60000);
 
     const handleFCM = () => loadAllData();
     window.addEventListener("fcm_message", handleFCM);

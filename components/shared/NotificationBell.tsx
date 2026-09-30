@@ -51,7 +51,7 @@ export function NotificationBell() {
       if (document.visibilityState === "visible") {
         fetchAlerts();
       }
-    }, 30000);
+    }, 120000);
 
     const handleFCM = () => fetchAlerts();
     window.addEventListener("fcm_message", handleFCM);

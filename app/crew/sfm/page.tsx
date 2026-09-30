@@ -131,7 +131,7 @@ export default function CrewSFMTerminal() {
     loadData(workOrders.length === 0);
     const fetchInterval = setInterval(() => {
       if (document.visibilityState === "visible") loadData(false);
-    }, 30000);
+    }, 60000);
     const handleFCM = () => loadData(false);
     window.addEventListener("fcm_message", handleFCM);
     const handleVisibility = () => {

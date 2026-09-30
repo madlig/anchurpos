@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
+import { getJakartaDate } from "@/lib/formatters";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
   const user = auth as AuthUser;
 
   try {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getJakartaDate();
     const attendanceId = `${today}_${user.uid}`;
     const todaySnap = await adminDb.doc(`attendance/${attendanceId}`).get();
 
@@ -55,8 +56,14 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.date.localeCompare(a.date));
 
     return NextResponse.json({ today: todayStatus, history });
-  } catch (err) {
+  } catch (err: any) {
     console.error("GET /api/attendance/my-status error:", err);
+    if (err?.code === 8 || err?.message?.includes("Quota exceeded") || err?.details?.includes("Quota exceeded")) {
+      return NextResponse.json(
+        { error: "Sistem absensi sedang sibuk. Silakan muat ulang atau hubungi Manager jika kendala berlanjut." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: "Gagal mengambil status absen" }, { status: 500 });
   }
 }

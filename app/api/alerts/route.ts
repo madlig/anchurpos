@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       const snap = await adminDb
         .collection("alerts")
         .orderBy("createdAt", "desc")
-        .limit(100)
+        .limit(20)
         .get();
       const results = snap.docs
         .filter((doc) => doc.data().isRead === false)

@@ -11,6 +11,8 @@ interface OrderItem {
   id: string; productName: string; variantName: string;
   qty: number; basePrice: number; discountPerUnit: number; totalPrice: number;
   assemblyStatus: string | null;
+  sauceId?: string | null;
+  sauceName?: string | null;
 }
 
 interface OrderDetail {
@@ -189,7 +191,7 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
           </style>
         </head>
         <body>
-          <div class="center header-brand">ANCHUR BANDUNG</div>
+          <div class="center header-brand">ANCHUR.US</div>
           <div class="center header-sub">Spesialis Churros & Dipping Sauces</div>
           <div class="center header-sub">IG: @anchur.id</div>
           
@@ -225,7 +227,7 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
           <table class="item-table">
             ${sortedItems.map(item => `
               <tr>
-                <td colspan="3" class="item-name">${item.productName} ${!isGenericVariant(item.variantName) ? `<span style="font-weight: normal; color: #475569;">(${item.variantName})</span>` : ""}</td>
+                <td colspan="3" class="item-name">${item.productName}${item.sauceName ? ` - ${item.sauceName}` : ''} ${!isGenericVariant(item.variantName) ? `<span style="font-weight: normal; color: #475569;">(${item.variantName})</span>` : ""}</td>
               </tr>
               <tr>
                 <td class="item-qty">${item.qty}x</td>
@@ -445,7 +447,10 @@ export function OrderDetailView({ orderId, onOrderUpdated, onClose }: OrderDetai
             <div key={idx} className="p-5 hover:bg-slate-50/50 transition-colors">
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <p className="text-sm font-bold text-slate-800">{item.productName}</p>
+                  <p className="text-sm font-bold text-slate-800">
+                    {item.productName}
+                    {item.sauceName ? ` - ${item.sauceName}` : ""}
+                  </p>
                   {item.variantName && !["none", "Tanpa Varian", "Jasa"].includes(item.variantName) && (
                     <p className="text-xs font-semibold text-primary mt-0.5 bg-brand-50 inline-block px-2 py-0.5 rounded-md">
                       Varian: {item.variantName}

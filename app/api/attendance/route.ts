@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
+import { getJakartaDate } from "@/lib/formatters";
 
 export async function GET(req: NextRequest) {
   const auth = await requireRole(req, ["owner", "manager", "crew"]);
@@ -31,10 +32,7 @@ export async function GET(req: NextRequest) {
   try {
     // ── AUTO-CHECKOUT ROUTINE (Hanya dijalankan untuk manager/owner untuk menghemat write op) ──
     if (user.role !== "crew") {
-      const today = new Date();
-      // Offset by UTC+7 for local Indonesian date
-      const offsetDate = new Date(today.getTime() + 7 * 60 * 60 * 1000);
-      const todayStr = offsetDate.toISOString().split("T")[0];
+      const todayStr = getJakartaDate();
 
       const unclosedSnap = await adminDb.collection("attendance")
         .where("status", "==", "belum_lengkap")

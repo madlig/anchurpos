@@ -4,6 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
 import { sendAttendanceNotification } from "@/lib/attendance-notifications";
+import { getJakartaDate } from "@/lib/formatters";
 
 async function uploadAttendancePhoto(
   userId: string,
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
       locationValid = distance <= allowedRadius;
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = getJakartaDate();
     const attendanceId = `${today}_${user.uid}`;
     const existingSnap = await adminDb.doc(`attendance/${attendanceId}`).get();
 
@@ -146,8 +147,14 @@ export async function POST(req: NextRequest) {
     }).catch((err) => console.error("Error triggering check-in notification:", err));
 
     return NextResponse.json({ success: true, attendanceId });
-  } catch (err) {
+  } catch (err: any) {
     console.error("POST /api/attendance/check-in error:", err);
-    return NextResponse.json({ error: "Gagal absen masuk" }, { status: 500 });
+    if (err?.code === 8 || err?.message?.includes("Quota exceeded") || err?.details?.includes("Quota exceeded")) {
+      return NextResponse.json(
+        { error: "Terjadi kendala pada sistem absensi. Silakan langsung hubungi Manager untuk bantuan absensi." },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json({ error: "Gagal absen masuk. Silakan hubungi Manager jika kendala berlanjut." }, { status: 500 });
   }
 }

@@ -175,7 +175,7 @@ export default function OwnerSFMPage() {
 
     const intervalId = setInterval(() => {
       if (document.visibilityState === "visible") load(false);
-    }, 30000);
+    }, 60000);
 
     const handleFCM = () => load(false);
     window.addEventListener("fcm_message", handleFCM);

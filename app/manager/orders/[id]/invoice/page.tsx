@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { Printer } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
 
-interface OrderItem { productName: string; variantName: string; qty: number; basePrice: number; discountPerUnit?: number; totalPrice: number; }
+interface OrderItem { productName: string; variantName: string; qty: number; basePrice: number; discountPerUnit?: number; totalPrice: number; sauceId?: string | null; sauceName?: string | null; }
 interface OrderDetail {
   id: string; orderNumber: string; customerName: string; customerPhone: string | null;
   channel: string; orderChannel: string; customerType: string | null; poNumber: string | null;
@@ -172,7 +172,7 @@ export default function InvoicePage() {
               <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                 <img src="/logo.png" alt="Anchur Logo" style={{ width: "52px", height: "52px", objectFit: "contain", borderRadius: "10px" }} />
                 <div>
-                  <h1 style={{ fontSize: "20px", fontWeight: "900", color: "#0F172A", margin: 0, letterSpacing: "0.04em" }}>ANCHUR BANDUNG</h1>
+                  <h1 style={{ fontSize: "20px", fontWeight: "900", color: "#0F172A", margin: 0, letterSpacing: "0.04em" }}>ANCHUR.US</h1>
                   <p style={{ fontSize: "11px", color: "#64748B", margin: "2px 0 0" }}>Spesialis Churros & Dips · Operasional Kasir & Penjualan</p>
                 </div>
               </div>
@@ -212,7 +212,7 @@ export default function InvoicePage() {
                     Pelunasan Pesanan {order.orderNumber} ({sortedItems.reduce((s, i) => s + i.qty, 0)} item{shipping > 0 ? " + Ongkos Kirim" : ""})
                   </p>
                   <p style={{ margin: "4px 0 0", fontSize: "11px", color: "#64748B", lineHeight: "1.4" }}>
-                    {sortedItems.map(i => `${i.qty}x ${i.productName}${!isGenericVariant(i.variantName) ? ` (${i.variantName})` : ''}`).join(", ")}
+                    {sortedItems.map(i => `${i.qty}x ${i.productName}${i.sauceName ? ` - ${i.sauceName}` : ''}${!isGenericVariant(i.variantName) ? ` (${i.variantName})` : ''}`).join(", ")}
                     {order.shippingAddress ? ` · Tujuan: ${order.shippingAddress}` : ""}
                   </p>
                 </div>
@@ -256,7 +256,7 @@ export default function InvoicePage() {
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <img src="/logo.png" alt="Anchur Logo" style={{ width: "48px", height: "48px", objectFit: "contain", borderRadius: "8px" }} />
                 <div>
-                  <h1 style={{ fontSize: "18px", fontWeight: "900", color: "#0F172A", margin: 0, letterSpacing: "0.03em" }}>ANCHUR BANDUNG</h1>
+                  <h1 style={{ fontSize: "18px", fontWeight: "900", color: "#0F172A", margin: 0, letterSpacing: "0.03em" }}>ANCHUR.US</h1>
                   <p style={{ fontSize: "11px", color: "#475569", margin: "2px 0 0" }}>Spesialis Churros & Dipping Sauces · Bandung</p>
                   <p style={{ fontSize: "10px", color: "#64748B", margin: "1px 0 0" }}>Instagram: @anchur.id</p>
                 </div>
@@ -307,11 +307,14 @@ export default function InvoicePage() {
                       <td style={{ padding: "9px 8px", textAlign: "center", fontSize: "12px", color: "#64748B", verticalAlign: "top" }}>{i + 1}</td>
                       <td style={{ padding: "9px 8px", textAlign: "center", fontSize: "12px", fontWeight: "700", color: "#0F172A", verticalAlign: "top" }}>{item.qty}</td>
                       <td style={{ padding: "9px 12px", fontSize: "12px", verticalAlign: "top" }}>
-                        <span style={{ fontWeight: "700", color: "#0F172A" }}>{item.productName}</span>
+                        <span style={{ fontWeight: "700", color: "#0F172A" }}>
+                          {item.productName}
+                          {item.sauceName ? ` - ${item.sauceName}` : ""}
+                        </span>
                         {!isGenericVariant(item.variantName) && (
                           <span style={{ fontSize: "11px", color: "#475569", marginLeft: "6px" }}>({item.variantName})</span>
                         )}
-                        {hasSauces && (
+                        {hasSauces && !item.sauceName && (
                           <div style={{ marginTop: "4px", background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "4px 8px", borderRadius: "5px", display: "inline-block" }}>
                             <span style={{ fontSize: "10px", fontWeight: "800", color: "#475569", textTransform: "uppercase", marginRight: "6px" }}>Saus Include:</span>
                             <span style={{ fontSize: "11px", color: "#334155" }}>
@@ -334,6 +337,17 @@ export default function InvoicePage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "28px" }}>
               {/* Catatan / Keterangan Pembayaran */}
               <div style={{ maxWidth: "340px", fontSize: "11px", color: "#475569" }}>
+                {(!isPaid || order.paymentMethod === "transfer") && (
+                  <div style={{ background: "#F1F5F9", border: "1px solid #CBD5E1", padding: "8px 12px", borderRadius: "8px", marginBottom: "8px" }}>
+                    <p style={{ margin: "0 0 2px", fontWeight: "800", color: "#0F172A", fontSize: "11px" }}>Pembayaran Transfer:</p>
+                    <p style={{ margin: 0, fontSize: "12px", fontWeight: "800", color: "#0F172A" }}>
+                      BCA: 6395479567 <span style={{ fontWeight: "500", fontSize: "11px", color: "#475569" }}>a/n Anindya Azzahra</span>
+                    </p>
+                    <p style={{ margin: "3px 0 0", fontSize: "10px", color: "#64748B" }}>
+                      Sertakan bukti transfer agar pesanan dapat langsung diproses.
+                    </p>
+                  </div>
+                )}
                 {order.orderNotes && (
                   <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "8px 12px", borderRadius: "6px", marginBottom: "8px" }}>
                     <strong>Catatan:</strong> {order.orderNotes}
@@ -402,7 +416,7 @@ export default function InvoicePage() {
                 Perhatian: Barang yang sudah dibeli tidak dapat ditukar/dikembalikan kecuali ada perjanjian terlebih dahulu.
               </p>
               <p style={{ fontSize: "9px", color: "#94A3B8", margin: 0 }}>
-                Terima kasih atas kunjungan & kepercayaan Anda berbelanja di Anchur Bandung.
+                Terima kasih atas kunjungan & kepercayaan Anda berbelanja di Anchur.us.
               </p>
             </div>
           </div>
@@ -413,8 +427,8 @@ export default function InvoicePage() {
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "32px", borderBottom: "2px solid #E85D8C", paddingBottom: "24px" }}>
               <div>
                 <img src="/logo.png" alt="Anchur Logo" style={{ width: "auto", height: "64px", objectFit: "contain", marginBottom: "12px", borderRadius: "12px" }} />
-                <h1 style={{ fontSize: "22px", fontWeight: "800", color: "#E85D8C", margin: 0 }}>AnchurPOS</h1>
-                <p style={{ fontSize: "12px", color: "#94A3B8", margin: "2px 0 0" }}>Sistem Manajemen Produksi</p>
+                <h1 style={{ fontSize: "22px", fontWeight: "900", color: "#E85D8C", margin: 0, letterSpacing: "0.04em" }}>ANCHUR.US</h1>
+                <p style={{ fontSize: "12px", color: "#64748B", margin: "2px 0 0" }}>Spesialis Churros & Dipping Sauces</p>
               </div>
               <div style={{ textAlign: "right" }}>
                 <h2 style={{ fontSize: "28px", fontWeight: "800", color: "#1C1C1E", margin: "0 0 6px" }}>{docTitle}</h2>
@@ -448,10 +462,16 @@ export default function InvoicePage() {
                     {order.completedAt && <p style={{ fontSize: "12px", color: "#64748B", margin: 0 }}>Tgl. Lunas: {fmtDate(order.completedAt)}</p>}
                   </>
                 ) : (
-                  <div style={{ background: "#F1F5F9", padding: "10px", borderRadius: "8px", borderLeft: "3px solid #E85D8C" }}>
-                    <p style={{ fontSize: "11px", color: "#475569", margin: "0 0 4px", fontWeight: "600" }}>Instruksi Pembayaran</p>
-                    <p style={{ fontSize: "11px", color: "#64748B", margin: 0, lineHeight: "1.4" }}>
-                      Mohon lakukan pembayaran sesuai nominal tagihan melalui metode yang telah disepakati sebelum pesanan dikirim/diambil.
+                  <div style={{ background: "#F1F5F9", padding: "10px 14px", borderRadius: "8px", borderLeft: "3px solid #E85D8C" }}>
+                    <p style={{ fontSize: "11px", color: "#475569", margin: "0 0 4px", fontWeight: "700", textTransform: "uppercase" }}>Instruksi Pembayaran Transfer</p>
+                    <p style={{ fontSize: "13px", color: "#0F172A", margin: "0 0 2px", fontWeight: "800" }}>
+                      Bank BCA: 6395479567
+                    </p>
+                    <p style={{ fontSize: "11px", color: "#475569", margin: "0 0 4px", fontWeight: "600" }}>
+                      a/n Anindya Azzahra
+                    </p>
+                    <p style={{ fontSize: "10px", color: "#64748B", margin: 0, lineHeight: "1.4" }}>
+                      Mohon transfer sesuai nominal tagihan dan kirimkan bukti transfer ke WhatsApp agar pesanan dapat langsung diproses.
                     </p>
                   </div>
                 )}
@@ -474,12 +494,15 @@ export default function InvoicePage() {
                   return (
                     <tr key={i} style={{ borderBottom: "1px solid #F1F5F9" }}>
                       <td style={{ padding: "12px", fontSize: "13px", verticalAlign: "top" }}>
-                        <p style={{ fontWeight: "600", color: "#1C1C1E", margin: "0 0 2px" }}>{item.productName}</p>
+                        <p style={{ fontWeight: "700", color: "#1C1C1E", margin: "0 0 2px" }}>
+                          {item.productName}
+                          {item.sauceName ? ` - ${item.sauceName}` : ""}
+                        </p>
                         {!isGenericVariant(item.variantName) && (
-                          <p style={{ fontSize: "11px", color: "#94A3B8", margin: 0 }}>Varian: {item.variantName}</p>
+                          <p style={{ fontSize: "11px", color: "#64748B", margin: 0 }}>({item.variantName})</p>
                         )}
                         
-                        {hasSauces && (
+                        {hasSauces && !item.sauceName && (
                           <div style={{ marginTop: "8px", background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "6px 10px", borderRadius: "6px", display: "inline-block" }}>
                             <p style={{ fontSize: "10px", fontWeight: "700", color: "#64748B", margin: "0 0 4px", textTransform: "uppercase" }}>Saus (Include):</p>
                             {Object.entries(order.sauceDistribution!).map(([sauceId, qty], idx) => qty > 0 && (

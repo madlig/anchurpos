@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth-middleware";
 import type { AuthUser } from "@/lib/auth-middleware";
 import { BUSINESS } from "@/lib/constants";
 import { sendAttendanceNotification } from "@/lib/attendance-notifications";
+import { getJakartaDate } from "@/lib/formatters";
 
 async function uploadAttendancePhoto(
   userId: string,
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
       locationValid = distance <= allowedRadius;
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = getJakartaDate();
     const attendanceId = `${today}_${user.uid}`;
     const docSnap = await adminDb.doc(`attendance/${attendanceId}`).get();
 
@@ -175,8 +176,14 @@ export async function POST(req: NextRequest) {
       totalHours: Math.round(totalHours * 100) / 100,
       overtimeBonus,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("POST /api/attendance/check-out error:", err);
-    return NextResponse.json({ error: "Gagal absen pulang" }, { status: 500 });
+    if (err?.code === 8 || err?.message?.includes("Quota exceeded") || err?.details?.includes("Quota exceeded")) {
+      return NextResponse.json(
+        { error: "Terjadi kendala pada sistem absensi. Silakan langsung hubungi Manager untuk bantuan absensi pulang." },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json({ error: "Gagal absen pulang. Silakan hubungi Manager jika kendala berlanjut." }, { status: 500 });
   }
 }
