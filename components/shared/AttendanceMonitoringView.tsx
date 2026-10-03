@@ -439,55 +439,57 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
         </div>
       </div>
 
-      {/* ── WIDGET REAL-TIME HARI INI (LIVE SHIFT ROSTER) ── */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 rounded-3xl p-5 text-white shadow-xl border border-slate-800 space-y-4">
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <h3 className="text-sm font-black uppercase tracking-wider text-slate-200">
-              Live Shift Toko Hari Ini ({fmtDateFull(todayStr)})
+      {/* ── WIDGET REAL-TIME HARI INI (RINGKASAN SHIFT) ── */}
+      <div className="bg-white rounded-2xl p-5 shadow-xs border border-slate-200 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800">
+              Pantauan Shift Hari Ini ({fmtDateFull(todayStr)})
             </h3>
+            <p className="text-xs text-slate-400 font-medium">
+              Status kehadiran kru yang bertugas di toko hari ini
+            </p>
           </div>
-          <span className="text-[11px] font-bold text-slate-400">
-            Total {todayAttendances.length} Shift Tercatat
+          <span className="text-xs font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 w-fit">
+            {todayAttendances.length} Shift Tercatat
           </span>
         </div>
 
         {/* 3 Metric Cards disesuaikan dengan sistem kerja Shift */}
         <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
           {/* On-Duty */}
-          <div className="bg-white/10 rounded-2xl p-3.5 border border-white/10 text-center">
-            <p className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider">Sedang Shift</p>
-            <p className="text-2xl font-black text-white mt-1">{onDutyCrew.length}</p>
-            <p className="text-[10px] text-white/60 mt-0.5">On-Duty di Toko</p>
+          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-center">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Sedang Shift</p>
+            <p className="text-2xl font-mono font-black text-slate-900 mt-1">{onDutyCrew.length}</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">On-Duty di Toko</p>
           </div>
 
           {/* Selesai */}
-          <div className="bg-white/10 rounded-2xl p-3.5 border border-white/10 text-center">
-            <p className="text-[10px] font-bold text-blue-300 uppercase tracking-wider">Selesai Hari Ini</p>
-            <p className="text-2xl font-black text-white mt-1">{completedTodayCrew.length}</p>
-            <p className="text-[10px] text-white/60 mt-0.5">Sudah Checkout</p>
+          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-center">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Selesai Hari Ini</p>
+            <p className="text-2xl font-mono font-black text-slate-900 mt-1">{completedTodayCrew.length}</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">Sudah Checkout</p>
           </div>
 
           {/* Total Hadir */}
-          <div className="bg-white/10 rounded-2xl p-3.5 border border-white/10 text-center">
-            <p className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Total Hadir</p>
-            <p className="text-2xl font-black text-white mt-1">{todayAttendances.length}</p>
-            <p className="text-[10px] text-white/60 mt-0.5">Crew Bertugas</p>
+          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-center">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Hadir</p>
+            <p className="text-2xl font-mono font-black text-slate-900 mt-1">{todayAttendances.length}</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">Kru Bertugas</p>
           </div>
         </div>
 
         {/* List of On-Duty Crew right now */}
         {onDutyCrew.length > 0 ? (
           <div className="pt-2">
-            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-400 mb-2">
-              Crew Sedang Bertugas Saat Ini:
+            <p className="text-xs font-bold text-slate-700 mb-2">
+              Kru Sedang Bertugas:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {onDutyCrew.map((c) => (
                 <div
                   key={c.id}
-                  className="bg-white/5 border border-emerald-500/30 rounded-xl p-2.5 flex items-center justify-between gap-2"
+                  className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 flex items-center justify-between gap-2"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     {c.checkIn?.photoUrl ? (
@@ -507,30 +509,30 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
                             longitude: c.checkIn?.longitude,
                           })
                         }
-                        className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-emerald-400/50 cursor-pointer relative group"
-                        title="Klik untuk lihat selfie"
+                        className="w-9 h-9 rounded-lg overflow-hidden shrink-0 border border-slate-200 cursor-pointer relative group"
+                        title="Lihat foto selfie masuk"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={c.checkIn.photoUrl} alt="Selfie" className="w-full h-full object-cover" />
                       </button>
                     ) : (
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0">
-                        <User size={14} />
+                      <div className="w-9 h-9 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center shrink-0">
+                        <User size={15} />
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-white truncate">{c.employeeName}</p>
-                      <p className="text-[10px] text-slate-300">
+                      <p className="text-xs font-bold text-slate-800 truncate">{c.employeeName}</p>
+                      <p className="text-[11px] font-mono text-slate-500">
                         Masuk: {fmtTime(c.checkIn!.time)} · Durasi:{" "}
                         <LiveShiftTimer checkInTime={c.checkIn!.time} />
                       </p>
                     </div>
                   </div>
                   <span
-                    className={`text-[9px] font-black px-2 py-0.5 rounded-full shrink-0 ${
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0 ${
                       c.checkIn?.locationValid
-                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                        : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : "bg-rose-50 text-rose-700 border border-rose-200"
                     }`}
                   >
                     {c.checkIn?.locationValid ? "Di Toko" : "Luar Radius"}
@@ -540,22 +542,22 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
             </div>
           </div>
         ) : todayAttendances.length === 0 ? (
-          <p className="text-xs text-slate-400 text-center py-2 italic">
-            Belum ada crew yang melakukan absen shift hari ini.
+          <p className="text-xs text-slate-400 text-center py-3 bg-slate-50/60 rounded-xl border border-dashed border-slate-200">
+            Belum ada kru yang melakukan absen shift hari ini.
           </p>
         ) : null}
 
         {/* Collapsible untuk melihat crew yang belum ada absen hari ini (off-duty / jadwal shift nanti) */}
         {unclockedCrew.length > 0 && (
-          <div className="pt-1 border-t border-white/5">
+          <div className="pt-2 border-t border-slate-100">
             <button
               type="button"
               onClick={() => setShowUnclockedCrew((prev) => !prev)}
-              className="text-[11px] font-bold text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Users size={13} />
+              <Users size={14} />
               <span>
-                Lihat Crew yang Belum Absen Hari Ini ({unclockedCrew.length} crew)
+                Lihat Kru yang Belum Absen Hari Ini ({unclockedCrew.length} kru)
               </span>
               <ChevronDown
                 size={14}
@@ -564,15 +566,15 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
             </button>
 
             {showUnclockedCrew && (
-              <div className="mt-2.5 p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-wrap gap-2 animate-in fade-in">
+              <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap gap-2 animate-in fade-in">
                 {unclockedCrew.map((c) => (
                   <span
                     key={c.id}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-700"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-slate-700 text-xs font-medium border border-slate-200 shadow-2xs"
                   >
                     <User size={12} className="text-slate-400" />
                     <span>{c.name}</span>
-                    <span className="text-[10px] text-slate-500 font-medium">({c.role})</span>
+                    <span className="text-[10px] text-slate-400">({c.role})</span>
                   </span>
                 ))}
               </div>
