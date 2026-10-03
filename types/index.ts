@@ -308,6 +308,7 @@ export interface Attendance {
   overtimeHours: number | null;
   overtimeBlocks: number | null;
   overtimeBonus: number | null;
+  overtimeClassification?: "lembur" | "molor" | "none" | null;
   status: AttendanceStatus;
   flaggedReason: string | null;
   reviewedBy: string | null;

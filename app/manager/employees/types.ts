@@ -22,6 +22,7 @@ export interface AttendanceRecord {
   status: string;
   overtimeHours?: number | null;
   overtimeBonus?: number | null;
+  overtimeClassification?: "lembur" | "molor" | "none" | null;
   flaggedReason?: string | null;
 }
 

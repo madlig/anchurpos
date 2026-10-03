@@ -146,6 +146,7 @@ export async function GET(req: NextRequest) {
         overtimeHours: d.overtimeHours,
         overtimeBlocks: d.overtimeBlocks,
         overtimeBonus: d.overtimeBonus,
+        overtimeClassification: d.overtimeClassification ?? null,
         status: d.status,
         flaggedReason: d.flaggedReason,
         issue: d.flaggedReason ?? "Perlu review",

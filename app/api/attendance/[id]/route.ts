@@ -71,7 +71,18 @@ export async function PATCH(
 
   try {
     const body = await req.json();
-    const { status, totalHours, regularHours, overtimeHours, overtimeBlocks, overtimeBonus, flaggedReason } = body;
+    const {
+      status,
+      totalHours,
+      regularHours,
+      overtimeHours,
+      overtimeBlocks,
+      overtimeBonus,
+      flaggedReason,
+      checkInTime,
+      checkOutTime,
+      overtimeClassification,
+    } = body;
 
     const attRef = adminDb.collection("attendance").doc(id);
     const snap = await attRef.get();
@@ -79,11 +90,68 @@ export async function PATCH(
       return NextResponse.json({ error: "Absensi tidak ditemukan" }, { status: 404 });
     }
 
+    const attData = snap.data()!;
+    const employeeId = attData.employeeId;
+    const date = attData.date || new Date().toISOString().split("T")[0];
+
     const updates: Record<string, any> = {
       status: status || "lengkap",
       reviewedBy: user.uid,
       reviewedAt: FieldValue.serverTimestamp(),
     };
+
+    if (checkInTime) {
+      const inIso = checkInTime.includes("T")
+        ? checkInTime
+        : new Date(`${date}T${checkInTime.length === 5 ? checkInTime + ":00" : checkInTime}+07:00`).toISOString();
+      const existingCheckIn = attData.checkIn || {
+        photoUrl: null,
+        latitude: null,
+        longitude: null,
+        distance: null,
+        locationValid: true,
+      };
+      updates.checkIn = {
+        ...existingCheckIn,
+        time: inIso,
+      };
+    }
+
+    if (checkOutTime) {
+      let outDate = date;
+      const effectiveIn = checkInTime || (attData.checkIn?.time ? new Date(attData.checkIn.time).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(".", ":") : "08:00");
+      if (!checkOutTime.includes("T") && checkOutTime < effectiveIn) {
+        // Cross-midnight shift
+        const dObj = new Date(date + "T00:00:00+07:00");
+        dObj.setDate(dObj.getDate() + 1);
+        outDate = dObj.toISOString().split("T")[0];
+      }
+      const outIso = checkOutTime.includes("T")
+        ? checkOutTime
+        : new Date(`${outDate}T${checkOutTime.length === 5 ? checkOutTime + ":00" : checkOutTime}+07:00`).toISOString();
+      const existingCheckOut = attData.checkOut || {
+        photoUrl: null,
+        latitude: null,
+        longitude: null,
+        distance: null,
+        locationValid: true,
+      };
+      updates.checkOut = {
+        ...existingCheckOut,
+        time: outIso,
+      };
+    }
+
+    if (overtimeClassification !== undefined) {
+      updates.overtimeClassification = overtimeClassification;
+      if (overtimeClassification === "molor") {
+        updates.overtimeHours = 0;
+        updates.overtimeBlocks = 0;
+        updates.overtimeBonus = 0;
+        updates.regularHours = 8;
+        if (!flaggedReason) updates.flaggedReason = "Shift Molor (Tanpa Lembur)";
+      }
+    }
 
     if (totalHours !== undefined) updates.totalHours = Number(totalHours);
     if (regularHours !== undefined) updates.regularHours = Number(regularHours);
@@ -95,9 +163,6 @@ export async function PATCH(
     await attRef.update(updates);
 
     // Automatic payroll sync for crew based on 29-28 cutoff cycle
-    const attData = snap.data()!;
-    const employeeId = attData.employeeId;
-    const date = attData.date;
     const { payrollMonth, startDate, endDate } = getPayrollPeriod(date);
 
     const userSnap = await adminDb.doc(`users/${employeeId}`).get();

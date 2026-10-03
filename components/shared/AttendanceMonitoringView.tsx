@@ -25,6 +25,8 @@ import {
 import { AttendanceRecord, Employee } from "@/app/manager/employees/types";
 import { StoreLocationModal } from "@/components/shared/StoreLocationModal";
 import { AttendancePhotoModal, AttendancePhotoModalData } from "@/components/shared/AttendancePhotoModal";
+import { formatTimeOnly, calcHoursBetween, addHoursToTime } from "@/lib/formatters";
+import { BUSINESS } from "@/lib/constants";
 
 const fmtDateFull = (dStr: string) => {
   if (!dStr) return "-";
@@ -96,9 +98,12 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
   const [filterType, setFilterType] = useState<"all" | "today" | "flagged">("all");
 
   const [expandedAttId, setExpandedAttId] = useState<string | null>(null);
-  const [editTotalHours, setEditTotalHours] = useState("");
-  const [editOvertimeHours, setEditOvertimeHours] = useState("");
-  const [editOvertimeBonus, setEditOvertimeBonus] = useState("");
+  const [editCheckInTime, setEditCheckInTime] = useState("08:00");
+  const [editCheckOutTime, setEditCheckOutTime] = useState("16:00");
+  const [editTotalHours, setEditTotalHours] = useState("8");
+  const [editOvertimeHours, setEditOvertimeHours] = useState("0");
+  const [editOvertimeBonus, setEditOvertimeBonus] = useState("0");
+  const [editClassification, setEditClassification] = useState<"lembur" | "molor" | "none" | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -206,23 +211,105 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
       setExpandedAttId(null);
     } else {
       setExpandedAttId(a.id);
-      setEditTotalHours(String(a.totalHours ?? 8));
-      setEditOvertimeHours(String(a.overtimeHours ?? 0));
+      const inTime = formatTimeOnly(a.checkIn?.time) || "08:00";
+      const tot = a.totalHours ?? 8;
+      const outTime = formatTimeOnly(a.checkOut?.time) || addHoursToTime(inTime, tot);
+
+      setEditCheckInTime(inTime);
+      setEditCheckOutTime(outTime);
+      setEditTotalHours(String(tot));
+      setEditOvertimeHours(
+        String(
+          a.overtimeHours ??
+            (tot > BUSINESS.REGULAR_HOURS_PER_SHIFT
+              ? Math.round((tot - BUSINESS.REGULAR_HOURS_PER_SHIFT) * 10) / 10
+              : 0)
+        )
+      );
       setEditOvertimeBonus(String(a.overtimeBonus ?? 0));
+      setEditClassification(
+        a.overtimeClassification ??
+          (Number(a.overtimeBonus) > 0 || Number(a.overtimeHours) > 0 ? "lembur" : null)
+      );
+    }
+  };
+
+  const handleMarkClassification = (type: "lembur" | "molor") => {
+    setEditClassification(type);
+    if (type === "lembur") {
+      const currentTot = parseFloat(editTotalHours) || 8;
+      const ovt = Math.max(0, Math.round((currentTot - BUSINESS.REGULAR_HOURS_PER_SHIFT) * 10) / 10);
+      setEditOvertimeHours(String(ovt));
+      const blocks = Math.floor(ovt);
+      const suggestedBonus = blocks * BUSINESS.OVERTIME_BONUS_PER_BLOCK;
+      if (Number(editOvertimeBonus) === 0 && suggestedBonus > 0) {
+        setEditOvertimeBonus(String(suggestedBonus));
+      }
+    } else if (type === "molor") {
+      setEditOvertimeHours("0");
+      setEditOvertimeBonus("0");
+    }
+  };
+
+  const handleCheckInChange = (newInTime: string) => {
+    setEditCheckInTime(newInTime);
+    if (newInTime && editCheckOutTime) {
+      const hours = calcHoursBetween(newInTime, editCheckOutTime);
+      setEditTotalHours(String(hours));
+      if (editClassification !== "molor") {
+        const ovt = Math.max(0, Math.round((hours - BUSINESS.REGULAR_HOURS_PER_SHIFT) * 10) / 10);
+        setEditOvertimeHours(String(ovt));
+      }
+    }
+  };
+
+  const handleCheckOutChange = (newOutTime: string) => {
+    setEditCheckOutTime(newOutTime);
+    if (editCheckInTime && newOutTime) {
+      const hours = calcHoursBetween(editCheckInTime, newOutTime);
+      setEditTotalHours(String(hours));
+      if (editClassification !== "molor") {
+        const ovt = Math.max(0, Math.round((hours - BUSINESS.REGULAR_HOURS_PER_SHIFT) * 10) / 10);
+        setEditOvertimeHours(String(ovt));
+      }
+    }
+  };
+
+  const handleTotalHoursChange = (val: string | number) => {
+    const hours = typeof val === "number" ? val : parseFloat(val) || 0;
+    setEditTotalHours(String(val));
+    if (editCheckInTime) {
+      const newOut = addHoursToTime(editCheckInTime, hours);
+      setEditCheckOutTime(newOut);
+    }
+    if (editClassification !== "molor") {
+      const ovt = Math.max(0, Math.round((hours - BUSINESS.REGULAR_HOURS_PER_SHIFT) * 10) / 10);
+      setEditOvertimeHours(String(ovt));
     }
   };
 
   const handleSaveCorrection = async (a: AttendanceRecord) => {
     setSavingId(a.id);
     try {
+      const reason =
+        editClassification === "molor"
+          ? "Shift Molor (Tanpa Lembur)"
+          : editClassification === "lembur"
+          ? "Lembur Terverifikasi"
+          : "Dikoreksi Management";
+
       const res = await fetchWithAuth(`/api/attendance/${a.id}`, {
         method: "PATCH",
         body: JSON.stringify({
           status: "lengkap",
+          checkInTime: editCheckInTime,
+          checkOutTime: editCheckOutTime,
           totalHours: Number(editTotalHours),
+          regularHours: editClassification === "molor" ? 8 : Math.min(Number(editTotalHours), 8),
           overtimeHours: Number(editOvertimeHours),
           overtimeBonus: Number(editOvertimeBonus),
-          flaggedReason: "Dikoreksi Management",
+          overtimeClassification: editClassification,
+          flaggedReason: reason,
         }),
       });
       if (res.ok) {
@@ -781,6 +868,28 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
                   </div>
                 </div>
 
+                {/* Status Klasifikasi Lembur vs Molor Badge */}
+                {((a.totalHours ?? 0) > 8 || a.overtimeClassification) && (
+                  <div className="mb-3 flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
+                    <span className="text-[11px] font-bold text-slate-500">
+                      Status Lembur
+                    </span>
+                    {a.overtimeClassification === "lembur" || (Number(a.overtimeBonus) > 0 && a.overtimeClassification !== "molor") ? (
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Lembur Disetujui (+{a.overtimeHours ?? 0}j)
+                      </span>
+                    ) : a.overtimeClassification === "molor" ? (
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                        Shift Molor (Tanpa Lembur)
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+                        Perlu Ditandai (&gt;8 jam)
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {/* Tombol Expand Koreksi Manual */}
                 <button
                   type="button"
@@ -804,42 +913,158 @@ export function AttendanceMonitoringView({ hideHeaderTitle = false }: Attendance
 
                 {/* Form Koreksi Jam Manual */}
                 {expandedAttId === a.id && (
-                  <div className="mt-4 pt-4 border-t border-slate-100 animate-in slide-in-from-top-2">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                      <div>
-                        <label className="text-[10px] font-extrabold text-slate-400 block mb-1 tracking-wide">
-                          EDIT TOTAL JAM
-                        </label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={editTotalHours}
-                          onChange={(e) => setEditTotalHours(e.target.value)}
-                          className="w-full h-10 rounded-xl border border-slate-200 px-3 font-bold text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-700 bg-white"
-                        />
+                  <div className="mt-4 pt-4 border-t border-slate-100 animate-in slide-in-from-top-2 space-y-4">
+                    {/* Panel Pilihan Lembur vs Molor */}
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-slate-700">
+                          Klasifikasi Kelebihan Jam Shift
+                        </span>
+                        {editClassification === "lembur" && (
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 w-fit">
+                            Lembur Disetujui
+                          </span>
+                        )}
+                        {editClassification === "molor" && (
+                          <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 w-fit">
+                            Shift Molor
+                          </span>
+                        )}
                       </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleMarkClassification("lembur")}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            editClassification === "lembur"
+                              ? "bg-slate-900 text-white shadow-xs"
+                              : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
+                          }`}
+                        >
+                          <Check size={14} /> Lembur Valid (Hitung Bonus)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMarkClassification("molor")}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            editClassification === "molor"
+                              ? "bg-amber-600 text-white shadow-xs"
+                              : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
+                          }`}
+                        >
+                          <X size={14} /> Shift Molor (Tanpa Bonus Lembur)
+                        </button>
+                      </div>
+
+                      {editClassification === "lembur" && (
+                        <p className="text-[11px] text-emerald-800 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100">
+                          Lembur terhitung dan uang lembur akan masuk ke payroll. Anda dapat mengedit nominal uang lembur manual di bawah.
+                        </p>
+                      )}
+                      {editClassification === "molor" && (
+                        <p className="text-[11px] text-slate-700 bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200">
+                          Jam lembur di-nolkan. Karyawan hanya dibayar shift reguler standar tanpa tambahan lembur.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/80">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2.5">
+                        <span className="text-[11px] font-bold text-slate-700 tracking-wide">
+                          Koreksi Jam Masuk, Keluar & Durasi
+                        </span>
+                        <span className="text-[11px] font-mono font-bold text-slate-700 bg-white px-2.5 py-0.5 rounded-md border border-slate-200 w-fit">
+                          {editCheckInTime || "--:--"} → {editCheckOutTime || "--:--"} ({editTotalHours} jam)
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {/* Jam Masuk */}
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1 tracking-wide uppercase">
+                            Jam Masuk
+                          </label>
+                          <input
+                            type="time"
+                            value={editCheckInTime}
+                            onChange={(e) => handleCheckInChange(e.target.value)}
+                            className="w-full h-10 rounded-xl border border-slate-200 px-3 font-mono font-bold text-sm focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 text-slate-800 bg-white shadow-2xs"
+                          />
+                        </div>
+
+                        {/* Jam Keluar */}
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1 tracking-wide uppercase">
+                            Jam Keluar
+                          </label>
+                          <input
+                            type="time"
+                            value={editCheckOutTime}
+                            onChange={(e) => handleCheckOutChange(e.target.value)}
+                            className="w-full h-10 rounded-xl border border-slate-200 px-3 font-mono font-bold text-sm focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 text-slate-800 bg-white shadow-2xs"
+                          />
+                        </div>
+
+                        {/* Total Jam Kerja */}
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1 tracking-wide uppercase">
+                            Total Jam Kerja
+                          </label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={editTotalHours}
+                            onChange={(e) => handleTotalHoursChange(e.target.value)}
+                            className="w-full h-10 rounded-xl border border-slate-300 px-3 font-mono font-bold text-sm focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 text-slate-800 bg-white shadow-2xs"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quick Duration Buttons (Chips) */}
+                      <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] font-bold text-slate-400 mr-1">Preset Durasi:</span>
+                        {[7, 8, 8.5, 9, 10].map((dur) => (
+                          <button
+                            key={dur}
+                            type="button"
+                            onClick={() => handleTotalHoursChange(dur)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              Number(editTotalHours) === dur
+                                ? "bg-slate-900 text-white shadow-2xs"
+                                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                            }`}
+                          >
+                            {dur} jam {dur === 8 && "(Normal)"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Lembur & Bonus Lembur */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[10px] font-extrabold text-slate-400 block mb-1 tracking-wide">
-                          EDIT LEMBUR (JAM)
+                        <label className="text-[10px] font-bold text-slate-500 block mb-1 tracking-wide uppercase">
+                          Lembur (Jam)
                         </label>
                         <input
                           type="number"
                           step="0.1"
                           value={editOvertimeHours}
                           onChange={(e) => setEditOvertimeHours(e.target.value)}
-                          className="w-full h-10 rounded-xl border border-slate-200 px-3 font-bold text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-700 bg-white"
+                          className="w-full h-10 rounded-xl border border-slate-200 px-3 font-mono font-bold text-sm focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 text-slate-700 bg-white"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-extrabold text-slate-400 block mb-1 tracking-wide">
-                          EDIT UANG LEMBUR (RP)
+                        <label className="text-[10px] font-bold text-slate-500 block mb-1 tracking-wide uppercase">
+                          Uang Lembur (Rp)
                         </label>
                         <input
                           type="number"
                           step="1000"
                           value={editOvertimeBonus}
                           onChange={(e) => setEditOvertimeBonus(e.target.value)}
-                          className="w-full h-10 rounded-xl border border-emerald-200 px-3 font-bold text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-emerald-800 bg-emerald-50/50"
+                          className="w-full h-10 rounded-xl border border-slate-200 px-3 font-mono font-bold text-sm focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 text-slate-800 bg-white"
                         />
                       </div>
                     </div>
