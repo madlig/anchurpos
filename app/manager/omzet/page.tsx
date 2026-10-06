@@ -8,18 +8,20 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-interface OrderItem {
-  id: string;
-  orderNumber: string;
-  customerName: string;
-  channel: string;
-  orderChannel: string;
-  status: string;
-  paymentStatus: string;
-  paymentMethod: string | null;
-  totalOrderValue?: number;
-  platformFee?: number;
-  createdAt: string;
+interface OmzetSummary {
+  timeRange: string;
+  grossSales: number;
+  netSales: number;
+  totalPlatformFees: number;
+  orderCount: number;
+  avgBasketSize: number;
+  channels: Record<string, { count: number; omzet: number }>;
+  payments: {
+    cash: number;
+    bank: number;
+    qris: number;
+    totalPaid: number;
+  };
 }
 
 const DAILY_TARGET = 2_000_000;
@@ -30,7 +32,7 @@ function fmt(n: number) {
 
 export default function OmzetAnalyticsPage() {
   const { getToken } = useAuth();
-  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [data, setData] = useState<OmzetSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<"today" | "yesterday" | "7days" | "month">("today");
 
@@ -42,109 +44,50 @@ export default function OmzetAnalyticsPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth("/api/orders");
+      const res = await fetchWithAuth(`/api/reports/omzet?timeRange=${timeRange}`);
       if (res.ok) {
-        setOrders(await res.json());
+        setData(await res.json());
       }
     } finally {
       setLoading(false);
     }
-  }, [fetchWithAuth]);
+  }, [fetchWithAuth, timeRange]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Filter orders by selected time range
-  const filteredOrders = useMemo(() => {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    return orders.filter(order => {
-      if (order.status === "void") return false;
-      const orderDate = new Date(order.createdAt);
-
-      if (timeRange === "today") {
-        return orderDate >= todayStart;
-      } else if (timeRange === "yesterday") {
-        const yesterdayStart = new Date(todayStart);
-        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-        return orderDate >= yesterdayStart && orderDate < todayStart;
-      } else if (timeRange === "7days") {
-        const sevenDaysAgo = new Date(todayStart);
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        return orderDate >= sevenDaysAgo;
-      } else if (timeRange === "month") {
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        return orderDate >= monthStart;
-      }
-      return true;
-    });
-  }, [orders, timeRange]);
-
-  // Calculations
-  const grossSales = useMemo(() => {
-    return filteredOrders.reduce((sum, o) => sum + (o.totalOrderValue ?? 0), 0);
-  }, [filteredOrders]);
-
-  const totalPlatformFees = useMemo(() => {
-    return filteredOrders.reduce((sum, o) => sum + (o.platformFee ?? 0), 0);
-  }, [filteredOrders]);
-
-  const netSales = grossSales - totalPlatformFees;
-
-  const orderCount = filteredOrders.length;
-  const avgBasketSize = orderCount > 0 ? Math.round(grossSales / orderCount) : 0;
+  // Derived metrics from server payload
+  const grossSales = data?.grossSales ?? 0;
+  const netSales = data?.netSales ?? 0;
+  const totalPlatformFees = data?.totalPlatformFees ?? 0;
+  const orderCount = data?.orderCount ?? 0;
+  const avgBasketSize = data?.avgBasketSize ?? 0;
 
   const target = timeRange === "today" ? DAILY_TARGET : timeRange === "yesterday" ? DAILY_TARGET : DAILY_TARGET * 30;
   const targetPct = Math.min(100, Math.round((grossSales / target) * 100));
 
   // Channel Breakdown
   const channelBreakdown = useMemo(() => {
-    const channels: Record<string, { count: number; omzet: number }> = {
+    const channels = data?.channels || {
       walkin: { count: 0, omzet: 0 },
       whatsapp: { count: 0, omzet: 0 },
       tiktok: { count: 0, omzet: 0 },
       shopee: { count: 0, omzet: 0 },
     };
 
-    filteredOrders.forEach(o => {
-      const ch = o.orderChannel || "walkin";
-      if (!channels[ch]) channels[ch] = { count: 0, omzet: 0 };
-      channels[ch].count += 1;
-      channels[ch].omzet += (o.totalOrderValue ?? 0);
-    });
-
     return [
-      { id: "walkin", label: "Walk-in Outlet", icon: Store, color: "text-emerald-600 bg-emerald-50 border-emerald-100", ...channels.walkin },
-      { id: "whatsapp", label: "WhatsApp", icon: MessageCircle, color: "text-emerald-600 bg-emerald-50 border-emerald-100", ...channels.whatsapp },
-      { id: "tiktok", label: "TikTok Shop", icon: Smartphone, color: "text-rose-600 bg-rose-50 border-rose-100", ...channels.tiktok },
-      { id: "shopee", label: "Shopee", icon: ShoppingBag, color: "text-orange-600 bg-orange-50 border-orange-100", ...channels.shopee },
+      { id: "walkin", label: "Walk-in Outlet", icon: Store, color: "text-emerald-600 bg-emerald-50 border-emerald-100", ...(channels.walkin || { count: 0, omzet: 0 }) },
+      { id: "whatsapp", label: "WhatsApp", icon: MessageCircle, color: "text-emerald-600 bg-emerald-50 border-emerald-100", ...(channels.whatsapp || { count: 0, omzet: 0 }) },
+      { id: "tiktok", label: "TikTok Shop", icon: Smartphone, color: "text-rose-600 bg-rose-50 border-rose-100", ...(channels.tiktok || { count: 0, omzet: 0 }) },
+      { id: "shopee", label: "Shopee", icon: ShoppingBag, color: "text-orange-600 bg-orange-50 border-orange-100", ...(channels.shopee || { count: 0, omzet: 0 }) },
     ];
-  }, [filteredOrders]);
+  }, [data]);
 
   // Payment Breakdown
   const paymentBreakdown = useMemo(() => {
-    let cash = 0;
-    let bank = 0;
-    let qris = 0;
-
-    filteredOrders.forEach(o => {
-      if (o.paymentStatus !== "sudah_bayar") return;
-      const method = (o.paymentMethod || "cash").toLowerCase();
-      const val = o.totalOrderValue ?? 0;
-
-      if (method.includes("bank") || method.includes("transfer")) {
-        bank += val;
-      } else if (method.includes("qris")) {
-        qris += val;
-      } else {
-        cash += val;
-      }
-    });
-
-    return { cash, bank, qris, totalPaid: cash + bank + qris };
-  }, [filteredOrders]);
+    return data?.payments || { cash: 0, bank: 0, qris: 0, totalPaid: 0 };
+  }, [data]);
 
   const dateLabel = useMemo(() => {
     if (timeRange === "today") return "Hari Ini (" + new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) + ")";
@@ -292,7 +235,7 @@ export default function OmzetAnalyticsPage() {
                 <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                   <ShoppingCart size={14} className="text-primary" /> Omzet Per Channel Penjualan
                 </h2>
-                <span className="text-xs font-bold text-slate-400">{filteredOrders.length} Order</span>
+                <span className="text-xs font-bold text-slate-400">{orderCount} Order</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

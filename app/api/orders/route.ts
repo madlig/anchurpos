@@ -14,12 +14,19 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
   const paymentStatus = searchParams.get("paymentStatus");
+  const rawLimit = searchParams.get("limit");
+  const parsedLimit = rawLimit ? parseInt(rawLimit, 10) : 200;
+  const limit = Math.min(Math.max(isNaN(parsedLimit) ? 200 : parsedLimit, 1), 200);
 
   try {
+    // When status is omitted, we might filter out void orders post-fetch,
+    // so fetch a small buffer if limit is small, up to max 200.
+    const fetchLimit = status ? limit : Math.min(Math.max(limit + 5, limit * 2), 200);
+
     let query: FirebaseFirestore.Query = adminDb
       .collection("orders")
       .orderBy("createdAt", "desc")
-      .limit(200);
+      .limit(fetchLimit);
 
     // When explicitly requesting void tab, filter for void only
     // Otherwise always filter IN by status (non-void)
@@ -71,7 +78,11 @@ export async function GET(req: NextRequest) {
       orders = orders.filter((o) => o.status !== "void");
     }
 
-    // Removed slice to allow full client-side filtering of up to 200 recent orders
+    // Limit final list to requested limit
+    if (orders.length > limit) {
+      orders = orders.slice(0, limit);
+    }
+
     return NextResponse.json(orders);
   } catch (err) {
     console.error("GET /api/orders error:", err);

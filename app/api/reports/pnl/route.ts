@@ -35,10 +35,12 @@ export async function GET(req: NextRequest) {
       const data = doc.data();
       if (data.status === "void") continue;
 
-      let orderPemasukan = data.totalOrderValue ?? 0;
+      let orderPemasukan = (typeof data.totalOrderValue === "number")
+        ? data.totalOrderValue
+        : (typeof data.totalPrice === "number" ? data.totalPrice : null);
       let orderHpp = data.totalHpp ?? 0;
 
-      if (typeof data.totalOrderValue !== 'number') {
+      if (orderPemasukan === null) {
         orderPemasukan = 0;
         const itemsSnap = await doc.ref.collection("items").get();
         for (const itemDoc of itemsSnap.docs) {

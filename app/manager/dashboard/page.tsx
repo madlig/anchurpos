@@ -61,7 +61,7 @@ export default function ManagerDashboardPage() {
     Promise.all([
       fetchWithAuth("/api/dashboard/today").then((r) => r.json()),
       fetchWithAuth("/api/alerts?unread=true").then((r) => r.json()),
-      fetchWithAuth("/api/orders").then((r) => r.json()),
+      fetchWithAuth("/api/orders?limit=5").then((r) => r.json()),
       fetchWithAuth(`/api/reports/pnl?month=${currentMonth}`).then((r) => r.ok ? r.json() : null),
     ]).then(([d, a, o, p]) => {
       setData(d);

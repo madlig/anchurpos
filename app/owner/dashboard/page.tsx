@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import {
   Loader2, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle,
@@ -34,7 +34,6 @@ export default function OwnerDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showCashModal, setShowCashModal] = useState(false);
   const [cashModalType, setCashModalType] = useState<"expense" | "income">("expense");
-  const hasMounted = useRef(false);
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit) => {
     const token = await getToken();
@@ -63,16 +62,6 @@ export default function OwnerDashboardPage() {
   // Initial load
   useEffect(() => {
     loadAll();
-  }, [loadAll]);
-
-  // Auto-refresh when tab gains focus
-  useEffect(() => {
-    function onFocus() {
-      if (hasMounted.current) loadAll();
-      hasMounted.current = true;
-    }
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
   }, [loadAll]);
 
   // Post expense helper

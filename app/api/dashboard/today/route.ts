@@ -26,8 +26,12 @@ export async function GET(req: NextRequest) {
       if (d.status === "void") continue;
       orderCount++;
 
-      if (typeof d.totalOrderValue === "number") {
-        omzet += d.totalOrderValue;
+      const orderVal = (typeof d.totalOrderValue === "number")
+        ? d.totalOrderValue
+        : (typeof d.totalPrice === "number" ? d.totalPrice : null);
+
+      if (orderVal !== null) {
+        omzet += orderVal;
         hpp += d.totalHpp ?? 0;
       } else {
         const itemsSnap = await doc.ref.collection("items").get();

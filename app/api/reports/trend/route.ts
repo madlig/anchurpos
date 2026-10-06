@@ -18,17 +18,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const now = new Date();
-    const series: {
-      month: string;
-      label: string;
-      pemasukan: number;
-      hppProduk: number;
-      labaKotor: number;
-      biayaOperasional: number;
-      biayaPromosi: number;
-      gajiBonus: number;
-      labaBersih: number;
-    }[] = [];
+
 
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
@@ -39,62 +29,64 @@ export async function GET(req: NextRequest) {
       targets.push({ y: d.getFullYear(), m: d.getMonth() });
     }
 
-    for (const { y, m } of targets) {
-      const startOfMonth = new Date(y, m, 1);
-      const endOfMonth = new Date(y, m + 1, 0, 23, 59, 59, 999);
-      const monthKey = `${y}-${String(m + 1).padStart(2, "0")}`;
+    const series = await Promise.all(
+      targets.map(async ({ y, m }) => {
+        const startOfMonth = new Date(y, m, 1);
+        const endOfMonth = new Date(y, m + 1, 0, 23, 59, 59, 999);
+        const monthKey = `${y}-${String(m + 1).padStart(2, "0")}`;
 
-      const [ordersSnap, expensesSnap, adjSnap, payrollSnap] = await Promise.all([
-        adminDb.collection("orders").where("createdAt", ">=", startOfMonth).where("createdAt", "<=", endOfMonth).get(),
-        adminDb.collection("expenses").where("date", ">=", startOfMonth).where("date", "<=", endOfMonth).get(),
-        adminDb.collection("stockAdjustments").where("createdAt", ">=", startOfMonth).where("createdAt", "<=", endOfMonth).get(),
-        adminDb.collection("payroll").where("month", "==", monthKey).get(),
-      ]);
+        const [ordersSnap, expensesSnap, adjSnap, payrollSnap] = await Promise.all([
+          adminDb.collection("orders").where("createdAt", ">=", startOfMonth).where("createdAt", "<=", endOfMonth).get(),
+          adminDb.collection("expenses").where("date", ">=", startOfMonth).where("date", "<=", endOfMonth).get(),
+          adminDb.collection("stockAdjustments").where("createdAt", ">=", startOfMonth).where("createdAt", "<=", endOfMonth).get(),
+          adminDb.collection("payroll").where("month", "==", monthKey).get(),
+        ]);
 
-      let pemasukan = 0;
-      let hppProduk = 0;
-      for (const doc of ordersSnap.docs) {
-        const d = doc.data();
-        if (d.status === "void") continue;
-        const orderVal = d.totalOrderValue ?? 0;
-        pemasukan += orderVal - (d.platformFee ?? 0);
-        hppProduk += d.totalHpp ?? 0;
-      }
+        let pemasukan = 0;
+        let hppProduk = 0;
+        for (const doc of ordersSnap.docs) {
+          const d = doc.data();
+          if (d.status === "void") continue;
+          const orderVal = d.totalOrderValue ?? d.totalPrice ?? 0;
+          pemasukan += orderVal - (d.platformFee ?? 0);
+          hppProduk += d.totalHpp ?? 0;
+        }
 
-      let biayaOperasional = 0;
-      for (const doc of expensesSnap.docs) {
-        const d = doc.data();
-        if (d.type === "income") continue;
-        biayaOperasional += d.totalPrice ?? 0;
-      }
+        let biayaOperasional = 0;
+        for (const doc of expensesSnap.docs) {
+          const d = doc.data();
+          if (d.type === "income") continue;
+          biayaOperasional += d.totalPrice ?? 0;
+        }
 
-      let biayaPromosi = 0;
-      for (const doc of adjSnap.docs) {
-        biayaPromosi += doc.data().totalCost ?? 0;
-      }
+        let biayaPromosi = 0;
+        for (const doc of adjSnap.docs) {
+          biayaPromosi += doc.data().totalCost ?? 0;
+        }
 
-      let gajiBonus = 0;
-      for (const doc of payrollSnap.docs) {
-        const p = doc.data();
-        if (p.isLocked === false) continue;
-        gajiBonus += p.totalPaid ?? 0;
-      }
+        let gajiBonus = 0;
+        for (const doc of payrollSnap.docs) {
+          const p = doc.data();
+          if (p.isLocked === false) continue;
+          gajiBonus += p.totalPaid ?? 0;
+        }
 
-      const labaKotor = pemasukan - hppProduk;
-      const labaBersih = labaKotor - biayaOperasional - biayaPromosi - gajiBonus;
+        const labaKotor = pemasukan - hppProduk;
+        const labaBersih = labaKotor - biayaOperasional - biayaPromosi - gajiBonus;
 
-      series.push({
-        month: monthKey,
-        label: `${monthNames[m]} ${String(y).slice(2)}`,
-        pemasukan,
-        hppProduk,
-        labaKotor,
-        biayaOperasional,
-        biayaPromosi,
-        gajiBonus,
-        labaBersih,
-      });
-    }
+        return {
+          month: monthKey,
+          label: `${monthNames[m]} ${String(y).slice(2)}`,
+          pemasukan,
+          hppProduk,
+          labaKotor,
+          biayaOperasional,
+          biayaPromosi,
+          gajiBonus,
+          labaBersih,
+        };
+      })
+    );
 
     return NextResponse.json({ series });
   } catch (err) {
